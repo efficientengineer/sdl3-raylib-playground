@@ -1,0 +1,2 @@
+rootProject.name = 'sdl3-raylib-playground'
+include ':app'
