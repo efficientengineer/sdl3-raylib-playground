@@ -1,9 +1,6 @@
 package com.playground.sdlraylib;
 
-import android.app.NativeActivity;
+import org.libsdl.app.SDLActivity;
 
-public class MainActivity extends NativeActivity {
-    static {
-        System.loadLibrary("combined_demo");
-    }
+public class MainActivity extends SDLActivity {
 }

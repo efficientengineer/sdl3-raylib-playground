@@ -2,13 +2,14 @@
 set -e
 PHONE=192.168.1.217:5555
 PKG=com.playground.sdlraylib
+ADB=~/Library/Android/sdk/platform-tools/adb
 
-adb connect "$PHONE" 2>/dev/null || true
+"$ADB" connect "$PHONE" 2>/dev/null || true
 
-export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
 cd android
 ./gradlew assembleDebug "$@"
 cd ..
 
-adb -s "$PHONE" install -r android/app/build/outputs/apk/debug/app-debug.apk
-adb -s "$PHONE" shell am start -n "$PKG/.MainActivity"
+"$ADB" -s "$PHONE" install -r android/app/build/outputs/apk/debug/app-debug.apk
+"$ADB" -s "$PHONE" shell am start -n "$PKG/.MainActivity"
