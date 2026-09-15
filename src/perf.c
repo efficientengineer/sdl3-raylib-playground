@@ -13,11 +13,10 @@ static int visible;
 static Uint64 frame_start;
 static double fps;
 static double frame_ms;
-static int draw_calls;
-static int triangles;
-static int vertices;
 
-static double fps_accum;
+static int draw_calls, triangles, vertices;
+static int last_draw_calls, last_triangles, last_vertices;
+
 static int fps_frames;
 static Uint64 fps_last;
 
@@ -25,7 +24,6 @@ void perf_init(void) {
     visible = 0;
     fps = 0;
     frame_ms = 0;
-    fps_accum = 0;
     fps_frames = 0;
     fps_last = SDL_GetPerformanceCounter();
 }
@@ -47,6 +45,10 @@ void perf_frame_end(void) {
     Uint64 now = SDL_GetPerformanceCounter();
     double freq = (double)SDL_GetPerformanceFrequency();
     frame_ms = (now - frame_start) / freq * 1000.0;
+
+    last_draw_calls = draw_calls;
+    last_triangles = triangles;
+    last_vertices = vertices;
 
     fps_frames++;
     double elapsed = (now - fps_last) / freq;
@@ -70,6 +72,8 @@ void perf_draw(int sw, int sh) {
 
     char buf[64];
 
+    text_begin();
+
     snprintf(buf, sizeof buf, "FPS: %.0f", fps);
     float r = fps >= 50 ? 0.3f : (fps >= 30 ? 1.0f : 1.0f);
     float g = fps >= 50 ? 1.0f : (fps >= 30 ? 0.8f : 0.3f);
@@ -81,14 +85,16 @@ void perf_draw(int sw, int sh) {
     text_draw(buf, x, y, scx, scy, 0.8f, 0.8f, 0.8f);
     y += line;
 
-    snprintf(buf, sizeof buf, "Draws: %d", draw_calls);
+    snprintf(buf, sizeof buf, "Draws: %d", last_draw_calls);
     text_draw(buf, x, y, scx, scy, 0.8f, 0.8f, 0.8f);
     y += line;
 
-    snprintf(buf, sizeof buf, "Tris: %d", triangles);
+    snprintf(buf, sizeof buf, "Tris: %d", last_triangles);
     text_draw(buf, x, y, scx, scy, 0.8f, 0.8f, 0.8f);
     y += line;
 
-    snprintf(buf, sizeof buf, "Verts: %d", vertices);
+    snprintf(buf, sizeof buf, "Verts: %d", last_vertices);
     text_draw(buf, x, y, scx, scy, 0.8f, 0.8f, 0.8f);
+
+    text_flush();
 }

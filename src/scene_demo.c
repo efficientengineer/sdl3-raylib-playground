@@ -125,29 +125,28 @@ static void bake_color(float *rgb, float nx, float ny, float nz,
     rgb[2] = base_b * b;
 }
 
-typedef struct { GLuint vao, vbo, line_ibo; int count, line_count; } Mesh;
+// Growable PVert array for collecting all geometry before upload
+typedef struct { PVert *data; int count, cap; } PVertArray;
 
-static void mesh_build_lines(Mesh *m) {
-    int ntris = m->count / 3;
-    int nlines = ntris * 6;
-    unsigned int *idx = SDL_malloc(nlines * sizeof(unsigned int));
-    for (int i = 0; i < ntris; i++) {
-        int b = i * 3;
-        idx[i*6+0] = b;   idx[i*6+1] = b+1;
-        idx[i*6+2] = b+1; idx[i*6+3] = b+2;
-        idx[i*6+4] = b+2; idx[i*6+5] = b;
-    }
-    m->line_count = nlines;
-    glBindVertexArray(m->vao);
-    glGenBuffers(1, &m->line_ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->line_ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nlines * sizeof(unsigned int), idx, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    SDL_free(idx);
+static void pva_init(PVertArray *a, int cap) {
+    a->data = SDL_malloc(cap * sizeof(PVert));
+    a->count = 0; a->cap = cap;
 }
 
-static Mesh upload_par(par_shapes_mesh *pm, float ox, float oy, float oz,
-                       float scale, float cr, float cg, float cb) {
+static void pva_grow(PVertArray *a, int need) {
+    if (a->count + need <= a->cap) return;
+    while (a->cap < a->count + need) a->cap *= 2;
+    a->data = SDL_realloc(a->data, a->cap * sizeof(PVert));
+}
+
+static void pva_push(PVertArray *a, PVert v) {
+    pva_grow(a, 1);
+    a->data[a->count++] = v;
+}
+
+static void collect_par(PVertArray *a, par_shapes_mesh *pm,
+                        float ox, float oy, float oz,
+                        float scale, float cr, float cg, float cb) {
     int nv = pm->npoints;
     PVert *verts = SDL_malloc(nv * sizeof(PVert));
     for (int i = 0; i < nv; i++) {
@@ -158,40 +157,21 @@ static Mesh upload_par(par_shapes_mesh *pm, float ox, float oy, float oz,
         verts[i].z = p[2] * scale + oz;
         bake_color(&verts[i].r, n[0], n[1], n[2], cr, cg, cb);
     }
-
     int ni = pm->ntriangles * 3;
-    PVert *tris = SDL_malloc(ni * sizeof(PVert));
+    pva_grow(a, ni);
     for (int i = 0; i < ni; i++)
-        tris[i] = verts[pm->triangles[i]];
-
-    Mesh m;
-    m.count = ni;
-    glGenVertexArrays(1, &m.vao);
-    glBindVertexArray(m.vao);
-    glGenBuffers(1, &m.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
-    glBufferData(GL_ARRAY_BUFFER, ni * sizeof(PVert), tris, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PVert), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PVert), (void*)12);
-
+        a->data[a->count++] = verts[pm->triangles[i]];
     SDL_free(verts);
-    SDL_free(tris);
-    return m;
 }
 
-static Mesh make_terrain(void) {
+static void collect_terrain(PVertArray *a) {
     int sz = 80;
     float half = sz * 0.5f;
     fnl_state noise = fnlCreateState();
     noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
     noise.frequency = 0.03f;
 
-    int nv = sz * sz * 6;
-    PVert *verts = SDL_malloc(nv * sizeof(PVert));
-    int n = 0;
-
+    pva_grow(a, sz * sz * 6);
     for (int z = 0; z < sz; z++) {
         for (int x = 0; x < sz; x++) {
             float x0 = x - half, x1 = x + 1 - half;
@@ -201,7 +181,6 @@ static Mesh make_terrain(void) {
             float y01 = fnlGetNoise2D(&noise, x0, z1) * 0.5f;
             float y11 = fnlGetNoise2D(&noise, x1, z1) * 0.5f;
 
-            // normal from cross product
             float ax=1, ay=y10-y00, az=0, bx=0, by=y01-y00, bz=1;
             float nx = ay*bz - az*by, ny = az*bx - ax*bz, nz = ax*by - ay*bx;
             float nl = sqrtf(nx*nx+ny*ny+nz*nz);
@@ -211,31 +190,53 @@ static Mesh make_terrain(void) {
             float rgb[3];
             bake_color(rgb, nx, ny, nz, 0.35f, green + 0.15f, 0.2f);
 
-            PVert a = {x0, y00, z0, rgb[0], rgb[1], rgb[2]};
-            PVert b = {x1, y10, z0, rgb[0], rgb[1], rgb[2]};
-            PVert c = {x1, y11, z1, rgb[0], rgb[1], rgb[2]};
-            PVert d = {x0, y01, z1, rgb[0], rgb[1], rgb[2]};
-            verts[n++] = a; verts[n++] = b; verts[n++] = c;
-            verts[n++] = a; verts[n++] = c; verts[n++] = d;
+            PVert va = {x0, y00, z0, rgb[0], rgb[1], rgb[2]};
+            PVert vb = {x1, y10, z0, rgb[0], rgb[1], rgb[2]};
+            PVert vc = {x1, y11, z1, rgb[0], rgb[1], rgb[2]};
+            PVert vd = {x0, y01, z1, rgb[0], rgb[1], rgb[2]};
+            pva_push(a, va); pva_push(a, vb); pva_push(a, vc);
+            pva_push(a, va); pva_push(a, vc); pva_push(a, vd);
         }
     }
+}
 
-    Mesh m;
-    m.count = n;
-    glGenVertexArrays(1, &m.vao);
-    glBindVertexArray(m.vao);
-    glGenBuffers(1, &m.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
-    glBufferData(GL_ARRAY_BUFFER, n * sizeof(PVert), verts, GL_STATIC_DRAW);
+typedef struct { GLuint vao, vbo, line_ibo; int count, line_count; } SceneBatch;
+
+static SceneBatch upload_scene(PVertArray *a) {
+    SceneBatch s;
+    s.count = a->count;
+
+    glGenVertexArrays(1, &s.vao);
+    glBindVertexArray(s.vao);
+    glGenBuffers(1, &s.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, s.vbo);
+    glBufferData(GL_ARRAY_BUFFER, a->count * sizeof(PVert), a->data, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PVert), (void*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PVert), (void*)12);
-    SDL_free(verts);
-    return m;
-}
 
-#define MAX_MESHES 32
+    // wireframe line indices
+    int ntris = a->count / 3;
+    int nlines = ntris * 6;
+    unsigned int *idx = SDL_malloc(nlines * sizeof(unsigned int));
+    for (int i = 0; i < ntris; i++) {
+        int b = i * 3;
+        idx[i*6+0] = b;   idx[i*6+1] = b+1;
+        idx[i*6+2] = b+1; idx[i*6+3] = b+2;
+        idx[i*6+4] = b+2; idx[i*6+5] = b;
+    }
+    s.line_count = nlines;
+    glGenBuffers(1, &s.line_ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s.line_ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, nlines * sizeof(unsigned int), idx, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    SDL_free(idx);
+
+    SDL_free(a->data);
+    a->data = NULL; a->count = 0; a->cap = 0;
+    return s;
+}
 
 int main(int argc, char *argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
@@ -276,31 +277,29 @@ int main(int argc, char *argv[]) {
     GLint u_hf = glGetUniformLocation(prog, "hf_floor");
     GLint u_hc = glGetUniformLocation(prog, "hf_ceil");
 
-    // terrain
-    Mesh terrain = make_terrain();
-    mesh_build_lines(&terrain);
+    // collect all geometry into one batch
+    PVertArray all_geo;
+    pva_init(&all_geo, 80 * 80 * 6 + 8192);
 
-    // scatter par_shapes primitives
-    Mesh objects[MAX_MESHES];
-    int nobj = 0;
+    collect_terrain(&all_geo);
 
     struct { float x, z; int type; float r, g, b; float scale; } spawns[] = {
-        { 0,  0,  0, 0.7f, 0.3f, 0.2f, 1.5f},  // sphere at center
-        { 5, -3,  1, 0.8f, 0.7f, 0.3f, 1.0f},  // cylinder near
-        {-4,  6,  2, 0.3f, 0.5f, 0.8f, 1.2f},  // torus near
-        {12,  8,  0, 0.9f, 0.4f, 0.4f, 2.0f},  // sphere mid
-        {-10, -12, 1, 0.5f, 0.7f, 0.5f, 1.5f}, // cylinder mid
-        { 15, -10, 2, 0.6f, 0.4f, 0.7f, 1.0f}, // torus mid
-        {-18,  15, 0, 0.8f, 0.6f, 0.3f, 1.8f}, // sphere far
-        { 20,  18, 3, 0.7f, 0.5f, 0.4f, 1.0f}, // dodecahedron far
-        {-22, -20, 1, 0.4f, 0.6f, 0.7f, 2.0f}, // cylinder far
-        { 25,  -5, 2, 0.5f, 0.3f, 0.6f, 1.5f}, // torus very far
-        {-8,  25,  3, 0.6f, 0.6f, 0.4f, 1.2f}, // dodecahedron far
-        { 30,  25, 0, 0.7f, 0.4f, 0.5f, 2.5f}, // sphere very far
+        { 0,  0,  0, 0.7f, 0.3f, 0.2f, 1.5f},
+        { 5, -3,  1, 0.8f, 0.7f, 0.3f, 1.0f},
+        {-4,  6,  2, 0.3f, 0.5f, 0.8f, 1.2f},
+        {12,  8,  0, 0.9f, 0.4f, 0.4f, 2.0f},
+        {-10, -12, 1, 0.5f, 0.7f, 0.5f, 1.5f},
+        { 15, -10, 2, 0.6f, 0.4f, 0.7f, 1.0f},
+        {-18,  15, 0, 0.8f, 0.6f, 0.3f, 1.8f},
+        { 20,  18, 3, 0.7f, 0.5f, 0.4f, 1.0f},
+        {-22, -20, 1, 0.4f, 0.6f, 0.7f, 2.0f},
+        { 25,  -5, 2, 0.5f, 0.3f, 0.6f, 1.5f},
+        {-8,  25,  3, 0.6f, 0.6f, 0.4f, 1.2f},
+        { 30,  25, 0, 0.7f, 0.4f, 0.5f, 2.5f},
     };
     int nspawns = sizeof(spawns) / sizeof(spawns[0]);
 
-    for (int i = 0; i < nspawns && nobj < MAX_MESHES; i++) {
+    for (int i = 0; i < nspawns; i++) {
         par_shapes_mesh *pm = NULL;
         switch (spawns[i].type) {
             case 0: pm = par_shapes_create_parametric_sphere(20, 20); break;
@@ -310,11 +309,12 @@ int main(int argc, char *argv[]) {
         }
         if (!pm) continue;
         float s = spawns[i].scale;
-        objects[nobj++] = upload_par(pm, spawns[i].x, s, spawns[i].z,
-                                    s, spawns[i].r, spawns[i].g, spawns[i].b);
+        collect_par(&all_geo, pm, spawns[i].x, s, spawns[i].z,
+                    s, spawns[i].r, spawns[i].g, spawns[i].b);
         par_shapes_free_mesh(pm);
-        mesh_build_lines(&objects[nobj - 1]);
     }
+
+    SceneBatch scene = upload_scene(&all_geo);
 
     // font
 #ifdef __ANDROID__
@@ -448,33 +448,19 @@ int main(int argc, char *argv[]) {
         glUniform1f(u_hf, -1.0f);
         glUniform1f(u_hc, 4.0f);
 
-        glBindVertexArray(terrain.vao);
-        glDrawArrays(GL_TRIANGLES, 0, terrain.count);
-        perf_add_draw_call(terrain.count / 3, terrain.count);
+        glBindVertexArray(scene.vao);
+        glDrawArrays(GL_TRIANGLES, 0, scene.count);
+        perf_add_draw_call(scene.count / 3, scene.count);
 
-        for (int i = 0; i < nobj; i++) {
-            glBindVertexArray(objects[i].vao);
-            glDrawArrays(GL_TRIANGLES, 0, objects[i].count);
-            perf_add_draw_call(objects[i].count / 3, objects[i].count);
-        }
-
-        // wireframe overlay
         if (wireframe) {
             glUseProgram(wire_prog);
             glUniformMatrix4fv(wu_mvp, 1, GL_FALSE, mvp);
             glUniform3f(wu_col, 0.0f, 1.0f, 0.3f);
             glDepthFunc(GL_LEQUAL);
-
-            glBindVertexArray(terrain.vao);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrain.line_ibo);
-            glDrawElements(GL_LINES, terrain.line_count, GL_UNSIGNED_INT, 0);
-
-            glUniform3f(wu_col, 1.0f, 1.0f, 0.0f);
-            for (int i = 0; i < nobj; i++) {
-                glBindVertexArray(objects[i].vao);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, objects[i].line_ibo);
-                glDrawElements(GL_LINES, objects[i].line_count, GL_UNSIGNED_INT, 0);
-            }
+            glBindVertexArray(scene.vao);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, scene.line_ibo);
+            glDrawElements(GL_LINES, scene.line_count, GL_UNSIGNED_INT, 0);
+            perf_add_draw_call(scene.line_count / 2, scene.count);
             glDepthFunc(GL_LESS);
         }
 

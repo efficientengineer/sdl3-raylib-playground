@@ -10,7 +10,7 @@
 #define UI_MAX_BUTTONS 16
 
 typedef struct {
-    float x, y, w, h; // pixels, top-left origin
+    float x, y, w, h;
     const char *label;
     int toggled;
     int id;
@@ -18,7 +18,7 @@ typedef struct {
 
 void ui_init(void);
 int  ui_add_button(float x, float y, float w, float h, const char *label);
-int  ui_touch_up(float px, float py); // pixel coords; returns button id or -1
+int  ui_touch_up(float px, float py);
 void ui_draw(int screen_w, int screen_h);
 UIButton *ui_get(int id);
 void ui_cleanup(void);

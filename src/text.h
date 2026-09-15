@@ -10,6 +10,8 @@
 void text_init(const unsigned char *ttf_data, float pixel_height);
 void text_draw(const char *str, float x, float y, float sx, float sy,
                float r, float g, float b);
+void text_begin(void);
+void text_flush(void);
 void text_cleanup(void);
 
 #endif

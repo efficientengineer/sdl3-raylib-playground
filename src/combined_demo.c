@@ -239,7 +239,9 @@ int main(int argc, char *argv[]) {
         perf_add_draw_call(index_count / 3, (RINGS + 1) * (SECTORS + 1));
 
         float scx = 2.0f / w, scy = 2.0f / h;
+        text_begin();
         text_draw("Touch to move sphere", 20, 50, scx, scy, 1, 1, 1);
+        text_flush();
 
         perf_draw(w, h);
         ui_draw(w, h);
