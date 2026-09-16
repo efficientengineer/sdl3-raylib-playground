@@ -182,6 +182,16 @@ struct HotReloader {
     }
 };
 
+// UI scale from the SHORTER screen edge so portrait and landscape agree
+// (1080x2400 phone -> 3.0 either way). Desktop windows stay at 1.0.
+static float compute_dpi_scale(int w, int h) {
+    int m = w < h ? w : h;
+    return (m > 1000) ? m / 360.0f : 1.0f;
+}
+// Base font size before the game's FontGlobalScale. 10px * scale reproduces
+// the preferred look (~30px on the phone), which the game scales x1.3.
+static float font_px(float dpi_scale) { return 10.0f * dpi_scale; }
+
 int main(int argc, char *argv[]) {
     // Keep the SDL loop running while backgrounded so hot reloads land
     // immediately instead of waiting for the app to return to the foreground.
@@ -211,17 +221,20 @@ int main(int argc, char *argv[]) {
 
     int w, h;
     SDL_GetWindowSizeInPixels(win, &w, &h);
-    float dpi_scale = (h > 1000) ? h / 800.0f : 1.0f;
+    float dpi_scale = compute_dpi_scale(w, h);
 
 #ifdef __ANDROID__
     const char *font_path = "Roboto-Regular.ttf";
 #else
     const char *font_path = "assets/Roboto-Regular.ttf";
 #endif
-    float font_size = 22.0f * dpi_scale;
+    // Font is added at a nominal size only; the live size is set every frame
+    // via style.FontSizeBase (ImGui 1.92+ dynamic fonts), so it tracks
+    // rotation and the transient sizes SDL reports during startup.
+    float font_size = font_px(dpi_scale);
     {
         int lw, lh; SDL_GetWindowSize(win, &lw, &lh);
-        LOGI("Startup size: pixels %dx%d, logical %dx%d, dpi_scale %.3f, font_size %.1f\n",
+        LOGI("Startup size: pixels %dx%d, logical %dx%d, dpi_scale %.3f, font_px %.1f\n",
              w, h, lw, lh, dpi_scale, font_size);
     }
     size_t font_data_size = 0;
@@ -344,21 +357,23 @@ int main(int argc, char *argv[]) {
             running = false;
         }
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-
         SDL_GetWindowSizeInPixels(win, &w, &h);
-        dpi_scale = (h > 1000) ? h / 800.0f : 1.0f;
+        dpi_scale = compute_dpi_scale(w, h);
+        font_size = font_px(dpi_scale);
+        ImGui::GetStyle().FontSizeBase = font_size;
         {
             static int last_w = -1, last_h = -1;
             if (w != last_w || h != last_h) {
                 int lw, lh; SDL_GetWindowSize(win, &lw, &lh);
-                LOGI("Size changed: pixels %dx%d, logical %dx%d, dpi_scale %.3f (font baked at %.1f)\n",
+                LOGI("Size changed: pixels %dx%d, logical %dx%d, dpi_scale %.3f, font_px %.1f\n",
                      w, h, lw, lh, dpi_scale, font_size);
                 last_w = w; last_h = h;
             }
         }
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
 
         if (reloader.api.state && reloader.api.tick)
             reloader.api.tick(reloader.api.state, w, h, dpi_scale);
