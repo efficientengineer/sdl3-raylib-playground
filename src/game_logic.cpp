@@ -630,6 +630,7 @@ struct Character {
     int combat_hp;
     int initiative;
     bool defending;
+    float shake_timer; // seconds remaining of shake animation
 };
 
 // ── Enemies ──
@@ -638,6 +639,8 @@ struct Enemy {
     int level, hp, max_hp, ac, attack, damage;
     bool alive;
     int xp_reward, gold_reward;
+    int initiative;
+    float shake_timer;
 };
 
 // ── Combat ──
@@ -682,12 +685,17 @@ struct Game {
 
     Enemy enemies[MAX_ENEMIES];
     int enemy_count;
-    int turn_index; // whose turn in combat
-    bool player_turn;
+    int turn_index; // index into init_order
+    bool player_turn; // true = waiting for player input on current turn
     int selected_target;
     int selected_ability;
     CombatLog combat_log;
     int combat_round;
+
+    // Initiative order: positive = party index, negative = -(enemy_index+1)
+    int init_order[MAX_PARTY + MAX_ENEMIES];
+    int init_count;
+    int init_current; // current position in init_order
 
     // creation state
     int create_race;
@@ -982,7 +990,9 @@ static void qa_create_bug(Game *g) {
 }
 
 // ── Save / Load ──
-#define SAVE_VERSION 1
+// Format: int version, int sizeof(Game), raw Game bytes.
+// Bump SAVE_VERSION when the Game layout changes. Old saves are discarded, not migrated.
+#define SAVE_VERSION 2
 static const char *save_path_buf = nullptr;
 
 static const char *get_save_path() {
@@ -1002,21 +1012,49 @@ static void save_game(Game *g) {
     if (!f) return;
     int ver = SAVE_VERSION;
     SDL_WriteIO(f, &ver, sizeof(ver));
+    int struct_size = (int)sizeof(Game);
+    SDL_WriteIO(f, &struct_size, sizeof(struct_size));
     SDL_WriteIO(f, g, sizeof(Game));
     SDL_CloseIO(f);
 }
 
+// Sanity-check a loaded Game so a stale/corrupt blob can't index tables out of range.
+static bool validate_game(Game *g) {
+    if (g->screen < SCR_TITLE || g->screen > SCR_VICTORY) return false;
+    if (g->party_size < 0 || g->party_size > MAX_PARTY) return false;
+    if (g->enemy_count < 0 || g->enemy_count > MAX_ENEMIES) return false;
+    for (int i = 0; i < g->party_size; i++) {
+        Character *c = &g->party[i];
+        if (c->primary_class < CLASS_FIGHTER || c->primary_class > CLASS_BARBARIAN) return false;
+        if (c->race < RACE_HUMAN || c->race > RACE_HALFLING) return false;
+    }
+    return true;
+}
+
+// Loads a save written by the current SAVE_VERSION with an identical Game layout.
+// Any other version or layout is rejected and the game starts fresh: the Game struct
+// embeds Character/Enemy, so a raw memcpy of an older layout scrambles every field
+// after the first changed struct (this crashed the app on load once).
 static bool load_game(Game *g) {
     const char *path = get_save_path();
     if (!path) return false;
     SDL_IOStream *f = SDL_IOFromFile(path, "rb");
     if (!f) return false;
-    int ver = 0;
-    SDL_ReadIO(f, &ver, sizeof(ver));
-    if (ver != SAVE_VERSION) { SDL_CloseIO(f); return false; }
-    SDL_ReadIO(f, g, sizeof(Game));
+    int ver = 0, struct_size = 0;
+    bool ok = SDL_ReadIO(f, &ver, sizeof(ver)) == sizeof(ver)
+           && SDL_ReadIO(f, &struct_size, sizeof(struct_size)) == sizeof(struct_size)
+           && ver == SAVE_VERSION
+           && struct_size == (int)sizeof(Game);
+    if (ok) {
+        Game *tmp = (Game *)malloc(sizeof(Game));
+        ok = tmp && SDL_ReadIO(f, tmp, sizeof(Game)) == sizeof(Game) && validate_game(tmp);
+        if (ok) memcpy(g, tmp, sizeof(Game));
+        free(tmp);
+    }
     SDL_CloseIO(f);
-    return true;
+    if (!ok) SDL_Log("save.dat rejected (ver %d, size %d, expected %d/%d) — starting fresh",
+                     ver, struct_size, SAVE_VERSION, (int)sizeof(Game));
+    return ok;
 }
 
 // ── Stat helpers ──
@@ -1171,7 +1209,7 @@ static void spawn_enemies(Game *g, int count, int level) {
         if (el < 1) el = 1;
         int name_idx = (el < 4) ? rng_range(0, 4) : (el < 8) ? rng_range(3, 8) :
                        (el < 14) ? rng_range(6, 12) : rng_range(10, 15);
-        snprintf(e->name, 32, "%s Lv%d", names[name_idx], el);
+        snprintf(e->name, 32, "%s L%d", names[name_idx], el);
         e->level = el;
         e->max_hp = (int)((el * 8 + rng_range(0, el * 4)) * hp_mult[diff]);
         e->hp = e->max_hp;
@@ -1219,6 +1257,7 @@ static void do_single_attack(Game *g, Character *c, int target) {
             dmg += rng_range(sneak, sneak * 3);
         }
         e->hp -= dmg;
+        e->shake_timer = 0.3f;
         if (e->hp <= 0) { e->hp = 0; e->alive = false; }
         log_combat(&g->combat_log, "%s %s %s for %d%s%s", c->name,
             crit ? "CRITS" : "hits", e->name, dmg,
@@ -1262,6 +1301,7 @@ static void do_ability(Game *g, Character *c, int target) {
         for (int i = 0; i < g->enemy_count; i++) {
             if (!g->enemies[i].alive) continue;
             g->enemies[i].hp -= dmg;
+            g->enemies[i].shake_timer = 0.3f;
             if (g->enemies[i].hp <= 0) { g->enemies[i].hp = 0; g->enemies[i].alive = false; }
         }
         log_combat(&g->combat_log, "%s casts Fireball for %d to all!", c->name, dmg);
@@ -1291,6 +1331,7 @@ static void do_ability(Game *g, Character *c, int target) {
         int dmg = rng_range(char_damage(c), char_damage(c) * 2) + 5;
         if (c->feats[17]) dmg += 4;
         e->hp -= dmg;
+        e->shake_timer = 0.3f;
         if (e->hp <= 0) { e->hp = 0; e->alive = false; }
         log_combat(&g->combat_log, "%s RAGES at %s for %d!%s", c->name, e->name, dmg, e->alive ? "" : " [DEAD]");
         sfx_play(SFX_RAGE);
@@ -1329,12 +1370,87 @@ static void do_enemy_turn(Game *g, Enemy *e) {
             }
         }
         c->combat_hp -= dmg;
+        c->shake_timer = 0.3f;
         if (c->combat_hp <= 0) { c->combat_hp = 0; c->alive = false; }
         log_combat(&g->combat_log, "%s hits %s for %d%s", e->name, c->name, dmg, c->alive ? "" : " [DOWN]");
         sfx_play(SFX_ENEMY_HIT);
         if (!c->alive) sfx_play(SFX_DEATH, 0.3f);
     } else {
         log_combat(&g->combat_log, "%s misses %s", e->name, c->name);
+    }
+}
+
+// ── Initiative order (D&D 3.5e style) ──
+static void roll_initiative(Game *g) {
+    g->init_count = 0;
+    // Roll for party
+    for (int i = 0; i < g->party_size; i++) {
+        if (!g->party[i].alive) continue;
+        g->party[i].initiative = d20() + stat_mod(char_stat(&g->party[i], DEX));
+        g->init_order[g->init_count++] = i; // positive = party
+    }
+    // Roll for enemies
+    for (int i = 0; i < g->enemy_count; i++) {
+        if (!g->enemies[i].alive) continue;
+        // Enemy DEX mod approximated from level
+        g->enemies[i].initiative = d20() + (g->enemies[i].level / 3);
+        g->init_order[g->init_count++] = -(i + 1); // negative = enemy
+    }
+    // Sort descending by initiative (bubble sort, small N)
+    for (int i = 0; i < g->init_count - 1; i++) {
+        for (int j = i + 1; j < g->init_count; j++) {
+            int init_i, init_j;
+            if (g->init_order[i] >= 0) init_i = g->party[g->init_order[i]].initiative;
+            else init_i = g->enemies[-(g->init_order[i] + 1)].initiative;
+            if (g->init_order[j] >= 0) init_j = g->party[g->init_order[j]].initiative;
+            else init_j = g->enemies[-(g->init_order[j] + 1)].initiative;
+            if (init_j > init_i) {
+                int tmp = g->init_order[i];
+                g->init_order[i] = g->init_order[j];
+                g->init_order[j] = tmp;
+            }
+        }
+    }
+    g->init_current = 0;
+}
+
+static void advance_initiative(Game *g) {
+    // Safety: max iterations to prevent infinite loops
+    for (int safety = 0; safety < 64; safety++) {
+        g->init_current++;
+        // Skip dead combatants
+        while (g->init_current < g->init_count) {
+            int idx = g->init_order[g->init_current];
+            if (idx >= 0 && !g->party[idx].alive) { g->init_current++; continue; }
+            if (idx < 0 && !g->enemies[-(idx+1)].alive) { g->init_current++; continue; }
+            break;
+        }
+        // Round over — new round
+        if (g->init_current >= g->init_count) {
+            // Check if combat should end (no alive on one side)
+            if (count_alive_enemies(g) == 0 || count_alive_party(g) == 0) {
+                g->player_turn = false;
+                return;
+            }
+            g->combat_round++;
+            for (int i = 0; i < g->party_size; i++) g->party[i].defending = false;
+            roll_initiative(g);
+            if (g->init_count == 0) return; // no combatants
+            log_combat(&g->combat_log, "--- Round %d ---", g->combat_round);
+        }
+        // Check current turn
+        int cur = g->init_order[g->init_current];
+        if (cur < 0) {
+            // Enemy turn — auto-execute and continue loop
+            do_enemy_turn(g, &g->enemies[-(cur+1)]);
+            // Check if combat ended from this enemy turn
+            if (count_alive_party(g) == 0) { g->player_turn = false; return; }
+            continue;
+        }
+        // Player turn — set for UI and return
+        g->turn_index = cur;
+        g->player_turn = true;
+        return;
     }
 }
 
@@ -1626,6 +1742,22 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                     }
 
                     ImGui::BeginChild("##msglist", ImVec2(0, -ImGui::GetFrameHeightWithSpacing() - 4*dpi_scale));
+
+                    // Touch drag-to-scroll: track drag start inside child, keep scrolling even outside
+                    static bool msglist_dragging = false;
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
+                        msglist_dragging = true;
+                    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                        msglist_dragging = false;
+                    if (msglist_dragging && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                        ImGui::SetScrollY(ImGui::GetScrollY() - ImGui::GetIO().MouseDelta.y);
+                    }
+
+                    float msg_scale = 0.75f;
+                    ImGui::SetWindowFontScale(msg_scale);
+                    float orig_spacing = ImGui::GetStyle().ItemSpacing.y;
+                    ImGui::GetStyle().ItemSpacing.y = 1.0f * dpi_scale;
+
                     for (int i = 0; i < dev_log.count; i++) {
                         DevMsg *m = &dev_log.msgs[i];
                         const char *ts = m->timestamp[0] ? m->timestamp : "";
@@ -1645,7 +1777,16 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                             ImGui::PopStyleColor();
                         }
                     }
-                    if (dev_log.count > 0) ImGui::SetScrollHereY(1.0f);
+
+                    ImGui::SetWindowFontScale(1.0f);
+                    ImGui::GetStyle().ItemSpacing.y = orig_spacing;
+                    // Auto-scroll only when new messages arrive AND user is near bottom
+                    static int prev_msg_count = 0;
+                    bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10;
+                    if (dev_log.count > prev_msg_count && at_bottom) {
+                        ImGui::SetScrollHereY(1.0f);
+                    }
+                    prev_msg_count = dev_log.count;
                     ImGui::EndChild();
 
                     // Input area
@@ -1751,6 +1892,17 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
         // ── CHARACTER CREATION ──
         else if (game.screen == SCR_CREATE) {
             ImGui::Begin("##create", nullptr, wf);
+            ImGui::BeginChild("##create_scroll", ImVec2(0, 0));
+
+            // Touch drag-to-scroll for create panel
+            static bool create_dragging = false;
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
+                create_dragging = true;
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+                create_dragging = false;
+            if (create_dragging && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                ImGui::SetScrollY(ImGui::GetScrollY() - ImGui::GetIO().MouseDelta.y);
+
             ImGui::Text("Create Hero %d of %d", game.party_size + 1, MAX_PARTY);
             ImGui::Separator();
 
@@ -1782,7 +1934,38 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             }
             ImGui::Separator();
 
-            ImGui::InputText("Name", game.create_name, 24);
+            ImGui::Text("Name:");
+            ImGui::SameLine();
+            ImGui::PushItemWidth(bw * 0.5f);
+            ImGui::InputText("##name", game.create_name, 24);
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            if (ImGui::Button("\xF0\x9F\x8E\xB2", ImVec2(0, 0))) { // 🎲
+                // German/Frieren-style syllable generator
+                static const char *starts[] = {
+                    "Fr", "H", "St", "Fl", "Gr", "Kr", "Br", "Sch",
+                    "W", "Z", "L", "R", "D", "N", "S", "E", "A",
+                    "Str", "Gl", "Bl", "Tr", "Kl", "Pf", "Sp",
+                };
+                static const char *mids[] = {
+                    "ie", "ei", "au", "im", "ar", "en", "il", "er",
+                    "al", "an", "ol", "ul", "iel", "ier", "eis", "ach",
+                    "ind", "ell", "orn", "ung", "alt", "ern", "ieg",
+                };
+                static const char *ends[] = {
+                    "en", "el", "er", "n", "t", "ke", "ne", "se",
+                    "ren", "den", "cht", "nd", "rt", "gen", "zel",
+                    "ler", "ner", "mer", "fen", "ben", "ten", "de",
+                };
+                int ns = sizeof(starts)/sizeof(starts[0]);
+                int nm = sizeof(mids)/sizeof(mids[0]);
+                int ne = sizeof(ends)/sizeof(ends[0]);
+                char buf[24];
+                snprintf(buf, sizeof(buf), "%s%s%s",
+                    starts[rand()%ns], mids[rand()%nm], ends[rand()%ne]);
+                if (buf[0] >= 'a' && buf[0] <= 'z') buf[0] -= 32;
+                snprintf(game.create_name, 24, "%s", buf);
+            }
 
             ImGui::Text("Race:");
             float race_w = bw * 0.44f;
@@ -1814,20 +1997,24 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
 
             ImGui::Spacing();
             ImGui::Text("Stats (Points: %d)", game.create_points);
+            float stat_label_w = 90 * dpi_scale;
+            float stat_btn = 36 * dpi_scale;
             for (int s = 0; s < NUM_STATS; s++) {
                 ImGui::PushID(s);
-                float stat_btn = 48 * dpi_scale;
-                ImGui::Text("%s: %2d", STAT_NAMES[s], game.create_stats[s] + RACE_BONUSES[game.create_race][s]);
-                ImGui::SameLine();
+                char stat_buf[16];
+                snprintf(stat_buf, sizeof(stat_buf), "%s: %2d", STAT_NAMES[s],
+                    game.create_stats[s] + RACE_BONUSES[game.create_race][s]);
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX());
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(stat_buf);
+                ImGui::SameLine(stat_label_w);
                 if (ImGui::Button("-", ImVec2(stat_btn, 0)) && game.create_stats[s] > 8) { game.create_stats[s]--; game.create_points++; }
                 ImGui::SameLine();
                 if (ImGui::Button("+", ImVec2(stat_btn, 0)) && game.create_points > 0 && game.create_stats[s] < 18) { game.create_stats[s]++; game.create_points--; }
                 ImGui::PopID();
             }
 
-            // pin Add/Done at bottom
-            float cr_btn_h = ImGui::GetFrameHeightWithSpacing() + 30*dpi_scale;
-            ImGui::SetCursorPosY(bh - cr_btn_h);
+            ImGui::Spacing();
             ImGui::Separator();
             if (ImGui::Button("Add to Party", ImVec2(bw*0.45f, 0))) {
                 init_character(&game.party[game.party_size], game.create_name,
@@ -1848,6 +2035,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                     game.screen = SCR_TOWN;
                 }
             }
+            ImGui::EndChild();
             ImGui::End();
         }
 
@@ -1861,36 +2049,42 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             ImGui::Text("    Gold: %d", game.gold);
             ImGui::Separator();
 
-            // party summary
+            // party summary — 2-line compact layout
+            float bar_w = bw * 0.45f;
+            float bar_h = 14 * dpi_scale;
+            float indent = 12 * dpi_scale;
             for (int i = 0; i < game.party_size; i++) {
                 Character *c = &game.party[i];
                 ImGui::PushID(i);
+                // Line 1: Name + level-up/reincarnate status
                 ImGui::PushStyleColor(ImGuiCol_Text, CLASS_COLORS[c->primary_class]);
                 ImGui::Text("%s", c->name);
                 ImGui::PopStyleColor();
-                ImGui::SameLine();
-                ImGui::Text("Lv%d %s", c->level, CLASS_NAMES[c->primary_class]);
-                if (c->total_past_lives > 0) {
-                    ImGui::SameLine();
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0.85f, 0.2f, 1));
-                    ImGui::Text("[%d PL]", c->total_past_lives);
-                    ImGui::PopStyleColor();
-                }
-                ImGui::SameLine();
-                draw_hp_bar((float)c->hp, (float)c->max_hp, 200*dpi_scale, 20*dpi_scale);
                 if (can_level(c)) {
                     ImGui::SameLine();
-                    ImGui::TextColored(ImVec4(1,0.85f,0.2f,1), "[READY]");
+                    ImGui::TextColored(ImVec4(1,0.85f,0.2f,1), "[LEVEL UP]");
                 }
                 if (c->level >= MAX_LEVEL) {
                     ImGui::SameLine();
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f,0.3f,0.7f,1));
-                    if (ImGui::Button("REINCARNATE", ImVec2(bw*0.35f, 0))) {
+                    if (ImGui::Button("REINCARNATE", ImVec2(0, 0))) {
                         game.levelup_who = i;
                         game.screen = SCR_REINCARNATE;
                     }
                     ImGui::PopStyleColor();
                 }
+                if (c->total_past_lives > 0) {
+                    ImGui::SameLine();
+                    ImGui::TextColored(ImVec4(1, 0.85f, 0.2f, 1), "[%dPL]", c->total_past_lives);
+                }
+                // Line 2: Class + HP bar (indented, smaller text)
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+                ImGui::SetWindowFontScale(0.8f);
+                ImGui::TextColored(ImVec4(0.7f,0.7f,0.7f,1), "L%d %s", c->level, CLASS_NAMES[c->primary_class]);
+                ImGui::SameLine();
+                draw_hp_bar((float)c->hp, (float)c->max_hp, bar_w, bar_h);
+                ImGui::SetWindowFontScale(1.0f);
+                if (i < game.party_size - 1) ImGui::Spacing();
                 ImGui::PopID();
             }
 
@@ -1945,11 +2139,20 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                     for (int j = 0; j < game.party_size; j++) {
                         game.party[j].combat_hp = game.party[j].hp;
                         game.party[j].defending = false;
-                        game.party[j].initiative = d20() + stat_mod(char_stat(&game.party[j], DEX));
                     }
-                    game.turn_index = 0;
-                    game.player_turn = true;
                     log_combat(&game.combat_log, "--- Round %d ---", game.combat_round);
+                    roll_initiative(&game);
+                    // Process first turn: run enemy turns until a player turn
+                    if (game.init_count > 0) {
+                        int first = game.init_order[game.init_current];
+                        if (first < 0) {
+                            do_enemy_turn(&game, &game.enemies[-(first+1)]);
+                            advance_initiative(&game);
+                        } else {
+                            game.turn_index = first;
+                            game.player_turn = true;
+                        }
+                    }
                     game.screen = SCR_COMBAT;
                 }
             }
@@ -2036,11 +2239,20 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                     for (int j = 0; j < game.party_size; j++) {
                         game.party[j].combat_hp = game.party[j].hp;
                         game.party[j].defending = false;
-                        game.party[j].initiative = d20() + stat_mod(char_stat(&game.party[j], DEX));
                     }
-                    game.turn_index = 0;
-                    game.player_turn = true;
                     log_combat(&game.combat_log, "--- Round %d ---", game.combat_round);
+                    roll_initiative(&game);
+                    // Process first turn: run enemy turns until a player turn
+                    if (game.init_count > 0) {
+                        int first = game.init_order[game.init_current];
+                        if (first < 0) {
+                            do_enemy_turn(&game, &game.enemies[-(first+1)]);
+                            advance_initiative(&game);
+                        } else {
+                            game.turn_index = first;
+                            game.player_turn = true;
+                        }
+                    }
                     game.screen = SCR_COMBAT;
                 }
             }
@@ -2062,47 +2274,109 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
 
             ImGui::BeginChild("##combat_top", ImVec2(0, top_h));
 
-            // enemies
-            ImGui::Text("ENEMIES");
+            // ── Enemies: 4-column grid ──
+            ImGui::SetWindowFontScale(0.8f);
+            float cell_w = bw / 4.0f - 2*dpi_scale;
+            float io_dt = ImGui::GetIO().DeltaTime;
             for (int i = 0; i < game.enemy_count; i++) {
                 Enemy *e = &game.enemies[i];
+                if (e->shake_timer > 0) e->shake_timer -= io_dt;
                 ImGui::PushID(100+i);
+                if (i % 4 != 0) ImGui::SameLine();
+                // Apply shake offset
+                float shake_x = 0;
+                if (e->shake_timer > 0) {
+                    float intensity = e->shake_timer / 0.3f; // 1→0
+                    shake_x = sinf(e->shake_timer * 60.0f) * 4.0f * dpi_scale * intensity;
+                }
+                if (shake_x != 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + shake_x);
+                ImVec2 cell_start = ImGui::GetCursorScreenPos();
+                ImGui::BeginGroup();
                 bool sel = (game.selected_target == i);
                 if (!e->alive) {
                     ImGui::TextDisabled("[X] %s", e->name);
                 } else {
                     if (sel) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,0.3f,0.3f,1));
-                    if (ImGui::Selectable(e->name, sel, 0, ImVec2(bw*0.5f, 0)))
+                    if (ImGui::Selectable(e->name, sel, 0, ImVec2(cell_w, 0)))
                         game.selected_target = i;
                     if (sel) ImGui::PopStyleColor();
-                    ImGui::SameLine();
-                    draw_hp_bar((float)e->hp, (float)e->max_hp, 200*dpi_scale, 18*dpi_scale);
+                    float hp_pct = (float)e->hp / (float)e->max_hp;
+                    ImVec4 hp_col = ImVec4(1.0f, hp_pct, hp_pct, 1.0f); // red→white lerp
+                    ImGui::TextColored(hp_col, "%d", e->hp);
                 }
+                ImGui::EndGroup();
+                // Alternating cell background
+                ImVec2 cell_end = ImVec2(cell_start.x + cell_w + 2*dpi_scale, ImGui::GetItemRectMax().y + 2*dpi_scale);
+                ImU32 bg = (i % 2 == 0) ? IM_COL32(40, 40, 55, 100) : IM_COL32(55, 55, 70, 100);
+                ImGui::GetWindowDrawList()->AddRectFilled(cell_start, cell_end, bg);
                 ImGui::PopID();
             }
+            ImGui::SetWindowFontScale(1.0f);
 
+            // ── Combat canvas: blank area for GL rendering ──
+            ImGui::Separator();
+            float used_y = ImGui::GetCursorPosY();
+            // Reserve space for party grid below (1 row of 4)
+            float party_grid_h = ImGui::GetFrameHeightWithSpacing() * 3 + 20*dpi_scale;
+            float canvas_h = top_h - used_y - party_grid_h;
+            if (canvas_h < 40*dpi_scale) canvas_h = 40*dpi_scale;
+            ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(bw, canvas_h));
+            ImVec2 canvas_size = ImVec2(bw, canvas_h);
+            ImGui::GetWindowDrawList()->AddRect(
+                canvas_pos,
+                ImVec2(canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y),
+                IM_COL32(60, 60, 80, 120));
+            (void)canvas_pos; (void)canvas_size;
             ImGui::Separator();
 
-            // party status (no buttons here)
-            ImGui::Text("YOUR PARTY  (Round %d)", game.combat_round);
+            // ── Party: 4-column single row ──
+            ImGui::SetWindowFontScale(0.8f);
+            ImGui::Text("Round %d", game.combat_round);
+            float pcell_w = bw / 4.0f - 2*dpi_scale;
             for (int i = 0; i < game.party_size; i++) {
                 Character *c = &game.party[i];
+                if (c->shake_timer > 0) c->shake_timer -= io_dt;
                 ImGui::PushID(200+i);
+                if (i % 4 != 0) ImGui::SameLine();
+                // Apply shake offset
+                float pshake_x = 0;
+                if (c->shake_timer > 0) {
+                    float intensity = c->shake_timer / 0.3f;
+                    pshake_x = sinf(c->shake_timer * 60.0f) * 4.0f * dpi_scale * intensity;
+                }
+                if (pshake_x != 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + pshake_x);
+                ImVec2 pcell_start = ImGui::GetCursorScreenPos();
+                ImGui::BeginGroup();
+                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + pcell_w);
                 bool is_active = (game.player_turn && game.turn_index == i && c->alive);
                 if (is_active) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1,1,0.3f,1));
                 else ImGui::PushStyleColor(ImGuiCol_Text, CLASS_COLORS[c->primary_class]);
-                ImGui::Text("%s%s", is_active ? "> " : "  ", c->name);
+                ImGui::Text("%s%s", is_active ? ">" : " ", c->name);
                 ImGui::PopStyleColor();
-                ImGui::SameLine();
-                draw_hp_bar((float)c->combat_hp, (float)c->max_hp, 150*dpi_scale, 18*dpi_scale);
-                if (c->max_sp > 0) {
-                    ImGui::SameLine();
-                    ImGui::Text("SP:%d/%d", c->sp, c->max_sp);
+                float hp_pct = c->max_hp > 0 ? (float)c->combat_hp / (float)c->max_hp : 0;
+                ImVec4 hp_col = ImVec4(1.0f, hp_pct, hp_pct, 1.0f); // red→white lerp
+                if (!c->alive) {
+                    ImGui::TextDisabled("DEAD");
+                } else {
+                    ImGui::TextColored(hp_col, "%d", c->combat_hp);
+                    if (c->max_sp > 0) {
+                        ImGui::SameLine();
+                        float sp_pct = (float)c->sp / (float)c->max_sp;
+                        ImVec4 sp_col = ImVec4(0.4f + 0.6f*(1-sp_pct), 0.4f + 0.6f*sp_pct, 1.0f, 1.0f);
+                        ImGui::TextColored(sp_col, "%d", c->sp);
+                    }
+                    if (c->defending) { ImGui::SameLine(); ImGui::TextDisabled("DEF"); }
                 }
-                if (c->defending) { ImGui::SameLine(); ImGui::TextDisabled("[DEF]"); }
-                if (!c->alive) { ImGui::SameLine(); ImGui::TextDisabled("[DEAD]"); }
+                ImGui::PopTextWrapPos();
+                ImGui::EndGroup();
+                ImVec2 pcell_end = ImVec2(pcell_start.x + pcell_w + 2*dpi_scale, ImGui::GetItemRectMax().y + 2*dpi_scale);
+                ImU32 pbg = (i % 2 == 0) ? IM_COL32(40, 50, 40, 100) : IM_COL32(50, 60, 50, 100);
+                ImGui::GetWindowDrawList()->AddRectFilled(pcell_start, pcell_end, pbg);
                 ImGui::PopID();
             }
+            ImGui::SetWindowFontScale(1.0f);
+
             ImGui::EndChild();
 
             // fixed action bar at bottom
@@ -2114,7 +2388,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                 float abw = bw * 0.30f;
                 if (ImGui::Button("Attack", ImVec2(abw, 0))) {
                     do_player_attack(&game, c, game.selected_target);
-                    game.turn_index++;
+                    advance_initiative(&game);
                 }
                 ImGui::SameLine();
                 bool has_ability = (c->class_levels[CLASS_WIZARD] > 0 && c->sp >= 5) ||
@@ -2124,7 +2398,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                 if (!has_ability) ImGui::BeginDisabled();
                 if (ImGui::Button("Ability", ImVec2(abw, 0))) {
                     do_ability(&game, c, game.selected_target);
-                    game.turn_index++;
+                    advance_initiative(&game);
                 }
                 if (!has_ability) ImGui::EndDisabled();
                 ImGui::SameLine();
@@ -2132,28 +2406,9 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                     c->defending = true;
                     log_combat(&game.combat_log, "%s defends (+4 AC, half dmg)", c->name);
                     sfx_play(SFX_DEFEND);
-                    game.turn_index++;
+                    advance_initiative(&game);
                 }
             }
-
-            // advance turns
-            if (game.player_turn && game.turn_index >= game.party_size) {
-                game.player_turn = false;
-                game.turn_index = 0;
-            }
-            if (!game.player_turn) {
-                for (int i = 0; i < game.enemy_count; i++)
-                    do_enemy_turn(&game, &game.enemies[i]);
-                game.player_turn = true;
-                game.turn_index = 0;
-                game.combat_round++;
-                for (int i = 0; i < game.party_size; i++) game.party[i].defending = false;
-                while (game.turn_index < game.party_size && !game.party[game.turn_index].alive)
-                    game.turn_index++;
-                log_combat(&game.combat_log, "--- Round %d ---", game.combat_round);
-            }
-            while (game.player_turn && game.turn_index < game.party_size && !game.party[game.turn_index].alive)
-                game.turn_index++;
 
             // check victory/defeat
             if (count_alive_enemies(&game) == 0) {

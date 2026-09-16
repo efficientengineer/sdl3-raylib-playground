@@ -2,6 +2,12 @@
 
 SDL3 + OpenGL playground. C11 own code, C++ deps allowed.
 
+## Session startup
+
+At the start of every session, ask the user if they want to start polling (bug reports + dev messages from the Android device).
+
+Always hot reload (`./fast_reload.sh`) after making code changes — don't wait to be asked.
+
 ## Switches
 
 - **TARGET: Android** — build and deploy to phone only. Don't build desktop.
@@ -84,6 +90,30 @@ creates fresh state → deserializes. Game continues seamlessly.
 - Serialization copies `Game` by `sizeof`; changing the struct between reloads misaligns the trailing fields. Restart the app after struct changes.
 - `c++_static` STL works fine — imgui_shared.so is the bridge, no duplicate C++ runtime.
 - `CMAKE_SHARED_LINKER_FLAGS` with `-Wl,-z,max-page-size=16384` set BEFORE `FetchContent_MakeAvailable(SDL3)`.
+
+### Diagnosing crashes on the phone
+
+Follow these steps in order. Don't guess from the diff alone.
+
+1. **Get the real backtrace.** `adb` is at `~/Library/Android/sdk/platform-tools/adb` (not on PATH).
+   ```bash
+   ADB=~/Library/Android/sdk/platform-tools/adb
+   $ADB logcat -c; $ADB shell monkey -p com.playground.sdlraylib 1; sleep 6
+   $ADB logcat -d | grep -E "F DEBUG|signal [0-9]|SDL/APP"
+   ```
+   Look at the `#00`/`#01` frames. A crash inside an ImGui function called from `libgame_logic.so`
+   almost always means garbage input (bad index into `CLASS_COLORS[]`, etc.), not an ImGui bug.
+2. **Suspect the save file first if it crashes on load.** `files/save.dat` is a raw `memcpy` of
+   `Game`, which embeds `Character` and `Enemy`. Adding a field to *any* of those changes the layout,
+   and an old blob loaded over the new layout scrambles every field after the change. Check the header:
+   `$ADB shell run-as com.playground.sdlraylib od -A d -t d4 -N 8 files/save.dat` → `version, sizeof(Game)`.
+   The loader must reject a mismatched size and validate indices; never "migrate" by copying bytes.
+   To rule the save out entirely: `$ADB shell run-as com.playground.sdlraylib rm files/save.dat`.
+3. **Remember the hot-reload copies.** The app loads `files/libgame_logic.so`, not the APK's copy. After a
+   struct change, `fast_reload.sh` alone is unsafe: the serialized state won't match. Force-stop and relaunch.
+   If the app isn't running, the reload flag does nothing — relaunch with the `monkey` command above.
+4. **Verify the fix by launch, not by compile.** Confirm `$ADB shell pidof com.playground.sdlraylib` still
+   returns a pid ~10 s after launch and logcat has no new `F DEBUG` lines.
 
 ### Dev messaging
 
