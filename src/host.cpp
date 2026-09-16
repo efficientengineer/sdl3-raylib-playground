@@ -183,6 +183,10 @@ struct HotReloader {
 };
 
 int main(int argc, char *argv[]) {
+    // Keep the SDL loop running while backgrounded so hot reloads land
+    // immediately instead of waiting for the app to return to the foreground.
+    // The loop skips rendering while in_background is set (no EGL surface).
+    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "0");
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -274,6 +278,27 @@ int main(int argc, char *argv[]) {
 
     int frame_counter = 0;
     bool running = true;
+
+    // SDL3 does NOT queue the app lifecycle events (SDL_EVENT_*_BACKGROUND /
+    // _FOREGROUND); SDL_SendAppEvent hands them only to event watchers, so
+    // checking them in the SDL_PollEvent loop never fires. The watcher runs on
+    // the SDL thread from inside SDL_PumpEvents, so plain fields are safe.
+    struct Lifecycle { bool in_background; bool just_foregrounded; HotReloader *reloader; } lc = { false, false, &reloader };
+    SDL_AddEventWatch([](void *ud, SDL_Event *e) -> bool {
+        Lifecycle *lc = (Lifecycle *)ud;
+        if (e->type == SDL_EVENT_DID_ENTER_BACKGROUND || e->type == SDL_EVENT_TERMINATING) {
+            LOGI("Entered background\n");
+            if (lc->reloader->api.state && lc->reloader->api.on_save_event)
+                lc->reloader->api.on_save_event(lc->reloader->api.state);
+            lc->in_background = true;
+        } else if (e->type == SDL_EVENT_DID_ENTER_FOREGROUND) {
+            LOGI("Entered foreground\n");
+            lc->in_background = false;
+            lc->just_foregrounded = true;
+        }
+        return true;
+    }, &lc);
+
     while (running) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -283,16 +308,21 @@ int main(int argc, char *argv[]) {
                     reloader.api.on_save_event(reloader.api.state);
                 running = false;
             }
-            if (e.type == SDL_EVENT_DID_ENTER_BACKGROUND ||
-                e.type == SDL_EVENT_TERMINATING) {
-                if (reloader.api.state && reloader.api.on_save_event)
-                    reloader.api.on_save_event(reloader.api.state);
-            }
-            if (e.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
-                LOGI("Returned to foreground, checking for hot reload\n");
-                reloader.try_reload(dpi_scale);
-                frame_counter = 0;
-            }
+        }
+
+        if (lc.just_foregrounded) {
+            lc.just_foregrounded = false;
+            reloader.try_reload(dpi_scale);
+            frame_counter = 0;
+        }
+
+        if (lc.in_background) {
+            // No surface to draw on. Poll the reload flag ~4x/s and idle.
+            // Reload only swaps game logic (no GL), so it's safe here.
+            if (reloader.try_reload(dpi_scale))
+                LOGI("Hot reload applied while backgrounded\n");
+            SDL_Delay(250);
+            continue;
         }
 
         // Check for hot reload every 60 frames (~1 second)

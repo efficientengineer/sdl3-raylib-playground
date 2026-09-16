@@ -68,9 +68,6 @@ if [ -z "$("$ADB" -s "$DEVICE" shell pidof $PKG)" ]; then
     exit 0
 fi
 
-# Android pauses the SDL loop while the app is backgrounded, so the 1 s flag
-# poll never runs. Bring the app to the front first (no-op if already there).
-"$ADB" -s "$DEVICE" shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
 echo "=== Setting reload flag ==="
 "$ADB" -s "$DEVICE" logcat -c
 echo "1" > /tmp/reload.flag
@@ -92,4 +89,5 @@ for i in $(seq 1 12); do
         exit 1
     fi
 done
-echo "WARNING: no reload confirmation in 6s. App may be backgrounded; it reloads on return to foreground."
+echo "ERROR: no reload confirmation in 6s. Check: $ADB shell pidof $PKG; $ADB logcat -d -s QuestGlory" >&2
+exit 1
