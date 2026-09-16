@@ -219,6 +219,11 @@ int main(int argc, char *argv[]) {
     const char *font_path = "assets/Roboto-Regular.ttf";
 #endif
     float font_size = 22.0f * dpi_scale;
+    {
+        int lw, lh; SDL_GetWindowSize(win, &lw, &lh);
+        LOGI("Startup size: pixels %dx%d, logical %dx%d, dpi_scale %.3f, font_size %.1f\n",
+             w, h, lw, lh, dpi_scale, font_size);
+    }
     size_t font_data_size = 0;
     void *font_data = SDL_LoadFile(font_path, &font_data_size);
     if (font_data) {
@@ -345,6 +350,15 @@ int main(int argc, char *argv[]) {
 
         SDL_GetWindowSizeInPixels(win, &w, &h);
         dpi_scale = (h > 1000) ? h / 800.0f : 1.0f;
+        {
+            static int last_w = -1, last_h = -1;
+            if (w != last_w || h != last_h) {
+                int lw, lh; SDL_GetWindowSize(win, &lw, &lh);
+                LOGI("Size changed: pixels %dx%d, logical %dx%d, dpi_scale %.3f (font baked at %.1f)\n",
+                     w, h, lw, lh, dpi_scale, font_size);
+                last_w = w; last_h = h;
+            }
+        }
 
         if (reloader.api.state && reloader.api.tick)
             reloader.api.tick(reloader.api.state, w, h, dpi_scale);
