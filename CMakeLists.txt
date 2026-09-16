@@ -8,42 +8,77 @@ FetchContent_Declare(SDL3
     GIT_TAG        main
     GIT_SHALLOW    TRUE)
 
-FetchContent_Declare(cglm
-    GIT_REPOSITORY https://github.com/recp/cglm.git
-    GIT_TAG        master
-    GIT_SHALLOW    TRUE)
-
 if(ANDROID)
     set(SDL_SHARED ON CACHE BOOL "" FORCE)
     set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    # 16KB page alignment for all shared libraries
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
 else()
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON CACHE BOOL "" FORCE)
 endif()
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-set(CGLM_SHARED OFF CACHE BOOL "" FORCE)
-set(CGLM_STATIC ON CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(SDL3 cglm)
+FetchContent_MakeAvailable(SDL3)
 
 set(THIRD_PARTY ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
+set(IMGUI_DIR ${THIRD_PARTY}/imgui)
+
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(ANDROID)
-    add_library(main SHARED src/scene_demo.c src/text.c src/ui.c src/perf.c src/third_party_impl.c)
-    target_link_libraries(main PRIVATE SDL3::SDL3 cglm
-        android log EGL GLESv3)
-    target_include_directories(main PRIVATE src ${THIRD_PARTY} ${THIRD_PARTY}/sokol)
+    # ImGui as shared lib — single copy of ImGui state
+    add_library(imgui_shared SHARED ${IMGUI_SOURCES})
+    target_include_directories(imgui_shared PUBLIC
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+    target_link_libraries(imgui_shared PUBLIC SDL3::SDL3 EGL GLESv3 android log)
+    target_compile_definitions(imgui_shared PUBLIC IMGUI_IMPL_OPENGL_ES3)
+
+    # Game logic: hot-reloadable
+    add_library(game_logic SHARED src/game_logic.cpp)
+    target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+    target_link_libraries(game_logic PRIVATE imgui_shared)
+    set_target_properties(game_logic PROPERTIES
+        CXX_VISIBILITY_PRESET hidden)
+
+    # Host: entry point, owns window/GL/ImGui init, hot-reload machinery
+    add_library(main SHARED src/host.cpp)
+    target_link_libraries(main PRIVATE imgui_shared android log EGL GLESv3)
+    target_include_directories(main PRIVATE src ${THIRD_PARTY}
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 else()
-    add_executable(sdl3_demo src/sdl3_demo.c)
-    target_link_libraries(sdl3_demo PRIVATE SDL3::SDL3-static)
+    add_library(imgui_shared SHARED ${IMGUI_SOURCES})
+    target_include_directories(imgui_shared PUBLIC
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+    target_link_libraries(imgui_shared PUBLIC SDL3::SDL3-static "-framework OpenGL")
 
-    add_executable(combined_demo src/combined_demo.c src/text.c src/ui.c src/perf.c src/third_party_impl.c)
-    target_link_libraries(combined_demo PRIVATE SDL3::SDL3-static cglm
-        "-framework OpenGL")
-    target_include_directories(combined_demo PRIVATE src ${THIRD_PARTY} ${THIRD_PARTY}/sokol)
+    add_library(game_logic SHARED src/game_logic.cpp)
+    target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+    target_link_libraries(game_logic PRIVATE imgui_shared)
+    set_target_properties(game_logic PROPERTIES
+        CXX_VISIBILITY_PRESET hidden)
 
-    add_executable(scene_demo src/scene_demo.c src/text.c src/third_party_impl.c)
-    target_link_libraries(scene_demo PRIVATE SDL3::SDL3-static cglm
+    add_executable(quest_glory src/host.cpp)
+    target_link_libraries(quest_glory PRIVATE imgui_shared)
+    target_include_directories(quest_glory PRIVATE src ${THIRD_PARTY}
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+
+    add_executable(scene_demo src/scene_demo.cpp ${IMGUI_SOURCES})
+    target_link_libraries(scene_demo PRIVATE SDL3::SDL3-static
         "-framework OpenGL")
-    target_include_directories(scene_demo PRIVATE src ${THIRD_PARTY} ${THIRD_PARTY}/sokol)
+    target_include_directories(scene_demo PRIVATE src ${THIRD_PARTY}
+        ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 endif()

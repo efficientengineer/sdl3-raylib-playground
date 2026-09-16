@@ -1,0 +1,310 @@
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+
+#ifdef __ANDROID__
+#include <GLES3/gl3.h>
+#include <android/log.h>
+#define LOG_TAG "QuestGlory"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#else
+#include <OpenGL/gl3.h>
+#define LOGI(...) printf(__VA_ARGS__)
+#endif
+
+#include "imgui.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_opengl3.h"
+
+#include "game_api.h"
+
+#include <dlfcn.h>
+#include <sys/stat.h>
+
+struct HotReloader {
+    void *lib_handle;
+    GameAPI api;
+    char lib_path[512];
+    char flag_path[512];
+    char *state_buf;
+    size_t state_buf_size;
+    size_t state_size;
+    time_t last_mod_time;
+    int reload_gen;
+
+    bool load(const char *path) {
+        lib_handle = dlopen(path, RTLD_NOW);
+        if (!lib_handle) {
+            LOGI("dlopen failed: %s\n", dlerror());
+            return false;
+        }
+        auto get_api = (GetGameAPIFunc)dlsym(lib_handle, "get_game_api");
+        if (!get_api) {
+            LOGI("dlsym get_game_api failed: %s\n", dlerror());
+            dlclose(lib_handle);
+            lib_handle = nullptr;
+            return false;
+        }
+        api = get_api();
+        LOGI("Hot reload: loaded %s\n", path);
+        return true;
+    }
+
+    void unload() {
+        if (!lib_handle) return;
+        dlclose(lib_handle);
+        lib_handle = nullptr;
+        memset(&api, 0, sizeof(api));
+    }
+
+    bool check_reload_flag() {
+        SDL_IOStream *f = SDL_IOFromFile(flag_path, "rb");
+        if (f) {
+            Sint64 sz = SDL_GetIOSize(f);
+            SDL_CloseIO(f);
+            if (sz <= 0) return false;
+            f = SDL_IOFromFile(flag_path, "wb");
+            if (f) SDL_CloseIO(f);
+            return true;
+        }
+        return false;
+    }
+
+    bool check_lib_modified() {
+#ifndef __ANDROID__
+        struct stat st;
+        if (stat(lib_path, &st) == 0) {
+            if (st.st_mtime != last_mod_time) {
+                last_mod_time = st.st_mtime;
+                return true;
+            }
+        }
+#endif
+        return false;
+    }
+
+    bool try_reload(float dpi_scale) {
+        bool should_reload = check_reload_flag();
+#ifndef __ANDROID__
+        if (!should_reload) should_reload = check_lib_modified();
+#endif
+        if (!should_reload) return false;
+
+        LOGI("Hot reload triggered!\n");
+
+        // Serialize current state
+        if (api.state && api.serialize)
+            state_size = api.serialize(api.state, state_buf, state_buf_size);
+        if (api.state && api.destroy) {
+            api.destroy(api.state);
+            api.state = nullptr;
+        }
+
+#ifdef __ANDROID__
+        // On Android, copy .so to a unique name and dlopen that instead of
+        // dlclose+dlopen the same path. dlclose can cause the app to lose
+        // foreground focus. Old copies leak memory but that's fine for dev.
+        char reload_path[512];
+        snprintf(reload_path, sizeof(reload_path), "%s.%d", lib_path, ++reload_gen);
+        // Copy via filesystem
+        {
+            SDL_IOStream *src = SDL_IOFromFile(lib_path, "rb");
+            if (src) {
+                SDL_IOStream *dst = SDL_IOFromFile(reload_path, "wb");
+                if (dst) {
+                    char copybuf[4096];
+                    size_t n;
+                    while ((n = SDL_ReadIO(src, copybuf, sizeof(copybuf))) > 0)
+                        SDL_WriteIO(dst, copybuf, n);
+                    SDL_CloseIO(dst);
+                }
+                SDL_CloseIO(src);
+            }
+        }
+        // Don't dlclose old handle — just open the new copy
+        lib_handle = nullptr;
+        memset(&api, 0, sizeof(api));
+        if (!load(reload_path)) {
+            LOGI("Hot reload FAILED\n");
+            return false;
+        }
+#else
+        unload();
+        if (!load(lib_path)) {
+            LOGI("Hot reload FAILED\n");
+            return false;
+        }
+#endif
+
+        api.state = api.create(dpi_scale);
+        if (api.state && api.deserialize && state_size > 0)
+            api.deserialize(api.state, state_buf, state_size);
+
+        LOGI("Hot reload SUCCESS\n");
+        return true;
+    }
+};
+
+int main(int argc, char *argv[]) {
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+#ifdef __ANDROID__
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#endif
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+    SDL_Window *win = SDL_CreateWindow("fungame", 800, 600,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN);
+    SDL_GLContext gl_ctx = SDL_GL_CreateContext(win);
+    SDL_GL_SetSwapInterval(1);
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    int w, h;
+    SDL_GetWindowSizeInPixels(win, &w, &h);
+    float dpi_scale = (h > 1000) ? h / 800.0f : 1.0f;
+
+#ifdef __ANDROID__
+    const char *font_path = "Roboto-Regular.ttf";
+#else
+    const char *font_path = "assets/Roboto-Regular.ttf";
+#endif
+    float font_size = 22.0f * dpi_scale;
+    size_t font_data_size = 0;
+    void *font_data = SDL_LoadFile(font_path, &font_data_size);
+    if (font_data) {
+        ImFontConfig fc;
+        fc.FontDataOwnedByAtlas = false;
+        io.Fonts->AddFontFromMemoryTTF(font_data, (int)font_data_size, font_size, &fc);
+    }
+
+#ifdef __ANDROID__
+    ImGui_ImplSDL3_InitForOpenGL(win, gl_ctx);
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
+    ImGui_ImplSDL3_InitForOpenGL(win, gl_ctx);
+    ImGui_ImplOpenGL3_Init("#version 330");
+#endif
+
+    // Set up hot reloader
+    HotReloader reloader = {};
+    reloader.state_buf_size = 1024 * 1024;
+    reloader.state_buf = (char *)malloc(reloader.state_buf_size);
+    const char *pref = SDL_GetPrefPath("com.playground", "questglory");
+    LOGI("SDL_GetPrefPath returned: [%s]\n", pref ? pref : "NULL");
+
+#ifdef __ANDROID__
+    snprintf(reloader.lib_path, sizeof(reloader.lib_path),
+             "%slibgame_logic.so", pref);
+    // Try hot-reload path first, then bundled APK lib
+    if (!reloader.load(reloader.lib_path)) {
+        // Bundled .so is loaded by short name (Android linker finds it)
+        snprintf(reloader.lib_path, sizeof(reloader.lib_path),
+                 "libgame_logic.so");
+        reloader.load(reloader.lib_path);
+        // But set lib_path to the hot-reload location for future reloads
+        snprintf(reloader.lib_path, sizeof(reloader.lib_path),
+                 "%slibgame_logic.so", pref);
+    }
+#else
+    // On desktop, load from build directory
+    const char *exe_dir = SDL_GetBasePath();
+    snprintf(reloader.lib_path, sizeof(reloader.lib_path),
+             "%slibgame_logic.dylib", exe_dir);
+    reloader.load(reloader.lib_path);
+#endif
+
+    snprintf(reloader.flag_path, sizeof(reloader.flag_path),
+             "%sreload.flag", pref);
+    LOGI("Hot reload lib_path: [%s]\n", reloader.lib_path);
+    LOGI("Hot reload flag_path: [%s]\n", reloader.flag_path);
+
+    if (!reloader.api.create) {
+        LOGI("FATAL: Could not load game logic library\n");
+        return 1;
+    }
+
+    // Initialize game state
+    reloader.api.state = reloader.api.create(dpi_scale);
+
+    int frame_counter = 0;
+    bool running = true;
+    while (running) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            ImGui_ImplSDL3_ProcessEvent(&e);
+            if (e.type == SDL_EVENT_QUIT) {
+                if (reloader.api.state && reloader.api.on_save_event)
+                    reloader.api.on_save_event(reloader.api.state);
+                running = false;
+            }
+            if (e.type == SDL_EVENT_DID_ENTER_BACKGROUND ||
+                e.type == SDL_EVENT_TERMINATING) {
+                if (reloader.api.state && reloader.api.on_save_event)
+                    reloader.api.on_save_event(reloader.api.state);
+            }
+            if (e.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
+                LOGI("Returned to foreground, checking for hot reload\n");
+                reloader.try_reload(dpi_scale);
+                frame_counter = 0;
+            }
+        }
+
+        // Check for hot reload every 60 frames (~1 second)
+        if (++frame_counter >= 60) {
+            frame_counter = 0;
+            reloader.try_reload(dpi_scale);
+        }
+
+        // Check if game wants to quit
+        if (reloader.api.state && reloader.api.wants_quit &&
+            reloader.api.wants_quit(reloader.api.state)) {
+            if (reloader.api.on_save_event)
+                reloader.api.on_save_event(reloader.api.state);
+            running = false;
+        }
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        SDL_GetWindowSizeInPixels(win, &w, &h);
+        dpi_scale = (h > 1000) ? h / 800.0f : 1.0f;
+
+        if (reloader.api.state && reloader.api.tick)
+            reloader.api.tick(reloader.api.state, w, h, dpi_scale);
+
+        ImGui::Render();
+        glViewport(0, 0, w, h);
+        glClearColor(0.08f, 0.08f, 0.10f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        SDL_GL_SwapWindow(win);
+    }
+
+    if (reloader.api.state && reloader.api.destroy)
+        reloader.api.destroy(reloader.api.state);
+    reloader.unload();
+    free(reloader.state_buf);
+
+    if (font_data) SDL_free(font_data);
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+    SDL_GL_DestroyContext(gl_ctx);
+    SDL_DestroyWindow(win);
+    SDL_Quit();
+    return 0;
+}

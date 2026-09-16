@@ -19,6 +19,10 @@ SDL3 + OpenGL playground. C11 own code, C++ deps allowed.
 ./build.sh [target]           # desktop build+run (default: combined_demo)
 ./deploy.sh                   # android APK → phone (Wi-Fi adb)
 ./compile_shaders.sh          # GLSL 450 → SPIR-V → glsl330, glsl300es, msl, hlsl
+./fast_reload.sh              # hot reload game_logic.so to phone (~0.7s, NDK direct)
+./hot_reload.sh android       # hot reload via gradle (~3s, use fast_reload.sh instead)
+./dev_msg.sh "message"        # send dev message to in-game Messages tab
+./watch_bugs.sh               # monitor bug reports on device
 ```
 
 ## Shader pipeline
@@ -50,6 +54,58 @@ Single headers need `#define ...IMPLEMENTATION` once — that's in `src/third_pa
 - JDK 21 via brew for Android builds — AS bundled JDK 25 breaks Gradle 8.9.
 - No realtime lighting — bake light into vertex colors/textures.
 - Readability via: height fog, distance fog, good procedural textures.
+
+## Hot Reload Architecture
+
+Split-library architecture for live code reloading on Android without app restart.
+
+### How it works
+
+- **libmain.so** (host.cpp) — owns SDL window, GL context, ImGui init, hot-reload machinery
+- **libimgui_shared.so** — shared ImGui + SDL3 symbols, linked PUBLIC so all .so files share one copy
+- **libgame_logic.so** — all game logic, hot-reloadable via dlopen/dlclose
+- **libSDL3.so** — SDL3 built as shared lib on Android
+
+Host checks for `reload.flag` every ~1 second. When found: serializes game state →
+dlopen new .so (unique filename, no dlclose to avoid Android backgrounding the app) →
+creates fresh state → deserializes. Game continues seamlessly.
+
+### Key details
+
+- `SDL_GetPrefPath("com.playground", "questglory")` returns `/data/data/com.playground.sdlraylib/files/` on Android
+- Serialization buffer is **heap-allocated** (1MB via malloc). Stack allocation crashes Android's SDL thread (limited stack).
+- On Android, **no dlclose** — old .so stays in memory. dlclose causes Android to background the app.
+  New .so is copied to a unique filename (`libgame_logic.so.1`, `.2`, etc.) and dlopen'd fresh.
+- `fast_reload.sh` compiles directly with NDK clang++, skipping gradle entirely (~0.7s vs ~3s).
+- `hot_reload.sh android` uses gradle (slower but guaranteed correct flags).
+- Reload flag: file with content = trigger reload; host truncates to 0 bytes after consuming.
+- Host also checks the flag on `SDL_EVENT_DID_ENTER_FOREGROUND`, so a reload pushed while the app is backgrounded lands the moment it's brought back.
+- Font size is fixed at startup (`22 * dpi_scale` in host.cpp); only style/padding can change via hot reload. `setup_touch_style` runs every tick so a bad deserialized `dpi_scale` can't stick.
+- Serialization copies `Game` by `sizeof`; changing the struct between reloads misaligns the trailing fields. Restart the app after struct changes.
+- `c++_static` STL works fine — imgui_shared.so is the bridge, no duplicate C++ runtime.
+- `CMAKE_SHARED_LINKER_FLAGS` with `-Wl,-z,max-page-size=16384` set BEFORE `FetchContent_MakeAvailable(SDL3)`.
+
+### Dev messaging
+
+- `dev_msg.sh "text"` — pushes `[DEV HH:MM:SS] text` to device's `files/dev_log.txt`
+- In-game Messages tab (QA Tools) — user types messages saved as `[YOU HH:MM:SS] text`
+- Game checks for new messages every ~0.5 seconds when Messages tab is open
+- Monitor from CLI: poll `files/dev_log.txt` via `adb shell run-as` every 1 second
+
+### File format
+
+- `dev_log.txt`: one line per message, `[DEV HH:MM:SS] text` or `[YOU HH:MM:SS] text`
+- Log is capped at `MAX_MSGS` (25, owner's choice); loader keeps the **newest**. It once kept the oldest, which silently dropped every new DEV line once the file passed the cap. `MSG_LEN` 512.
+- `mirror_to_phone.py` = Claude Code `Stop` hook (registered in the session project's `.claude/settings.local.json`): pushes every paragraph of the assistant's turn to the phone via `dev_msg.sh`, so the owner sees in-app everything said on the web. Hook config is read at session start; restart the session after changing it.
+- `dev_msg.sh` does read-append-write of the whole file; the game re-reads the file before every save so appended lines survive. Small race if you Send within the same ~100ms.
+- `reload.flag`: non-empty = reload requested; host truncates to 0 after consuming
+- `libgame_logic.so`: pushed to `files/` for hot reload; bundled copy in APK as fallback
+
+### QA Tools
+
+Debug panel (top 1/3 of screen) with two tabs:
+- **Bugs** — in-game bug reporter with binary save format (QA_SAVE_VER=2, BUG_DESC_LEN=256)
+- **Messages** — chat-style log between dev and user, timestamps, auto-scroll
 
 ## Index
 

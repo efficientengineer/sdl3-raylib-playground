@@ -67,7 +67,7 @@ void perf_draw(int sw, int sh) {
 
     float scx = 2.0f / sw, scy = 2.0f / sh;
     float x = 12.0f;
-    float y = 80.0f;
+    float y = 120.0f;
     float line = 32.0f;
 
     char buf[64];
