@@ -39,12 +39,57 @@ $CC -shared -static-libstdc++ \
     -o "$OBJ_DIR/libgame_logic.so"
 
 echo "=== Pushing to device ==="
-$ADB -s "$DEVICE" push "$OBJ_DIR/libgame_logic.so" /data/local/tmp/libgame_logic.so
-$ADB -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/libgame_logic.so files/libgame_logic.so"
+"$ADB" connect "$DEVICE" >/dev/null 2>&1 || true
+if ! "$ADB" -s "$DEVICE" get-state >/dev/null 2>&1; then
+    echo "ERROR: $DEVICE not connected. Run: $ADB connect $DEVICE" >&2
+    exit 1
+fi
+LOCAL_MD5=$(md5 -q "$OBJ_DIR/libgame_logic.so")
+"$ADB" -s "$DEVICE" push "$OBJ_DIR/libgame_logic.so" /data/local/tmp/libgame_logic.so
+# Copy to a temp name then mv so the host never dlopens a half-written file.
+"$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cp /data/local/tmp/libgame_logic.so files/libgame_logic.so.tmp && mv files/libgame_logic.so.tmp files/libgame_logic.so'"
+REMOTE_MD5=$("$ADB" -s "$DEVICE" shell "run-as $PKG md5sum files/libgame_logic.so" | cut -d' ' -f1)
+if [ "$LOCAL_MD5" != "$REMOTE_MD5" ]; then
+    echo "ERROR: checksum mismatch after push (local $LOCAL_MD5, device $REMOTE_MD5)" >&2
+    exit 1
+fi
 
+if [ -z "$("$ADB" -s "$DEVICE" shell pidof $PKG)" ]; then
+    echo "=== App not running; launching (loads new lib at startup) ==="
+    "$ADB" -s "$DEVICE" logcat -c
+    "$ADB" -s "$DEVICE" shell am start -n "$PKG/.MainActivity" >/dev/null
+    sleep 5
+    if [ -z "$("$ADB" -s "$DEVICE" shell pidof $PKG)" ]; then
+        echo "ERROR: app died on launch. Backtrace:" >&2
+        "$ADB" -s "$DEVICE" logcat -d | grep -E "F DEBUG|SDL/APP|QuestGlory" | tail -30 >&2
+        exit 1
+    fi
+    echo "=== Done (launched fresh) ==="
+    exit 0
+fi
+
+# Android pauses the SDL loop while the app is backgrounded, so the 1 s flag
+# poll never runs. Bring the app to the front first (no-op if already there).
+"$ADB" -s "$DEVICE" shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
 echo "=== Setting reload flag ==="
+"$ADB" -s "$DEVICE" logcat -c
 echo "1" > /tmp/reload.flag
-$ADB -s "$DEVICE" push /tmp/reload.flag /data/local/tmp/reload.flag > /dev/null 2>&1
-$ADB -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/reload.flag files/reload.flag"
+"$ADB" -s "$DEVICE" push /tmp/reload.flag /data/local/tmp/reload.flag > /dev/null 2>&1
+"$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/reload.flag files/reload.flag"
 
-echo "=== Done ==="
+echo "=== Waiting for host to apply reload ==="
+for i in $(seq 1 12); do
+    sleep 0.5
+    LINE=$("$ADB" -s "$DEVICE" logcat -d -s QuestGlory 2>/dev/null | grep -E "Hot reload (SUCCESS|FAILED|SKIPPED)|layout changed|failed validation" | tail -1)
+    if [ -n "$LINE" ]; then
+        echo "$LINE"
+        case "$LINE" in *SUCCESS*|*"layout changed"*|*"failed validation"*) echo "=== Done ==="; exit 0;; esac
+        exit 1
+    fi
+    if [ -z "$("$ADB" -s "$DEVICE" shell pidof $PKG)" ]; then
+        echo "ERROR: app crashed during reload. Backtrace:" >&2
+        "$ADB" -s "$DEVICE" logcat -d | grep -E "F DEBUG|SDL/APP|QuestGlory" | tail -30 >&2
+        exit 1
+    fi
+done
+echo "WARNING: no reload confirmation in 6s. App may be backgrounded; it reloads on return to foreground."

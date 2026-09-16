@@ -87,7 +87,11 @@ creates fresh state → deserializes. Game continues seamlessly.
 - Reload flag: file with content = trigger reload; host truncates to 0 bytes after consuming.
 - Host also checks the flag on `SDL_EVENT_DID_ENTER_FOREGROUND`, so a reload pushed while the app is backgrounded lands the moment it's brought back.
 - Font size is fixed at startup (`22 * dpi_scale` in host.cpp); only style/padding can change via hot reload. `setup_touch_style` runs every tick so a bad deserialized `dpi_scale` can't stick.
-- Serialization copies `Game` by `sizeof`; changing the struct between reloads misaligns the trailing fields. Restart the app after struct changes.
+- Reload blob has a header with `sizeof(Game/Character/Enemy)`. If any changed since the running build, deserialize logs "layout changed" and keeps the fresh state from `game_create` (which loads the validated `save.dat`). No restart needed; you just lose unsaved in-memory state.
+- Host loads the new .so **before** destroying the old game. A bad .so logs `Hot reload FAILED: keeping previous game logic` and the app keeps running.
+- Unique reload copies are named `libgame_logic.so.<pid>.<gen>` so a restarted process never reuses a name.
+- `fast_reload.sh` is self-verifying: checks the device is connected, verifies the pushed md5, copies via tmp+mv, brings the app to the foreground (Android pauses the SDL loop when backgrounded, so the flag poll never fires otherwise), launches the app if it's not running, then waits for `Hot reload SUCCESS/FAILED` in logcat and exits non-zero on failure. Read its output; don't assume the reload landed.
+- `deploy.sh` deletes `files/libgame_logic.so*` after install so a stale hot-reloaded lib can't shadow the freshly built APK lib.
 - `c++_static` STL works fine — imgui_shared.so is the bridge, no duplicate C++ runtime.
 - `CMAKE_SHARED_LINKER_FLAGS` with `-Wl,-z,max-page-size=16384` set BEFORE `FetchContent_MakeAvailable(SDL3)`.
 
@@ -109,9 +113,10 @@ Follow these steps in order. Don't guess from the diff alone.
    `$ADB shell run-as com.playground.sdlraylib od -A d -t d4 -N 8 files/save.dat` → `version, sizeof(Game)`.
    The loader must reject a mismatched size and validate indices; never "migrate" by copying bytes.
    To rule the save out entirely: `$ADB shell run-as com.playground.sdlraylib rm files/save.dat`.
-3. **Remember the hot-reload copies.** The app loads `files/libgame_logic.so`, not the APK's copy. After a
-   struct change, `fast_reload.sh` alone is unsafe: the serialized state won't match. Force-stop and relaunch.
-   If the app isn't running, the reload flag does nothing — relaunch with the `monkey` command above.
+3. **Remember the hot-reload copies.** The app loads `files/libgame_logic.so` if present, else the APK's copy.
+   `fast_reload.sh` handles the app-not-running and backgrounded cases itself and prints the host's verdict.
+   If it prints `WARNING: no reload confirmation`, check `pidof` and the logcat `QuestGlory` tag before retrying.
+   Changing `host.cpp` or `game_api.h` needs `./deploy.sh` (full APK); hot reload only swaps game_logic.
 4. **Verify the fix by launch, not by compile.** Confirm `$ADB shell pidof com.playground.sdlraylib` still
    returns a pid ~10 s after launch and logcat has no new `F DEBUG` lines.
 

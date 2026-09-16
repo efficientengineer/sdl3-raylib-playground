@@ -23,6 +23,7 @@
 #include "game_api.h"
 
 #include <dlfcn.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 struct HotReloader {
@@ -87,6 +88,15 @@ struct HotReloader {
         return false;
     }
 
+    // Returns the size of the file at `path`, or -1 if it can't be opened.
+    static Sint64 file_size(const char *path) {
+        SDL_IOStream *f = SDL_IOFromFile(path, "rb");
+        if (!f) return -1;
+        Sint64 sz = SDL_GetIOSize(f);
+        SDL_CloseIO(f);
+        return sz;
+    }
+
     bool try_reload(float dpi_scale) {
         bool should_reload = check_reload_flag();
 #ifndef __ANDROID__
@@ -96,55 +106,78 @@ struct HotReloader {
 
         LOGI("Hot reload triggered!\n");
 
-        // Serialize current state
-        if (api.state && api.serialize)
-            state_size = api.serialize(api.state, state_buf, state_buf_size);
-        if (api.state && api.destroy) {
-            api.destroy(api.state);
-            api.state = nullptr;
+        // Refuse to touch the running game if the new lib isn't there. This
+        // happens when the flag lands before the .so (or the push failed).
+        Sint64 new_size = file_size(lib_path);
+        if (new_size <= 0) {
+            LOGI("Hot reload SKIPPED: %s missing or empty\n", lib_path);
+            return false;
         }
 
+        // Serialize current state
+        state_size = 0;
+        if (api.state && api.serialize)
+            state_size = api.serialize(api.state, state_buf, state_buf_size);
+
+        // Load the new lib *before* destroying the old game so a bad .so
+        // leaves the running game untouched instead of a blank screen.
+        void *old_handle = lib_handle;
+        GameAPI old_api = api;
 #ifdef __ANDROID__
         // On Android, copy .so to a unique name and dlopen that instead of
         // dlclose+dlopen the same path. dlclose can cause the app to lose
         // foreground focus. Old copies leak memory but that's fine for dev.
+        // The name includes the pid so a restarted process never reuses a
+        // name the linker may still have cached from a previous run.
         char reload_path[512];
-        snprintf(reload_path, sizeof(reload_path), "%s.%d", lib_path, ++reload_gen);
-        // Copy via filesystem
+        snprintf(reload_path, sizeof(reload_path), "%s.%d.%d", lib_path, (int)getpid(), ++reload_gen);
+        Sint64 copied = 0;
         {
             SDL_IOStream *src = SDL_IOFromFile(lib_path, "rb");
             if (src) {
                 SDL_IOStream *dst = SDL_IOFromFile(reload_path, "wb");
                 if (dst) {
-                    char copybuf[4096];
+                    char copybuf[16384];
                     size_t n;
                     while ((n = SDL_ReadIO(src, copybuf, sizeof(copybuf))) > 0)
-                        SDL_WriteIO(dst, copybuf, n);
+                        copied += (Sint64)SDL_WriteIO(dst, copybuf, n);
                     SDL_CloseIO(dst);
                 }
                 SDL_CloseIO(src);
             }
         }
-        // Don't dlclose old handle — just open the new copy
+        if (copied != new_size) {
+            LOGI("Hot reload FAILED: copy %lld/%lld bytes to %s\n",
+                 (long long)copied, (long long)new_size, reload_path);
+            return false;
+        }
         lib_handle = nullptr;
         memset(&api, 0, sizeof(api));
         if (!load(reload_path)) {
-            LOGI("Hot reload FAILED\n");
+            LOGI("Hot reload FAILED: keeping previous game logic\n");
+            lib_handle = old_handle;
+            api = old_api;
             return false;
         }
 #else
         unload();
         if (!load(lib_path)) {
-            LOGI("Hot reload FAILED\n");
+            LOGI("Hot reload FAILED: keeping previous game logic\n");
+            lib_handle = old_handle;
+            api = old_api;
             return false;
         }
 #endif
+        (void)old_handle;
+
+        if (old_api.state && old_api.destroy)
+            old_api.destroy(old_api.state);
 
         api.state = api.create(dpi_scale);
         if (api.state && api.deserialize && state_size > 0)
             api.deserialize(api.state, state_buf, state_size);
 
-        LOGI("Hot reload SUCCESS\n");
+        LOGI("Hot reload SUCCESS (%lld bytes, gen %d)\n", (long long)new_size, reload_gen);
         return true;
     }
 };

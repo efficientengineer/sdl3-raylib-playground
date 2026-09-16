@@ -1019,12 +1019,12 @@ static void save_game(Game *g) {
 }
 
 // Sanity-check a loaded Game so a stale/corrupt blob can't index tables out of range.
-static bool validate_game(Game *g) {
+static bool validate_game(const Game *g) {
     if (g->screen < SCR_TITLE || g->screen > SCR_VICTORY) return false;
     if (g->party_size < 0 || g->party_size > MAX_PARTY) return false;
     if (g->enemy_count < 0 || g->enemy_count > MAX_ENEMIES) return false;
     for (int i = 0; i < g->party_size; i++) {
-        Character *c = &g->party[i];
+        const Character *c = &g->party[i];
         if (c->primary_class < CLASS_FIGHTER || c->primary_class > CLASS_BARBARIAN) return false;
         if (c->race < RACE_HUMAN || c->race > RACE_HALFLING) return false;
     }
@@ -1543,7 +1543,7 @@ static void reincarnate(Character *c) {
 // ── UI style ──
 static void setup_touch_style(float dpi_scale) {
     ImGuiStyle &s = ImGui::GetStyle();
-    float s2 = dpi_scale * 0.5f;
+    float s2 = dpi_scale;
     s.FramePadding    = ImVec2(8 * s2, 6 * s2);
     s.ItemSpacing     = ImVec2(6 * s2, 4 * s2);
     s.ItemInnerSpacing = ImVec2(4 * s2, 4 * s2);
@@ -1638,11 +1638,24 @@ static int game_wants_quit(void *state) {
     return gs->quit_requested ? 1 : 0;
 }
 
+// Hot-reload state blob: header + raw Game + dpi + rng. The header records the
+// struct sizes so a reload across a layout change is detected instead of
+// memcpy'ing misaligned bytes (which produced garbage state and crashes).
+struct ReloadHeader {
+    uint32_t magic;       // 'QGRL'
+    uint32_t game_size;   // sizeof(Game)
+    uint32_t char_size;   // sizeof(Character)
+    uint32_t enemy_size;  // sizeof(Enemy)
+};
+#define RELOAD_MAGIC 0x4C524751u
+
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     GameState *gs = (GameState *)state;
-    size_t needed = sizeof(Game) + sizeof(float) + sizeof(uint64_t);
+    size_t needed = sizeof(ReloadHeader) + sizeof(Game) + sizeof(float) + sizeof(uint64_t);
     if (!buf || buf_size < needed) return needed;
     char *p = (char *)buf;
+    ReloadHeader h = { RELOAD_MAGIC, (uint32_t)sizeof(Game), (uint32_t)sizeof(Character), (uint32_t)sizeof(Enemy) };
+    memcpy(p, &h, sizeof(h)); p += sizeof(h);
     memcpy(p, &gs->game, sizeof(Game)); p += sizeof(Game);
     memcpy(p, &gs->dpi_scale, sizeof(float)); p += sizeof(float);
     memcpy(p, &rng_state, sizeof(uint64_t));
@@ -1652,9 +1665,27 @@ static size_t game_serialize(void *state, void *buf, size_t buf_size) {
 static void game_deserialize(void *state, const void *buf, size_t size) {
     GameState *gs = (GameState *)state;
     const char *p = (const char *)buf;
-    if (size >= sizeof(Game)) { memcpy(&gs->game, p, sizeof(Game)); p += sizeof(Game); }
-    if (size >= sizeof(Game) + sizeof(float)) { memcpy(&gs->dpi_scale, p, sizeof(float)); p += sizeof(float); }
-    if (size >= sizeof(Game) + sizeof(float) + sizeof(uint64_t)) { memcpy(&rng_state, p, sizeof(uint64_t)); }
+    ReloadHeader h = {};
+    bool layout_ok = size >= sizeof(h);
+    if (layout_ok) { memcpy(&h, p, sizeof(h)); p += sizeof(h); size -= sizeof(h); }
+    layout_ok = layout_ok && h.magic == RELOAD_MAGIC && h.game_size == sizeof(Game)
+             && h.char_size == sizeof(Character) && h.enemy_size == sizeof(Enemy)
+             && size >= sizeof(Game);
+    if (!layout_ok) {
+        // Layout changed between builds. Keep the fresh state from game_create
+        // (which already loaded the validated save.dat) rather than corrupt it.
+        SDL_Log("Hot reload: Game layout changed (blob %u/%u/%u vs %u/%u/%u) — state reset from save.dat",
+                h.game_size, h.char_size, h.enemy_size,
+                (unsigned)sizeof(Game), (unsigned)sizeof(Character), (unsigned)sizeof(Enemy));
+        return;
+    }
+    if (!validate_game((Game *)p)) { // blob is a raw Game; validate in place before adopting it
+        SDL_Log("Hot reload: serialized Game failed validation — state reset from save.dat");
+        return;
+    }
+    memcpy(&gs->game, p, sizeof(Game)); p += sizeof(Game); size -= sizeof(Game);
+    if (size >= sizeof(float)) { memcpy(&gs->dpi_scale, p, sizeof(float)); p += sizeof(float); size -= sizeof(float); }
+    if (size >= sizeof(uint64_t)) { memcpy(&rng_state, p, sizeof(uint64_t)); }
     setup_touch_style(gs->dpi_scale);
 }
 
@@ -2283,14 +2314,8 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                 if (e->shake_timer > 0) e->shake_timer -= io_dt;
                 ImGui::PushID(100+i);
                 if (i % 4 != 0) ImGui::SameLine();
-                // Apply shake offset
-                float shake_x = 0;
-                if (e->shake_timer > 0) {
-                    float intensity = e->shake_timer / 0.3f; // 1→0
-                    shake_x = sinf(e->shake_timer * 60.0f) * 4.0f * dpi_scale * intensity;
-                }
-                if (shake_x != 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + shake_x);
                 ImVec2 cell_start = ImGui::GetCursorScreenPos();
+                int vtx_before = ImGui::GetWindowDrawList()->VtxBuffer.Size;
                 ImGui::BeginGroup();
                 bool sel = (game.selected_target == i);
                 if (!e->alive) {
@@ -2309,6 +2334,14 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                 ImVec2 cell_end = ImVec2(cell_start.x + cell_w + 2*dpi_scale, ImGui::GetItemRectMax().y + 2*dpi_scale);
                 ImU32 bg = (i % 2 == 0) ? IM_COL32(40, 40, 55, 100) : IM_COL32(55, 55, 70, 100);
                 ImGui::GetWindowDrawList()->AddRectFilled(cell_start, cell_end, bg);
+                // Shake: offset rendered vertices without affecting layout
+                if (e->shake_timer > 0) {
+                    float intensity = e->shake_timer / 0.3f;
+                    float sx = sinf(e->shake_timer * 60.0f) * 4.0f * dpi_scale * intensity;
+                    ImDrawList *dl = ImGui::GetWindowDrawList();
+                    for (int v = vtx_before; v < dl->VtxBuffer.Size; v++)
+                        dl->VtxBuffer[v].pos.x += sx;
+                }
                 ImGui::PopID();
             }
             ImGui::SetWindowFontScale(1.0f);
@@ -2339,14 +2372,8 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                 if (c->shake_timer > 0) c->shake_timer -= io_dt;
                 ImGui::PushID(200+i);
                 if (i % 4 != 0) ImGui::SameLine();
-                // Apply shake offset
-                float pshake_x = 0;
-                if (c->shake_timer > 0) {
-                    float intensity = c->shake_timer / 0.3f;
-                    pshake_x = sinf(c->shake_timer * 60.0f) * 4.0f * dpi_scale * intensity;
-                }
-                if (pshake_x != 0) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + pshake_x);
                 ImVec2 pcell_start = ImGui::GetCursorScreenPos();
+                int pvtx_before = ImGui::GetWindowDrawList()->VtxBuffer.Size;
                 ImGui::BeginGroup();
                 ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + pcell_w);
                 bool is_active = (game.player_turn && game.turn_index == i && c->alive);
@@ -2373,6 +2400,14 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
                 ImVec2 pcell_end = ImVec2(pcell_start.x + pcell_w + 2*dpi_scale, ImGui::GetItemRectMax().y + 2*dpi_scale);
                 ImU32 pbg = (i % 2 == 0) ? IM_COL32(40, 50, 40, 100) : IM_COL32(50, 60, 50, 100);
                 ImGui::GetWindowDrawList()->AddRectFilled(pcell_start, pcell_end, pbg);
+                // Shake: offset rendered vertices without affecting layout
+                if (c->shake_timer > 0) {
+                    float intensity = c->shake_timer / 0.3f;
+                    float sx = sinf(c->shake_timer * 60.0f) * 4.0f * dpi_scale * intensity;
+                    ImDrawList *dl = ImGui::GetWindowDrawList();
+                    for (int v = pvtx_before; v < dl->VtxBuffer.Size; v++)
+                        dl->VtxBuffer[v].pos.x += sx;
+                }
                 ImGui::PopID();
             }
             ImGui::SetWindowFontScale(1.0f);
