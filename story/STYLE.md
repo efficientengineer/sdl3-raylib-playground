@@ -18,6 +18,17 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
 4. **No readable text in images.** Image models mangle pixel fonts. Dialogue lives in
    the scene file and is drawn by the game. The image gets an empty dialogue box at most.
 5. If the tool rejects a scene, fix the scene. Do not bypass the tool.
+6. **Three scene types**, chosen by the `- type:` line in the scene file. A **panel** scene (the
+   default, no `type` line) is a manga page and obeys every composition rule below. A **narration**
+   scene is text over black: `## Dialogue` only. A **talk** scene is a Phantasy Star IV field
+   conversation: `## Dialogue` only, no panels and no `[n]` reveal tags, with each speaker's
+   portrait drawn beside the dialogue box; an optional `- backdrop: <scene_stem>:<panel_number>`
+   shows an existing panel from another scene dimmed behind it. Narration and talk scenes need no
+   art, so `sheet` and `build` refuse them. Portraits are not drawn by hand either: they are cut
+   from the middle panel of each character's reference sheet by `./story_prompt.py portraits`, which
+   is why the `refsheet` block puts a head-and-shoulders portrait in the middle. Within a scene the
+   first speaker's portrait sits on the left, the second's on the right, and later speakers
+   alternate; a speaker keeps their side for the whole scene.
 
 ## Composition rules (enforced by `story_prompt.py`)
 

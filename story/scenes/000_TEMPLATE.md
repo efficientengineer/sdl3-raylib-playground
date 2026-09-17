@@ -1,5 +1,13 @@
 # Scene 000: Title
 
+Three scene types, set by the `- type:` line. This template shows a **panel** scene (the default,
+omit the line): a manga page, `## Panels` plus `## Dialogue`, all composition rules apply.
+`- type: narration` is text over black: `## Dialogue` only, no panels (see `p01_prologue.md`).
+`- type: talk` is a Phantasy Star IV field conversation: `## Dialogue` only, no panels and no `[n]`
+reveal tags, speaker portraits beside the dialogue box, and an optional
+`- backdrop: <scene_stem>:<panel_number>` naming a panel from another scene to show dimmed behind it
+(see `003b_after_the_warning.md`). Talk scenes need no art of their own.
+
 - location: one visual sentence describing the place
 - characters: Name, Name
 - mood: one or two words

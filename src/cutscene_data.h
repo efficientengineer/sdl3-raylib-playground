@@ -2,18 +2,22 @@
 #pragma once
 
 enum CsMood { CS_WONDER, CS_DREAD, CS_TENSE, CS_CONFRONT, CS_SORROW, CS_HOPE, CS_MOOD_COUNT };
+enum CsKind { CS_PANELS, CS_NARRATION, CS_TALK };   // panels = manga page, narration = text over black, talk = dialogue box over black or a dimmed backdrop
+enum CsSide { CS_LEFT, CS_RIGHT };                   // which end of the dialogue box a portrait sits at
 struct CsRect { float x, y, w, h; };                 // percent of the stage
 struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen
-struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood; };  // reveal 0 = none
-struct CsScene { const char *id; const char *title; bool narration;
+struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood;  // reveal 0 = none
+                const char *portrait; CsSide side; };  // portrait file, or nullptr when the speaker has none
+struct CsScene { const char *id; const char *title; bool narration;   // narration == (kind == CS_NARRATION)
+                 CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
 
 static const CsLine CS_p01_prologue_LINES[] = {
-    { "Narrator", "Long ago, the people of the hills built their halls downward, toward something that sang to them in the dark.", 0, CS_WONDER },
-    { "Narrator", "They grew wise there. They grew rich. And then, in a single season, they sealed every door from the inside.", 0, CS_WONDER },
-    { "Narrator", "No one came out. The guards who held those doors swore an oath that outlasted their lives.", 0, CS_DREAD },
-    { "Narrator", "A thousand years later, a contract appeared on a frontier quest board. Clear the entrance. Ask no questions.", 0, CS_DREAD },
-    { "Narrator", "Four hunters signed it. Two of them reached the first door ahead of the others.", 0, CS_TENSE },
+    { "Narrator", "Long ago, the people of the hills built their halls downward, toward something that sang to them in the dark.", 0, CS_WONDER, nullptr, CS_LEFT },
+    { "Narrator", "They grew wise there. They grew rich. And then, in a single season, they sealed every door from the inside.", 0, CS_WONDER, nullptr, CS_LEFT },
+    { "Narrator", "No one came out. The guards who held those doors swore an oath that outlasted their lives.", 0, CS_DREAD, nullptr, CS_LEFT },
+    { "Narrator", "A thousand years later, a contract appeared on a frontier quest board. Clear the entrance. Ask no questions.", 0, CS_DREAD, nullptr, CS_LEFT },
+    { "Narrator", "Four hunters signed it. Two of them reached the first door ahead of the others.", 0, CS_TENSE, nullptr, CS_LEFT },
 };
 
 static const CsPanel CS_003_the_warning_PANELS[] = {
@@ -26,17 +30,27 @@ static const CsPanel CS_003_the_warning_PANELS[] = {
     { "003_the_warning_p7_portrait_inset.png", 1, {82.0f, 38.0f, 17.0f, 29.6f}, {69.0f, 36.0f, 30.0f, 26.1f} },
 };
 static const CsLine CS_003_the_warning_LINES[] = {
-    { "Bron", "It's blocking the way.", 1, CS_TENSE },
-    { "Lyra", "No. Look at it. It's pointing us back the way we came.", 2, CS_DREAD },
-    { "Bron", "A dead man doesn't give me orders.", 3, CS_TENSE },
-    { "Bron", "Then it can point while I walk through it!", 4, CS_CONFRONT },
-    { "Lyra", "Bron, wait!", 5, CS_CONFRONT },
-    { "Lyra", "It hasn't moved. It could have cut us down the moment that door opened.", 6, CS_DREAD },
-    { "Lyra", "It isn't guarding the door from us. It's still guarding us from the door.", 7, CS_SORROW },
+    { "Bron", "It's blocking the way.", 1, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Lyra", "No. Look at it. It's pointing us back the way we came.", 2, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
+    { "Bron", "A dead man doesn't give me orders.", 3, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Bron", "Then it can point while I walk through it!", 4, CS_CONFRONT, "portrait_bron.png", CS_LEFT },
+    { "Lyra", "Bron, wait!", 5, CS_CONFRONT, "portrait_lyra.png", CS_RIGHT },
+    { "Lyra", "It hasn't moved. It could have cut us down the moment that door opened.", 6, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
+    { "Lyra", "It isn't guarding the door from us. It's still guarding us from the door.", 7, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
+};
+
+static const CsLine CS_003b_after_the_warning_LINES[] = {
+    { "Bron", "It's still standing there. It hasn't even shifted its grip.", 0, CS_DREAD, "portrait_bron.png", CS_LEFT },
+    { "Lyra", "It won't. It's been holding that gap for a thousand years.", 0, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
+    { "Bron", "Then whatever it's holding it against is still down there.", 0, CS_DREAD, "portrait_bron.png", CS_LEFT },
+    { "Lyra", "That's what frightens me. It sealed itself in with the thing it was afraid of.", 0, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
+    { "Bron", "The contract says clear the entrance. Nobody said anything about what's behind it.", 0, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Lyra", "Then we go in with our eyes open. And we tell the others before we take another step.", 0, CS_HOPE, "portrait_lyra.png", CS_RIGHT },
 };
 
 static const CsScene CS_INTRO[] = {
-    { "p01_prologue", "Beneath the Hills", true, nullptr, 0, CS_p01_prologue_LINES, 5 },
-    { "003_the_warning", "The Warning", false, CS_003_the_warning_PANELS, 7, CS_003_the_warning_LINES, 7 },
+    { "p01_prologue", "Beneath the Hills", true, CS_NARRATION, nullptr, nullptr, 0, CS_p01_prologue_LINES, 5 },
+    { "003_the_warning", "The Warning", false, CS_PANELS, nullptr, CS_003_the_warning_PANELS, 7, CS_003_the_warning_LINES, 7 },
+    { "003b_after_the_warning", "After the Warning", false, CS_TALK, "003_the_warning_p6_full_body_reveal.png", nullptr, 0, CS_003b_after_the_warning_LINES, 6 },
 };
 static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);

@@ -17,12 +17,23 @@ and combat are deliberately not started. It builds as `libgame_logic.so`, so eve
 kept for reference and **no longer built**; don't add features there.
 
 - **Content is data.** Scenes live in `story/scenes/*.md`; `story/playlist.md` orders them.
-  `./story_prompt.py export` writes `src/cutscene_data.h` (text, panel layout, reveal order, music
-  mood per line). `fast_reload.sh` and `deploy.sh` both run the export first, so editing a scene file
-  and hot reloading is the whole loop. Never edit `cutscene_data.h` by hand.
-- **Panel art** comes from `story/panels/`. `fast_reload.sh` pushes new or changed PNGs to the phone's
-  `files/cutscenes/`; `deploy.sh` bundles them into the APK assets. The game looks in `files/` first.
-  A playlist scene whose panels aren't all generated yet is skipped by the export, with a warning.
+  `./story_prompt.py export` writes `src/cutscene_data.h` (scene kind, text, panel layout, reveal
+  order, music mood, portrait and portrait side per line). `fast_reload.sh` and `deploy.sh` both run
+  the export first, so editing a scene file and hot reloading is the whole loop. Never edit
+  `cutscene_data.h` by hand.
+- **Three scene kinds** (`CsKind`, the scene file's `- type:` line): `panels` (default) is the manga
+  page; `narration` is text over black; `talk` is a Phantasy Star IV field conversation — no panels,
+  black background or the `- backdrop:` panel shown dimmed, dialogue box with speaker portraits.
+- **Speaker portraits** are drawn at one end of the dialogue box in panel *and* talk scenes, with the
+  text narrowed to fit and the name still in yellow. They slide in when the speaker changes. The
+  first speaker in a scene takes the left, the second the right, later speakers alternate, and a
+  speaker keeps their side for the whole scene. A line with no portrait (a narrator, an NPC with no
+  reference sheet) draws the box exactly as it was before portraits existed.
+- **Panel art** comes from `story/panels/`, portraits from `story/portraits/` (generated, gitignored).
+  `fast_reload.sh` pushes new or changed PNGs to the phone's `files/cutscenes/`; `deploy.sh` bundles
+  them into the APK assets. Portraits ship under the name `portrait_<name>.png`. The game looks in
+  `files/` first. A playlist scene whose panels aren't all generated yet is skipped by the export,
+  with a warning; talk and narration scenes are never skipped.
 - **Hot reload keeps your place**: screen, scene, and line index survive, and the page is rebuilt
   from them. Edit a line of dialogue or a music pattern and judge it on the line you were looking at.
 - **Music** is one sequencer with six moods (`wonder, dread, tense, confront, sorrow, hope`), two-operator
@@ -57,6 +68,7 @@ kept for reference and **no longer built**; don't add features there.
 ./watch_bugs.sh               # monitor bug reports on device
 ./story_prompt.py sheet <scene>  # scene file → ChatGPT package (prompt + refs to attach) in story/out/
 ./story_prompt.py slice <sheet.json> <img>  # cut the generated shot sheet into story/panels/
+./story_prompt.py portraits      # refs sheets → story/portraits/<name>.png (dialogue-box portraits)
 ```
 
 ## Shader pipeline
@@ -189,7 +201,8 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
   overlapping, so they can be cut apart. The game layers the panels into the manga page itself.
   1. `./story_prompt.py refsheet <Name>` once per character → owner generates it and saves it at the
      character's `ref:` path in `characters.md` (`story/refs/<name>.png`). Optional style reference
-     at `story/refs/style.png`.
+     at `story/refs/style.png`. That sheet's middle panel also becomes the character's in-game
+     dialogue portrait — see "Portraits" below — so keep it head-and-shoulders.
   2. `./story_prompt.py sheet <scene> [more scenes]` → `story/out/<name>.chatgpt.md`: which files to
      attach in which order, and the prompt to paste. Max 6 panels per sheet; two 3-panel scenes fit one.
      The tool computes a varied layout (tall panels get a side column spanning most of the height,
@@ -204,6 +217,17 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
      manga-style and reveals them line by line with a dialogue box (tap or space to advance; `#all`
      on the URL shows every panel at once). Missing panel images become labelled placeholders, so a
      scene's pacing can be tested before any art exists. This is the reference for the in-game player.
+- **Talk scenes need no art.** `- type: talk` is a field conversation: no `## Panels`, no `[n]` reveal
+  tags, `## Dialogue` only. `- backdrop: <scene_stem>:<panel_number>` optionally names an existing
+  panel from another scene to show dimmed behind the box (the tool checks that the scene and panel
+  exist; a not-yet-generated image is only a warning). `sheet` and `build` refuse a talk scene;
+  `check`, `brief`, `export`, and `preview` handle it. Any speaker name works — one not in
+  `characters.md` is a one-off NPC and just gets no portrait.
+- **Portraits.** `./story_prompt.py portraits` cuts every character's reference sheet down to its
+  middle panel (the head-and-shoulders portrait the `refsheet` block asks for) and writes
+  `story/portraits/<name>.png`. It reuses the same border detection as `slice`, needs exactly three
+  panels on the sheet, and warns and skips otherwise. `fast_reload.sh` and `deploy.sh` run it before
+  the export, so regenerating a reference sheet and hot reloading updates the in-game portrait.
 - **Pages and sheet size.** A scene is 1-3 pages of 2-4 panels, at most 8 panels, with `---` in
   `## Panels` starting a new page (the game clears the screen, as Phantasy Star IV does). Aim for 6-8
   shots in a scene that matters. One sheet holds the whole scene: up to 4 panels use 1536x1024-class
@@ -258,4 +282,5 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
 - `assets/` — Roboto-Regular.ttf (also copied to android assets)
 - `third_party/` — single-header libs (stb, par_shapes, FastNoiseLite, sokol)
 - `android/` — Gradle project, SDLActivity, reuses root CMake
-- `story/` — `STYLE.md` (locked art rules), `characters.md`, `plot.md`, `scenes/`; `story_prompt.py` builds prompts
+- `story/` — `STYLE.md` (locked art rules), `characters.md`, `plot.md`, `scenes/`, `panels/`, `refs/`,
+  `portraits/` (generated from `refs/`, gitignored); `story_prompt.py` builds prompts and exports

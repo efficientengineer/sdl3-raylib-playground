@@ -22,7 +22,9 @@ GAME_SRC="$SCRIPT_DIR/src/star_logic.cpp"
 IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
 SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"
 
-# Scene text and panel layout are compiled in: regenerate the header from story/ on every reload.
+# Speaker portraits are cut from the reference sheets; scene text and panel layout are compiled in.
+# Regenerate both from story/ on every reload (portraits first: export records which ones exist).
+"$SCRIPT_DIR/story_prompt.py" portraits
 "$SCRIPT_DIR/story_prompt.py" export
 SDL3_INC="$CXX_DIR/_deps/sdl3-src/include"
 SDL3_BUILD_INC="$CXX_DIR/_deps/sdl3-build/include-revision"
@@ -54,17 +56,25 @@ if ! "$ADB" -s "$DEVICE" get-state >/dev/null 2>&1; then
     echo "ERROR: $DEVICE not connected. Run: $ADB connect $DEVICE" >&2
     exit 1
 fi
-# Panel images: push only the ones the device doesn't already have at the same size.
+# Panel images and speaker portraits: push only the ones the device doesn't already have at the same size.
 "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/cutscenes"
 HAVE="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/cutscenes && stat -c \"%n %s\" *.png 2>/dev/null'" | tr -d '\r')"
-for f in "$SCRIPT_DIR"/story/panels/*.png; do
-    [ -f "$f" ] || continue
-    n="$(basename "$f")"; sz="$(stat -f %z "$f")"
+push_art() {                                   # $1 = local file, $2 = name on the device
+    local f="$1" n="$2" sz
+    sz="$(stat -f %z "$f")"
     if ! echo "$HAVE" | grep -qx "$n $sz"; then
-        echo "  panel $n"
+        echo "  art $n"
         "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
         "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/cutscenes/$n && rm /data/local/tmp/$n"
     fi
+}
+for f in "$SCRIPT_DIR"/story/panels/*.png; do
+    [ -f "$f" ] || continue
+    push_art "$f" "$(basename "$f")"
+done
+for f in "$SCRIPT_DIR"/story/portraits/*.png; do   # cutscene_data.h names these portrait_<name>.png
+    [ -f "$f" ] || continue
+    push_art "$f" "portrait_$(basename "$f")"
 done
 
 LOCAL_MD5=$(md5 -q "$OBJ_DIR/libgame_logic.so")

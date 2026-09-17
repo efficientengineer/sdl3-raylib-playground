@@ -239,7 +239,8 @@ static const char *pref_path() {
 
 struct Tex { GLuint id; int w, h; };
 
-// Panels load from <pref>/cutscenes/ first (pushed by fast_reload.sh), then from the APK assets.
+// Panels, speaker portraits, and talk backdrops all load from <pref>/cutscenes/ first
+// (pushed by fast_reload.sh), then from the APK assets.
 static Tex tex_load(const char *file) {
     Tex t = {0, 0, 0};
     char path[768];
@@ -330,7 +331,9 @@ static void dev_send(const char *text) {
 
 enum Screen { SCR_TITLE, SCR_INTRO, SCR_END };
 #define MAX_PANELS 12
+#define MAX_FACES 6               // distinct speaker portraits cached per scene
 #define PANEL_IN 0.28f            // seconds for a panel to arrive
+#define FACE_IN 0.22f             // seconds for a portrait to slide in when the speaker changes
 #define TYPE_CPS 42.0f            // typewriter characters per second
 
 struct Star {
@@ -343,15 +346,50 @@ struct Star {
     int panel_z[MAX_PANELS], z_next;
     int page;                     // page currently on screen; revealing a panel from another page clears it
     Tex tex[MAX_PANELS];
+    Tex face[MAX_FACES];          // speaker portraits, one per distinct file in the scene
+    const char *face_file[MAX_FACES];
+    Tex backdrop;                 // talk scenes: the panel shown dimmed behind the conversation
     int tex_scene;                // which scene's textures are loaded (-1 = none)
+    const char *face_cur;         // portrait on screen, so a change can slide the new one in
+    float face_t;
     float dpi_scale;
     float title_t;
 };
 
 static void star_free_textures(Star *st) {
     for (int i = 0; i < MAX_PANELS; i++) if (st->tex[i].id) glDeleteTextures(1, &st->tex[i].id);
+    for (int i = 0; i < MAX_FACES; i++) if (st->face[i].id) glDeleteTextures(1, &st->face[i].id);
+    if (st->backdrop.id) glDeleteTextures(1, &st->backdrop.id);
     memset(st->tex, 0, sizeof(st->tex));
+    memset(st->face, 0, sizeof(st->face));
+    memset(st->face_file, 0, sizeof(st->face_file));
+    st->backdrop = Tex{0, 0, 0};
     st->tex_scene = -1;
+    st->face_cur = nullptr;
+}
+
+static bool same_file(const char *a, const char *b) { return a == b || (a && b && !strcmp(a, b)); }
+
+// The scene's portraits, loaded once in star_goto. Null file or an unknown one means "no portrait",
+// and the dialogue box is then drawn exactly as it is without one.
+static const Tex *face_tex(Star *st, const char *file) {
+    if (!file) return nullptr;
+    for (int i = 0; i < MAX_FACES; i++)
+        if (same_file(st->face_file[i], file)) return st->face[i].id ? &st->face[i] : nullptr;
+    return nullptr;
+}
+
+static void load_faces(Star *st, const CsScene *sc) {
+    int n = 0;
+    for (int i = 0; i < sc->line_count && n < MAX_FACES; i++) {
+        const char *f = sc->lines[i].portrait;
+        if (!f) continue;
+        bool seen = false;
+        for (int k = 0; k < n; k++) seen = seen || same_file(st->face_file[k], f);
+        if (seen) continue;
+        st->face_file[n] = f;
+        st->face[n++] = tex_load(f);
+    }
 }
 
 static void reveal_panel(Star *st, const CsScene *sc, int n, bool instant) {   // n is 1-based, 0 = none
@@ -374,6 +412,8 @@ static void star_goto(Star *st, int scene, int line, bool instant) {
     if (st->tex_scene != scene) {
         star_free_textures(st);
         for (int i = 0; i < sc->panel_count && i < MAX_PANELS; i++) st->tex[i] = tex_load(sc->panels[i].file);
+        if (sc->backdrop) st->backdrop = tex_load(sc->backdrop);
+        load_faces(st, sc);
         st->tex_scene = scene;
     }
     if (scene != st->scene || line == 0 || instant) {
@@ -386,6 +426,10 @@ static void star_goto(Star *st, int scene, int line, bool instant) {
     st->scene = scene;
     st->line = line;
     st->line_t = instant ? 99.0f : 0.0f;
+    if (!same_file(st->face_cur, sc->lines[line].portrait)) {              // a new speaker slides in
+        st->face_cur = sc->lines[line].portrait;
+        st->face_t = instant ? FACE_IN : 0.0f;
+    }
     reveal_panel(st, sc, sc->lines[line].reveal, instant);
     mus_start(sc->lines[line].mood);
 }
@@ -456,6 +500,15 @@ static void draw_scene(Star *st, int w, int h, float dt) {
     }
     float u = text_size * 0.12f;
 
+    // Talk scenes: no panels, just the named backdrop panel dimmed and centred behind the box.
+    if (sc->kind == CS_TALK && st->backdrop.id) {
+        float ia = (float)st->backdrop.w / (float)st->backdrop.h, dw = sw, dh = sh;
+        if (ia > sw / sh) dh = sw / ia; else dw = sh * ia;
+        ImVec2 p0(sx + (sw - dw) * 0.5f, sy + (sh - dh) * 0.5f);
+        dl->AddImage((ImTextureID)(intptr_t)st->backdrop.id, p0, ImVec2(p0.x + dw, p0.y + dh),
+                     ImVec2(0, 0), ImVec2(1, 1), IM_COL32(80, 80, 92, 255));   // tint multiplies: dim, slightly cool
+    }
+
     // Panels, oldest first so newer ones overlap them.
     for (int z = 0; z < st->z_next; z++) {
         for (int i = 0; i < sc->panel_count && i < MAX_PANELS; i++) {
@@ -483,6 +536,7 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         static int last_blip = -1;
         if (chars / 3 != last_blip && ln->text[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, sc->narration ? 520.0f : 760.0f, 0.04f, 0.10f); }
     }
+    float arrow_x = bx1 - text_size * 1.1f;                                // moves in when a portrait sits on the right
     if (sc->narration) {
         float a = ease_out(st->line_t / 0.6f);
         float size = text_size * 1.08f, width = (port ? w * 0.84f : w * 0.7f);
@@ -490,11 +544,32 @@ static void draw_scene(Star *st, int w, int h, float dt) {
     } else {
         draw_box(dl, ImVec2(bx0, by0), ImVec2(bx1, by1), u);
         float pad = text_size * 0.75f;
-        dl->AddText(font, text_size * 0.92f, ImVec2(bx0 + pad, by0 + pad * 0.7f), IM_COL32(255, 216, 74, 255), ln->speaker);
-        draw_typed(dl, font, text_size, ImVec2(bx0 + pad, by0 + pad * 0.7f + text_size * 1.35f), (bx1 - bx0) - pad * 2, IM_COL32_WHITE, ln->text, chars, false);
+        float tx0 = bx0 + pad, tx1 = bx1 - pad;
+        // Speaker portrait at one end of the box (Phantasy Star IV field talk), text narrowed to fit.
+        const Tex *fa = face_tex(st, ln->portrait);
+        if (fa) {
+            st->face_t += dt;
+            float inset = u * 2.0f, fh = (by1 - by0) - inset * 2.0f;
+            float fw = fh * (float)fa->w / (float)fa->h, cap = (bx1 - bx0) * 0.3f;
+            if (fw > cap) { fw = cap; fh = fw * (float)fa->h / (float)fa->w; }
+            bool right = (ln->side == CS_RIGHT);
+            float a = ease_out(st->face_t / FACE_IN);
+            float fx = right ? bx1 - inset - fw : bx0 + inset;
+            float fy = by0 + ((by1 - by0) - fh) * 0.5f;
+            ImVec2 f0(fx + (1.0f - a) * fw * 0.4f * (right ? 1.0f : -1.0f), fy), f1(f0.x + fw, f0.y + fh);
+            dl->AddRectFilled(f0, f1, with_alpha(IM_COL32(6, 8, 22, 255), a));
+            dl->AddImage((ImTextureID)(intptr_t)fa->id, f0, f1, ImVec2(0, 0), ImVec2(1, 1), with_alpha(IM_COL32_WHITE, a));
+            dl->AddRect(f0, f1, with_alpha(IM_COL32(225, 225, 235, 255), a), 0, 0, u * 0.7f);
+            dl->AddRect(ImVec2(f0.x + u * 0.8f, f0.y + u * 0.8f), ImVec2(f1.x - u * 0.8f, f1.y - u * 0.8f),
+                        with_alpha(IM_COL32(90, 100, 150, 255), a), 0, 0, u * 0.35f);
+            if (right) { tx1 = fx - pad * 0.6f; arrow_x = fx - text_size * 0.7f; }
+            else tx0 = fx + fw + pad * 0.6f;
+        }
+        dl->AddText(font, text_size * 0.92f, ImVec2(tx0, by0 + pad * 0.7f), IM_COL32(255, 216, 74, 255), ln->speaker);
+        draw_typed(dl, font, text_size, ImVec2(tx0, by0 + pad * 0.7f + text_size * 1.35f), tx1 - tx0, IM_COL32_WHITE, ln->text, chars, false);
     }
     if (!typing && fmodf(st->line_t, 1.0f) < 0.6f) {                       // blinking "more" arrow
-        ImVec2 c = sc->narration ? ImVec2(w * 0.5f, h * (port ? 0.72f : 0.8f)) : ImVec2(bx1 - text_size * 1.1f, by1 - text_size * 0.95f);
+        ImVec2 c = sc->narration ? ImVec2(w * 0.5f, h * (port ? 0.72f : 0.8f)) : ImVec2(arrow_x, by1 - text_size * 0.95f);
         dl->AddTriangleFilled(ImVec2(c.x - text_size * 0.4f, c.y), ImVec2(c.x + text_size * 0.4f, c.y), ImVec2(c.x, c.y + text_size * 0.45f), IM_COL32_WHITE);
     }
 

@@ -6,10 +6,18 @@ ADB=~/Library/Android/sdk/platform-tools/adb
 
 "$ADB" connect "$PHONE" 2>/dev/null || true
 
-# Bundle scene data and panel art into the APK (the copies are generated; story/ is the source).
+# Bundle scene data, panel art, and speaker portraits into the APK (the copies are generated;
+# story/ is the source). Portraits run first: the export records which ones exist.
+./story_prompt.py portraits
 ./story_prompt.py export
 mkdir -p android/app/src/main/assets/cutscenes
-rsync -a --delete --include='*.png' --exclude='*' story/panels/ android/app/src/main/assets/cutscenes/
+# portrait_*.png is excluded so --delete leaves the portraits copied in below alone.
+rsync -a --delete --exclude='portrait_*.png' --include='*.png' --exclude='*' story/panels/ android/app/src/main/assets/cutscenes/
+for f in story/portraits/*.png; do
+    [ -f "$f" ] || continue
+    d="android/app/src/main/assets/cutscenes/portrait_$(basename "$f")"   # the name cutscene_data.h uses
+    cmp -s "$f" "$d" || cp "$f" "$d"
+done
 
 export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
 cd android

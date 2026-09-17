@@ -9,3 +9,4 @@ safe to list scenes whose art is not generated yet.
 - 001_sealed_door
 - 002_the_guard
 - 003_the_warning
+- 003b_after_the_warning
