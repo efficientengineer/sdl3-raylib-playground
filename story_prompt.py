@@ -41,6 +41,8 @@ STYLE_WORDS = ["gradient", "photorealistic", "3d", "blur", "glow", "painterly",
                "realistic", "hd", "4k", "smooth"]   # R8
 TEXT_WORDS = ["text", "caption", "speech bubble", "lettering", "written", "inscription reading",
               "sign saying", "sign that says", "sign reading", "the words", "subtitle"]  # R9
+LOOK_BANNED = ["dwarf", "dwarven", "halfling", "hobbit", "elf", "elven", "gnome", "orc", "fighter",
+               "rogue", "cleric", "wizard", "ranger", "barbarian", "paladin", "beard", "bearded"]  # see characters.md
 REQUIRED_BLOCKS = ["header", "layout", "framing", "character_design", "rendering",
                    "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet", "refsheet_avoid"]
 
@@ -136,6 +138,10 @@ def load_cast():
     for name, body in h2_sections(CAST.read_text()).items():
         kv = kv_lines(body)
         if "look" in kv:
+            bad = [w for w in LOOK_BANNED if re.search(rf"\b{w}\b", kv["look"], flags=re.I)]
+            if bad:
+                die(f"characters.md: {name.title()}'s look contains {bad}. Race, class, and beard words pull image "
+                    f"models toward Western fantasy. Describe only what is visible (see 'Design direction').")
             # h2_sections lowercases; recover the display name from the look or title-case it
             cast[name] = {"name": name.title(), **kv}
     if not cast:

@@ -73,10 +73,14 @@ entirely by a flat color, dithered tone, or speed lines in emotional moments.
 ### character_design
 
 ```
-Early 90s anime and manga character design: sharp angular faces, large eyes
-with simple highlights, spiky layered hair with hard-edged shine bands, lean
-proportions. Clean dark outlines, flat cel shading with only 2-3 tones per
-color, no gradients.
+1990s Japanese anime and manga character design, like the cast of a 1993
+sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes
+with simple highlights, small noses and pointed chins, big layered spiky hair
+with hard-edged shine bands, slim necks, clean readable silhouettes.
+Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes,
+oversized shoulder plates, headbands, sashes. Simple clean shapes and large
+flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones
+per color, no gradients.
 ```
 
 ### rendering
@@ -84,7 +88,8 @@ color, no gradients.
 ```
 Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels
 on a single consistent pixel grid, limited palette of about 32 colors,
-checkerboard dithering for skies, walls, and shadows, muted earthy base
+checkerboard dithering for skies, walls, and shadows only, never as noisy
+texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base
 tones with saturated accents on clothing and hair.
 ```
 
@@ -132,6 +137,7 @@ same face, hair, outfit, and colors. No text, no labels, no color swatches.
 ### refsheet_avoid
 
 ```
+western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture,
 smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render,
 photorealistic, modern anime, chibi, high resolution detail, lens flare,
 glow effects, mixed pixel sizes, different outfits or colors between panels,
@@ -142,6 +148,7 @@ watermark, signature
 ### negative
 
 ```
+western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture,
 smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render,
 photorealistic, modern anime, chibi, high resolution detail, lens flare,
 glow effects, mixed pixel sizes, even panel grid, panels filling the whole
