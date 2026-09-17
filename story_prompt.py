@@ -597,12 +597,15 @@ def cmd_sheet(args):
             b_ = rects[j]
             v_overlap = a[1] < b_[1] + b_[3] and b_[1] < a[1] + a[3]
             h_overlap = a[0] < b_[0] + b_[2] and b_[0] < a[0] + a[2]
+            near = 0.12                                       # only true neighbours: facing edges this close
             if v_overlap:
                 left, right = (i, j) if a[0] < b_[0] else (j, i)
-                gaps.append(f"between the right edge of panel {left+1} and the left edge of panel {right+1}")
+                if rects[right][0] - (rects[left][0] + rects[left][2]) <= near:
+                    gaps.append(f"between the right edge of panel {left+1} and the left edge of panel {right+1}")
             elif h_overlap:
                 top, bottom = (i, j) if a[1] < b_[1] else (j, i)
-                gaps.append(f"between the bottom of panel {top+1} and the top of panel {bottom+1}")
+                if rects[bottom][1] - (rects[top][1] + rects[top][3]) <= near:
+                    gaps.append(f"between the bottom of panel {top+1} and the top of panel {bottom+1}")
     if gaps:
         L.append("A band of pure black must be clearly visible " + "; ".join(gaps) + ". If space is tight, draw the "
                  "panels smaller. No panel may cover any part of another panel, not even a corner.")
