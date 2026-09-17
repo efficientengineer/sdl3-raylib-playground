@@ -109,8 +109,9 @@ cut apart afterwards. Solid pure black background (#000000). Every panel is a
 separate rectangle with a thin white border and a 1-pixel dark inner line.
 Panels never overlap, never touch each other, and never touch the edge of the
 image. Leave a gutter of pure black at least 5 percent of the image width
-between neighbouring panels and around the outside. Panels in the same row are
-top-aligned and share the same height. Nothing is drawn in the gutters: no
+between neighbouring panels and around the outside. The panels have clearly different sizes and proportions and sit at the stated
+positions; this is not an even grid and the panels do not fill the image.
+Nothing is drawn in the gutters: no
 numbers, labels, captions, arrows, or decorations. Each panel is a complete,
 self-contained picture of a single static camera shot.
 ```
@@ -129,7 +130,7 @@ a single merged illustration, a dialogue box
 A character reference sheet on a solid pure black background, three separate
 white-bordered panels in one row. Left panel: full-body standing pose, head to
 boots, three-quarter view. Middle panel: head-and-shoulders portrait in
-three-quarter view against a flat single-color background. Right panel: the
+three-quarter view against a flat neutral mid-grey background. Right panel: the
 same head in strict profile. The character is identical in all three panels:
 same face, hair, outfit, and colors. No text, no labels, no color swatches.
 ```
@@ -167,10 +168,10 @@ captions, speech bubbles, watermark, signature
 
 Used by `sheet` mode, where panels must not overlap. The ratios are width:height.
 
-- wide: a wide horizontal panel, about 2:1
-- tall: a tall narrow vertical panel, about 1:2
-- square: a small square panel, 1:1
-- slit: a very wide, very short letterbox panel, about 4:1
+- wide: a wide horizontal panel, exactly twice as wide as it is tall (2:1)
+- tall: a tall narrow vertical panel, exactly twice as tall as it is wide (1:2)
+- square: a small perfectly square panel (1:1), the smallest panel on the sheet
+- slit: a very wide, very short letterbox strip, four times as wide as it is tall (4:1)
 
 ## Reference images
 
@@ -193,7 +194,7 @@ description is used alone. Character references are set per character in
 - shape: square
 - scale: close
 - use: marks who is speaking or reacting
-- prompt: Head-and-shoulders portrait in three-quarter view, cropped at the top of the hair, against a flat single-color background with no scenery.
+- prompt: Head-and-shoulders portrait in three-quarter view, cropped at the top of the hair. Background: one flat dark color taken from this scene's own setting and lighting, no scenery, not a color copied from a reference image.
 
 ### eyes_slit
 - shape: slit
@@ -241,7 +242,7 @@ description is used alone. Character references are set per character in
 - shape: square
 - scale: close
 - use: quiet or sad beats
-- prompt: Strict side-view profile of one face, background a single flat color or dithered tone.
+- prompt: Strict side-view profile of one face. Background: one flat dark color or dithered tone taken from this scene's own setting and lighting, not a color copied from a reference image.
 
 ### impact
 - shape: wide

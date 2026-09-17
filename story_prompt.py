@@ -376,24 +376,57 @@ character status in story/characters.md.""")
 
 # ───────────────────────── ChatGPT shot sheets ─────────────────────────
 
-def pack_rows(shapes):
-    """Greedy reading-order rows. Returns (rows of panel indexes, row height %, canvas text)."""
-    rows, cur, total = [], [], 0.0
-    for i, shape in enumerate(shapes):
-        a = SHAPE_ASPECT[shape]
-        if cur and total + a > ROW_CAPACITY:
+def sheet_geometry(shapes):
+    """Place panels on a canvas at varied sizes. Returns (canvas text, [(x, y, w, h)] normalized 0-1).
+
+    Up to two tall panels get their own side columns (right, then left) spanning most of the height.
+    Everything else flows in staggered rows between them, each row alternately left and right aligned.
+    """
+    best = None
+    for W, H, label in ((1536, 1024, "landscape, 1536x1024"), (1024, 1536, "portrait, 1024x1536"),
+                        (1024, 1024, "square, 1024x1024")):
+        g = 0.05 * W
+        rects = [None] * len(shapes)
+        talls = [i for i, sh in enumerate(shapes) if sh == "tall"][:2]
+        flow = [i for i in range(len(shapes)) if i not in talls]
+        tw = min(0.21 * W, (H - 2 * g) / 2 * 0.95) if talls else 0
+        x0, x1 = g, W - g
+        for k, i in enumerate(talls):
+            if k == 0:
+                rects[i] = (W - g - tw, g, tw, 2 * tw)
+                x1 = W - 2 * g - tw
+            else:
+                rects[i] = (g, H - g - 2 * tw, tw, 2 * tw)
+                x0 = 2 * g + tw
+        rw = x1 - x0
+        rows, cur, total = [], [], 0.0
+        for i in flow:
+            a = SHAPE_ASPECT[shapes[i]]
+            if cur and total + a > 3.2:
+                rows.append(cur)
+                cur, total = [], 0.0
+            cur.append(i)
+            total += a
+        if cur:
             rows.append(cur)
-            cur, total = [], 0.0
-        cur.append(i)
-        total += a
-    if cur:
-        rows.append(cur)
-    heights = [1.0 / max(sum(SHAPE_ASPECT[shapes[i]] for i in row), ROW_MIN_ASPECT) for row in rows]
-    page = sum(heights) * 1.25                         # gutters
-    canvas = ("portrait, 1024x1536" if page > 1.05 else
-              "landscape, 1536x1024" if page < 0.8 else "square, 1024x1024")
-    pct = [round(100 * h / sum(heights)) for h in heights]
-    return rows, pct, canvas
+        heights = [min((rw - g * (len(r) - 1)) / sum(SHAPE_ASPECT[shapes[i]] for i in r), 0.40 * H) for r in rows]
+        need = sum(heights) + g * max(0, len(rows) - 1)
+        scale = min(1.0, (H - 2 * g) / need) if need else 1.0
+        heights = [h * scale for h in heights]
+        y = g + (H - 2 * g - (sum(heights) + g * max(0, len(rows) - 1))) / 2
+        for r, (row, h) in enumerate(zip(rows, heights)):
+            widths = [SHAPE_ASPECT[shapes[i]] * h for i in row]
+            used = sum(widths) + g * (len(row) - 1)
+            x = x0 if r % 2 == 0 else x1 - used          # stagger rows left / right
+            for i, w in zip(row, widths):
+                rects[i] = (x, y, w, h)
+                x += w + g
+            y += h + g
+        area = sum(w * h for _, _, w, h in rects) / (W * H)
+        norm = [(x / W, y / H, w / W, h / H) for x, y, w, h in rects]
+        if best is None or area > best[0]:
+            best = (area, label, norm)
+    return best[1], best[2]
 
 
 def existing(path_text):
@@ -415,7 +448,8 @@ def attachments(style, cast, names, warn):
         rp = existing(cast[c].get("ref"))
         if rp:
             out.append((rp, f"CHARACTER reference for {cast[c]['name']}. Keep the face, hair, outfit, and "
-                            f"colors identical to this image in every panel {cast[c]['name']} appears in."))
+                            f"colors identical to this image in every panel {cast[c]['name']} appears in. Use it only "
+                            f"for the character's design: ignore its background colors and its three-panel layout."))
         else:
             warn.append(f"no reference image for {cast[c]['name']} at {cast[c].get('ref')}; "
                         f"run: story_prompt.py refsheet {cast[c]['name']}")
@@ -451,7 +485,7 @@ def cmd_sheet(args):
     if len(flat) > SHEET_MAX_PANELS:
         die(f"{len(flat)} panels on one sheet, max {SHEET_MAX_PANELS}. Split the scenes across sheets.")
     shapes = [shots[sid]["shape"] for _, _, sid, _ in flat]
-    rows, pct, canvas = pack_rows(shapes)
+    canvas, rects = sheet_geometry(shapes)
     name = scenes[0]["stem"] if len(scenes) == 1 else \
         "sheet_" + "-".join(re.match(r"\d+|\w+", sc["stem"]).group(0) for sc in scenes)
 
@@ -467,10 +501,10 @@ def cmd_sheet(args):
         L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
         L.append("")
     L += [f"SHEET LAYOUT: {b['sheet_layout']}", "",
-          f"The sheet has {len(rows)} row(s), read left to right, top to bottom:"]
-    for r, row in enumerate(rows, 1):
-        cells = ", then ".join(f"Panel {i+1} ({style['sheet_shapes'][shapes[i]]})" for i in row)
-        L.append(f"Row {r}, about {pct[r-1]} percent of the image height: {cells}.")
+          "PANEL SIZES AND POSITIONS, as percentages of the whole image (follow these closely):"]
+    for i, (x, y, w, h) in enumerate(rects):
+        L.append(f"Panel {i+1}: {style['sheet_shapes'][shapes[i]]}. Left edge at {x*100:.0f}%, top edge at "
+                 f"{y*100:.0f}%, width {w*100:.0f}%, height {h*100:.0f}%.")
     L.append("")
     k = 0
     for sc in scenes:
@@ -497,7 +531,7 @@ def cmd_sheet(args):
     OUT.mkdir(exist_ok=True)
     manifest = OUT / f"{name}.sheet.json"
     manifest.write_text(json.dumps({
-        "sheet": name, "canvas": canvas, "rows": [[i + 1 for i in row] for row in rows],
+        "sheet": name, "canvas": canvas, "rects": [[round(v, 4) for v in r] for r in rects],
         "panels": [{"n": i + 1, "scene": sc["stem"], "scene_panel": n, "shot": sid, "shape": shapes[i],
                     "content": desc} for i, (sc, n, sid, desc) in enumerate(flat)],
         "dialogue": {sc["stem"]: [{"speaker": w, "line": l} for w, l in sc["dialogue"]] for sc in scenes},
@@ -511,8 +545,7 @@ def cmd_sheet(args):
         "", "```", f"./story_prompt.py slice {manifest.relative_to(ROOT.parent)} ~/Downloads/<file>.png", "```"]))
     for w in warn:
         print(f"warning: {w}", file=sys.stderr)
-    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(flat)} panels, {len(rows)} row(s), {canvas}, "
-          f"{len(attach)} attachment(s))")
+    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(flat)} panels, {canvas}, {len(attach)} attachment(s))")
 
 
 def cmd_refsheet(args):
@@ -643,6 +676,22 @@ def find_panels(w, h, ch, rows):
     return ordered + sorted(row)
 
 
+def match_boxes(boxes, rects, w, h):
+    """Order detected boxes to match the expected panels: nearest centre plus closest aspect ratio."""
+    import itertools
+    import math
+
+    def cost(b, r):
+        cx, cy = (b[0] + b[2]) / 2 / w, (b[1] + b[3]) / 2 / h
+        ex, ey = r[0] + r[2] / 2, r[1] + r[3] / 2
+        got = (b[2] - b[0]) / (b[3] - b[1]) * (w / h) ** 0   # pixel aspect
+        exp = (r[2] * w) / (r[3] * h)
+        return math.hypot(cx - ex, cy - ey) + 0.5 * abs(math.log(got / exp))
+    best = min(itertools.permutations(range(len(boxes))),
+               key=lambda perm: sum(cost(boxes[j], rects[i]) for i, j in enumerate(perm)))
+    return [boxes[j] for j in best]
+
+
 def cmd_slice(args):
     pos, trim, manual, it = [], 0, None, iter(args)
     for a in it:
@@ -670,6 +719,8 @@ def cmd_slice(args):
     if len(boxes) != len(want):
         die("panel count mismatch, nothing written. Panels probably touch or overlap: ask ChatGPT to regenerate "
             'with wider black gutters, or pass the boxes by hand with --boxes "x,y,w,h;x,y,w,h".')
+    if manifest.get("rects") and not manual:
+        boxes = match_boxes(boxes, manifest["rects"], w, h)
     PANELS.mkdir(exist_ok=True)
     for b, p in zip(boxes, want):
         x0, y0, x1, y1 = b[0] + trim, b[1] + trim, b[2] - trim, b[3] - trim

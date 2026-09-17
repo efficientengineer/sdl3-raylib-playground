@@ -166,8 +166,12 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
      at `story/refs/style.png`.
   2. `./story_prompt.py sheet <scene> [more scenes]` → `story/out/<name>.chatgpt.md`: which files to
      attach in which order, and the prompt to paste. Max 6 panels per sheet; two 3-panel scenes fit one.
+     The tool computes a varied layout (tall panels get a side column spanning most of the height,
+     other rows stagger left and right) and states each panel's position and size as percentages.
+     Without that, ChatGPT returns a uniform 2x2 grid with every panel near 1.4:1.
   3. `./story_prompt.py slice story/out/<name>.sheet.json <download>` → `story/panels/<scene>_pN_<shot>.png`.
-     It auto-detects panels by their borders (works on dark interiors), converts non-PNG via `sips`,
+     It auto-detects panels by their borders (works on dark interiors), matches them to the expected
+     panels by position and proportion (not reading order), converts non-PNG via `sips`,
      and writes nothing if the count is wrong. Escape hatches: `--boxes "x,y,w,h;..."`, `--trim N` to
      shave the white border. Pure stdlib; no Pillow on this machine.
   4. `./story_prompt.py preview <scene>` → `story/out/<scene>.preview.html`: layers the sliced panels
@@ -176,6 +180,9 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
      scene's pacing can be tested before any art exists. This is the reference for the in-game player.
 - Dialogue lines may carry a reveal tag, `- Lyra [2]: text`, naming the panel that appears with that
   line. Untagged lines reveal the next unseen panel. Several lines can hold on one panel.
+- Keep the raw generations in `story/sheets/<scene>_vN.png` so a scene can be re-sliced later.
+- Portrait and profile insets use a flat dark color from the scene's own palette. Reference sheets use
+  a neutral grey portrait background, because ChatGPT copies a reference's background color into scenes.
 - Generated reference sheets are the truth for a character: after saving one, edit the `look` line to
   match what was actually drawn. `story/refs/style.*` is gitignored (third-party screenshot).
 - `./story_prompt.py build <scene>` is the older single-page mode (overlapping panels in one image) for
