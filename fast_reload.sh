@@ -8,16 +8,26 @@ DEVICE="192.168.1.217:5555"
 PKG="com.playground.sdlraylib"
 NDK="$HOME/Library/Android/sdk/ndk/27.0.12077973"
 CC="$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android24-clang++"
-CXX_DIR="$SCRIPT_DIR/android/app/.cxx/Debug/931y536w/arm64-v8a"
+# Gradle names the CMake dir with a per-checkout hash, so find it rather than hard-coding it.
+CXX_DIR="$(ls -d "$SCRIPT_DIR"/android/app/.cxx/Debug/*/arm64-v8a 2>/dev/null | head -1)"
+if [ -z "$CXX_DIR" ]; then
+    echo "ERROR: no Android build found in this checkout. Run ./deploy.sh once first." >&2
+    exit 1
+fi
+HASH="$(basename "$(dirname "$CXX_DIR")")"
 OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
+GAME_SRC="$SCRIPT_DIR/src/star_logic.cpp"
 
-IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/931y536w/obj/arm64-v8a/libimgui_shared.so"
-SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/931y536w/obj/arm64-v8a/libSDL3.so"
+IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
+SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"
+
+# Scene text and panel layout are compiled in: regenerate the header from story/ on every reload.
+"$SCRIPT_DIR/story_prompt.py" export
 SDL3_INC="$CXX_DIR/_deps/sdl3-src/include"
 SDL3_BUILD_INC="$CXX_DIR/_deps/sdl3-build/include-revision"
 
-echo "=== Compiling game_logic.cpp ==="
+echo "=== Compiling $(basename "$GAME_SRC") ==="
 $CC -std=c++17 -O0 -g -DANDROID -DIMGUI_IMPL_OPENGL_ES3 -Dgame_logic_EXPORTS \
     -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong \
     -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -fPIC -fvisibility=hidden \
@@ -27,7 +37,7 @@ $CC -std=c++17 -O0 -g -DANDROID -DIMGUI_IMPL_OPENGL_ES3 -Dgame_logic_EXPORTS \
     -I"$SCRIPT_DIR/third_party/imgui/backends" \
     -I"$SDL3_BUILD_INC" \
     -I"$SDL3_INC" \
-    -c "$SCRIPT_DIR/src/game_logic.cpp" -o "$OBJ_DIR/game_logic.o"
+    -c "$GAME_SRC" -o "$OBJ_DIR/game_logic.o"
 
 echo "=== Linking libgame_logic.so ==="
 $CC -shared -static-libstdc++ \
@@ -44,6 +54,19 @@ if ! "$ADB" -s "$DEVICE" get-state >/dev/null 2>&1; then
     echo "ERROR: $DEVICE not connected. Run: $ADB connect $DEVICE" >&2
     exit 1
 fi
+# Panel images: push only the ones the device doesn't already have at the same size.
+"$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/cutscenes"
+HAVE="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/cutscenes && stat -c \"%n %s\" *.png 2>/dev/null'" | tr -d '\r')"
+for f in "$SCRIPT_DIR"/story/panels/*.png; do
+    [ -f "$f" ] || continue
+    n="$(basename "$f")"; sz="$(stat -f %z "$f")"
+    if ! echo "$HAVE" | grep -qx "$n $sz"; then
+        echo "  panel $n"
+        "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
+        "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/cutscenes/$n && rm /data/local/tmp/$n"
+    fi
+done
+
 LOCAL_MD5=$(md5 -q "$OBJ_DIR/libgame_logic.so")
 "$ADB" -s "$DEVICE" push "$OBJ_DIR/libgame_logic.so" /data/local/tmp/libgame_logic.so
 # Copy to a temp name then mv so the host never dlopens a half-written file.

@@ -13,5 +13,6 @@ One short paragraph: what happens and why it matters. Story context only.
 2. shot_id | ...
 
 ## Dialogue
-- Name [1]: line. The [n] is the panel revealed when this line appears (optional; default: next panel)
+- Name [1] {tense}: line. [n] = panel revealed with this line (optional; default: next panel).
+  {mood} = music mood from here on: wonder, dread, tense, confront, sorrow, hope (optional; default: keep)
 - Name: drawn by the game, never sent to the image model

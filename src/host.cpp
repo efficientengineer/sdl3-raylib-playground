@@ -209,6 +209,9 @@ int main(int argc, char *argv[]) {
 #endif
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
+    // Landscape only: the cutscene pages are composed for a wide screen. Without this hint SDL
+    // overrides the manifest (the window is resizable) and the app follows the phone's auto-rotate.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     SDL_Window *win = SDL_CreateWindow("fungame", 800, 600,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN);
     SDL_GLContext gl_ctx = SDL_GL_CreateContext(win);

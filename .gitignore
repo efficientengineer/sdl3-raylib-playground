@@ -14,3 +14,4 @@ third_party/imgui/docs/
 story/out/
 __pycache__/
 story/refs/style.*
+android/app/src/main/assets/cutscenes/

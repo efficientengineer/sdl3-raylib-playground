@@ -46,7 +46,8 @@ if(ANDROID)
     target_compile_definitions(imgui_shared PUBLIC IMGUI_IMPL_OPENGL_ES3)
 
     # Game logic: hot-reloadable
-    add_library(game_logic SHARED src/game_logic.cpp)
+    # The game. src/game_logic.cpp is the previous RPG, kept for reference and no longer built.
+    add_library(game_logic SHARED src/star_logic.cpp)
     target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(game_logic PRIVATE imgui_shared)
@@ -64,7 +65,8 @@ else()
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(imgui_shared PUBLIC SDL3::SDL3-static "-framework OpenGL")
 
-    add_library(game_logic SHARED src/game_logic.cpp)
+    # The game. src/game_logic.cpp is the previous RPG, kept for reference and no longer built.
+    add_library(game_logic SHARED src/star_logic.cpp)
     target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(game_logic PRIVATE imgui_shared)

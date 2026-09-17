@@ -16,8 +16,8 @@ keeping its oath, and that frightens her more than an attack would.
 4. portrait_inset | Lyra, eyes lowered, troubled
 
 ## Dialogue
-- Bron [1]: It's blocking the way.
-- Lyra [2]: No. Look at it. It's pointing us back.
-- Bron [3]: Then it can point while I walk through it.
-- Lyra [3]: Bron, wait.
-- Lyra [4]: It isn't guarding the door from us. It's still guarding us from the door.
+- Bron [1] {tense}: It's blocking the way.
+- Lyra [2] {dread}: No. Look at it. It's pointing us back.
+- Bron [3] {confront}: Then it can point while I walk through it.
+- Lyra [3] {confront}: Bron, wait.
+- Lyra [4] {sorrow}: It isn't guarding the door from us. It's still guarding us from the door.

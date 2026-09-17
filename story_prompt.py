@@ -16,6 +16,9 @@
                                                write story/out/<scene>.preview.html: panels layered manga-style and
                                                revealed line by line with a dialogue box (placeholders if not sliced yet)
 
+  ./story_prompt.py export                     write src/cutscene_data.h from story/playlist.md for the game
+                                               (scenes whose panels are not all generated yet are skipped)
+
   Single finished page (generators without reference images):
   ./story_prompt.py build  story/scenes/001_x.md | --all    write story/out/001_x.prompt.txt + .json
 
@@ -45,6 +48,7 @@ STYLE_WORDS = ["gradient", "photorealistic", "3d", "blur", "glow", "painterly",
                "realistic", "hd", "4k", "smooth"]   # R8
 TEXT_WORDS = ["text", "caption", "speech bubble", "lettering", "written", "inscription reading",
               "sign saying", "sign that says", "sign reading", "the words", "subtitle"]  # R9
+MOODS = ["wonder", "dread", "tense", "confront", "sorrow", "hope"]      # music moods; order = CsMood enum in the game
 LOOK_BANNED = ["dwarf", "dwarven", "halfling", "hobbit", "elf", "elven", "gnome", "orc", "fighter",
                "rogue", "cleric", "wizard", "ranger", "barbarian", "paladin", "beard", "bearded"]  # see characters.md
 REQUIRED_BLOCKS = ["header", "layout", "framing", "character_design", "rendering",
@@ -160,10 +164,12 @@ def parse_scene(path):
     secs = h2_sections(text)
     panels = [(m.group(1), m.group(2).strip())
               for m in re.finditer(r"^\d+\.\s*([\w-]+)\s*\|\s*(.+)$", secs.get("panels", ""), flags=re.M)]
-    dialogue, reveals = [], []
-    for m in re.finditer(r"^- ([^:\[\n]+?)\s*(?:\[(\d+)\])?\s*:\s*(.+)$", secs.get("dialogue", ""), flags=re.M):
-        dialogue.append((m.group(1).strip(), m.group(3).strip()))
+    dialogue, reveals, moods = [], [], []
+    for m in re.finditer(r"^- ([^:\[{\n]+?)\s*(?:\[(\d+)\])?\s*(?:\{(\w+)\})?\s*:\s*(.+)$",
+                         secs.get("dialogue", ""), flags=re.M):
+        dialogue.append((m.group(1).strip(), m.group(4).strip()))
         reveals.append(int(m.group(2)) if m.group(2) else None)
+        moods.append(m.group(3).lower() if m.group(3) else None)
     meta = kv_lines(head)
     return {
         "path": path, "stem": path.stem,
@@ -171,7 +177,8 @@ def parse_scene(path):
         "meta": meta,
         "characters": [c.strip() for c in meta.get("characters", "").split(",") if c.strip()],
         "beat": squash(secs.get("beat", "")),
-        "panels": panels, "dialogue": dialogue, "reveals": reveals,
+        "panels": panels, "dialogue": dialogue, "reveals": reveals, "moods": moods,
+        "narration": meta.get("type", "").lower() == "narration",
     }
 
 
@@ -183,6 +190,16 @@ def validate(scene, style, cast):
     """Returns (errors, warnings). Errors block the build."""
     err, warn = [], []
     shots, panels = style["shots"], scene["panels"]
+
+    for n, mood in enumerate(scene["moods"], 1):
+        if mood and mood not in MOODS:
+            err.append(f"dialogue line {n}: unknown mood '{{{mood}}}'. Use one of: {', '.join(MOODS)}")
+    if scene["narration"]:
+        if panels:
+            err.append("a narration scene has no panels; remove '## Panels' or the 'type: narration' line")
+        if not scene["dialogue"]:
+            err.append("a narration scene needs at least one line under '## Dialogue'")
+        return err, warn
 
     if not scene["meta"].get("location"):
         err.append("missing '- location:' line")
@@ -733,13 +750,15 @@ def cmd_slice(args):
 
 # ───────────────────────── Browser preview (panel reveal + dialogue) ─────────────────────────
 
-STAGE_ASPECT = 1.6            # 16:10 stage; the dialogue box covers the bottom of it
-PAGE_BOTTOM = 74.0            # panels stay above this percent of the stage height
-SLOTS = {                     # shape -> (width %, [(x %, y %) for 1st, 2nd use])
-    "wide":   (52, [(4, 5), (20, 40)]),
-    "tall":   (22, [(73, 3), (5, 8)]),
-    "slit":   (60, [(20, 52), (8, 6)]),
-    "square": (17, None),     # tucked over the bottom-right corner of the previous panel
+# Two page layouts, as percentages of a stage. "land": 16:10 stage, dialogue box overlays the bottom.
+# "port": 4:5 stage for an upright phone, dialogue box sits below the stage.
+LAYOUTS = {
+    "land": {"aspect": 1.6, "bottom": 74.0, "tuck": (7, 9), "slots": {
+        "wide": (52, [(4, 5), (20, 40)]), "tall": (22, [(73, 3), (5, 8)]),
+        "slit": (60, [(20, 52), (8, 6)]), "square": (17, None)}},
+    "port": {"aspect": 0.8, "bottom": 99.0, "tuck": (14, 10), "slots": {
+        "wide": (80, [(3, 2), (17, 52)]), "tall": (36, [(61, 10), (3, 30)]),
+        "slit": (92, [(4, 40), (4, 8)]), "square": (30, None)}},
 }
 
 
@@ -748,28 +767,44 @@ def png_size(path):
     return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else None
 
 
-def page_layout(scene, style):
-    out, used, prev = [], {}, None
+def panel_file(scene, n, sid):
+    return PANELS / f"{scene['stem']}_p{n}_{sid}.png"
+
+
+def page_layout(scene, style, mode="land"):
+    """Where each panel sits on the composed page. Square panels tuck over the previous panel's corner."""
+    lay, out, used, prev = LAYOUTS[mode], [], {}, None
     for n, (sid, desc) in enumerate(scene["panels"], 1):
         shape = style["shots"][sid]["shape"]
-        img = PANELS / f"{scene['stem']}_p{n}_{sid}.png"
+        img = panel_file(scene, n, sid)
         size = png_size(img) if img.exists() else None
         aspect = size[0] / size[1] if size else SHAPE_ASPECT[shape]
-        w, spots = SLOTS[shape]
+        w, spots = lay["slots"][shape]
         if spots:
             x, y = spots[min(used.get(shape, 0), len(spots) - 1)]
         elif prev:
-            x, y = prev["x"] + prev["w"] - 7, prev["y"] + prev["h"] - 9
+            x, y = prev["x"] + prev["w"] - lay["tuck"][0], prev["y"] + prev["h"] - lay["tuck"][1]
         else:
             x, y = 6, 40
-        h = w / aspect * STAGE_ASPECT
+        h = w / aspect * lay["aspect"]
         x = max(1, min(x, 99 - w))
-        y = max(1, min(y, PAGE_BOTTOM - h))
+        y = max(1, min(y, lay["bottom"] - h))
         used[shape] = used.get(shape, 0) + 1
         prev = {"n": n, "shot": sid, "x": round(x, 1), "y": round(y, 1), "w": w, "h": round(h, 1),
-                "img": f"../panels/{img.name}" if size else None, "content": desc}
+                "img": f"../panels/{img.name}" if size else None, "file": img.name, "content": desc}
         out.append(prev)
     return out
+
+
+def reveal_plan(scene):
+    """Panel revealed by each dialogue line: the [n] tag, else the next unseen panel (0 when none are left)."""
+    shown, plan, total = set(), [], len(scene["panels"])
+    for tag in scene["reveals"]:
+        n = tag or next((i for i in range(1, total + 1) if i not in shown), 0)
+        if n:
+            shown.add(n)
+        plan.append(n)
+    return plan
 
 
 PREVIEW_HTML = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -794,8 +829,12 @@ html,body{margin:0;height:100%;background:#000;color:#fff;font-family:ui-monospa
 <script>
 const D=__DATA__, stage=document.getElementById('stage'), who=document.getElementById('who'),
       txt=document.getElementById('txt'), arrow=document.getElementById('arrow');
+const port=location.hash.includes('port')||(!location.hash.includes('land')&&innerWidth<innerHeight);
+if(port){stage.style.width='min(100vw,62vh)';stage.style.aspectRatio='4/6.4';D.panels=D.port;
+  const b=document.getElementById('box');b.style.height='20%';b.style.bottom='1%'}
 const els=D.panels.map(p=>{const e=document.createElement('div');e.className='p'+(p.img?'':' ph');
-  e.style.cssText=`left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%`;
+  e.style.cssText=port?`left:${p.x}%;top:${p.y*0.78}%;width:${p.w}%;height:${p.h*0.78}%`
+                      :`left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%`;
   if(p.img){const i=new Image();i.src=p.img;e.appendChild(i)}else e.textContent=`P${p.n} ${p.shot}\n${p.content}`;
   stage.insertBefore(e,document.getElementById('box'));return e});
 let line=-1,typing=null,z=1;
@@ -807,7 +846,7 @@ function next(){if(typing)return done();
   if(line>=D.lines.length-1){els.forEach(e=>e.classList.remove('on'));z=1;line=-1}
   line++;show()}
 stage.onclick=next;document.onkeydown=e=>{if(e.key===' '||e.key==='Enter')next()};
-if(location.hash==='#all'){D.panels.forEach(p=>reveal(p.n));if(D.lines.length){line=D.lines.length-1;show();done()}}
+if(location.hash.includes('all')){D.panels.forEach(p=>reveal(p.n));if(D.lines.length){line=D.lines.length-1;show();done()}}
 else if(D.lines.length)next();else D.panels.forEach(p=>reveal(p.n));
 </script>
 """
@@ -822,19 +861,83 @@ def cmd_preview(args):
             for e in err:
                 print(f"{path.name}: ERROR: {e}", file=sys.stderr)
             sys.exit("story_prompt: scene rejected. Fix the scene file; do not bypass the rules.")
-        panels = page_layout(scene, style)
-        shown, lines = set(), []
-        for (speaker, text), tag in zip(scene["dialogue"], scene["reveals"]):
-            n = tag or next((p["n"] for p in panels if p["n"] not in shown), len(panels))
-            shown.add(n)
-            lines.append({"speaker": speaker, "text": text, "reveal": n})
-        data = {"panels": panels, "lines": lines}
+        panels = page_layout(scene, style, "land")
+        lines = [{"speaker": who, "text": text, "reveal": n}
+                 for (who, text), n in zip(scene["dialogue"], reveal_plan(scene))]
+        data = {"panels": panels, "port": page_layout(scene, style, "port"), "lines": lines}
         OUT.mkdir(exist_ok=True)
         html = OUT / f"{scene['stem']}.preview.html"
         html.write_text(PREVIEW_HTML.replace("__TITLE__", scene["title"]).replace("__DATA__", json.dumps(data)))
         have = sum(1 for p in panels if p["img"])
         print(f"wrote {html.relative_to(ROOT.parent)}  ({have}/{len(panels)} panel images found, "
               f"{len(lines)} dialogue lines). Open it in a browser; tap or press space to advance.")
+
+
+# ───────────────────────── Export to the game ─────────────────────────
+
+GAME_HEADER = ROOT.parent / "src" / "cutscene_data.h"
+
+
+def c_str(text):
+    for a, b in (("‘", "'"), ("’", "'"), ("“", '"'), ("”", '"'), ("—", " - "), ("…", "...")):
+        text = text.replace(a, b)
+    text = text.encode("ascii", "replace").decode()              # the game font covers Basic Latin
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def cmd_export(args):
+    style, cast = load_style(), load_cast()
+    secs = h2_sections((ROOT / "playlist.md").read_text())
+    stems = re.findall(r"^- ([\w-]+)\s*$", secs.get("intro", ""), flags=re.M)
+    if not stems:
+        die("playlist.md: no scenes listed under '## intro'")
+    out = ["// GENERATED by ./story_prompt.py export. Do not edit: change story/scenes/*.md or story/playlist.md.",
+           "#pragma once", "",
+           "enum CsMood { " + ", ".join(f"CS_{m.upper()}" for m in MOODS) + ", CS_MOOD_COUNT };",
+           "struct CsRect { float x, y, w, h; };                 // percent of the stage",
+           "struct CsPanel { const char *file; CsRect land, port; };",
+           "struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood; };  // reveal 0 = none",
+           "struct CsScene { const char *id; const char *title; bool narration;",
+           "                 const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };", ""]
+    table, mood = [], "tense"
+    for stem in stems:
+        path = SCENES / f"{stem}.md"
+        if not path.exists():
+            die(f"playlist.md lists '{stem}' but {path.relative_to(ROOT.parent)} does not exist")
+        scene = parse_scene(path)
+        err, _ = validate(scene, style, cast)
+        if err:
+            for e in err:
+                print(f"{path.name}: ERROR: {e}", file=sys.stderr)
+            sys.exit("story_prompt: scene rejected. Fix the scene file; do not bypass the rules.")
+        missing = [panel_file(scene, n, sid).name for n, (sid, _) in enumerate(scene["panels"], 1)
+                   if not panel_file(scene, n, sid).exists()]
+        if missing:
+            print(f"skipped {stem}: {len(missing)} panel image(s) not generated yet ({missing[0]} ...)", file=sys.stderr)
+            continue
+        ident = re.sub(r"\W", "_", stem)
+        if scene["panels"]:
+            land, port = page_layout(scene, style, "land"), page_layout(scene, style, "port")
+            out.append(f"static const CsPanel CS_{ident}_PANELS[] = {{")
+            for a, b in zip(land, port):
+                rect = lambda r: "{" + ", ".join(f"{float(r[k]):.1f}f" for k in "xywh") + "}"
+                out.append(f'    {{ "{a["file"]}", {rect(a)}, {rect(b)} }},')
+            out.append("};")
+        out.append(f"static const CsLine CS_{ident}_LINES[] = {{")
+        for (who, text), reveal, tag in zip(scene["dialogue"], reveal_plan(scene), scene["moods"]):
+            mood = tag or mood                                    # an untagged line keeps the current mood
+            out.append(f"    {{ {c_str(who)}, {c_str(text)}, {reveal}, CS_{mood.upper()} }},")
+        out += ["};", ""]
+        title = re.sub(r"^(Scene \d+|Prologue):\s*", "", scene["title"])
+        panels = f"CS_{ident}_PANELS, {len(scene['panels'])}" if scene["panels"] else "nullptr, 0"
+        table.append(f'    {{ "{stem}", {c_str(title)}, {"true" if scene["narration"] else "false"}, '
+                     f'{panels}, CS_{ident}_LINES, {len(scene["dialogue"])} }},')
+    if not table:
+        die("nothing to export: no listed scene is complete")
+    out += ["static const CsScene CS_INTRO[] = {"] + table + ["};",
+            "static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);", ""]
+    GAME_HEADER.write_text("\n".join(out))
+    print(f"wrote {GAME_HEADER.relative_to(ROOT.parent)}  ({len(table)} of {len(stems)} scenes)")
 
 
 def main():
@@ -854,6 +957,8 @@ def main():
         cmd_slice(args[1:])
     elif cmd == "preview":
         cmd_preview(args[1:])
+    elif cmd == "export":
+        cmd_export(args[1:])
     else:
         print(__doc__.strip())
         sys.exit(0 if cmd in ("", "-h", "--help", "help") else 2)

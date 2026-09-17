@@ -8,6 +8,32 @@ At the start of every session, ask the user if they want to start polling (bug r
 
 Always hot reload (`./fast_reload.sh`) after making code changes — don't wait to be asked.
 
+## The game
+
+`src/star_logic.cpp` is the game: a Phantasy Star IV style JRPG, currently the intro only (title,
+narration prologue, manga-panel cutscenes with typewriter dialogue, adaptive music). World navigation
+and combat are deliberately not started. It builds as `libgame_logic.so`, so everything under
+"Hot Reload Architecture" applies unchanged. `src/game_logic.cpp` is the previous RPG (Quest & Glory),
+kept for reference and **no longer built**; don't add features there.
+
+- **Content is data.** Scenes live in `story/scenes/*.md`; `story/playlist.md` orders them.
+  `./story_prompt.py export` writes `src/cutscene_data.h` (text, panel layout, reveal order, music
+  mood per line). `fast_reload.sh` and `deploy.sh` both run the export first, so editing a scene file
+  and hot reloading is the whole loop. Never edit `cutscene_data.h` by hand.
+- **Panel art** comes from `story/panels/`. `fast_reload.sh` pushes new or changed PNGs to the phone's
+  `files/cutscenes/`; `deploy.sh` bundles them into the APK assets. The game looks in `files/` first.
+  A playlist scene whose panels aren't all generated yet is skipped by the export, with a warning.
+- **Hot reload keeps your place**: screen, scene, and line index survive, and the page is rebuilt
+  from them. Edit a line of dialogue or a music pattern and judge it on the line you were looking at.
+- **Music** is one sequencer with six moods (`wonder, dread, tense, confront, sorrow, hope`), two-operator
+  FM voices for a Genesis flavour. A dialogue line's `{mood}` tag sets the target; the change lands on
+  the next beat with a stinger, the tempo glides, and the bar count never resets. Patterns are in
+  `mus_step`, chords and tempi in `MOODS`. An untagged line keeps the current mood.
+- **Landscape only.** host.cpp sets `SDL_HINT_ORIENTATIONS` before creating the window (owner's call:
+  the pages are composed for a wide screen). A portrait page layout still exists as a fallback.
+- The **Dev** button (top right) opens the phone-to-dev message log, scene controls (restart intro,
+  next scene, title), and mood audition buttons. The old QA bug reporter was not carried over.
+
 ## Switches
 
 - **TARGET: Android** — build and deploy to phone only. Don't build desktop.
@@ -84,14 +110,14 @@ creates fresh state → deserializes. Game continues seamlessly.
 - Serialization buffer is **heap-allocated** (1MB via malloc). Stack allocation crashes Android's SDL thread (limited stack).
 - On Android, **no dlclose** — old .so stays in memory. dlclose causes Android to background the app.
   New .so is copied to a unique filename (`libgame_logic.so.1`, `.2`, etc.) and dlopen'd fresh.
-- `fast_reload.sh` compiles directly with NDK clang++, skipping gradle entirely (~0.7s vs ~3s).
+- `fast_reload.sh` compiles directly with NDK clang++, skipping gradle entirely (~0.7s vs ~3s). It finds the gradle CMake dir by glob (the hash differs per checkout), so it works in a git worktree once `./deploy.sh` has run there. A worktree also needs `android/local.properties` (`sdk.dir=...`), which is gitignored.
 - `hot_reload.sh android` uses gradle (slower but guaranteed correct flags).
 - Reload flag: file with content = trigger reload; host truncates to 0 bytes after consuming.
 - **Reloads land while backgrounded.** Host sets `SDL_HINT_ANDROID_BLOCK_ON_PAUSE=0` so the SDL loop keeps running when the app is hidden; it skips rendering and polls the flag 4x/s, logging `Hot reload applied while backgrounded`. No need to foreground the app.
 - **SDL3 never queues lifecycle events.** `SDL_EVENT_DID_ENTER_BACKGROUND/FOREGROUND` go only to `SDL_AddEventWatch` callbacks, never to `SDL_PollEvent`. Host uses a watcher for save-on-background and the foreground reload check. Any `if (e.type == SDL_EVENT_DID_ENTER_*)` inside the poll loop is dead code.
 - **UI scale** (`dpi_scale`) = shorter screen edge / 360 (phone: 3.0 in both orientations), computed in host.cpp every frame. Never derive scale from height alone: it flips between orientations and SDL reports transient sizes at startup.
 - **Font size is live**, not baked: host sets `style.FontSizeBase = 10 * dpi_scale` before every `NewFrame` (ImGui 1.92+ dynamic fonts); game logic multiplies by `FontGlobalScale` 1.3. Changing either ratio is a host change (`./deploy.sh`). `setup_touch_style` runs every tick so a bad deserialized `dpi_scale` can't stick.
-- Manifest says `sensorLandscape` but SDL overrides orientation to FULL_USER because the window is `SDL_WINDOW_RESIZABLE`; the app follows auto-rotate. Landscape layout is still portrait-shaped (panels stack by height).
+- Orientation is locked to landscape by `SDL_HINT_ORIENTATIONS` in host.cpp. Without that hint SDL overrides the manifest (the window is `SDL_WINDOW_RESIZABLE`) and the app follows auto-rotate.
 - Reload blob has a header with `sizeof(Game/Character/Enemy)`. If any changed since the running build, deserialize logs "layout changed" and keeps the fresh state from `game_create` (which loads the validated `save.dat`). No restart needed; you just lose unsaved in-memory state.
 - Host loads the new .so **before** destroying the old game. A bad .so logs `Hot reload FAILED: keeping previous game logic` and the app keeps running.
 - Unique reload copies are named `libgame_logic.so.<pid>.<gen>` so a restarted process never reuses a name.
@@ -199,7 +225,7 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
 
 ## Index
 
-- `src/` — all C source (text.h/text.c = font renderer)
+- `src/` — all source. `star_logic.cpp` = the game, `host.cpp` = window/GL/hot reload, `cutscene_data.h` = generated, `game_logic.cpp` = old RPG (unbuilt)
 - `shaders/` — GLSL 450 source; `compiled/` = generated, gitignored
 - `assets/` — Roboto-Regular.ttf (also copied to android assets)
 - `third_party/` — single-header libs (stb, par_shapes, FastNoiseLite, sokol)
