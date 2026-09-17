@@ -1,0 +1,186 @@
+# STYLE.md — locked art direction for scene images
+
+Target look: 16-bit Sega Genesis manga cutscenes in the manner of Phantasy Star IV.
+This file is the single source of truth. `story_prompt.py` parses it, so the
+headings, the `- key: value` lines, and the fenced blocks are load-bearing.
+
+## Rules for anyone (human or model) writing image prompts
+
+1. **Never hand-write a final image prompt.** Write a scene file in `story/scenes/`
+   and run `./story_prompt.py build <scene>`. The tool assembles the prompt from the
+   locked blocks below, and refuses scenes that break the composition rules.
+2. **Never paraphrase the locked blocks or a character's `look`.** They are inserted
+   verbatim so every image matches. To change the style, edit this file, not a prompt.
+3. **A scene file only decides content and camera:** which shot from the menu each
+   panel uses, and what is in it. It never restates style, palette, or rendering.
+4. **No readable text in images.** Image models mangle pixel fonts. Dialogue lives in
+   the scene file and is drawn by the game. The image gets an empty dialogue box at most.
+5. If the tool rejects a scene, fix the scene. Do not bypass the tool.
+
+## Composition rules (enforced by `story_prompt.py`)
+
+- **R1 panel count** — 2 to 4 panels per image.
+- **R2 menu only** — every panel uses a shot id from the shot menu below.
+- **R3 alternate scale** — neighbouring panels never share a scale. A close-up sits
+  next to a wide or medium shot, never two medium shots side by side.
+- **R4 vary shape** — 2 panels need 2 different shapes; 3 or 4 panels need at least 3.
+  One wide, one tall, one small square reads as this style. A grid of equal panels does not.
+- **R5 anchor and punch** — with 3 or more panels, at least one panel is an anchor
+  (scale wide, full, or medium) and at least one is a punch (scale close, extreme, or insert).
+- **R6 known cast** — every character named in a scene exists in `characters.md`, and is
+  listed in the scene's `characters:` line. Their `look` is inserted verbatim.
+- **R7 short panels** — a panel description is at most 40 words. It says who, doing what,
+  where they look. It does not describe style.
+- **R8 no style leakage** — panel descriptions may not contain style or rendering words
+  (gradient, photorealistic, 3D, blur, glow, painterly, realistic, HD, 4k, smooth).
+- **R9 no text** — panel descriptions may not ask for written words, signs, captions,
+  or speech bubbles.
+
+## Locked style blocks
+
+### header
+
+```
+16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.
+```
+
+### layout
+
+```
+A comic page built from rectangular panels of clearly different sizes and
+aspect ratios, arranged asymmetrically on a solid black background with
+generous empty black space. The panels cover roughly half to two thirds of
+the frame, never tiled edge to edge, never an even grid. Thin white panel
+borders with a 1-pixel dark inner line. Panels overlap slightly, smaller
+panels layered on top of the corners of larger ones. Each panel is a single
+static camera shot.
+```
+
+### framing
+
+```
+Tight cinematic crops, figures cut off by the panel edge at the waist,
+shoulders, or top of the head. Characters in three-quarter view or profile,
+rarely facing the camera straight on. Eyelines point off-panel toward the
+adjacent panel. Shallow staging: figures placed on one or two flat planes,
+a foreground figure overlapping a background figure, flat backdrop with no
+vanishing point. Backgrounds simplified to a few flat shapes, or replaced
+entirely by a flat color, dithered tone, or speed lines in emotional moments.
+```
+
+### character_design
+
+```
+Early 90s anime and manga character design: sharp angular faces, large eyes
+with simple highlights, spiky layered hair with hard-edged shine bands, lean
+proportions. Clean dark outlines, flat cel shading with only 2-3 tones per
+color, no gradients.
+```
+
+### rendering
+
+```
+Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels
+on a single consistent pixel grid, limited palette of about 32 colors,
+checkerboard dithering for skies, walls, and shadows, muted earthy base
+tones with saturated accents on clothing and hair.
+```
+
+### dialogue_box
+
+```
+Across the bottom, an empty dark blue dialogue box with a beveled grey
+border and a small white down-arrow in its lower right corner. The box
+contains no text.
+```
+
+### negative
+
+```
+smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render,
+photorealistic, modern anime, chibi, high resolution detail, lens flare,
+glow effects, mixed pixel sizes, even panel grid, panels filling the whole
+frame, deep perspective, centered full-figure composition, text, letters,
+captions, speech bubbles, watermark, signature
+```
+
+## Panel shapes
+
+- wide: a wide horizontal panel
+- tall: a tall narrow vertical panel
+- square: a small square panel overlapping the corner of a larger panel
+- slit: a very wide, very short letterbox panel
+
+## Shot menu
+
+### two_shot
+- shape: wide
+- scale: medium
+- use: default conversation or party shot
+- prompt: Medium two-shot at eye level. Two or more characters from the waist or knees up, the nearer one overlapping the other, cropped by the panel edge.
+
+### portrait_inset
+- shape: square
+- scale: close
+- use: marks who is speaking or reacting
+- prompt: Head-and-shoulders portrait in three-quarter view, cropped at the top of the hair, against a flat single-color background with no scenery.
+
+### eyes_slit
+- shape: slit
+- scale: extreme
+- use: shock, anger, resolve
+- prompt: Extreme close-up showing only the eyes and brow, filling the panel from edge to edge.
+
+### establishing_tall
+- shape: tall
+- scale: wide
+- use: where we are; no characters
+- prompt: Establishing shot of architecture or landscape from a slight low angle, open space or darkness filling the top half, no characters.
+
+### establishing_wide
+- shape: wide
+- scale: wide
+- use: where we are, with tiny figures for scale
+- prompt: Wide establishing shot of the location at eye level, any figures small and seen from behind, flat layered backdrop.
+
+### full_body_reveal
+- shape: tall
+- scale: full
+- use: introductions, villains, monsters
+- prompt: Single standing figure from head to boots at a low angle, looming, simple dark or flat background.
+
+### low_angle_menace
+- shape: tall
+- scale: close
+- use: threat, authority
+- prompt: Camera below chin level looking up at the face and shoulders, face partly in shadow, dark or abstract background.
+
+### high_angle_down
+- shape: wide
+- scale: medium
+- use: vulnerability, defeat, discovery on the floor
+- prompt: Camera looking down from above on a kneeling, fallen, or crouching character, floor filling most of the panel.
+
+### over_shoulder
+- shape: wide
+- scale: medium
+- use: confrontation, facing something
+- prompt: Over-the-shoulder shot. Dark back of a head and shoulder in the foreground at one edge, the facing character or object at mid-distance.
+
+### profile_flat
+- shape: square
+- scale: close
+- use: quiet or sad beats
+- prompt: Strict side-view profile of one face, background a single flat color or dithered tone.
+
+### impact
+- shape: wide
+- scale: full
+- use: attacks, traps firing, sudden motion
+- prompt: Figure mid-action against radial speed lines or a solid bright color, slight camera tilt, no environment.
+
+### object_insert
+- shape: square
+- scale: insert
+- use: clues, items, mechanisms, hands
+- prompt: Tightly cropped insert of a single object or a hand holding it, nothing else in the panel, flat dark background.

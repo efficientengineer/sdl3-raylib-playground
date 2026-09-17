@@ -29,6 +29,7 @@ Always hot reload (`./fast_reload.sh`) after making code changes — don't wait 
 ./hot_reload.sh android       # hot reload via gradle (~3s, use fast_reload.sh instead)
 ./dev_msg.sh "message"        # send dev message to in-game Messages tab
 ./watch_bugs.sh               # monitor bug reports on device
+./story_prompt.py build --all # scene files → validated image prompts in story/out/
 ```
 
 ## Shader pipeline
@@ -146,6 +147,26 @@ Debug panel (top 1/3 of screen) with two tabs:
 - **Bugs** — in-game bug reporter with binary save format (QA_SAVE_VER=2, BUG_DESC_LEN=256)
 - **Messages** — chat-style log between dev and user, timestamps, auto-scroll
 
+## Story scenes and image prompts
+
+Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style is **locked** in
+`story/STYLE.md`; read its "Rules" section before writing anything image-related.
+
+- **Never hand-write a final image prompt**, and never paste style text into one. Write a scene
+  file in `story/scenes/NNN_slug.md` (copy `000_TEMPLATE.md`), then run `./story_prompt.py build <scene>`.
+  The tool inserts the locked style blocks and each character's `look` verbatim, and exits non-zero
+  if the scene breaks a composition rule (panel count, shot menu only, alternate scale, vary shape,
+  anchor + punch, known cast, no style words, no text). Fix the scene; don't bypass the tool.
+- Send the image model the `prompt` and `negative` from `story/out/<scene>.json`, unedited.
+- **Writing the next scene:** `./story_prompt.py brief ["beat"]` prints the full writer's brief
+  (rules, shot menu, cast, plot state, last two scenes). With no argument it uses `## Next beat`
+  from `story/plot.md`. After the scene builds, update `plot.md` (beats so far, open threads,
+  next beat) and any changed `status` in `characters.md`.
+- To change the look, a shot, or a character design, edit `STYLE.md` / `characters.md`, then
+  rebuild every scene with `build --all` so old prompts don't drift from new ones.
+- Rule thresholds live in both `STYLE.md` (prose) and the top of `story_prompt.py` (constants). Change both.
+- Dialogue is never rendered into images; the game draws it. `story/out/` is generated and gitignored.
+
 ## Index
 
 - `src/` — all C source (text.h/text.c = font renderer)
@@ -153,3 +174,4 @@ Debug panel (top 1/3 of screen) with two tabs:
 - `assets/` — Roboto-Regular.ttf (also copied to android assets)
 - `third_party/` — single-header libs (stb, par_shapes, FastNoiseLite, sokol)
 - `android/` — Gradle project, SDLActivity, reuses root CMake
+- `story/` — `STYLE.md` (locked art rules), `characters.md`, `plot.md`, `scenes/`; `story_prompt.py` builds prompts

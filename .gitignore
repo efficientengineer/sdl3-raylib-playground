@@ -11,3 +11,5 @@ android/local.properties
 shaders/compiled/
 third_party/imgui/examples/
 third_party/imgui/docs/
+story/out/
+__pycache__/
