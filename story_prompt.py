@@ -453,15 +453,16 @@ def sheet_geometry(shapes):
         rects = [None] * len(shapes)
         talls = [i for i, sh in enumerate(shapes) if sh == "tall"][:2]
         flow = [i for i in range(len(shapes)) if i not in talls]
-        tw = min(0.21 * W, (H - 2 * g) / 2 * 0.95) if talls else 0
+        tw = min(0.20 * W, (H - 2 * g) / 2 * 0.95) if talls else 0
+        cg = 0.09 * W                 # image models draw panels fatter than asked: keep columns well clear
         x0, x1 = g, W - g
         for k, i in enumerate(talls):
             if k == 0:
                 rects[i] = (W - g - tw, g, tw, 2 * tw)
-                x1 = W - 2 * g - tw
+                x1 = W - g - tw - cg
             else:
                 rects[i] = (g, H - g - 2 * tw, tw, 2 * tw)
-                x0 = 2 * g + tw
+                x0 = g + tw + cg
         rw = x1 - x0
         rows, cur, total = [], [], 0.0
         for i in flow:
@@ -473,18 +474,24 @@ def sheet_geometry(shapes):
             total += a
         if cur:
             rows.append(cur)
-        heights = [min((rw - g * (len(r) - 1)) / sum(SHAPE_ASPECT[shapes[i]] for i in r), 0.40 * H) for r in rows]
+        rg = 0.07 * W                 # gutter between panels sharing a row
+        heights = [min((rw - rg * (len(r) - 1)) / sum(SHAPE_ASPECT[shapes[i]] for i in r), 0.40 * H) for r in rows]
         need = sum(heights) + g * max(0, len(rows) - 1)
         scale = min(1.0, (H - 2 * g) / need) if need else 1.0
         heights = [h * scale for h in heights]
         y = g + (H - 2 * g - (sum(heights) + g * max(0, len(rows) - 1))) / 2
         for r, (row, h) in enumerate(zip(rows, heights)):
             widths = [SHAPE_ASPECT[shapes[i]] * h for i in row]
-            used = sum(widths) + g * (len(row) - 1)
-            x = x0 if r % 2 == 0 else x1 - used          # stagger rows left / right
+            used = sum(widths) + rg * (len(row) - 1)
+            if len(talls) == 1:
+                x = x0                                    # hug the side away from the tall column
+            elif len(talls) == 2:
+                x = x0 + (rw - used) / 2
+            else:
+                x = x0 if r % 2 == 0 else x1 - used       # no columns: stagger rows left / right
             for i, w in zip(row, widths):
                 rects[i] = (x, y, w, h)
-                x += w + g
+                x += w + rg
             y += h + g
         area = sum(w * h for _, _, w, h in rects) / (W * H)
         norm = [(x / W, y / H, w / W, h / H) for x, y, w, h in rects]
@@ -568,8 +575,23 @@ def cmd_sheet(args):
     L += [f"SHEET LAYOUT: {b['sheet_layout']}", "",
           "PANEL SIZES AND POSITIONS, as percentages of the whole image (follow these closely):"]
     for i, (x, y, w, h) in enumerate(rects):
-        L.append(f"Panel {i+1}: {style['sheet_shapes'][shapes[i]]}. Left edge at {x*100:.0f}%, top edge at "
-                 f"{y*100:.0f}%, width {w*100:.0f}%, height {h*100:.0f}%.")
+        L.append(f"Panel {i+1}: {style['sheet_shapes'][shapes[i]]}. Left edge at {x*100:.0f}%, right edge at "
+                 f"{(x+w)*100:.0f}%, top edge at {y*100:.0f}%, bottom edge at {(y+h)*100:.0f}%.")
+    gaps = []
+    for i, a in enumerate(rects):                        # spell out the black gap between every pair that could collide
+        for j in range(i + 1, len(rects)):
+            b_ = rects[j]
+            v_overlap = a[1] < b_[1] + b_[3] and b_[1] < a[1] + a[3]
+            h_overlap = a[0] < b_[0] + b_[2] and b_[0] < a[0] + a[2]
+            if v_overlap:
+                left, right = (i, j) if a[0] < b_[0] else (j, i)
+                gaps.append(f"between the right edge of panel {left+1} and the left edge of panel {right+1}")
+            elif h_overlap:
+                top, bottom = (i, j) if a[1] < b_[1] else (j, i)
+                gaps.append(f"between the bottom of panel {top+1} and the top of panel {bottom+1}")
+    if gaps:
+        L.append("A band of pure black must be clearly visible " + "; ".join(gaps) + ". If space is tight, draw the "
+                 "panels smaller. No panel may cover any part of another panel, not even a corner.")
     L.append("")
     k, checks = 0, []
     for sc in scenes:

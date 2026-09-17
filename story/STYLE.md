@@ -151,7 +151,9 @@ This is a production shot sheet, not a finished comic page: the panels will be
 cut apart afterwards. Solid pure black background (#000000). Every panel is a
 separate rectangle with a thin white border and a 1-pixel dark inner line.
 Panels never overlap, never touch each other, and never touch the edge of the
-image. Leave a gutter of pure black at least 5 percent of the image width
+image: no panel covers any part of another, not even a corner, and all four
+corners and all four border lines of every panel are fully visible. If space
+is tight, draw the panels smaller rather than closer. Leave a gutter of pure black at least 5 percent of the image width
 between neighbouring panels and around the outside. The panels have clearly different sizes and proportions and sit at the stated
 positions; this is not an even grid and the panels do not fill the image.
 Nothing is drawn in the gutters: no
