@@ -7,8 +7,10 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
 ## Rules for anyone (human or model) writing image prompts
 
 1. **Never hand-write a final image prompt.** Write a scene file in `story/scenes/`
-   and run `./story_prompt.py build <scene>`. The tool assembles the prompt from the
-   locked blocks below, and refuses scenes that break the composition rules.
+   and run `./story_prompt.py sheet <scene>` (ChatGPT shot sheet, the normal path) or
+   `./story_prompt.py build <scene>` (single finished page, for generators without
+   reference images). The tool assembles the prompt from the locked blocks below, and
+   refuses scenes that break the composition rules.
 2. **Never paraphrase the locked blocks or a character's `look`.** They are inserted
    verbatim so every image matches. To change the style, edit this file, not a prompt.
 3. **A scene file only decides content and camera:** which shot from the menu each
@@ -94,6 +96,39 @@ border and a small white down-arrow in its lower right corner. The box
 contains no text.
 ```
 
+### sheet_layout
+
+```
+This is a production shot sheet, not a finished comic page: the panels will be
+cut apart afterwards. Solid pure black background (#000000). Every panel is a
+separate rectangle with a thin white border and a 1-pixel dark inner line.
+Panels never overlap, never touch each other, and never touch the edge of the
+image. Leave a gutter of pure black at least 5 percent of the image width
+between neighbouring panels and around the outside. Panels in the same row are
+top-aligned and share the same height. Nothing is drawn in the gutters: no
+numbers, labels, captions, arrows, or decorations. Each panel is a complete,
+self-contained picture of a single static camera shot.
+```
+
+### sheet_avoid
+
+```
+overlapping panels, panels touching, panels bleeding off the image edge,
+panel numbers, labels, gutters that are not pure black, rounded panel corners,
+a single merged illustration, a dialogue box
+```
+
+### refsheet
+
+```
+A character reference sheet on a solid pure black background, three separate
+white-bordered panels in one row. Left panel: full-body standing pose, head to
+boots, three-quarter view. Middle panel: head-and-shoulders portrait in
+three-quarter view against a flat single-color background. Right panel: the
+same head in strict profile. The character is identical in all three panels:
+same face, hair, outfit, and colors. No text, no labels, no color swatches.
+```
+
 ### negative
 
 ```
@@ -110,6 +145,24 @@ captions, speech bubbles, watermark, signature
 - tall: a tall narrow vertical panel
 - square: a small square panel overlapping the corner of a larger panel
 - slit: a very wide, very short letterbox panel
+
+## Sheet panel shapes
+
+Used by `sheet` mode, where panels must not overlap. The ratios are width:height.
+
+- wide: a wide horizontal panel, about 2:1
+- tall: a tall narrow vertical panel, about 1:2
+- square: a small square panel, 1:1
+- slit: a very wide, very short letterbox panel, about 4:1
+
+## Reference images
+
+Files to attach in ChatGPT. A missing file is skipped with a warning and the text
+description is used alone. Character references are set per character in
+`characters.md` with a `- ref:` line; make them with `./story_prompt.py refsheet <Name>`.
+
+- style: story/refs/style.png
+- style_note: Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
 
 ## Shot menu
 

@@ -19,11 +19,13 @@ cold cut-stone halls below, old mechanisms that still work. Torchlight, dust, br
 ## Beats so far
 1. The party accepts a quest-board contract to clear the Ancient Halls entrance.
 2. At the first sealed door, Pip finds fresh scratches on the inside of the lock: it was opened from within. (scene 001)
+3. The door opens on its own. A skeleton in old hall-guard armor waits beyond it. Zeph recognises the magic as ancient. (scene 002)
 
 ## Open threads
 - Who posted the contract?
 - What came out through the sealed door?
+- Why is the dead guard still following its orders, and whose orders are they?
 - What is the Wandering Merchant doing this deep in the Halls?
 
 ## Next beat
-The door grinds open on its own. A skeleton in the rusted armor of an old hall guard stands waiting on the other side.
+The guard does not attack. It lowers its halberd across the doorway and points back up the corridor, as if ordering them to leave.
