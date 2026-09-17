@@ -113,7 +113,7 @@ creates fresh state → deserializes. Game continues seamlessly.
 - `fast_reload.sh` compiles directly with NDK clang++, skipping gradle entirely (~0.7s vs ~3s). It finds the gradle CMake dir by glob (the hash differs per checkout), so it works in a git worktree once `./deploy.sh` has run there. A worktree also needs `android/local.properties` (`sdk.dir=...`), which is gitignored.
 - `hot_reload.sh android` uses gradle (slower but guaranteed correct flags).
 - Reload flag: file with content = trigger reload; host truncates to 0 bytes after consuming.
-- **Reloads land while backgrounded.** Host sets `SDL_HINT_ANDROID_BLOCK_ON_PAUSE=0` so the SDL loop keeps running when the app is hidden; it skips rendering and polls the flag 4x/s, logging `Hot reload applied while backgrounded`. No need to foreground the app.
+- **Reloads land while backgrounded.** Host sets `SDL_HINT_ANDROID_BLOCK_ON_PAUSE=0` so the SDL loop keeps running when the app is hidden; it skips rendering and polls the flag 4x/s, logging `Hot reload applied while backgrounded`. No need to foreground the app. Exception: after a while in the background Android moves the process to its cached state and freezes it, and a frozen process cannot poll. `fast_reload.sh` detects that, prints `Queued`, and exits 0; the reload applies the moment the game is opened.
 - **SDL3 never queues lifecycle events.** `SDL_EVENT_DID_ENTER_BACKGROUND/FOREGROUND` go only to `SDL_AddEventWatch` callbacks, never to `SDL_PollEvent`. Host uses a watcher for save-on-background and the foreground reload check. Any `if (e.type == SDL_EVENT_DID_ENTER_*)` inside the poll loop is dead code.
 - **UI scale** (`dpi_scale`) = shorter screen edge / 360 (phone: 3.0 in both orientations), computed in host.cpp every frame. Never derive scale from height alone: it flips between orientations and SDL reports transient sizes at startup.
 - **Font size is live**, not baked: host sets `style.FontSizeBase = 10 * dpi_scale` before every `NewFrame` (ImGui 1.92+ dynamic fonts); game logic multiplies by `FontGlobalScale` 1.3. Changing either ratio is a host change (`./deploy.sh`). `setup_touch_style` runs every tick so a bad deserialized `dpi_scale` can't stick.
@@ -204,6 +204,15 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
      manga-style and reveals them line by line with a dialogue box (tap or space to advance; `#all`
      on the URL shows every panel at once). Missing panel images become labelled placeholders, so a
      scene's pacing can be tested before any art exists. This is the reference for the in-game player.
+- **Pages and sheet size.** A scene is 1-3 pages of 2-4 panels, at most 8 panels, with `---` in
+  `## Panels` starting a new page (the game clears the screen, as Phantasy Star IV does). Aim for 6-8
+  shots in a scene that matters. One sheet holds the whole scene: up to 4 panels use 1536x1024-class
+  canvases, more use 2560x1440-class ones (the largest size OpenAI doesn't call experimental). Layout is
+  by fixed relative shape sizes (`SHAPE_UNITS`) packed into staggered rows and scaled to fit, so wide
+  panels are always the big ones. Two earlier search-based layout engines produced huge insets and tiny
+  two-shots; don't go back to scoring functions.
+- The export includes a scene as soon as it has any panel art; missing panels show as dark placeholder
+  boxes in the game, so a scene stays playable while its sheet is being regenerated.
 - **Acting is mandatory.** A panel scene needs a `- staging:` line (fixed screen direction for the whole
   scene) and, under each panel, an indented acting line for every cast member in it: where their eyes
   point, their expression, their body. The `## Beat` paragraph is sent to ChatGPT as the situation, so

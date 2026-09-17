@@ -15,6 +15,9 @@ it. This IS sent to the image model as the situation, so write what an artist ne
    - Name: where they look (a named target or a screen direction), expression, body language (max 25 words)
    - Name: ... one line for every cast member named in the panel
 2. shot_id | ...
+---
+3. shot_id | a line of three dashes starts a new PAGE: the screen clears and these panels build a fresh page
+4. shot_id | 2-4 panels per page, at most 8 panels per scene, numbered straight through
 
 ## Dialogue
 - Name [1] {tense}: line. [n] = panel revealed with this line (optional; default: next panel).

@@ -329,7 +329,7 @@ static void dev_send(const char *text) {
 // ───────────────────────── Game state ─────────────────────────
 
 enum Screen { SCR_TITLE, SCR_INTRO, SCR_END };
-#define MAX_PANELS 8
+#define MAX_PANELS 12
 #define PANEL_IN 0.28f            // seconds for a panel to arrive
 #define TYPE_CPS 42.0f            // typewriter characters per second
 
@@ -341,6 +341,7 @@ struct Star {
     bool panel_on[MAX_PANELS];
     float panel_t[MAX_PANELS];
     int panel_z[MAX_PANELS], z_next;
+    int page;                     // page currently on screen; revealing a panel from another page clears it
     Tex tex[MAX_PANELS];
     int tex_scene;                // which scene's textures are loaded (-1 = none)
     float dpi_scale;
@@ -353,8 +354,14 @@ static void star_free_textures(Star *st) {
     st->tex_scene = -1;
 }
 
-static void reveal_panel(Star *st, int n, bool instant) {                 // n is 1-based, 0 = none
-    if (n < 1 || n > MAX_PANELS || st->panel_on[n - 1]) return;
+static void reveal_panel(Star *st, const CsScene *sc, int n, bool instant) {   // n is 1-based, 0 = none
+    if (n < 1 || n > MAX_PANELS || n > sc->panel_count) return;
+    if (sc->panels[n - 1].page != st->page) {                              // new page: start from an empty screen
+        st->page = sc->panels[n - 1].page;
+        memset(st->panel_on, 0, sizeof(st->panel_on));
+        st->z_next = 0;
+    }
+    if (st->panel_on[n - 1]) return;
     st->panel_on[n - 1] = true;
     st->panel_t[n - 1] = instant ? PANEL_IN : 0.0f;
     st->panel_z[n - 1] = st->z_next++;
@@ -372,13 +379,14 @@ static void star_goto(Star *st, int scene, int line, bool instant) {
     if (scene != st->scene || line == 0 || instant) {
         memset(st->panel_on, 0, sizeof(st->panel_on));
         st->z_next = 0;
-        for (int i = 0; i < line; i++) reveal_panel(st, sc->lines[i].reveal, true);
+        st->page = 0;
+        for (int i = 0; i < line; i++) reveal_panel(st, sc, sc->lines[i].reveal, true);
     }
     st->screen = SCR_INTRO;
     st->scene = scene;
     st->line = line;
     st->line_t = instant ? 99.0f : 0.0f;
-    reveal_panel(st, sc->lines[line].reveal, instant);
+    reveal_panel(st, sc, sc->lines[line].reveal, instant);
     mus_start(sc->lines[line].mood);
 }
 

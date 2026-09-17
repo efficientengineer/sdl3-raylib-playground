@@ -21,7 +21,10 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
 
 ## Composition rules (enforced by `story_prompt.py`)
 
-- **R1 panel count** — 2 to 4 panels per image.
+- **R1 panel count** — a scene is 1 to 3 **pages** of 2 to 4 panels, at most 8 panels in all. A line of
+  `---` in `## Panels` starts a new page: the game clears the screen and builds the next page from
+  empty, the way Phantasy Star IV does. One shot sheet holds the whole scene. Aim for 6 to 8 shots in
+  a scene that matters; 3 or 4 is fine for a short beat. R3, R4, and R5 apply to each page on its own.
 - **R2 menu only** — every panel uses a shot id from the shot menu below.
 - **R3 alternate scale** — neighbouring panels never share a scale. A close-up sits
   next to a wide or medium shot, never two medium shots side by side.

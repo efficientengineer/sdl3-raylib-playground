@@ -40,7 +40,8 @@ STYLE, CAST, PLOT = ROOT / "STYLE.md", ROOT / "characters.md", ROOT / "plot.md"
 SCENES, OUT, PANELS = ROOT / "scenes", ROOT / "out", ROOT / "panels"
 
 # ── Rule thresholds (mirror STYLE.md "Composition rules") ──
-PANELS_MIN, PANELS_MAX = 2, 4                       # R1
+PANELS_MIN, PANELS_MAX = 2, 4                       # R1, per page
+SCENE_MAX_PANELS = 8                                # R1, per scene (one shot sheet)
 ANCHOR_SCALES = {"wide", "full", "medium"}          # R5
 PUNCH_SCALES = {"close", "extreme", "insert"}       # R5
 MAX_PANEL_WORDS = 40                                # R7
@@ -58,7 +59,7 @@ REQUIRED_BLOCKS = ["header", "layout", "framing", "acting", "character_design", 
                    "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet", "refsheet_avoid"]
 
 # ── Sheet mechanics (layout maths, not style) ──
-SHEET_MAX_PANELS = 6
+SHEET_MAX_PANELS = 8
 SHAPE_ASPECT = {"wide": 2.0, "tall": 0.5, "square": 1.0, "slit": 4.0}   # width / height
 ROW_CAPACITY = 4.0            # max summed aspect per row
 ROW_MIN_ASPECT = 2.0          # a lone small panel does not get a giant row
@@ -165,12 +166,16 @@ def parse_scene(path):
     title = re.search(r"^# (.+)$", text, flags=re.M)
     head = text.split("\n## ", 1)[0]
     secs = h2_sections(text)
-    panels, acting = [], []
+    panels, acting, pages, page = [], [], [], 0
     for raw in secs.get("panels", "").splitlines():
+        if re.match(r"^\s*-{3,}\s*$", raw):                     # "---" starts a new page: the screen clears
+            page += 1 if panels and pages[-1] == page else 0
+            continue
         m = re.match(r"^\d+\.\s*([\w-]+)\s*\|\s*(.+)$", raw)
         if m:
             panels.append((m.group(1), m.group(2).strip()))
             acting.append({})
+            pages.append(page)
             continue
         m = re.match(r"^\s+- ([^:]+):\s*(.+)$", raw)           # indented "- Name: where they look, expression, body"
         if m and panels:
@@ -188,7 +193,7 @@ def parse_scene(path):
         "meta": meta,
         "characters": [c.strip() for c in meta.get("characters", "").split(",") if c.strip()],
         "beat": squash(secs.get("beat", "")),
-        "panels": panels, "acting": acting, "dialogue": dialogue, "reveals": reveals, "moods": moods,
+        "panels": panels, "acting": acting, "pages": pages, "dialogue": dialogue, "reveals": reveals, "moods": moods,
         "narration": meta.get("type", "").lower() == "narration",
     }
 
@@ -214,28 +219,35 @@ def validate(scene, style, cast):
 
     if not scene["meta"].get("location"):
         err.append("missing '- location:' line")
-    if not PANELS_MIN <= len(panels) <= PANELS_MAX:
-        err.append(f"R1 panel count: {len(panels)} panels, need {PANELS_MIN}-{PANELS_MAX}")
+    if len(panels) > SCENE_MAX_PANELS:
+        err.append(f"R1 panel count: {len(panels)} panels in the scene, max {SCENE_MAX_PANELS} (one shot sheet)")
     unknown = [sid for sid, _ in panels if sid not in shots]
     for sid in unknown:
         err.append(f"R2 menu only: unknown shot '{sid}' (run: story_prompt.py shots)")
     if unknown or not panels:
+        if not panels:
+            err.append("R1 panel count: no panels")
         return err, warn                                   # remaining rules need valid shots
 
-    scales = [shots[sid]["scale"] for sid, _ in panels]
-    shapes = [shots[sid]["shape"] for sid, _ in panels]
-    for i in range(len(panels) - 1):
-        if scales[i] == scales[i + 1]:
-            err.append(f"R3 alternate scale: panels {i+1} and {i+2} are both '{scales[i]}' "
-                       f"({panels[i][0]}, {panels[i+1][0]})")
-    need = 2 if len(panels) == 2 else 3
-    if len(set(shapes)) < need:
-        err.append(f"R4 vary shape: {len(set(shapes))} distinct shape(s) {sorted(set(shapes))}, need {need}")
-    if len(panels) >= 3:
-        if not ANCHOR_SCALES & set(scales):
-            err.append("R5 anchor and punch: no anchor panel (wide, full, or medium)")
-        if not PUNCH_SCALES & set(scales):
-            err.append("R5 anchor and punch: no punch panel (close, extreme, or insert)")
+    for pg in sorted(set(scene["pages"])):                 # composition rules apply to each page on its own
+        idx = [i for i, p in enumerate(scene["pages"]) if p == pg]
+        where = f"page {pg + 1}" if len(set(scene["pages"])) > 1 else "the page"
+        if not PANELS_MIN <= len(idx) <= PANELS_MAX:
+            err.append(f"R1 panel count: {where} has {len(idx)} panels, need {PANELS_MIN}-{PANELS_MAX}")
+        scales = [shots[panels[i][0]]["scale"] for i in idx]
+        shapes = [shots[panels[i][0]]["shape"] for i in idx]
+        for k in range(len(idx) - 1):
+            if scales[k] == scales[k + 1]:
+                err.append(f"R3 alternate scale: panels {idx[k]+1} and {idx[k+1]+1} are both '{scales[k]}' "
+                           f"({panels[idx[k]][0]}, {panels[idx[k+1]][0]})")
+        need = 2 if len(idx) <= 2 else 3
+        if len(set(shapes)) < need:
+            err.append(f"R4 vary shape: {where} has {len(set(shapes))} distinct shape(s) {sorted(set(shapes))}, need {need}")
+        if len(idx) >= 3:
+            if not ANCHOR_SCALES & set(scales):
+                err.append(f"R5 anchor and punch: {where} has no anchor panel (wide, full, or medium)")
+            if not PUNCH_SCALES & set(scales):
+                err.append(f"R5 anchor and punch: {where} has no punch panel (close, extreme, or insert)")
 
     listed = [c.lower() for c in scene["characters"]]
     for c in listed:
@@ -362,7 +374,11 @@ def cmd_check_build(args, build):
                 print(f"{path.name}: ERROR: {e}", file=sys.stderr)
             continue
         if not build:
-            print(f"{path.name}: ok ({len(scene['panels'])} panels)")
+            pg = len(set(scene["pages"])) if scene["panels"] else 0
+            print(f"{path.name}: ok ({len(scene['panels'])} panels" + (f", {pg} pages)" if pg > 1 else ")"))
+            continue
+        if len(set(scene["pages"])) > 1:
+            print(f"{path.name}: skipped, 'build' draws one finished page and this scene has several. Use 'sheet'.", file=sys.stderr)
             continue
         prompt, negative = assemble(scene, style, cast)
         OUT.mkdir(exist_ok=True)
@@ -440,63 +456,61 @@ character status in story/characters.md.""")
 
 # ───────────────────────── ChatGPT shot sheets ─────────────────────────
 
-def sheet_geometry(shapes):
-    """Place panels on a canvas at varied sizes. Returns (canvas text, [(x, y, w, h)] normalized 0-1).
+# Relative size of each shape on a sheet, as (width, height) in units of u. A wide panel is the yardstick.
+SHAPE_UNITS = {"wide": (2.0, 1.0), "tall": (0.8, 1.6), "square": (0.8, 0.8), "slit": (1.8, 0.45)}
 
-    Up to two tall panels get their own side columns (right, then left) spanning most of the height.
-    Everything else flows in staggered rows between them, each row alternately left and right aligned.
-    """
-    best = None
-    for W, H, label in ((1536, 1024, "landscape, 1536x1024"), (1024, 1536, "portrait, 1024x1536"),
-                        (1024, 1024, "square, 1024x1024")):
-        g = 0.05 * W
-        rects = [None] * len(shapes)
-        talls = [i for i, sh in enumerate(shapes) if sh == "tall"][:2]
-        flow = [i for i in range(len(shapes)) if i not in talls]
-        tw = min(0.20 * W, (H - 2 * g) / 2 * 0.95) if talls else 0
-        cg = 0.09 * W                 # image models draw panels fatter than asked: keep columns well clear
-        x0, x1 = g, W - g
-        for k, i in enumerate(talls):
-            if k == 0:
-                rects[i] = (W - g - tw, g, tw, 2 * tw)
-                x1 = W - g - tw - cg
-            else:
-                rects[i] = (g, H - g - 2 * tw, tw, 2 * tw)
-                x0 = g + tw + cg
-        rw = x1 - x0
-        rows, cur, total = [], [], 0.0
-        for i in flow:
-            a = SHAPE_ASPECT[shapes[i]]
-            if cur and total + a > 3.2:
-                rows.append(cur)
-                cur, total = [], 0.0
-            cur.append(i)
-            total += a
-        if cur:
+
+def _pack(shapes, W, H, u):
+    """Pack panels in order into top-aligned rows at unit size `u`. Returns rects in pixels, or None if it overflows."""
+    g, rg = 0.05 * W, 0.06 * W                              # outer margin / row gap, and gap between panels in a row
+    rows, cur, width = [], [], 0.0
+    for i, sh in enumerate(shapes):
+        w = SHAPE_UNITS[sh][0] * u
+        if cur and width + rg + w > W - 2 * g:
             rows.append(cur)
-        rg = 0.07 * W                 # gutter between panels sharing a row
-        heights = [min((rw - rg * (len(r) - 1)) / sum(SHAPE_ASPECT[shapes[i]] for i in r), 0.40 * H) for r in rows]
-        need = sum(heights) + g * max(0, len(rows) - 1)
-        scale = min(1.0, (H - 2 * g) / need) if need else 1.0
-        heights = [h * scale for h in heights]
-        y = g + (H - 2 * g - (sum(heights) + g * max(0, len(rows) - 1))) / 2
-        for r, (row, h) in enumerate(zip(rows, heights)):
-            widths = [SHAPE_ASPECT[shapes[i]] * h for i in row]
-            used = sum(widths) + rg * (len(row) - 1)
-            if len(talls) == 1:
-                x = x0                                    # hug the side away from the tall column
-            elif len(talls) == 2:
-                x = x0 + (rw - used) / 2
-            else:
-                x = x0 if r % 2 == 0 else x1 - used       # no columns: stagger rows left / right
-            for i, w in zip(row, widths):
-                rects[i] = (x, y, w, h)
-                x += w + rg
-            y += h + g
-        area = sum(w * h for _, _, w, h in rects) / (W * H)
-        norm = [(x / W, y / H, w / W, h / H) for x, y, w, h in rects]
-        if best is None or area > best[0]:
-            best = (area, label, norm)
+            cur, width = [], 0.0
+        width += (rg if cur else 0) + w
+        cur.append(i)
+    rows.append(cur)
+    rects, y = [None] * len(shapes), g
+    for r, row in enumerate(rows):
+        used = sum(SHAPE_UNITS[shapes[i]][0] * u for i in row) + rg * (len(row) - 1)
+        if used > W - 2 * g:
+            return None
+        x = g if r % 2 == 0 else W - g - used                # stagger rows left / right so it never reads as a grid
+        for i in row:
+            w, h = SHAPE_UNITS[shapes[i]][0] * u, SHAPE_UNITS[shapes[i]][1] * u
+            rects[i] = (x, y, w, h)
+            x += w + rg
+        y += max(SHAPE_UNITS[shapes[i]][1] * u for i in row) + g
+    return rects if y - g <= H - g else None
+
+
+def sheet_geometry(shapes):
+    """Lay the panels out on a canvas. Returns (canvas text, [(x, y, w, h)] normalized 0-1).
+
+    Every shape has a fixed relative size (SHAPE_UNITS), so the important wide panels are always the
+    big ones and insets stay small. Panels pack into rows in reading order, and the whole sheet is scaled
+    up until it just fits. The canvas that lets the panels be largest wins. Up to 4 panels use the
+    standard sizes; more use the large ones (2560x1440 is the biggest size OpenAI does not call experimental).
+    """
+    small = ((1536, 1024, "landscape, 1536x1024"), (1024, 1536, "portrait, 1024x1536"), (1024, 1024, "square, 1024x1024"))
+    large = ((2560, 1440, "landscape, 2560x1440"), (1440, 2560, "portrait, 1440x2560"), (2048, 2048, "square, 2048x2048"))
+    best = None
+    for W, H, label in (small if len(shapes) <= 4 else large):
+        lo, hi = 1.0, float(max(W, H))
+        for _ in range(40):                                  # largest u that still fits
+            mid = (lo + hi) / 2
+            if _pack(shapes, W, H, mid): lo = mid
+            else: hi = mid
+        rects = _pack(shapes, W, H, lo)
+        if not rects:
+            continue
+        fill = sum(w * h for _, _, w, h in rects) / (W * H)
+        if best is None or fill > best[0]:
+            best = (fill, label, [(x / W, y / H, w / W, h / H) for x, y, w, h in rects])
+    if best is None:
+        die("could not fit the panels on any canvas")
     return best[1], best[2]
 
 
@@ -851,8 +865,10 @@ def panel_file(scene, n, sid):
 
 def page_layout(scene, style, mode="land"):
     """Where each panel sits on the composed page. Square panels tuck over the previous panel's corner."""
-    lay, out, used, prev = LAYOUTS[mode], [], {}, None
+    lay, out, used, prev, page = LAYOUTS[mode], [], {}, None, 0
     for n, (sid, desc) in enumerate(scene["panels"], 1):
+        if scene["pages"][n - 1] != page:                  # a new page starts from an empty screen
+            page, used, prev = scene["pages"][n - 1], {}, None
         shape = style["shots"][sid]["shape"]
         img = panel_file(scene, n, sid)
         size = png_size(img) if img.exists() else None
@@ -868,7 +884,7 @@ def page_layout(scene, style, mode="land"):
         x = max(1, min(x, 99 - w))
         y = max(1, min(y, lay["bottom"] - h))
         used[shape] = used.get(shape, 0) + 1
-        prev = {"n": n, "shot": sid, "x": round(x, 1), "y": round(y, 1), "w": w, "h": round(h, 1),
+        prev = {"n": n, "page": page, "shot": sid, "x": round(x, 1), "y": round(y, 1), "w": w, "h": round(h, 1),
                 "img": f"../panels/{img.name}" if size else None, "file": img.name, "content": desc}
         out.append(prev)
     return out
@@ -916,7 +932,9 @@ const els=D.panels.map(p=>{const e=document.createElement('div');e.className='p'
   if(p.img){const i=new Image();i.src=p.img;e.appendChild(i)}else e.textContent=`P${p.n} ${p.shot}\n${p.content}`;
   stage.insertBefore(e,document.getElementById('box'));return e});
 let line=-1,typing=null,z=1;
-function reveal(n){const e=els[n-1];if(e&&!e.classList.contains('on')){e.style.zIndex=z++;e.classList.add('on')}}
+let page=0;
+function reveal(n){const e=els[n-1],p=D.panels[n-1];if(!e)return;if(p.page!==page){page=p.page;els.forEach(x=>x.classList.remove('on'))}
+  if(!e.classList.contains('on')){e.style.zIndex=z++;e.classList.add('on')}}
 function show(){const l=D.lines[line];reveal(l.reveal);who.textContent=l.speaker;txt.textContent='';arrow.style.display='none';
   let i=0;typing=setInterval(()=>{txt.textContent=l.text.slice(0,++i);if(i>=l.text.length)done()},28)}
 function done(){clearInterval(typing);typing=null;txt.textContent=D.lines[line].text;arrow.style.display=''}
@@ -973,7 +991,7 @@ def cmd_export(args):
            "#pragma once", "",
            "enum CsMood { " + ", ".join(f"CS_{m.upper()}" for m in MOODS) + ", CS_MOOD_COUNT };",
            "struct CsRect { float x, y, w, h; };                 // percent of the stage",
-           "struct CsPanel { const char *file; CsRect land, port; };",
+           "struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen",
            "struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood; };  // reveal 0 = none",
            "struct CsScene { const char *id; const char *title; bool narration;",
            "                 const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };", ""]
@@ -990,16 +1008,19 @@ def cmd_export(args):
             sys.exit("story_prompt: scene rejected. Fix the scene file; do not bypass the rules.")
         missing = [panel_file(scene, n, sid).name for n, (sid, _) in enumerate(scene["panels"], 1)
                    if not panel_file(scene, n, sid).exists()]
-        if missing:
-            print(f"skipped {stem}: {len(missing)} panel image(s) not generated yet ({missing[0]} ...)", file=sys.stderr)
+        if scene["panels"] and len(missing) == len(scene["panels"]):
+            print(f"skipped {stem}: no panel art generated yet", file=sys.stderr)
             continue
+        if missing:                                            # the game draws a placeholder box for these
+            print(f"{stem}: {len(missing)} of {len(scene['panels'])} panels have no art yet, shown as placeholders "
+                  f"({', '.join(m.split('_', 3)[-1].removesuffix('.png') for m in missing)})", file=sys.stderr)
         ident = re.sub(r"\W", "_", stem)
         if scene["panels"]:
             land, port = page_layout(scene, style, "land"), page_layout(scene, style, "port")
             out.append(f"static const CsPanel CS_{ident}_PANELS[] = {{")
             for a, b in zip(land, port):
                 rect = lambda r: "{" + ", ".join(f"{float(r[k]):.1f}f" for k in "xywh") + "}"
-                out.append(f'    {{ "{a["file"]}", {rect(a)}, {rect(b)} }},')
+                out.append(f'    {{ "{a["file"]}", {a["page"]}, {rect(a)}, {rect(b)} }},')
             out.append("};")
         out.append(f"static const CsLine CS_{ident}_LINES[] = {{")
         for (who, text), reveal, tag in zip(scene["dialogue"], reveal_plan(scene), scene["moods"]):

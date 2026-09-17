@@ -3,7 +3,7 @@
 
 enum CsMood { CS_WONDER, CS_DREAD, CS_TENSE, CS_CONFRONT, CS_SORROW, CS_HOPE, CS_MOOD_COUNT };
 struct CsRect { float x, y, w, h; };                 // percent of the stage
-struct CsPanel { const char *file; CsRect land, port; };
+struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen
 struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood; };  // reveal 0 = none
 struct CsScene { const char *id; const char *title; bool narration;
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
@@ -17,21 +17,26 @@ static const CsLine CS_p01_prologue_LINES[] = {
 };
 
 static const CsPanel CS_003_the_warning_PANELS[] = {
-    { "003_the_warning_p1_establishing_wide.png", {4.0f, 5.0f, 52.0f, 36.6f}, {3.0f, 2.0f, 80.0f, 28.1f} },
-    { "003_the_warning_p2_low_angle_menace.png", {73.0f, 1.0f, 22.0f, 73.8f}, {61.0f, 10.0f, 36.0f, 60.3f} },
-    { "003_the_warning_p3_two_shot.png", {20.0f, 28.8f, 52.0f, 45.2f}, {17.0f, 52.0f, 80.0f, 34.8f} },
-    { "003_the_warning_p4_portrait_inset.png", {65.0f, 40.6f, 17.0f, 33.4f}, {69.0f, 69.5f, 30.0f, 29.5f} },
+    { "003_the_warning_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 36.6f}, {3.0f, 2.0f, 80.0f, 28.1f} },
+    { "003_the_warning_p2_low_angle_menace.png", 0, {73.0f, 1.0f, 22.0f, 73.8f}, {61.0f, 10.0f, 36.0f, 60.3f} },
+    { "003_the_warning_p3_eyes_slit.png", 0, {20.0f, 50.0f, 60.0f, 24.0f}, {4.0f, 40.0f, 92.0f, 18.4f} },
+    { "003_the_warning_p4_two_shot.png", 1, {4.0f, 5.0f, 52.0f, 45.2f}, {3.0f, 2.0f, 80.0f, 34.8f} },
+    { "003_the_warning_p5_object_insert.png", 1, {49.0f, 41.2f, 17.0f, 27.2f}, {69.0f, 26.8f, 30.0f, 24.0f} },
+    { "003_the_warning_p6_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f} },
+    { "003_the_warning_p7_portrait_inset.png", 1, {82.0f, 40.6f, 17.0f, 33.4f}, {69.0f, 57.6f, 30.0f, 29.5f} },
 };
 static const CsLine CS_003_the_warning_LINES[] = {
     { "Bron", "It's blocking the way.", 1, CS_TENSE },
-    { "Lyra", "No. Look at it. It's pointing us back.", 2, CS_DREAD },
-    { "Bron", "Then it can point while I walk through it.", 3, CS_CONFRONT },
-    { "Lyra", "Bron, wait.", 3, CS_CONFRONT },
-    { "Lyra", "It isn't guarding the door from us. It's still guarding us from the door.", 4, CS_SORROW },
+    { "Lyra", "No. Look at it. It's pointing us back the way we came.", 2, CS_DREAD },
+    { "Bron", "A dead man doesn't give me orders.", 3, CS_TENSE },
+    { "Bron", "Then it can point while I walk through it!", 4, CS_CONFRONT },
+    { "Lyra", "Bron, wait!", 5, CS_CONFRONT },
+    { "Lyra", "It hasn't moved. It could have cut us down the moment that door opened.", 6, CS_DREAD },
+    { "Lyra", "It isn't guarding the door from us. It's still guarding us from the door.", 7, CS_SORROW },
 };
 
 static const CsScene CS_INTRO[] = {
     { "p01_prologue", "Beneath the Hills", true, nullptr, 0, CS_p01_prologue_LINES, 5 },
-    { "003_the_warning", "The Warning", false, CS_003_the_warning_PANELS, 4, CS_003_the_warning_LINES, 5 },
+    { "003_the_warning", "The Warning", false, CS_003_the_warning_PANELS, 7, CS_003_the_warning_LINES, 7 },
 };
 static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);

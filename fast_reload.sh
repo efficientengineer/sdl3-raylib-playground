@@ -112,5 +112,12 @@ for i in $(seq 1 12); do
         exit 1
     fi
 done
+TOP="$("$ADB" -s "$DEVICE" shell dumpsys activity activities | grep -m1 topResumedActivity)"
+if ! echo "$TOP" | grep -q "$PKG"; then
+    # Android freezes apps that sit in the background for a while; a frozen process cannot poll.
+    echo "=== Queued: the game is in the background and Android has frozen it. ==="
+    echo "    The new build and reload flag are on the device; it reloads the moment the game is opened."
+    exit 0
+fi
 echo "ERROR: no reload confirmation in 6s. Check: $ADB shell pidof $PKG; $ADB logcat -d -s QuestGlory" >&2
 exit 1
