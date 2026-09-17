@@ -37,6 +37,30 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
   (gradient, photorealistic, 3D, blur, glow, painterly, realistic, HD, 4k, smooth).
 - **R9 no text** — panel descriptions may not ask for written words, signs, captions,
   or speech bubbles.
+- **R10 staging** — every panel scene has a `- staging:` line fixing screen direction for the whole
+  scene: who stands on which side, facing which way, and where the thing they react to is. Every
+  panel obeys it (the 180-degree rule), so a character who faces right in one panel never faces
+  left in the next without a reason.
+- **R11 acting** — every cast member named in a panel gets an acting line under that panel:
+  `- Name: <where they look>, <expression>, <body>`. It must say where the eyes point (at a named
+  target or a screen direction) and what the face is doing. "Neutral" is allowed only when written.
+  Characters reacting to the same thing look at the same thing. Max 25 words per line.
+
+## Review checklist (before accepting a generated sheet)
+
+`sheet` prints a per-scene version of this in the ChatGPT package, with a ready-made correction to
+paste back. Whoever receives a generated sheet (the owner, or a model shown the image) checks, per panel:
+
+1. **Gaze** — is every character looking where their acting line says? Do characters reacting to the
+   same thing look at the same spot? This is the most common failure.
+2. **Expression** — does each face show the stated emotion, or the reference sheet's neutral face?
+3. **Screen direction** — does the panel obey the scene's staging line?
+4. **Design** — hair, outfit, colors, and distinguishing marks match the reference.
+5. **Hands and props** — right number of fingers, weapon on the correct side, nothing invented.
+6. **Sheet hygiene** — panels separate on pure black, right count and proportions, no text or labels.
+
+Reject on 1-3 even when the art is beautiful: a wrong eyeline breaks the scene. Ask ChatGPT to redraw
+only the failing panel and keep the rest; it usually can.
 
 ## Locked style blocks
 
@@ -63,11 +87,30 @@ static camera shot.
 ```
 Tight cinematic crops, figures cut off by the panel edge at the waist,
 shoulders, or top of the head. Characters in three-quarter view or profile,
-rarely facing the camera straight on. Eyelines point off-panel toward the
-adjacent panel. Shallow staging: figures placed on one or two flat planes,
+rarely facing the camera straight on. Eyelines follow each panel's acting
+notes exactly. Shallow staging: figures placed on one or two flat planes,
 a foreground figure overlapping a background figure, flat backdrop with no
 vanishing point. Backgrounds simplified to a few flat shapes, or replaced
 entirely by a flat color, dithered tone, or speed lines in emotional moments.
+```
+
+### acting
+
+```
+ACTING IS THE POINT OF EVERY PANEL. Read the situation first: each panel is a
+moment in that story, not a character catalogue pose. For every character, the
+head and both eyes point at what the acting note says they are looking at, and
+two characters reacting to the same thing look at the same spot. Obey the
+staging: screen direction stays the same in every panel. Faces show the stated
+emotion in 1990s anime shorthand, pushed far enough to read at small size:
+anger is brows pulled down into a V, narrowed eyes, gritted teeth; fear is
+wide eyes with small irises, raised brows, parted lips, a sweat drop; alarm is
+a sharp turn of the head, open mouth, hair swinging; resolve is a set jaw, a
+level stare, brows low; sorrow is lowered eyes, brows raised at the centre,
+closed mouth; suspicion is one narrowed eye and a sidelong look. Bodies act
+too: leaning toward or away from the threat, a hand tightening on a weapon,
+shoulders raised. Never draw the calm neutral face from a reference sheet
+unless the acting note says calm.
 ```
 
 ### character_design

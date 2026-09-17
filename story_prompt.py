@@ -44,6 +44,9 @@ PANELS_MIN, PANELS_MAX = 2, 4                       # R1
 ANCHOR_SCALES = {"wide", "full", "medium"}          # R5
 PUNCH_SCALES = {"close", "extreme", "insert"}       # R5
 MAX_PANEL_WORDS = 40                                # R7
+MAX_ACTING_WORDS = 25                               # R11
+GAZE_WORDS = ["look", "glar", "star", "gaz", "glanc", "watch", "eyes", "eye ", "facing", "faces ", "turned",
+              "peer", "squint", "fixed on"]          # R11: an acting line must say where the eyes point
 STYLE_WORDS = ["gradient", "photorealistic", "3d", "blur", "glow", "painterly",
                "realistic", "hd", "4k", "smooth"]   # R8
 TEXT_WORDS = ["text", "caption", "speech bubble", "lettering", "written", "inscription reading",
@@ -51,7 +54,7 @@ TEXT_WORDS = ["text", "caption", "speech bubble", "lettering", "written", "inscr
 MOODS = ["wonder", "dread", "tense", "confront", "sorrow", "hope"]      # music moods; order = CsMood enum in the game
 LOOK_BANNED = ["dwarf", "dwarven", "halfling", "hobbit", "elf", "elven", "gnome", "orc", "fighter",
                "rogue", "cleric", "wizard", "ranger", "barbarian", "paladin", "beard", "bearded"]  # see characters.md
-REQUIRED_BLOCKS = ["header", "layout", "framing", "character_design", "rendering",
+REQUIRED_BLOCKS = ["header", "layout", "framing", "acting", "character_design", "rendering",
                    "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet", "refsheet_avoid"]
 
 # ── Sheet mechanics (layout maths, not style) ──
@@ -162,8 +165,16 @@ def parse_scene(path):
     title = re.search(r"^# (.+)$", text, flags=re.M)
     head = text.split("\n## ", 1)[0]
     secs = h2_sections(text)
-    panels = [(m.group(1), m.group(2).strip())
-              for m in re.finditer(r"^\d+\.\s*([\w-]+)\s*\|\s*(.+)$", secs.get("panels", ""), flags=re.M)]
+    panels, acting = [], []
+    for raw in secs.get("panels", "").splitlines():
+        m = re.match(r"^\d+\.\s*([\w-]+)\s*\|\s*(.+)$", raw)
+        if m:
+            panels.append((m.group(1), m.group(2).strip()))
+            acting.append({})
+            continue
+        m = re.match(r"^\s+- ([^:]+):\s*(.+)$", raw)           # indented "- Name: where they look, expression, body"
+        if m and panels:
+            acting[-1][m.group(1).strip().lower()] = m.group(2).strip()
     dialogue, reveals, moods = [], [], []
     for m in re.finditer(r"^- ([^:\[{\n]+?)\s*(?:\[(\d+)\])?\s*(?:\{(\w+)\})?\s*:\s*(.+)$",
                          secs.get("dialogue", ""), flags=re.M):
@@ -177,7 +188,7 @@ def parse_scene(path):
         "meta": meta,
         "characters": [c.strip() for c in meta.get("characters", "").split(",") if c.strip()],
         "beat": squash(secs.get("beat", "")),
-        "panels": panels, "dialogue": dialogue, "reveals": reveals, "moods": moods,
+        "panels": panels, "acting": acting, "dialogue": dialogue, "reveals": reveals, "moods": moods,
         "narration": meta.get("type", "").lower() == "narration",
     }
 
@@ -248,6 +259,24 @@ def validate(scene, style, cast):
             hit = "a quoted string"
         if hit:
             err.append(f"R9 no text: panel {n} asks for written words ({hit})")
+    if not scene["meta"].get("staging"):
+        err.append("R10 staging: missing '- staging:' line (who is on which side, facing which way, where the threat is)")
+    for n, ((sid, desc), notes) in enumerate(zip(panels, scene["acting"]), 1):
+        named = names_in(desc, cast)
+        for c in named:
+            if c not in notes:
+                err.append(f"R11 acting: panel {n} shows {c.title()} but has no acting line "
+                           f"('   - {c.title()}: where they look, expression, body')")
+        for c, note in notes.items():
+            if c not in named:
+                err.append(f"R11 acting: panel {n} has an acting line for '{c}' who is not named in the panel")
+            if not any(g in note.lower() for g in GAZE_WORDS):
+                err.append(f"R11 acting: panel {n}, {c.title()}: say where the eyes point (looking at..., glaring toward...)")
+            if len(note.split()) > MAX_ACTING_WORDS:
+                err.append(f"R11 acting: panel {n}, {c.title()}: {len(note.split())} words, max {MAX_ACTING_WORDS}")
+            for w in STYLE_WORDS:
+                if re.search(rf"\b{re.escape(w)}\b", note.lower()):
+                    err.append(f"R8 no style leakage: panel {n} acting line for {c.title()} contains '{w}'")
     for c in listed:
         if c in cast and c not in mentioned:
             warn.append(f"'{c}' is listed but never named in a panel; their look will not be included")
@@ -260,6 +289,27 @@ def validate(scene, style, cast):
     return err, warn
 
 
+def panel_text(style, cast, sid, desc, notes):
+    """One panel's line for the image prompt: shot, content, then who looks where and feels what."""
+    text = f"{style['shots'][sid]['prompt']} Content: {desc.rstrip('.')}."
+    if notes:
+        text += " Acting: " + " ".join(f"{cast[c]['name']}: {note.rstrip('.')}." for c, note in notes.items())
+    return text
+
+
+def scene_context(scene, span=""):
+    """Story context for the image model: what is happening, where, and the fixed screen direction."""
+    meta = scene["meta"]
+    out = [f"SITUATION{span}: {scene['beat']}"] if scene["beat"] else []
+    setting = f"SETTING{span}: {meta['location'].rstrip('.')}."
+    if meta.get("mood"):
+        setting += f" Mood: {meta['mood']}."
+    out.append(setting)
+    if meta.get("staging"):
+        out.append(f"STAGING{span}, the same in every panel: {meta['staging'].rstrip('.')}.")
+    return out
+
+
 def assemble(scene, style, cast):
     b, shots, shapes = style["blocks"], style["shots"], style["shapes"]
     meta, panels = scene["meta"], scene["panels"]
@@ -268,18 +318,15 @@ def assemble(scene, style, cast):
         for c in names_in(desc, cast):
             if c not in present:
                 present.append(c)
-    lines = [b["header"], ""]
-    subject = f"SUBJECT: {scene['title']}. Location: {meta['location'].rstrip('.')}."
-    if meta.get("mood"):
-        subject += f" Mood: {meta['mood']}."
-    lines += [subject, "", f"LAYOUT: Exactly {len(panels)} panels. {b['layout']}", "", "PANELS:"]
-    for n, (sid, desc) in enumerate(panels, 1):
-        shot = shots[sid]
-        lines.append(f"Panel {n}, {shapes[shot['shape']]}: {shot['prompt']} Content: {desc.rstrip('.')}.")
+    lines = [b["header"], "", f"SUBJECT: {scene['title']}."] + scene_context(scene)
+    lines += ["", f"LAYOUT: Exactly {len(panels)} panels. {b['layout']}", "", "PANELS:"]
+    for n, ((sid, desc), notes) in enumerate(zip(panels, scene["acting"]), 1):
+        lines.append(f"Panel {n}, {shapes[shots[sid]['shape']]}: {panel_text(style, cast, sid, desc, notes)}")
     if present:
         lines += ["", "CHARACTERS, drawn identically in every panel they appear in:"]
         lines += [f"- {cast[c]['look']}" for c in present]
-    lines += ["", f"CAMERA AND FRAMING: {b['framing']}",
+    lines += ["", b["acting"],
+              "", f"CAMERA AND FRAMING: {b['framing']}",
               "", f"CHARACTER DESIGN: {b['character_design']}",
               "", f"RENDERING: {b['rendering']}", ""]
     if meta.get("dialogue_box", "no").lower() in ("yes", "true", "1"):
@@ -466,7 +513,8 @@ def attachments(style, cast, names, warn):
         if rp:
             out.append((rp, f"CHARACTER reference for {cast[c]['name']}. Keep the face, hair, outfit, and "
                             f"colors identical to this image in every panel {cast[c]['name']} appears in. Use it only "
-                            f"for the character's design: ignore its background colors and its three-panel layout."))
+                            f"for the character's design: ignore its background colors and its three-panel layout, "
+                            f"and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes."))
         else:
             warn.append(f"no reference image for {cast[c]['name']} at {cast[c].get('ref')}; "
                         f"run: story_prompt.py refsheet {cast[c]['name']}")
@@ -523,23 +571,22 @@ def cmd_sheet(args):
         L.append(f"Panel {i+1}: {style['sheet_shapes'][shapes[i]]}. Left edge at {x*100:.0f}%, top edge at "
                  f"{y*100:.0f}%, width {w*100:.0f}%, height {h*100:.0f}%.")
     L.append("")
-    k = 0
+    k, checks = 0, []
     for sc in scenes:
         first, last = k + 1, k + len(sc["panels"])
-        span = f"Panel {first}" if first == last else f"Panels {first} to {last}"
-        setting = f"SETTING for {span}: {sc['meta']['location'].rstrip('.')}."
-        if sc["meta"].get("mood"):
-            setting += f" Mood: {sc['meta']['mood']}."
-        L.append(setting)
-        for sid, desc in sc["panels"]:
+        span = f" for Panel {first}" if first == last else f" for Panels {first} to {last}"
+        L += scene_context(sc, span)
+        for (sid, desc), notes in zip(sc["panels"], sc["acting"]):
             k += 1
-            L.append(f"Panel {k}: {shots[sid]['prompt']} Content: {desc.rstrip('.')}.")
+            L.append(f"Panel {k}: {panel_text(style, cast, sid, desc, notes)}")
+            for c, note in notes.items():
+                checks.append(f"- [ ] Panel {k}, {cast[c]['name']}: {note}")
         L.append("")
     if present:
         L.append("CHARACTERS, drawn identically in every panel they appear in:")
         L += [f"- {cast[c]['look']}" for c in present]
         L.append("")
-    L += [f"CAMERA AND FRAMING inside each panel: {b['framing']}", "",
+    L += [b["acting"], "", f"CAMERA AND FRAMING inside each panel: {b['framing']}", "",
           f"CHARACTER DESIGN: {b['character_design']}", "",
           f"RENDERING: {b['rendering']}", "",
           f"AVOID: {b['sheet_avoid']}, {b['negative']}"]
@@ -556,9 +603,18 @@ def cmd_sheet(args):
     }, indent=2) + "\n")
     md = OUT / f"{name}.chatgpt.md"
     md.write_text(package(f"shot sheet {name}", attach, prompt, [
-        f"- Check the result: {len(flat)} separate white-bordered panels on pure black, none touching, no labels.",
-        "  If panels overlap or merged, reply: \"Regenerate. Keep every panel separate with wide pure black gutters.\"",
-        "- Download the image, then cut it into panels:",
+        "Check the result against this list before accepting it (see 'Review checklist' in STYLE.md).",
+        "Gaze and expression are the usual failures; reject on those even if the art is beautiful.", "",
+        f"- [ ] {len(flat)} separate white-bordered panels on pure black, none touching, no labels or text",
+        "- [ ] Every panel obeys the staging (same screen direction throughout)",
+        *checks,
+        "- [ ] Hair, outfits, colors, and marks match the reference sheets; hands and weapons look right", "",
+        "If a panel fails, reply in the same chat, naming the panel and quoting the line it broke, for example:", "",
+        "```",
+        "Redraw only panel 3 and keep every other panel exactly as it is. In panel 3 both characters must look",
+        "at the same spot, off-panel to the right, at the guard. <paste the failed acting lines here>",
+        "```", "",
+        "When it passes, download the image and cut it into panels:",
         "", "```", f"./story_prompt.py slice {manifest.relative_to(ROOT.parent)} ~/Downloads/<file>.png", "```"]))
     for w in warn:
         print(f"warning: {w}", file=sys.stderr)

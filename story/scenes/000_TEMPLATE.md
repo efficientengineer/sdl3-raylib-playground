@@ -3,13 +3,17 @@
 - location: one visual sentence describing the place
 - characters: Name, Name
 - mood: one or two words
+- staging: who stands on which side of the screen, facing which way, and where the thing they react to is. Fixed for the whole scene.
 - dialogue_box: no
 
 ## Beat
-One short paragraph: what happens and why it matters. Story context only.
+One short paragraph: what is happening, what just changed, and what each character feels about
+it. This IS sent to the image model as the situation, so write what an artist needs to know.
 
 ## Panels
-1. shot_id | who, doing what, looking where (max 40 words, no style words, no text)
+1. shot_id | who, doing what, where (max 40 words, no style words, no text)
+   - Name: where they look (a named target or a screen direction), expression, body language (max 25 words)
+   - Name: ... one line for every cast member named in the panel
 2. shot_id | ...
 
 ## Dialogue

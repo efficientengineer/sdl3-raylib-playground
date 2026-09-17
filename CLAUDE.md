@@ -204,6 +204,15 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
      manga-style and reveals them line by line with a dialogue box (tap or space to advance; `#all`
      on the URL shows every panel at once). Missing panel images become labelled placeholders, so a
      scene's pacing can be tested before any art exists. This is the reference for the in-game player.
+- **Acting is mandatory.** A panel scene needs a `- staging:` line (fixed screen direction for the whole
+  scene) and, under each panel, an indented acting line for every cast member in it: where their eyes
+  point, their expression, their body. The `## Beat` paragraph is sent to ChatGPT as the situation, so
+  write it for an artist. Without these ChatGPT draws catalogue poses: characters facing different ways
+  with the reference sheet's neutral face, which is how the first two-shot failed.
+- **Review before slicing.** When the owner sends a generated sheet, check it against the checklist in
+  `story/out/<name>.chatgpt.md` (gaze, expression, screen direction, design, hands, sheet hygiene; see
+  "Review checklist" in `STYLE.md`) and say what fails before running `slice`. Reject on gaze or
+  expression even when the art is good, and give the owner the one-panel correction to paste back.
 - Dialogue lines may carry a reveal tag, `- Lyra [2]: text`, naming the panel that appears with that
   line. Untagged lines reveal the next unseen panel. Several lines can hold on one panel.
 - Keep the raw generations in `story/sheets/<scene>_vN.png` so a scene can be re-sliced later.
