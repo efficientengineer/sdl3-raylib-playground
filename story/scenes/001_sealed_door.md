@@ -1,23 +1,32 @@
 # Scene 001: The Sealed Door
 
-- location: a cold cut-stone corridor deep underground, a massive brass-banded stone door, one guttering wall torch
-- characters: Bron, Pip
+- location: a cold cut-stone corridor deep underground with square tooling marks on dressed walls, a great stone door standing open onto darkness at the right, one guttering torch in an iron wall bracket, dry dust, no daylight
+- characters: Bron, Lyra, Zeph, Pip
 - mood: uneasy
-- staging: Bron and Pip are on the left facing right. The great sealed door fills the right side of the corridor. Pip is closest to the door, Bron stands guard behind him
-- dialogue_box: yes
+- staging: Bron, Lyra, Zeph and Pip are on the left of the corridor facing right. The great door stands half open on its pivot on the right for the whole scene, with darkness beyond it. Everyone's attention goes right
 
 ## Beat
-The party has reached the first sealed door of the Ancient Halls. Pip, the lockpick, inspects the lock and finds fresh scratches on its inner edge: someone opened this door recently, from the inside. Pip is unsettled and tries to hide it. Bron grows wary and watches the door as if something might come through it.
+The first room inside the hill-mouth. The great outer door is not sealed and not locked: it stands
+half open on its stone pivot, and there is nothing here for a lockpick to do, which is the wrong
+kind of luck. The pry marks and the bright fresh scratches are on the door's inner edge, so it was
+worked from the other side. Pip goes very still, which for Pip is the alarming thing. Bron stops
+watching the door and starts watching the dark past it, with one hand back on his axe.
 
 ## Panels
-1. over_shoulder | Bron's shoulder and the back of his head in the left foreground, Pip crouched at the huge stone door on the right beyond him, working at the lock, torchlight from the left
-   - Bron: facing right toward the door with his back to the camera, head tilted down watching Pip work, one hand resting on his axe
-   - Pip: crouched in profile looking right at the lock, eyes narrowed in concentration, tongue at the corner of her mouth
-2. object_insert | Pip's gloved fingers on a brass lock plate marked by fresh bright scratches
-   - Pip: only her hand is visible, fingertips hovering just above the scratches, the hand gone still, eyes off-panel on the lock
-3. eyes_slit | Bron's amber eyes under his white headband
-   - Bron: eyes cut sharply to the right toward the door, narrowed in suspicion, brows low, a sweat drop at his temple
+1. establishing_wide | Bron, Lyra, Zeph and Pip small in the left foreground seen from behind, the great stone door standing half open on its pivot at the right of a cut-stone corridor, darkness beyond it
+   - Bron: facing right toward the open door, back to camera, one hand back on his axe haft, weight settled
+   - Lyra: facing right toward the same door, back to camera, head slightly raised, shoulders squared
+   - Zeph: facing right toward the door, back to camera, leaning forward from the hips, staff held out
+   - Pip: facing right toward the door, back to camera, crouched low with both hands on her knees
+2. object_insert | bright fresh scratches raked across the inner edge of a brass-banded stone door, the metal clean and unweathered under them
+3. portrait_inset | Pip in close-up, the grin gone, mouth closed
+   - Pip: eyes fixed right on the scratch marks, brows drawn together, mouth closed, shoulders dropped and still
+4. eyes_slit | Bron's amber eyes under the white headband, torchlight on one side
+   - Bron: eyes cut right past the door into the dark beyond it, narrowed, brows low, jaw set
 
 ## Dialogue
-- Pip: These scratches are new. And they're on the inside.
-- Bron: Then something came out.
+- Pip [1] {tense}: It's standing open.
+- Pip [1]: A door like that, and there's nothing here for me to do.
+- Pip [2]: These scratches are new. And they're on the inside.
+- Pip [3]: ...
+- Bron [4] {dread}: Then something came out.

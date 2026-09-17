@@ -16,8 +16,9 @@ static const CsLine CS_p01_prologue_LINES[] = {
     { "Narrator", "Long ago, the people of the hills built their halls downward, toward something that sang to them in the dark.", 0, CS_WONDER, nullptr, CS_LEFT },
     { "Narrator", "They grew wise there. They grew rich. And then, in a single season, they sealed every door from the inside.", 0, CS_WONDER, nullptr, CS_LEFT },
     { "Narrator", "No one came out. The guards who held those doors swore an oath that outlasted their lives.", 0, CS_DREAD, nullptr, CS_LEFT },
-    { "Narrator", "A thousand years later, a contract appeared on a frontier quest board. Clear the entrance. Ask no questions.", 0, CS_DREAD, nullptr, CS_LEFT },
-    { "Narrator", "Four hunters signed it. Two of them reached the first door ahead of the others.", 0, CS_TENSE, nullptr, CS_LEFT },
+    { "Narrator", "A thousand years later, a bill went up on the board in the water-house at Sallowgate.", 0, CS_DREAD, nullptr, CS_LEFT },
+    { "Narrator", "Clear the entrance. Ask no questions.", 0, CS_DREAD, nullptr, CS_LEFT },
+    { "Narrator", "Triple rate. Four hunters signed for it, and nobody in the hall asked why.", 0, CS_TENSE, nullptr, CS_LEFT },
 };
 
 static const CsPanel CS_003_the_warning_PANELS[] = {
@@ -49,7 +50,7 @@ static const CsLine CS_003b_after_the_warning_LINES[] = {
 };
 
 static const CsScene CS_INTRO[] = {
-    { "p01_prologue", "Beneath the Hills", true, CS_NARRATION, nullptr, nullptr, 0, CS_p01_prologue_LINES, 5 },
+    { "p01_prologue", "Beneath the Hills", true, CS_NARRATION, nullptr, nullptr, 0, CS_p01_prologue_LINES, 6 },
     { "003_the_warning", "The Warning", false, CS_PANELS, nullptr, CS_003_the_warning_PANELS, 7, CS_003_the_warning_LINES, 7 },
     { "003b_after_the_warning", "After the Warning", false, CS_TALK, "003_the_warning_p6_full_body_reveal.png", nullptr, 0, CS_003b_after_the_warning_LINES, 6 },
 };

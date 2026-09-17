@@ -111,7 +111,7 @@ order: build and height, skin, hair, ears, eyes.
 - voice: Exact, literal, unrounded; says "correct" and "not correct," refuses approximations, and announces her own state without embarrassment.
 - look: Ket, a narrow upright figure a head taller than Bron, with matte bone-white skin in one flat tone, no hair anywhere, no nose but two small slits above the mouth, large lensed pale-green eyes with a bright iris ring, four small lights set down each temple with five of the eight still lit, a long grey keeper's smock, a jade-green tool roll strapped across her chest, bare forearms, flat-soled boots, a brass ring-gauge in one hand.
 - status: alive, joins ch.4, leaves ch.15 to restart the Vintry well
-- notes: Ket-Ossun, 1,261, of the last muster. Keeper of Ossun until the Works metered it in 1082, then reassigned to Meddra. **Her lights go out across the game: five lit when she joins, two when she leaves, and no writer may light one back up.** Has not spoken to Tovin in forty-nine years; they resolve it in four lines in ch.4.
+- notes: Ket-Ossun, 1,261, of the last muster. Keeper of Ossun until the Works metered it in 1082, then reassigned to Meddra. **Her lights go out across the game: five lit when she joins, two when she leaves, and no writer may light one back up.** **The sheet is drawn at five and is only correct for ch.4-8.** The ledger is canon section 3: ch.9-11 four, ch.12 three, ch.13-16 two. From ch.9 on, the panel line must state the count, and nobody may ask the art tool for a five-light Ket in a late chapter. Has not spoken to Tovin in forty-nine years; they resolve it in four lines in ch.4.
 
 ## Hesk
 - role: doorward of the Fifth Door, Ninefold Terrace, spear
@@ -220,6 +220,33 @@ order: build and height, skin, hair, ears, eyes.
 - status: alive, doing his job, all game
 - notes: Emmet Sark, 33. The man at the folding table behind the ancient door in ch.1 who asks whether the party have an entry chit. He recurs doing his job — a counting house at Saltmouth in ch.6, a desk at Vantage in ch.12 — and in ch.15 he produces the 22:02 message log at the hearing because it was in the file. He never does anything but his job and he is the most important minor character in the game.
 
+## Ovey
+- role: Recovery Chief of the Clement Works recovery service; the boss of ch.8
+- ref: story/refs/ovey.png
+- people: human
+- voice: Brisk to the point of rude and not unkind about it; states the procedure once, the timing twice, and the fee in the same voice as the condolence, and will not pretend the thing does not work.
+- look: Ovey, a solid square man of middle height who moves like someone with a round to finish, with tan skin, grey hair combed flat back off a broad open face, mild brown eyes, the company-black senior stand-collar coat with no cuff band, a small brass number plate at the throat, a tobacco-brown knitted scarf tucked in at the neck, brown leather gloves, polished black boots, and a clipboard carried flat under one arm.
+- status: alive, in post, all game; on screen in ch.8
+- notes: Recovery Chief Ovey, age unspecified (read as 40s-50s). At `0885` he steps down off a handcart with a setting frame under canvas and two frame-bearers behind him and offers Dalla Kettle a legal treatment that takes four minutes and would quiet her husband tonight, and **he is right that it would work**. **He must not look like a villain**: the `full_body_reveal` low angle is for presence, not menace, and nothing about him is shadowed, sneering or armed. He is the fourth reasonable person in a row to offer the party a reasonable thing.
+
+## Marek
+- role: survey cut crew chief, Clement Works night shift above Windrow
+- ref: story/refs/marek.png
+- people: human
+- voice: Level and unhurried, does the arithmetic out loud without heat, says the eleven households and the four days before he says no, and does not repeat himself or forgive you.
+- look: Marek, a lean, long-armed man of middle height, with weathered tan skin, black hair going grey at the temples and flattened by a cap, deep-set dark eyes and a steady tired gaze, a charcoal company field coat with both sleeves cut off at the shoulder, a brass number plate at the throat, a mustard-yellow band on the left cuff, a canvas wage book in the breast pocket, and a bull's-eye naphtha lamp carried low in one hand.
+- status: alive, on the cut; ch.2 only
+- notes: Marek Culm, 44. The bible's unnamed crew chief who will not stop work for anybody, now named. **He is right and must be allowed to be right**: stopping the rig is four days' wage for eleven households and a repair bill off the crew's bonus, and he has no authority to give that away. `0270` lights him from below with the lamp in his own hand — not angry, just tired; `0275` is the arithmetic; `0280` puts Orrin Cadder's hand on his shoulder in front of the wrecked rig. No sneer, no shadow, no company-goon posture.
+
+## Ondra
+- role: Clement Works decommission clerk, closing Tellwater in ch.11
+- ref: story/refs/ondra.png
+- people: human
+- voice: Procedural and friendly; offers tea in the middle of bad news, says "I have never done one before and I had to ask" without embarrassment, and is never once defensive.
+- look: Ondra, a trim woman of middle height with pale skin, dark brown hair cut short and pinned behind one ear, quick hazel eyes, a charcoal company stand-collar coat with a brass number plate at the throat and a mustard-yellow band on the left cuff, a plum-purple knitted scarf and matching mittens against the cold, a pencil on a string at the buttonhole, flat town shoes, and a roster book with a brass clasp held against her chest.
+- status: alive; seals the postings on the 12th of Dust, and hands the roster over unsealed first
+- notes: Ondra Pell, 38. Four years in the town she is closing. On screen at `1155` she stands at the edge of a fair she is shutting down with the book still in her arms, and dances with the baker she is putting out of work, and neither of them finds that strange. Likeable, orderly, on a schedule, never cruel. At `1185` she gives Hesk the roster unsealed and does not write down that she did, and it costs her a signature she can no longer give.
+
 ---
 
 ## The Even Hand
@@ -230,7 +257,7 @@ order: build and height, skin, hair, ears, eyes.
 - people: Onn
 - voice: Flat and absolutely literal, keeps a running tally out loud, refuses to round a number, and delivers an extremely filthy joke without any change of expression.
 - look: Tovin, a narrow upright figure with matte ochre skin in one flat tone, no hair anywhere, no nose but two small slits above the mouth, large lensed amber eyes with a bright iris ring, four small lights down each temple with only two lit on each side, a long dark brown leather coat older than anyone in the room, a chalk roll and a brass ledger pen strapped across her chest, chalk dust white on both hands, and flat-soled boots.
-- status: alive, running the hall; at two lights and going down
+- status: alive, running the hall; two a side, four of eight, and going down
 - notes: Tovin-Caleth, 1,248, of the same muster as Ket. Keeper of the Caleth skywell until it died in 1058; took a bill because there was nothing else to do and has run the Sallowgate hall since 1073. Calls the hunters collectively "the board." Writes the ledger wall in her own hand and cannot be lied to about a date. Ch.1 she tells Bron the bill stinks and lets him take it. The last image of the game is her chalking a new one.
 
 ## Tibb
@@ -251,6 +278,28 @@ order: build and height, skin, hair, ears, eyes.
 - status: blank from ch.6 — healthy, calm, pleasant, and cannot say her own name
 - notes: Sela Marrin, 31. Inside the radius when Extraction Bore Four inverted. **Never draw her as a zombie**: upright, warm, looking at you with mild friendly interest. After ch.6 she is a person Tibb visits.
 
+## Mir
+- role: hall-keeper of the Even Hand's Braid chapter hall
+- ref: story/refs/mir.png
+- people: Vess
+- voice: Acknowledges before she answers, feeds you in the middle of the argument, no contractions; the only thing that makes her angry is a bill without a seal, and she is angry about it properly.
+- look: Mir, a tall, square-shouldered woman with ash-lilac skin, long backswept fluted ears with visible ribbing, solid amber-brown eyes with no whites, iron-silver wire-hair cropped blunt at the jaw and pushed back under a folded cloth, a claret-red wool over-apron with one deep front pocket over a grey working robe, cut-off gloves, a flat brass token stamped with an open hand at her left wrist, and a long iron stove-key hooked at her belt.
+- status: alive, keeping the hall
+- notes: Mir Lirr. Tovin-Caleth's counterpart and the only Even Hand hall in the Basin not run by humans. Ch.4: she signs the party in without comment, feeds them unasked, finds "cleared but unpaid" more offensive than the Pale, and will not pin Domma Sath's unsealed bill — the seal or no bill — and has still not thrown it out, and says so, and leaves the room. She is right about the Four Lines and nobody in the party argues that rules are made to be broken.
+
+---
+
+## Sallowgate
+
+## Bex
+- role: roofkeeper, Sallowgate third terrace
+- ref: story/refs/bex.png
+- people: Kell
+- voice: The fee first and the reason after, the Kell way round; complains bitterly about the heat coming off next door's flue and never once about the cold, and does not apologise for a true count.
+- look: Bex, a very short and very broad older woman, half again as wide through the shoulders as a human her height, with clay-warm skin, amber eyes with bright rings at the pupils, brass-coloured hair standing up in a stiff cropped brush, a sleeveless slate-blue roofkeeper's coat over a cream underlayer, bare arms, a wide belt of tank tools, a brass water-meter key on a cord at her hip, and flat boots dusted with sandstone.
+- status: alive, on the third terrace, with one cistern and no money
+- notes: Bex Caleth, 58. Posts chapter 1's optional bill: something is living in her roof tank, she is annoyed rather than frightened, and she will not pay a company crew the metered rate to look inside her own roof. She pays on completion in beans, without an apology, and Tovin enters the fee as nought out loud. Her heat complaint is the planted Kell rule and is played for comedy.
+
 ---
 
 ## Windrow
@@ -258,11 +307,11 @@ order: build and height, skin, hair, ears, eyes.
 ## Anneke
 - role: laundry presser, Windrow; Bron's mother
 - ref: story/refs/anneke.png
-- people: human
-- voice: Kind and ordinary and slightly shy with strangers; offers food and drink instead of conversation.
-- look: Anneke, a sturdy woman of middle height with brown skin reddened at the forearms from steam, greying dark-brown hair pinned up under a faded rose-pink headscarf, warm brown eyes, a sleeveless grey work dress over a cream blouse with the sleeves rolled, a long canvas laundry apron, wooden clogs, a flat iron held in one hand and a folded sheet over the opposite arm.
+- people: Kell
+- voice: Kind and ordinary and slightly shy with strangers; offers food and drink instead of conversation, and complains about the steam constantly and about the cold never.
+- look: Anneke, a very short and very broad woman, wide through the shoulders, with clay-warm skin reddened at the forearms from steam, iron-grey hair that will not lie flat pinned back under a faded rose-pink headscarf, amber eyes with a bright ring at the pupil, a sleeveless grey work dress over a cream underlayer, bare arms, a long canvas laundry apron, wooden clogs, and a flat iron in one hand with a folded sheet over the opposite arm.
 - status: alive, resettled 1093, filed as having no dependents
-- notes: Anneke Brae, 54. One of Tellwater's four hundred, set with a stock template and posted to a Windrow laundry; pairing survivors was more paperwork. Ch.10 she holds a chipped cup out to a stranger in a doorway and he does not take it and does not tell her. In the epilogue she asks Bron to tell her, and he does, and it takes eleven minutes and is not enough.
+- notes: Anneke Brae, **Kell**, 54 (canon D8.3). Four foot eleven — **the same height as her son, and neither of them knows**, which is the whole of the `1085` shot. One of Tellwater's four hundred, set with a stock template and posted to a Windrow laundry; pairing survivors was more paperwork. Ch.10 she holds a chipped cup out to a stranger in a doorway and he does not take it and does not tell her. In the epilogue she asks Bron to tell her, and he does, and it takes eleven minutes and is not enough.
 
 ## Aldo
 - role: retired tram inspector, Windrow
@@ -291,6 +340,33 @@ order: build and height, skin, hair, ears, eyes.
 - status: alive, at one light; restarts the Vintry well in the epilogue
 - notes: Arro-Vintry. Has swept a dead machine for a hundred and sixty-three years and is aware of the joke. Ch.10, ch.15, and the epilogue, where Ket comes to bring his well back up. Four of nine wells run within two years.
 
+## Orla
+- role: boarding-house keeper and laundress, Windrow
+- ref: story/refs/orla.png
+- people: human
+- voice: Warm, mercenary and entirely without curiosity about her guests; prices everything out loud, including the chair, and passes on the street's opinion as though it were weather.
+- look: Orla, a tall, rawboned old woman with a long straight back and big reddened hands, pale weather-chapped skin, grey-brown hair skewered up in a knot under a knitted cap, shrewd pale-blue eyes, a brick-red cardigan worn over three layers of grey and brown wool with the sleeves pushed back, a canvas laundry apron, a ring of room keys on a belt cord, a stub of chalk, and a tally slate held against one hip.
+- status: alive, letting rooms and taking in wash
+- notes: Orla Winch, 62. **She is not Anneke Brae and must never read as her**: human, tall, and three garments deep where Anneke is Kell, short, broad and bare-armed, and the keys and the tally slate are hers where the flat iron and the chipped cup are Anneke's. Ch.2: three beds, four hunters, and a charge for the chair; the garbled laundry-yard rumour about the woman in the grey coat; and, of Arro-Vintry three hundred feet above her drying yard, "I have never learned his name," said without any cruelty at all.
+
+## Rask
+- role: retired sergeant of the Pale, dying at the Quiet House
+- ref: story/refs/rask.png
+- people: human
+- voice: Slow and companionable and glad of the company; a dog, a tram strike, a wife who died first, and then the thing he has had in his mouth for fourteen years, said once, plainly.
+- look: Rask, a big man gone light and thin, propped upright on pillows in a narrow bed, with pale skin, white hair cropped close to the scalp, heavy brows over pale steady eyes, a collarless flannel nightshirt open at the throat, an ochre-yellow knitted blanket folded back across his knees, one broad flat hand resting on the covers, and behind him on a peg the pale ash-grey coat of the company police with its white sergeant's cross-belt still buckled across it.
+- status: dying; ch.12's optional side contract is sitting the hour with him
+- notes: Sergeant Bel Rask, 61. The bible's unnamed dying sergeant. He was in the Tellwater street at four in the morning in 1093 with four hundred people standing in it looking at him pleasantly, and the children would not walk when you told them, so you carried them, and he watched his warden carry one the whole four hundred yards. **He must not name the child and must not know who Bron is.** Bron does the Tally from memory, out of order, and it works anyway.
+
+## Mira
+- role: Ivo Teach's wife; the Quiet House, Windrow
+- ref: story/refs/mira.png
+- people: human
+- voice: Practical and few-worded; asks two questions in a whole conversation and both of them are about what happens next.
+- look: Mira, a broad, capable woman of middle height with brown skin, grey-streaked black hair in a loose night plait over one shoulder, level dark eyes, a dusky-lavender knitted shawl pulled on over a plain nightgown with a man's coat thrown over the top of it, thick stockings, flat house shoes, and both hands around a tin kettle she has just lifted off the stove.
+- status: alive; one scene, in her own kitchen, in the epilogue
+- notes: Mira Teach, about 55. Twenty years of keeping a boarding house for the widows of men who died on her husband's jobs, paid for out of his own pocket and never mentioned to anybody. At `1625` he sits down and tells her about the 9th of Fallow, 1093, all of it, including the boy he carried four hundred yards, and she asks whether the boy is all right now. **Do not let her absolve him.** She never meets Bron.
+
 ---
 
 ## Tellwater
@@ -300,9 +376,9 @@ order: build and height, skin, hair, ears, eyes.
 - ref: story/refs/sem.png
 - people: Onn
 - voice: Exact and patient; answers what she is asked, in full, and has been answering the same unasked question for fourteen years.
-- look: Sem, a narrow upright figure with matte slate-grey skin in one flat tone, no hair anywhere, no nose but two small slits above the mouth, large lensed pale-gold eyes with a bright iris ring, four small lights down each temple with six of the eight still lit, a long charcoal keeper's smock, an ochre-yellow keeper's sash knotted at the hip, flat-soled boots, and a brass well-key the length of her arm slung across her back.
-- status: alive, at her post; the only resident of Tellwater who is not an employee
-- notes: Sem-Dree. She watched the whole night of the 9th of Fallow, 1093 from the well platform, and has told anyone who asked for fourteen years, and nobody has asked. Ch.3 the party does not think to ask her. Ch.11 they ask. Ch.15.
+- look: Sem, a narrow upright figure with matte slate-grey skin in one flat tone, no hair anywhere, no nose but two small slits above the mouth, large lensed pale-gold eyes with a bright iris ring, four small lights down each temple with only two of the four still lit on each side, a long charcoal keeper's smock, an ochre-yellow keeper's sash knotted at the hip, flat-soled boots, and a brass well-key the length of her arm slung across her back.
+- status: alive, at her post; two a side, four of eight, on a dead well
+- notes: Sem-Dree. **Four of eight, two a side** (canon section 3, overruling the six this entry used to give): Ket at five is the brightest of the four Onn at the start of the game, and Sem keeps a well that is dark. The panels that show her temple (`1145` panel 3, `1560` panel 2) are drawn to that count. She watched the whole night of the 9th of Fallow, 1093 from the well platform, and has told anyone who asked for fourteen years, and nobody has asked. Ch.3 the party does not think to ask her. Ch.11 they ask. Ch.15.
 
 ## Neve
 - role: company shop clerk at Lomm; played "Hesta Sallow" 1093-1097
@@ -312,6 +388,24 @@ order: build and height, skin, hair, ears, eyes.
 - look: Neve, a slight woman of middle height with pale skin, brown hair going grey pulled into a plain low knot, quiet hazel eyes, a cornflower-blue shawl folded over a charcoal company shop coat with a brass number plate at the throat and a mustard-yellow band at the left cuff, a plain dark skirt, flat walking shoes, and a shopping basket held in front of her in both hands.
 - status: alive, on the payroll at Lomm
 - notes: Neve Ardo, 53. *Ardo, N. — role: Hesta Sallow, widow, one son — posting closed 1097.* The party read her out of the Tellwater payroll in ch.6. In ch.11 she comes back to the square on her own money and without permission, because for four years she was somebody's mother. Optional, and the best optional scene in the game.
+
+## Ista
+- role: weaver of Tellwater, on a three-year company posting
+- ref: story/refs/ista.png
+- people: human
+- voice: Warm, certain, and a half-beat too quick; uses a childhood name on you before you have given her your own, and is delighted that the fair is exactly the same every single year.
+- look: Ista, a small neat woman who stands very straight, with pale skin, brown hair going white at the front and rolled up under a sage-green band, bright hazel eyes and a broad ready smile, three layers of plain brown and grey wool, a rose-madder shawl crossed and tucked at the waist, a small brass posting badge pinned at the collar, a strip of half-woven braid on a belt loom at her hip, and a paper of pins on a cord.
+- status: alive, on a renewable posting; the postings close on the 11th of Dust
+- notes: Ista Fenn, 58. The one named face in `0310`'s `high_angle_down` of a whole square turned up and inward — the woman who greets Bron a degree too warmly and calls him a childhood nickname he has never had in his life, which two other people then use. **Nothing about her is sinister and she is not lying**: she read a town file and wants to do the job well. The brass badge is visible and unremarked, exactly like Ollo's. Ch.3, and `0325` if the player takes the fair.
+
+## Jory
+- role: contracted salvage foreman, Tellwater decommission
+- ref: story/refs/jory.png
+- people: human
+- voice: Loud, aggrieved and entirely within his rights; reads his own contract aloud at people and is genuinely offended that anybody would argue with paper.
+- look: Jory, a heavy, thick-necked man with a barrel chest and short arms, ruddy tan skin, black hair cropped close and flattened by a hat, small shrewd eyes, a rust-orange canvas work coat over a collarless shirt with the sleeves shoved past the elbow, a wide tool belt with a short crowbar through it, leather knee patches, heavy boots, and a folded contract wedged in the band of a battered felt hat.
+- status: alive; paid off, bribed or out-argued in ch.11, and not killed
+- notes: Jory Tass, 44. He holds a legal contract to strip the fair-ground loft for timber on the afternoon of the fair, which is why the party fight him and why the brawl is broad, non-lethal and the least significant scene in the chapter. A battle sprite would do the job; the entry exists so the sprite and the portrait agree with each other.
 
 ---
 
@@ -348,6 +442,33 @@ order: build and height, skin, hair, ears, eyes.
 - status: alive, running the rail
 - notes: Cassa Tessen, 19, Ilven's bond-pair. Sails and hand-cranks a rail sledge across the dry seabed. Ch.4, 5, 6, 13.
 
+## Domma
+- role: first chanter of a small Braid line, with Threnn Novven
+- ref: story/refs/domma.png
+- people: Vess
+- voice: Formal, warm and unhurried; thanks people at length and by name, never says a bitter word about the company, and lets her line hum underneath her.
+- look: Domma, a very tall, very thin old woman who sits straight-backed with her long hands folded in her lap, with ash-lilac skin gone pale over the knuckles, long backswept fluted ears with visible ribbing, solid slate eyes with no whites, white wire-hair in one flat plait pinned close to the skull, a mulberry-red chant-line wrap over a plain grey house robe, a knotted counting-cord at one wrist, and worn felt house-shoes.
+- status: alive, holding her line; ch.4 and ch.13
+- notes: Domma Sath, in her eighties. **One woman, not two** — Act II's grandmother and Act IV's first chanter are the same person. Ch.4: eleven years of savings bought a retail sleeve of one afternoon of her drowned daughter's, and at `0487` she takes the flat grey thread in both hands and thanks the party properly, eyes lowered, composed. Ch.13: she and Threnn halt a sledge mid-rehearsal and will not move, and they are correct. Her hands carry both scenes; the panels frame them more often than her face. Her design must not collide with Ilven's or Sefa's.
+
+## Threnn
+- role: first chanter of the same small line; Domma Sath's bond-pair
+- ref: story/refs/threnn.png
+- people: Vess
+- voice: Counts out loud, corrects your figure before he answers the question, and says "I have it as" about things nobody else would call facts.
+- look: Threnn, a very tall, very lean man with ash-lilac skin, long backswept fluted ears with visible ribbing, solid amber-brown eyes with no whites, silver-blue wire-hair in one long braid pulled forward over the shoulder and pinned with a plain steel pin, a turquoise quilted sail-cloth sledge-coat with a high collar, a turquoise counting-cord wound twice at the wrist, long bare hands, and flat rail-boots crusted white with salt.
+- status: alive, on the laid rail; ch.13, and his line's record is the one Zeph sings in ch.15
+- notes: Threnn Novven. Bonded to Domma Sath; between them the two of them hold the body of record of a line of eleven that has run since year 700. At `1335` they are four hours from the end of the day's passage and will not move a halted sledge for four thousand people, and they are **not protesting and not stubborn**: a passage broken in the middle is a passage lost. Calm, immovable, and right.
+
+## Ol
+- role: keeper of the dead Semmet well at Saltmouth
+- ref: story/refs/ol.png
+- people: Onn
+- voice: Exact and unhurried; exchanges lights, hours and stores the way colleagues exchange weather, files a grievance in order, and says "correct" where anyone else would say thank you.
+- look: Ol, a narrow upright figure with matte ochre skin in one flat tone, no hair anywhere, no nose but two small slits above the mouth, large lensed pale-blue eyes with a bright iris ring, four small lights down each temple with one of the eight still lit, a long grey keeper's smock washed thin at the elbows, a deep indigo-blue sash knotted at the hip, bare forearms, flat-soled boots, and a flat tin document case carried under one arm.
+- status: alive, at one light, at a well that died forty-six years ago
+- notes: Ol-Semmet, of the last muster. Ch.6, optional: the Works' bore runs through his foundation, he has written about it eleven times, and the tin case holds the eleven acknowledgments, filed in order, none of them an answer. **He is not Arro-Vintry and must not steal Arro's ch.10 beat** — no hundred and sixty-three years, no broom, no joke, nothing here about hope. Hesk says four words to him on the way out that are as close to an apology as a doorward gets, and he says "correct".
+
 ---
 
 ## The Flats
@@ -369,6 +490,15 @@ order: build and height, skin, hair, ears, eyes.
 - look: Ilsa, a square, steady woman of middle height with pale skin, iron-grey hair cut blunt at the jaw, calm pale eyes and a mild friendly expression that never changes, a cobalt-blue quilted work coat over engineer's overalls, a thick book strapped flat to her chest on a canvas harness, a pencil tied to the strap on a string, and heavy boots crusted white with salt.
 - status: blank since 1093; the only blank in the Basin who asks questions
 - notes: Ilsa Tremmel, 49. Entered the written objection at 21:40 on the 9th of Fallow and was found at the winch with her hand still on the brake. Her template did not take cleanly, which is why she asks; she has been writing the answers in a book for eleven years. Ch.9, ch.15.
+
+## Corrow
+- role: salt-crawler crew hand at Ostry Bar; restored on the road three weeks before ch.9
+- ref: story/refs/corrow.png
+- people: human
+- voice: Clear, flat and unsentimental; says the important thing twice so you cannot soften it, and asks you not to put "grateful" or "sorry" in his mouth.
+- look: Corrow, a wiry man of middle height burnt dark by the salt glare, with weathered brown skin, black hair going grey and hacked short by his own hand, deep-set brown eyes narrowed to a permanent squint, a saffron-yellow neck-cloth pulled up over the chin, a sleeveless canvas crawler coat over a grey long-sleeved shirt, leather wrist wraps, a canvas water-skin on a shoulder strap, and boots crusted white to the ankle.
+- status: alive, camped against the Sarn cap ring with four crewmates, and not coming back
+- notes: Corrow Sallow. Resettled off the same survey map Bron's surname came from, and **nobody in the party may remark on the name.** Maren gave him his life back three weeks ago: a name that is not the one on the payroll, and a wife eleven days' walk from here who married somebody else in 1099. He has thought about it a great deal and he is not going. Four crewmates stayed through a bad fortnight because somebody had to, and they are the point of the scene. Ch.9, optional.
 
 ---
 
@@ -416,6 +546,19 @@ order: build and height, skin, hair, ears, eyes.
 
 ---
 
+## Thurn
+
+## Nona
+- role: baker of Thurn; the face of the three hundred and forty
+- ref: story/refs/nona.png
+- people: Kell of Thurn
+- voice: Delighted, exact and completely present about the oven, the mix, the heat and the fat being wrong this week; cannot see why last week would matter and is not troubled by being asked.
+- look: Nona, a very short and very broad woman, wide through the shoulders, with clay-warm skin, amber eyes with bright rings at the pupils, pale gold hair standing straight up in a cropped brush, bare arms floured white to the elbow, a sleeveless square-cut overdress of faded woad-blue with a high banded collar and a row of bone toggles, a plain belted apron, and thin leather shoes — all of it very old, spotless, and invisibly mended.
+- status: alive and entirely well; ch.14, and the first person out of the Ninth Door in ch.15
+- notes: **Nine** — her working name this week; somebody called her that and next week it will be something else and she does not mind and cannot see why you would. Handle is **Nona** because "nine" false-matches "Nine Doors", "nine hundred tallies" and Ilven's nine chant-pins in panel text; write her dialogue speaker label as **Nine**, and any replacement working name must still be a number. **She must never be given a backstory**: she does not have one, cannot be given one, and nobody in Thurn knows their own age. Ch.14 Ollo asks her about the bread instead of the past and she is funny about the fat. Ch.15 `portrait_inset`, looking up into daylight she has never seen, delighted, recognising nobody. **She is not pitiable and is never drawn as a blank.** Her clothes are the whole design: old clothes in perfect repair.
+
+---
+
 ## Uniforms and recurring extras
 
 Reusable one-sentence looks for unnamed figures. These are **not** cast entries: paste the sentence
@@ -433,3 +576,9 @@ a `characters:` line.
 - **Onn keeper** — a narrow upright figure with matte skin in one flat colour, no hair, two small slits above the mouth, large lensed eyes with a bright iris ring, a row of four small temple lights of which some are dark, and a long grey keeper's smock with a chest tool roll.
 - **Even Hand hunter** — practical mismatched travelling gear in browns and greys, a high-collared jacket or half-cape, bracers, a weapon of their own choosing, and a flat brass token stamped with an open hand at the left wrist.
 - **Hall-guard of Thurn** — an armored skeleton standing in an ancient segmented helm with two small steady blue eye-lights, a tattered red cloak hanging still, a halberd held level, and nothing at all inside the armor.
+- **The dying hunter's hand** (Merrit Tack, ch.1) — a broad weathered hunter's hand and forearm lying palm up on a grey blanket, the nails short and split, a flat brass token on a cord looped loose around the wrist. No face, no reference sheet: a hand, a shape under a blanket, and the back of a head.
+- **The bench man** (ch.2, and never named) — a man in his thirties in a charcoal company coat with a small brass number stitched at the grey collar, seated easy on a bench with his hands loose on his knees, well-fed and warm, eyes clear and focused and looking right at you, and an open friendly half-smile. **Never vacant, never slack, never a stare.**
+- **Frame-bearer** — a Pale trooper in the pale ash-grey coat without the rifle, gloves off and tucked in the belt, carrying one end of a long canvas-covered case with brass buckle ends showing, bored, careful, and watching the ground for their footing.
+- **Standing Onn of the muster** (Ostry Bar, ch.9, at distance only) — a narrow upright figure in a long grey keeper's smock and a coloured sash, alone on white salt, motionless, facing out; drawn small, spaced far apart, never grouped and never facing one another.
+- **Person of Thurn** — a very short, very broad figure with clay-warm skin, amber eyes and upright metal-coloured hair, bare arms, and a square-cut sleeveless overdress with a high banded collar in a faded dye, centuries out of fashion, spotless and invisibly mended. Calm, healthy, unhurried, interested in the job in front of them.
+- **Sanatorium orderly** (Windrow, ch.10) — a bone-white buttoned sanatorium tunic with a black stand collar, sleeves buttoned at the wrist, a cloth folded over one forearm, a small ring of brass keys on a belt clip, quiet shoes, and a mild professional pleasantness.
