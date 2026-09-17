@@ -83,8 +83,10 @@ thinning the branch under the city.
 - who: Bron, Hesk, Ket, Zeph, Pip, Ollo, Sefa. Speakers: Hesk, Sefa, Bron, Ket.
 - beat: The one hall-mouth in the Basin the Works never got into is open, and nothing is broken: the
   seal is intact, the mortar is whole, the doors were unbarred from within by someone who said the
-  right words. Hesk has spent forty-four years being the person who keeps this shut and she walks up
-  to it, looks at it for a long moment, and then takes out a pocket notebook and a carpenter's pencil
+  right words. **The Ninth Door is the ninth door-mouth of Ninefold Terrace** — Hesk's own cliff, the
+  one the party counted in chapter 5, reached from behind and below by the Works' maintenance rail and
+  opening on the surface onto the terrace face. Hesk has spent forty-four years being one of the nine
+  people who keep these shut and she walks up to it, looks at it for a long moment, and then takes out a pocket notebook and a carpenter's pencil
   and starts writing down names. Sefa, who has spent fourteen years making things official, watches a
   Kell farmer invent a register in front of her and says the kindest thing she has said all game,
   which is that it is good practice. Last image: Hesk's pencil on the first line of a blank page,
@@ -690,8 +692,8 @@ hundred and forty people have to be walked up a mile of stair by hand, one at a 
   held. 8 `high_angle_down` the chamber from the gallery, the party standing back in a wide ring,
   giving them room.
 - lines: 10
-- notes: **The questions must be the canonical fifteen** — see `story/notes/outline-act5.md`, which
-  proposes the text; the Act I writer needs the same list for ch.1 and the orchestrator must fix it.
+- notes: **The questions are the canonical fifteen, frozen in `story/canon.md` section 1** (DECISIONS
+  D8.1); quote them verbatim and in order, and do not re-derive them from any notes file.
   Bron speaks four or five of them on the page, not all fifteen; the rest is time passing. He is not
   performing a rite and does not know he is running a maintenance procedure. Lyra is not named and not
   thought about out loud; the player does that work.
@@ -851,8 +853,9 @@ hundred and forty people have to be walked up a mile of stair by hand, one at a 
   they did) and Ladder E (the night, told) / setup for 1580.
 - mood: sorrow -> hope
 - panels: 2 pages, 7 panels. 1 `establishing_wide` the chamber floor, the seated half-ring, the face
-  behind. 2 `full_body_reveal` Sem-Dree standing to give her account, flat matte colour, one light
-  lit. 3 `portrait_inset` Maren, calm, her own face, eyes open. --- 4 `two_shot` Zeph kneeling at the
+  behind. 2 `full_body_reveal` Sem-Dree standing to give her account, flat matte slate-grey, two of
+  the four lights on the visible temple lit (four of eight — `story/canon.md`, Onn light counts).
+  3 `portrait_inset` Maren, calm, her own face, eyes open. --- 4 `two_shot` Zeph kneeling at the
   front of the ring with Ilven behind his shoulder. 5 `object_insert` a Vess hand on another Vess
   hand, bonded pair, on stone. 6 `profile_flat` Ilven in profile, listening, eyes closed. 7
   `high_angle_down` the whole floor from the gallery, the ring small, the face enormous.
@@ -967,11 +970,12 @@ hundred and forty people have to be walked up a mile of stair by hand, one at a 
 - where: the Choir chamber, at the Choir apparatus.
 - who: Ket, Hesk, Bron, Ollo, Sefa. Speakers: Ket, Hesk, Ollo, Bron.
 - beat: Ket has the specification and the Choir is a machine with a shutdown procedure, and the
-  procedure is the fifteen questions in maintenance wording: verify the record is whole, then stop
-  rehearsing it. She runs it out loud in about forty seconds, says "correct" fourteen times and "not
-  correct" once — one line of it is gone, has been gone for centuries, and cannot be recovered by her
-  or anyone — and then stops the Choir anyway, because the alternative is another week-deep draw
-  tomorrow. The cost is stated flatly and is not small: Thurn's lamps go out, its ovens go cold, its
+  procedure is the fifteen questions in maintenance wording: verify the record is whole, then declare
+  what is to be done with it. She runs it out loud in about forty seconds, says "correct" thirteen
+  times and "not correct" once — one line of it is gone, has been gone for centuries, and cannot be
+  recovered by her or anyone. **The fifteenth is the blank one**, the one the manual will not answer
+  and Bron had to ask Maren an hour ago, and there is nobody left to ask, so Ket answers it herself
+  and stops the Choir, because the alternative is another week-deep draw tomorrow. The cost is stated flatly and is not small: Thurn's lamps go out, its ovens go cold, its
   water stops, and three hundred and forty people who cannot hold a plan for a week have to be walked
   up a mile of stair by hand, one at a time, starting now and going on for months. Last line: Hesk
   says that is a job, and asks who is doing it, and answers her own question.
@@ -991,7 +995,8 @@ hundred and forty people have to be walked up a mile of stair by hand, one at a 
   Ollo, Pip, Bron.
 - beat: The party comes apart, on purpose, in the open, while people carry equipment past them. Ket
   says she is going to Vintry, which is eleven days of work, and asks Tovin-Caleth to come with her —
-  two Onn of the same muster, two lights each, forty-nine years of silence ended in chapter 4 and
+  two Onn of the same muster, Ket at two and Tovin at two a side, forty-nine years of silence ended
+  in chapter 4 and
   spent since — and Tovin says no, she has a wall to finish copying and nine hundred of four thousand
   done. Ollo says he is going back to Tellwater, because sixty people there have just stopped being
   employees and somebody has to be there who knows where the flour is kept. Pip does not say anything
@@ -1203,6 +1208,10 @@ and it is not enough. And then he goes back to the hall, and there is a bill on 
 - notes: Three wells running, not four — Dree follows within two years and that is narration, not this
   scene. **Two lights, six dark, for the rest of time.** No writer may light one. The joy in this
   scene belongs to the town, not to the Onn; Ket and Arro are simply at work and finished for the day.
+  **This scene is not optional and Arro is introduced in optional scenes only** (`0245`/`0250`/`0255`
+  in ch.2 and `1025` in ch.10). Write the first two lines so that a player meeting him here for the
+  first time gets everything they need — his name, his well, his hundred and sixty-three years — out
+  of Ket saying it to him, not out of exposition. Nothing later depends on the optional scenes.
 
 ### 1635_the_town_book — TALK
 - when: Green 1108; Tellwater, findable.
@@ -1298,7 +1307,7 @@ and it is not enough. And then he goes back to the hall, and there is a bill on 
 - where: Sallowgate, the Even Hand hall — the board, the ledger wall behind it, the stove that is
   never let out, the door standing open onto the terrace.
 - who: Tovin, Bron, Pip, Tibb. Speakers: Tovin, Bron, Pip.
-- beat: A cold bright autumn morning in a hall full of people eating. Tovin-Caleth, at two lights,
+- beat: A cold bright autumn morning in a hall full of people eating. Tovin-Caleth, at two lights a side,
   chalks a new bill onto the board — two days' walk, bad water, pays badly, a woman with a well and no
   money, and the seal is on it — and Bron takes it down and signs the ledger, and the wall behind him
   has fifty-five years of names on it including one with a bar through the line. Pip signs under him
@@ -1497,7 +1506,7 @@ Act V scene that pays it off breaks.
 - **Maren Ostry** — lives above the guild hall at Sallowgate and does small survey work. Not crowded
   for the first time in fourteen years. Remembers nothing of Tellwater, the sanatorium, or the last
   two years. Has never been to Braid to hear it.
-- **Tovin-Caleth** — two lights. Finishes copying the ledger wall into books; the hall is leased out
+- **Tovin-Caleth** — two lights a side, four of eight. Finishes copying the ledger wall into books; the hall is leased out
   from under her in 1110 and the books outlast the building, as intended. Chalks the last bill in the
   game.
 - **Tibb Orsk** — takes the bills the party turn down, as always. Visits **Sela Marrin**, who is

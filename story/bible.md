@@ -449,6 +449,49 @@ scene 003 lowers its halberd instead of swinging it.
 consumed, never craftable, obtained mostly by purchase from the Works. Spending one in battle should
 cost the player something they can feel.
 
+### The Tally — the fifteen questions
+
+*Added by the story editor per DECISIONS D8.1. These are frozen. `story/canon.md` section 1 is the
+copy scene writers quote; this is the same text. Question 7 is the edges test of hard rule 5, and
+question 15 is the only one that cannot be answered from a record, which is why the maintenance
+manual leaves it blank with the instruction "ask the holder".*
+
+1. Do you know where you are?
+2. Do you know who is holding your hand?
+3. What is your name?
+4. What name did your mother use?
+5. What did you eat last?
+6. What was the weather?
+7. What happened the day before this one?
+8. What did you do that you would do again?
+9. Who is owed something?
+10. Who owes you?
+11. What is unfinished?
+12. What should be told, and who to?
+13. Is there anything you would rather nobody knew?
+14. Is there anything you want said out loud now, while there are people?
+15. What do you want done?
+
+The sister never asks what the answer to 13 is. She asks whether there is one.
+
+### Two clarifications of the hard rules
+
+*Added by the story editor. Neither bends a hard rule; both close a gap writers were filling by
+guesswork.*
+
+**Rehearsal.** A stored pattern has to be rehearsed to stay coherent — that is already why the Seam
+sings (above). It follows that a saturated person holds what she holds by continuously rehearsing it
+herself, which is what the crowding and the voices are. When a Vess chant-line takes a record and
+rehearses it daily, she stops having to, and it goes quiet in her and stays quiet. **Nothing is
+copied** (hard rule 3): the record now lives in the line and not in her. Give away all of it and she
+is empty. This is the mechanism of chapter 15 and it is the only mechanism permitted for it.
+
+**"Taking the hour" is not a device.** It is what an Attendance sister does: be present, ask the
+Tally in order, and carry it afterwards because you were there. There is no frame, no strand, no
+glass, no transfer, no light, and nothing changes hands. A memory taken this way is a memory of
+having been in the room, which is why it is the only thing in Bron's head he is certain is real —
+and why it is not his. Any writer who adds machinery to it breaks hard rules 9 and 10.
+
 ---
 
 ## 6. The Clement Works
@@ -839,7 +882,11 @@ east of the town on the shallow branch that Dree's root shaft reaches.
 - **22:31.** 407 residents and 4 of the 5 crew go blank standing up. Nobody falls. Two people are
   walking down the lane; they keep walking until they stop. A kettle boils dry in a kitchen and
   nobody comes.
-- **22:31.** Maren, at the draw head, at the node, takes all of it.
+- **22:31.** Maren, at the draw head, at the node, takes all of it — four hundred and ten lives on top
+  of her own. **The one the node does not receive is the nine-year-old standing in the bore shed
+  doorway at the head of the open shaft.** What the field takes from directly over the open column
+  goes down past the bell and disperses into the branch. Nobody ever works this out; the file records
+  a blank child. That is Bron, and it is why he can never be restored.
 - **22:34.** Tremmel is found at the winch with her hand still on the brake, calm and friendly.
 - **22:40.** The relay hut two miles out loses the telegraph acknowledgment and sends a rider.
 - **23:55.** The rider reaches Windrow.
@@ -1145,9 +1192,15 @@ good at the work and liked. On the 9th of Fallow, 1093, she was 340 feet down Bo
 readings by hand because the gauge disagreed with itself. She was standing at the draw head when the
 field inverted.
 
-**What she is.** Saturated. Where the town was emptied, she was filled: four hundred and eleven
-lives, including her own and the two hours of Bron's that were later drawn out of her and sold back
-into him. The Works held her for twelve years at the Windrow sanatorium under the file name **the
+**What she is.** Saturated. Where the town was emptied, she was filled: **four hundred and ten other
+lives, and her own — four hundred and eleven records in all.** She holds **nothing of Bron's own
+past.** He was in the radius but standing at the head of the open shaft with the draw head three
+hundred and forty feet directly below him, not at the bell, and what the field took from over the
+open column went down past her and dispersed into the branch. The two hours he carries were never
+his: they are **her** ninth winter, drawn out of her in 1093 and set into him to give a stock template
+warmth. Nobody has ever worked this out and nobody in the game says it in these words; the file
+records a blank child and a cheap disposal. *(Editor's ruling, DECISIONS D8.2; section 16 decision 4
+governs. If Maren held Bron, chapter 10 has no reveal and Act V has no argument.)* The Works held her for twelve years at the Windrow sanatorium under the file name **the
 Fair Copy**, because she is the only complete record of Tellwater in existence and they were not
 going to destroy a record. She was not tortured. She was catalogued. In 1105 she walked out through
 an unlocked door, which nobody had thought to lock, because in twelve years she had never asked to
@@ -1231,7 +1284,11 @@ Fifteen to twenty recurring faces. Every one of them exists to make the Basin fe
   one son." In ch.11 she comes back to Tellwater on her own money and without permission, to stand in
   the square, because for four years she was somebody's mother. Ch.6 (on the payroll), ch.11 (in
   person, optional).
-- **Anneke Brae** — human, 54, laundry presser in Windrow. Bron's mother. Resettled with a stock
+- **Anneke Brae** — **Kell**, 54, laundry presser in Windrow. Bron's mother. Four foot eleven, the
+  same height as her son, and neither of them knows it; iron-grey hair that will not lie flat, amber
+  eyes, bare arms in a hot room because Kell run hot, and she complains about the steam constantly.
+  *(Editor's fix, DECISIONS D8.3: she was listed here as human, and Bron is Kell. The peoples do not
+  interbreed. "Brae" is a word off a survey map either way.)* Resettled with a stock
   template and filed as having no dependents, because pairing survivors was more paperwork. Ch.10
   (she offers a stranger a cup of tea in a doorway), ch.15.
 - **Aldo Fessel** — human, 71, retired tram inspector, Windrow. The clerk who signed Bron's intake
@@ -1917,3 +1974,35 @@ Non-obvious calls, with how to reverse them.
    ever let the player do it, hard rules 7 and 10 break. Recommended: it is never a player verb.
 6. **Chapter 8's side contract** ("Collection at Emberrow") lets the player buy a child out of a debt
    for a punishing sum. Confirm the economy can support a genuinely expensive optional choice.
+
+---
+
+## Editor's changes
+
+Made by the story editor after the five act outlines came back, applying the orchestrator's rulings
+in DECISIONS D8 and the rulings recorded in `story/canon.md`. Each is reversible; each says why.
+
+1. **Section 5 — the Tally's fifteen questions added in full** (new subsection "The Tally — the
+   fifteen questions"). D8.1 froze them using Act V's text and the bible had never written them out,
+   so four acts were quoting a list that did not exist. *Reverse:* edit both here and
+   `story/canon.md` section 1, and re-check chapters 1, 5, 9, 11, 14 and 15.
+2. **Section 5 — "Rehearsal" clarification added.** The bible said the giving empties Maren but not
+   by what mechanism, and the hard rules make the obvious readings illegal. This states the mechanism
+   (a stored pattern must be rehearsed to stay coherent; a chant-line taking it means she no longer
+   has to) without touching a hard rule. D8.8.
+3. **Section 5 — "'Taking the hour' is not a device" clarification added.** It is the single easiest
+   thing for a scene writer to get catastrophically wrong in chapter 11. D8.8.
+4. **Section 8, the 22:31 entry — the boy in the bore shed doorway is named as the one the node did
+   not receive.** The timeline already supplied the mechanism (Teach carries a nine-year-old "from the
+   bore shed doorway"); it just never said what it meant.
+5. **Section 10 — what Maren holds corrected.** It said "four hundred and eleven lives, including his
+   own and the two hours of Bron's", which contradicts section 12 chapter 10 and section 16 decision
+   4. Decision 4 governs (D8.2): four hundred and ten other lives plus her own, and **nothing of
+   Bron's own past**. The two hours he carries are her ninth winter. *Reverse:* if he can be restored,
+   chapter 10 has no reveal and Act V has no argument.
+6. **Section 11 — Anneke Brae is Kell, not human**, with a look line. Bron is Kell and the peoples do
+   not interbreed. D8.3.
+7. **Not changed, recorded instead:** section 12's chapter 15 panel list still ends on the new bill at
+   Sallowgate. Act V moved that image and "a cold wind he can finally feel" into the epilogue (1655)
+   and gave chapter 15 a different closer (1595). The editor accepted Act V's arrangement; the section
+   12 list is now a chapter-15-plus-epilogue list. See `story/canon.md`, rulings.

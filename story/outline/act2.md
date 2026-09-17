@@ -14,9 +14,9 @@ below. Scene ids are `CCSS_slug`. Chapter tallies are at the foot of the file.
 - **Dungeon:** the drowned lower stacks beneath the Braid archive annex.
 - **Boss:** the Sleeve Vault — a Vess-built automated retrieval gantry the company still runs, plus
   two annex guards who are on overtime and would rather not.
-- **Party:** Bron, Lyra, Zeph, Pip. **Ket-Ossun joins** at scene 0500.
+- **Party:** Bron, Lyra, Zeph, Pip. **Ket-Ossun joins** at scene 0484.
 - **Opens:** the ferry-rail. Braid, Wick, Lomm, Brand's Ferry.
-- **Side contract:** "Recover one paper sleeve" (0440 offer, 0505 hunt, 0510 delivery).
+- **Side contract:** "Recover one paper sleeve" (0440 offer, 0486 hunt, 0487 delivery).
 
 **The chapter as the player plays it.** Act I ends with the trade roads shut, so the party walks down
 the terrace stair onto the old sea floor with no map and no bill. They pick up laid rail, flag a Vess
@@ -38,14 +38,16 @@ rail where the Works cannot touch them.
 ---
 
 ### 0405_down_the_stair — NARRATION — optional: no
-- when: chapter open, before the player has control, straight off the end of chapter 3
-- where: the terrace stair down from the Rim Hills to the old sea floor
+- when: chapter open, before the player has control, the morning after `0395_camped_on_the_salt`
+- where: the open salt at the foot of the terrace stair, the laid rail running west
 - who: no speakers; unattributed narration
-- beat: Three days of stair. The Rim road behind them is closed and the towns on it will not sell to
-  four people whose names went round on a slate. The narration counts what they have left — a
-  cleared bill nobody paid out, one axe, one mace, one staff, two knives — and then the stair ends
-  and there is nothing but white. Last line points at the one thing moving on the salt: a set of
-  rails, laid flat on the seabed, going west out of sight.
+- beat: Three days of walking west beside the rail. The stair and the Rim road are behind them and the
+  towns on it will not sell to four people whose names went round on a slate. The narration counts
+  what they have left — a cleared bill nobody paid out, one axe, one mace, one staff, two knives —
+  and gives the salt in distances: no shade, no water, no turning. Last line points at the one thing
+  moving on it, a long way off and coming on fast under sail.
+- **Editor's note:** the descent, the white horizon and the rails are already spent by `0390` and
+  `0395` at the end of Act I. Do not re-reveal them; this narration starts from the camp.
 - purpose: world / setup for 0415 / carries the map closure from ch.3 into the map opening of ch.4
 - mood: sorrow -> wonder
 - lines: 5
@@ -100,14 +102,21 @@ rail where the Works cannot touch them.
   number of times Pip has asked how fast this goes — and adores Pip on sight. She explains what a
   chant-line is by describing her own, which is seventeen people who all have the same eleven hours
   in their heads, and mentions her bond-pair Ilven, who is seventy and first chanter, in the tone of
-  someone mentioning a national monument they have to do the washing for. Zeph is being unusually
-  quiet, which Pip notices and files. Last line: Cassa asks their names and repeats each one back
-  before answering, which is the first time the player hears a Vess do it on purpose.
-- purpose: character / world (chant-lines, Vess speech habits) / setup for 0435
+  someone mentioning a national monument they have to do the washing for. Pip tries a small lie on her
+  for fun and Cassa catches it instantly and explains why, cheerfully and without making anything of
+  it: **a Vess voice carries a second tone under the first, and it goes flat when they lie**, which is
+  why a chant-line can trust a chanter and why Vess find human witnesses exhausting. Zeph is being
+  unusually quiet, which Pip notices and files. Last line: Cassa asks their names and repeats each one
+  back before answering, which is the first time the player hears a Vess do it on purpose.
+- purpose: character / world (chant-lines, Vess speech habits) / **plant: the Vess second tone goes
+  flat when they lie — chapter 15's refusal of Sefa (1550) and acceptance of Zeph (1555) are built on
+  it, and it is planted nowhere else** / setup for 0435
 - mood: hope
 - lines: 12
 - notes: Cassa is nineteen and delightful and not comic relief; she is competent at a difficult job.
-  Zeph gives his given name only. He does not say his line name.
+  Zeph gives his given name only. He does not say his line name. The second-tone fact is delivered as
+  a party trick, in two lines, and nobody draws a conclusion from it — it must not be flagged as
+  important. A human cannot hear the second tone; Zeph can, and says nothing.
 
 ### 0425_reading_hours — PANEL — optional: no
 - when: on first entering Braid proper, walking up from the rail sheds
@@ -198,7 +207,7 @@ rail where the Works cannot touch them.
   should plan around it, and asks what they want. Last image: her hands going back into the machine
   mid-sentence.
 - purpose: plot (introduces Ket-Ossun) / world (Meddra runs on hand-work; the Works' slogan is a
-  true-sounding lie) / setup for 0500
+  true-sounding lie) / setup for 0484
 - mood: tense -> wonder
 - panels: 2 pages of 3 and 4 (7 panels).
   1. establishing_tall — the Meddra ring tower from its foot, the well-head platform small at the
@@ -352,7 +361,7 @@ rail where the Works cannot touch them.
   Nobody deduces anything out loud beyond what is written on the board. No character says the word
   "memory."
 
-### 0485_the_standing_notices — PANEL — optional: no
+### 0481_the_standing_notices — PANEL — optional: no
 - when: coming up out of the stacks through the company annex office, before the boss
 - where: Braid, the annex company office — a clerk's room over the stacks, a cork board of standing
   notices, a stove, nobody in it
@@ -364,7 +373,7 @@ rail where the Works cannot touch them.
   as the stove reminder and has clearly been there for a long time. Last image: the card, alone in
   frame, pinned crooked.
 - purpose: clue — **Ladder F, ch.4 rung** (a standing recovery notice: *the Fair Copy. Do not
-  converse.*) / setup for 0690 and ch.8
+  converse.*) / setup for 0686 and ch.8
 - mood: tense -> dread
 - panels: 1 page of 4 panels.
   1. establishing_wide — the office at night, board on one wall, the four of them dripping on the
@@ -378,7 +387,7 @@ rail where the Works cannot touch them.
   the file reference, the phrase "the Fair Copy," and "do not converse." Nobody speculates about who
   or what it is. Nobody says "a person?" The scene ends on silence and a stove.
 
-### 0490_the_sleeve_vault — PANEL — optional: no
+### 0482_the_sleeve_vault — PANEL — optional: no
 - when: boss lead-in, on trying to leave the annex with what they came for
 - where: Braid, the Sleeve Vault — the annex's retrieval hall, a Vess gantry on rails running the
   full height of the stacks, brass sleeve-trays racked floor to ceiling
@@ -407,7 +416,7 @@ rail where the Works cannot touch them.
   guards are likeable, paid by the hour, and survive; the party should feel slightly bad about them.
   No one dies in this chapter.
 
-### 0495_overtime — TALK — optional: no
+### 0483_overtime — TALK — optional: no
 - when: immediately after the boss
 - where: Braid, the retrieval hall, gantry stopped, everyone sitting down
 - who: Bron, Pip, Zeph, Lyra, the two annex guards. The older guard and Pip speak most.
@@ -423,7 +432,7 @@ rail where the Works cannot touch them.
 - notes: this is a funny scene and it should be. The guard is not corrupt, not kind, and not a
   recruit for the cause. He is managing his week.
 
-### 0500_what_we_have — TALK — optional: no
+### 0484_what_we_have — TALK — optional: no
 - when: after the dungeon, on the terrace lip at dawn; **Ket-Ossun joins the party here**
 - where: Braid, the terrace lip above the rail sheds, the salt going grey with morning
 - who: Bron, Lyra, Zeph, Pip, Ket-Ossun. All speak.
@@ -443,7 +452,7 @@ rail where the Works cannot touch them.
   she does **not** mention the cradle to anyone (that is hers until Act V). The word "Thurn" may be
   spoken here by Ket as a place-name only.
 
-### 0505_one_paper_sleeve — TALK — optional: yes
+### 0486_one_paper_sleeve — TALK — optional: yes
 - when: any time after 0440, if the player took the unsealed bill off the floor
 - where: Braid, the company shop counter behind the rail sheds
 - who: Pip, Zeph, a company shop clerk. Pip and the clerk speak.
@@ -453,15 +462,15 @@ rail where the Works cannot touch them.
   and took two years to fill. He hands it over across the counter with a form to sign. Pip, holding
   it, notices it is grey and flat, and the clerk says that happens, and that spent stock is not
   returnable, and is sorry, and means it. Last image: the form being countersigned.
-- purpose: side contract 2 of 3 / world (retail strands, the shop, the form) / setup for 0510
+- purpose: side contract 2 of 3 / world (retail strands, the shop, the form) / setup for 0487
 - mood: hope -> dread
 - lines: 12
 - notes: the sleeve is **already spent** — dull flat grey, no ripple. The clerk is not a villain and
   is not hiding anything; the shop genuinely did not check. Nobody in the scene yet knows whose
   afternoon it was.
 
-### 0510_domma_sath — PANEL — optional: yes
-- when: delivery of the side contract, after 0505
+### 0487_domma_sath — PANEL — optional: yes
+- when: delivery of the side contract, after 0486
 - where: Braid, a chant-hall back room — a low room with sleeping mats, one stove, an old Vess woman
   and her line around her
 - who: Pip, Bron, Domma Sath (Vess, 80s), two of her chant-line. Domma and Pip speak.
@@ -487,7 +496,7 @@ rail where the Works cannot touch them.
   anything about it. Nobody explains that the sleeve is spent; she knows before they say it, and says
   so. The player pays for this scene by choosing to take an unsealed bill.
 
-### 0515_wick — TALK — optional: yes
+### 0488_wick — TALK — optional: yes
 - when: any time after the ferry-rail opens
 - where: Wick — a raft hamlet on the last standing water, planked walkways, everything on skids
 - who: Bron, Ket-Ossun, a Wick raft-keeper. The raft-keeper speaks most.
@@ -501,7 +510,7 @@ rail where the Works cannot touch them.
 - mood: sorrow -> wonder
 - lines: 11
 
-### 0520_the_company_shop_at_lomm — TALK — optional: yes
+### 0489_the_company_shop_at_lomm — TALK — optional: yes
 - when: any time after the ferry-rail opens
 - where: Lomm — the company shop by the permit offices, a strand counter under a printed price card
 - who: Pip, Lyra, a shop clerk. The clerk speaks most; Pip buys or does not.
@@ -520,7 +529,7 @@ rail where the Works cannot touch them.
   mentions that a colleague called Neve is off shift today. That is a seed and nothing more; nobody
   reacts to it.
 
-### 0525_night_on_the_salt — TALK — optional: no
+### 0491_night_on_the_salt — TALK — optional: no
 - when: the night before leaving Braid, camped by the sledge
 - where: the ferry-rail siding below Braid, a camp on the salt, one lamp
 - who: Bron, Lyra, Ket-Ossun (Pip and Zeph asleep). Mostly Bron and Lyra; Ket speaks twice from
@@ -539,7 +548,7 @@ rail where the Works cannot touch them.
   before. Ket's temperature figure is a throwaway that the player may catch on a second playthrough
   and nothing in the scene draws attention to it. Bron is happy in this scene. That is the point.
 
-### 0530_the_rail_south — PANEL — optional: no
+### 0492_the_rail_south — PANEL — optional: no
 - when: chapter end, boarding the sledge for the terrace landing under the nine doors
 - where: the ferry-rail siding below Braid, at first light
 - who: Bron, Lyra, Zeph, Pip, Ket-Ossun, Cassa Tessen. Cassa, Ket and Bron speak.
@@ -928,9 +937,14 @@ one is Extraction Bore Four at Saltmouth, which is where Hesk's nephew draws his
 - lines: 7
 - notes: **this is the most delicate scene in Act II.** Two of the fifteen questions are printed for
   the player — the same wording the player heard Lyra say at a deathbed in ch.1 — and **no character
-  reacts.** Zeph finds it dull. Lyra does not speak in this scene and must not, and she says nothing
-  about it for four chapters (ch.9). If any character says "that sounds like—", the scene is ruined.
-  Hard rule: the Tally is not revealed as a maintenance procedure until ch.9.
+  reacts.** **The two printed are question 7 ("What happened the day before this one?") and question
+  13 ("Is there anything you would rather nobody knew?"), quoted from `story/canon.md` section 1,
+  verbatim.** The band also carries a numbered line 15 with nothing cut after it — that blank is what
+  Zeph means by the numbering being inconsistent, and it is why the maintenance manual in ch.9 and the
+  specification in ch.15 both leave the fifteenth to the holder. Zeph finds it dull. Lyra does not
+  speak in this scene and must not, and she says nothing about it for four chapters (ch.9). If any
+  character says "that sounds like—", the scene is ruined. Hard rule: the Tally is not revealed as a
+  maintenance procedure until ch.9.
 
 ### 0580_the_words_on_the_wall — TALK — optional: no
 - when: a rest point partway down the stair
@@ -947,7 +961,9 @@ one is Extraction Bore Four at Saltmouth, which is where Hesk's nephew draws his
 - mood: tense -> sorrow
 - lines: 10
 - notes: Lyra **does not lie** — she declines to answer, and Zeph lets her because he likes her.
-  Nobody names the Order. Keep this at ten lines and get out.
+  Nobody names the Order. Keep this at ten lines and get out. The "same question asked twice" Zeph
+  means is 13 and 14 (`story/canon.md` section 1); to a reader they are one question, and to a sister
+  they are not, and she does not explain the difference.
 
 ### 0585_the_oath — TALK — optional: no
 - when: at the first empty guard niche, before the boss
@@ -1020,7 +1036,7 @@ one is Extraction Bore Four at Saltmouth, which is where Hesk's nephew draws his
 - notes: the fill is **hand-laid from the inside** and that must be legible. No hint of what is
   beyond it. Nobody wonders aloud whether anyone is alive down there.
 
-### 0600_the_heat_complaint — TALK — optional: no
+### 0596_the_heat_complaint — TALK — optional: no
 - when: back at the village after the dungeon, evening
 - where: Ninefold Terrace, the household kitchen, the stove banked high
 - who: Hesk, Ket-Ossun, Pip, Lyra. Hesk and Ket carry it; Pip supplies the joke.
@@ -1037,7 +1053,7 @@ one is Extraction Bore Four at Saltmouth, which is where Hesk's nephew draws his
 - notes: the grievance is nine chapters long and resolves in two lines in ch.14; **do not resolve
   anything here.** Nobody apologises. The comedy is that everyone else in the room can see it.
 
-### 0605_pip_and_the_key — TALK — optional: no
+### 0597_pip_and_the_key — TALK — optional: no
 - when: any evening after Hesk joins
 - where: Ninefold Terrace, the door-mouth of the Fifth, sitting on the step in the dark
 - who: Pip, Hesk. Two-hander.
@@ -1055,7 +1071,7 @@ one is Extraction Bore Four at Saltmouth, which is where Hesk's nephew draws his
   resoled four times — as a joke about money, and Hesk does not ask. Lyra knows about the care-house
   and is not in this scene on purpose.
 
-### 0610_the_hill_path — PANEL — optional: no
+### 0598_the_hill_path — PANEL — optional: no
 - when: chapter end, leaving Ninefold Terrace westward off the company roads
 - where: the hill paths above the Flats, dusk, Saltmouth's headframe lit far below on the salt
 - who: Bron, Lyra, Zeph, Pip, Ket-Ossun, Hesk. Hesk and Bron speak; Ket gives the distance.
@@ -1090,8 +1106,11 @@ one is Extraction Bore Four at Saltmouth, which is where Hesk's nephew draws his
   not beat it; you survive it and get people out.
 - **Party:** Bron, Lyra, Zeph, Pip, Ket-Ossun, Hesk.
 - **Opens:** the salt-crawler freight routes, Kettle, and the drove roads.
-- **Side contract:** none assigned by the bible. Optional non-bill work: "the sump in the bunk rows,"
-  with Tibb Orsk and Sela Marrin (0635). See `story/notes/outline-act2.md`.
+- **Side contracts:** "Bad water at Kettle" — the bible's chapter-2 contract, posted at `0240` in ch.2
+  and cleared here at `0607` (DECISIONS D8.6). Plus optional non-bill work: "the sump in the bunk
+  rows," with Tibb Orsk and Sela Marrin (0635). See `story/notes/outline-act2.md`.
+- **Standing rule (ch.5-9):** Lyra says nothing about the Sealed Stair inscription, in this chapter or
+  any chapter before 9. One line of "that sounds like—" destroys `0960` and her whole arc.
 
 **The chapter as the player plays it.** Saltmouth is five thousand eight hundred people and one hole.
 Everybody's wage comes out of the same bore; the counting house on the square holds the whole Rim
@@ -1125,6 +1144,30 @@ on the salt edge, with a question about a face.
 - lines: 6
 - notes: the depth figure is the only thing in the narration that the player is meant to keep. Do not
   compare it to Tellwater in the text; just give it.
+
+### 0607_bad_water_at_kettle — TALK — optional: yes
+
+*Added by the story editor to close the canonical chapter-2 side contract in chapter 6 (DECISIONS
+D8.6). Plays only if the player took the bill at `0240_a_woman_off_the_drove_road`.*
+
+- when: on the crossing, at the metered cistern at Kettle, before Saltmouth. The route passes the door.
+- where: Kettle — three buildings, a scrap yard and a metered cistern on the drove road, wind, no shade.
+- who: Nessa Tull, Bron, Lyra, Zeph, Pip, Ket-Ossun, Hesk. Speakers: Nessa, Bron, Pip, Hesk.
+- beat: The bill Nessa Tull walked three days and paid tram fare to post in Windrow, cleared four
+  chapters later by six people who happened to be going past. The fouling is a dead salt-crawler wedged
+  in the inflow and eleven residents' worth of standing water; it is an hour of filthy work and Hesk is
+  the only one who enjoys it. Nessa pays on completion, out of her own money, in coin she counts twice,
+  and is furious when Bron tries to take less. The sting is the arithmetic she does out loud
+  afterwards, which is what the meter costs her a month against what she has just paid four strangers.
+  Last line: she asks whether the hall at Sallowgate got her second letter, and nobody knows.
+- purpose: side contract (the bible's chapter-2 contract, closed) / world (metered water, the Four
+  Lines — pay on completion, the seal) / character (Hesk at work; Bron and money) / callback to 0240.
+- mood: hope -> sorrow
+- lines: 12
+- notes: **This is the only place the bill can be cleared.** It is optional because taking it was
+  optional; no later scene may assume it. Nessa does not know anything about Tellwater, the Seam, or
+  the company beyond her own meter, and must not be used to deliver plot. She is very funny and only
+  about a third of it is on purpose. Chapter 9's `0925` revisits her and assumes nothing.
 
 ### 0610_saltmouth — PANEL — optional: no
 - when: arrival at the hub
@@ -1234,7 +1277,7 @@ on the salt edge, with a question about a face.
   clumsily, whether she has ever thought about partnering with someone, because going out four and
   coming back four is easier with two. Last line: Sela says they will stand the party a drink on
   payday, which is the ninth, which is two days away.
-- purpose: character / optional side work / setup for 0670 and 0695
+- purpose: character / optional side work / setup for 0670 and 0688
 - mood: hope
 - lines: 13
 - notes: **payday is the ninth** and the inversion happens before it. Do not underline that. Tibb and
@@ -1389,7 +1432,7 @@ on the salt edge, with a question about a face.
   screams. Nobody falls. Last image: Sela standing with the cup still in her hand, looking at Tibb
   with mild friendly interest.
 - purpose: plot (the act's catastrophe) / clue — **Ladder D, ch.6 rung** (what the Seam does when a
-  bore runs backwards) / setup for 0695
+  bore runs backwards) / setup for 0688
 - mood: tense -> dread
 - panels: 2 pages of 4 and 4 (8 panels).
   1. establishing_wide — the yard outside the gate at night, the shift standing about, the headframe
@@ -1475,7 +1518,7 @@ on the salt edge, with a question about a face.
   "You had that number before you counted." / "Yes." **Kerrow never lies in the whole game.** She
   does not hint at the study, and the party does not press, because Lyra recognises a closed door.
 
-### 0690_the_woman_in_the_dust — PANEL — optional: no
+### 0686_the_woman_in_the_dust — PANEL — optional: no
 - when: late morning, as the party crosses the yard
 - where: Saltmouth, the yard between the care-house and the bore gate, dust still hanging
 - who: Zeph, Pip, and a woman in a long grey coat at a distance, not identified. Zeph and Pip speak.
@@ -1486,7 +1529,7 @@ on the salt edge, with a question about a face.
   the direction. By the time Pip has turned round the crowd has closed. Last image: the crowd, and a
   gap where she was.
 - purpose: clue — **Ladder F, ch.6 rung** (glimpsed once, walking toward the bore, because she wanted
-  to know the radius) / payoff of 0485
+  to know the radius) / payoff of 0481
 - mood: dread
 - panels: 1 page of 3 panels.
   1. establishing_wide — the yard, the crowd moving one way, one grey figure at distance moving the
@@ -1496,10 +1539,10 @@ on the salt edge, with a question about a face.
 - lines: 5
 - notes: **no face.** She is at distance, in three-quarter back view or obscured by dust, and she does
   not speak and is not named. Pip may say "the card in Braid said don't talk to it" as a joke and
-  must be wrong about what she saw. Nobody pursues. The player connects it to 0485 or does not.
+  must be wrong about what she saw. Nobody pursues. The player connects it to 0481 or does not.
 
-### 0695_the_warden_asks — TALK — optional: no
-- when: after 0690, at the relief tent
+### 0688_the_warden_asks — TALK — optional: no
+- when: after 0686, at the relief tent
 - where: Saltmouth, outside the relief tent, a tea urn on a crate
 - who: Ivo Teach, Bron. Two-hander.
 - beat: A very large, very slow-moving man with a cup too small for his hands asks Bron questions he
@@ -1517,8 +1560,8 @@ on the salt edge, with a question about a face.
   the earliest.
 - lines: 12
 
-### 0700_tibb_and_sela_after — TALK — optional: no
-- when: afternoon, after 0695
+### 0689_tibb_and_sela_after — TALK — optional: no
+- when: afternoon, after 0688
 - where: Saltmouth, the care-house day room — clean, warm, well-lit, forty-one calm people in it
 - who: Tibb Orsk, Sela Marrin, Pip, Bron, Lyra. Tibb and Sela carry it; Pip cannot speak.
 - beat: Tibb is trying to have a conversation with his partner of four years. Sela is pleasant,
@@ -1536,7 +1579,7 @@ on the salt edge, with a question about a face.
   name it once. Nobody in the party consoles anybody. Pip does not speak in this scene at all and
   that is the note for her writer.
 
-### 0705_carry_that_box — TALK — optional: no
+### 0691_carry_that_box — TALK — optional: no
 - when: late afternoon, the party leaving the relief tent
 - where: Saltmouth, the counting-house steps, files being carried out to the relief tent
 - who: Emmet Sark, Bron, Zeph. Sark carries it.
@@ -1557,8 +1600,8 @@ on the salt edge, with a question about a face.
   short-handed. Zeph's theft is one page and is not celebrated. The fugitive notice is delivered as a
   mild administrative fact.
 
-### 0710_the_payroll — PANEL — optional: no
-- when: immediately after 0705, in the lee of the counting house
+### 0692_the_payroll — PANEL — optional: no
+- when: immediately after 0691, in the lee of the counting house
 - where: Saltmouth, an alley beside the counting house, the page held open in the wind
 - who: Bron, Zeph, Lyra, Pip, Hesk, Ket-Ossun. Zeph reads; Bron takes the page; Hesk speaks last.
 - beat: The Rim district payroll for the Tellwater station: sixty names, every one of them an
@@ -1588,8 +1631,8 @@ on the salt edge, with a question about a face.
   Nobody suggests Bron himself was set. **Hesk does not repeat her "word off a map" line here.** The
   reveal that sixty-one adults remember a mother called Hesta is ch.7 and must not be prefigured.
 
-### 0715_what_a_posting_is — TALK — optional: no
-- when: after 0710, walking out to the salt edge
+### 0693_what_a_posting_is — TALK — optional: no
+- when: after 0692, walking out to the salt edge
 - where: Saltmouth, the town edge where the streets stop and the salt starts
 - who: Zeph, Hesk, Ket-Ossun, Pip, Lyra. Bron is present and silent throughout.
 - beat: Five people arguing around a man who will not speak. Zeph does the arithmetic out loud and
@@ -1598,15 +1641,15 @@ on the salt edge, with a question about a face.
   tells her to shut up, and Hesk does not. Ket, asked directly, says what is documented and refuses to
   speculate beyond it, twice, and the refusal is more frightening than a theory. Lyra says nothing
   until the end and then asks the others to go on ahead. Last image: five walking on, one stopping.
-- purpose: character / plot (positions the turn) / setup for 0725
+- purpose: character / plot (positions the turn) / setup for 0696
 - mood: tense -> sorrow
 - lines: 14
 - notes: **nobody says the true answer aloud** and nobody may say "then who was your mother?" Bron
   has no lines in this scene at all — that is the writing task. Hesk is right and unbearable, which
   is her function.
 
-### 0720_pip_cannot_joke — TALK — optional: no
-- when: dusk, before 0725
+### 0694_pip_cannot_joke — TALK — optional: no
+- when: dusk, before 0696
 - where: Saltmouth, the step of a parked salt-crawler at the depot
 - who: Pip, Bron. Two-hander.
 - beat: Pip sits down next to him with two cups and makes a joke, and it does not work, and she makes
@@ -1624,7 +1667,7 @@ on the salt edge, with a question about a face.
   years and one pair of boots. They were very good boots." must be in. Bron must not comfort her and
   must not notice what she has told him.
 
-### 0725_her_face — PANEL — optional: no
+### 0696_her_face — PANEL — optional: no
 - when: **the last scene of Act II**, first light, before the crawler leaves
 - where: Saltmouth, the salt edge at dawn, the dead ring tower behind them, the headframe stopped
 - who: Bron, Lyra. Two-hander; the other four are visible at distance and do not speak.
@@ -1632,9 +1675,12 @@ on the salt edge, with a question about a face.
   widow, one son, a green apron, a kitchen, the autumn fair — a list of attributes with nothing
   behind them, and no eyes, no mouth, no one particular morning, and he does not hear it. She asks
   again, for one thing that was only hers. He starts three times. The third time he stops in the
-  middle of a sentence and stands there, and the stopping is the whole act landing. Then he asks
-  Lyra to tell him if he is ever wrong about himself, and she says she will. Last image: the two of
-  them on the salt with the light coming up, and four people waiting a long way off.
+  middle of a sentence and stands there, and the stopping is the whole act landing. **This is Lyra
+  keeping the promise he asked of her at the end of Act I** (`0395`, on the salt below Tellwater):
+  she is telling him he is wrong about something he remembers, by asking rather than saying, and she
+  says so in one line. He does not ask her again — the asking has already happened and must not be
+  repeated here. Last image: the two of them on the salt with the light coming up, and four people
+  waiting a long way off.
 - purpose: **the act's turn** — clue: **Ladder A, ch.6 rung** (Bron cannot describe his mother's
   face; what comes out is a role description) / setup for ch.7-11 and for ch.11's debt (a promise
   Lyra will not be alive to keep)
@@ -1665,10 +1711,15 @@ on the salt edge, with a question about a face.
 
 - **Chapter 4 "Annex":** 8 panel (1 optional), 16 talk (4 optional), 2 narration. 26 scenes.
 - **Chapter 5 "Nine Doors":** 7 panel (1 optional), 14 talk (3 optional), 1 narration. 22 scenes.
-- **Chapter 6 "Bore Four":** 8 panel, 15 talk (2 optional), 2 narration. 25 scenes.
-- **Act II total:** 23 panel scenes (2 optional), 45 talk scenes (9 optional), 5 narration. 73 scenes.
+- **Chapter 6 "Bore Four":** 8 panel, 16 talk (3 optional), 2 narration. 26 scenes.
+- **Act II total:** 23 panel scenes (2 optional), 46 talk scenes (10 optional), 5 narration. 74 scenes.
 
-### Characters my scenes require
+**Scene ids were renumbered by the story editor** so that every id stays inside its own chapter block
+(`CCSS`, any two-digit order — DECISIONS D8.4). Chapters 4, 5 and 6 had overflowed into 05xx, 06xx and
+07xx, colliding with each other and with Act III's chapter 7. The mapping is in `story/canon.md`
+("Act II renumbering"). Slugs are unchanged; quote ids from the current file.
+
+### Characters Act II scenes require
 
 Already in `characters.md`: Bron, Lyra, Zeph, Pip.
 
@@ -1688,7 +1739,7 @@ hand, a company stores clerk at Meddra, two annex guards, a company shop clerk a
 at Lomm, a Wick raft-keeper, a Kell field woman, the doorward council speaker, a bunk-row woman, a
 Clement Works site supervisor, a night-shift crew chief.
 
-### Locations my scenes require
+### Locations Act II scenes require
 
 Rim/stair: the terrace stair down to the seabed.
 Braid: the ferry-rail siding and rail sheds; a crank sledge (interior deck); the terrace lip; the
@@ -1766,7 +1817,7 @@ assumptions:
    checkpoint clerk reading out "Bron Sallow." Scenes 0535 and 0545 are the next two rungs and assume
    both are already in the player's head.
 8. Ch.3 established the drowned bore's maker's plate dated 1093, the rehearsed welcome, "Hesta's
-   boy," and that Warden Teach looked at Bron for three seconds and stepped aside. 0695 repeats that
+   boy," and that Warden Teach looked at Bron for three seconds and stepped aside. 0688 repeats that
    beat deliberately.
 9. Emmet Sark was the duty clerk at the folding table behind the ancient door in ch.1 and asked for
    an entry chit. Scene 0620 is a direct callback and needs that line to have been said.

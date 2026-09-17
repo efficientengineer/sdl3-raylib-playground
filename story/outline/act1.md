@@ -113,7 +113,8 @@ finds the under-impression still legible.
   board, and behind it the ledger wall — every bill cleared since 1053 written out by hand, floor to
   ceiling, the dead marked by a bar through the line.
 - who: Bron, Lyra, Zeph, Pip, Tovin-Caleth, Tibb Orsk. Tovin, Bron, Tibb and Pip speak.
-- beat: Tovin-Caleth, an Onn at two lights, takes their proof, counts it out loud, refuses to round
+- beat: Tovin-Caleth, an Onn at two lights a side (four of eight), takes their proof, counts it out
+  loud, refuses to round
   it, pays them on the spot and takes the tenth. She calls the hunters "the board" and announces that
   the board eats at six. Tibb Orsk needles Bron about the size of the fee. Then Tovin says, flatly and
   without softening it, that Merrit Tack is upstairs and will not see morning, and that the sister is
@@ -154,11 +155,11 @@ finds the under-impression still legible.
   nothing, calm, eyes open.
 - lines: 9-10, and every box carries more than one of the fifteen questions where it can. All fifteen
   must be heard.
-- notes: **The exact text of the fifteen questions is fixed forever by this scene.** They recur cut
-  into a wall in chapter 5, read off a maintenance manual in chapter 9, half-finished in the road in
-  chapter 11, and recited to hold a woman together in chapter 15. See
-  `story/notes/outline-act1.md` for a proposed set; the orchestrator must freeze it before this
-  scene is written. Bron must not be in the room and must never learn the fifteenth question here —
+- notes: **The fifteen questions are frozen canon. Quote them from `story/canon.md` section 1,
+  verbatim, in order.** Do not use the candidate set in `story/notes/outline-act1.md`; that set is
+  superseded (DECISIONS D8.1). They recur cut into a wall in chapter 5, read off a maintenance manual
+  in chapter 9, half-finished in the road in chapter 11, and recited to hold a woman together in
+  chapter 15. Bron must not be in the room and must never learn the fifteenth question here —
   in chapter 11 he says "I don't know it" and it has to be true. Merrit Tack needs no character
   design: he is a hand, a shape under a blanket and the back of a head. Lyra does not cry. Nobody
   says "I'm sorry for your loss" in this game, here least of all.
@@ -184,7 +185,9 @@ finds the under-impression still legible.
 ### 0125_the_burned_seal — PANEL — optional: no
 
 - when: at six, after supper is called. The board becomes usable when this scene ends.
-- where: Sallowgate guild hall, main room, at the bill board; the ledger wall behind it.
+- where: Sallowgate guild hall, main room, at the bill board; the ledger wall behind it. **The Four
+  Lines are burned into the board's own timber frame, one to a side, older than the paint** — the
+  player must be able to see them here, because chapters 14 and 15 are built on them.
 - who: Tovin-Caleth, Bron, Lyra, Zeph, Pip, Tibb Orsk. Tovin and Bron carry it; Pip and Tibb get a
   line each.
 - beat: A new bill is on the board, chalked in Tovin's hand off a paper that came up the tram: *clear
@@ -196,8 +199,9 @@ finds the under-impression still legible.
 - purpose: plot / clue ladder B rung 1 (burned seal, triple rate, ask no questions) / complicity beat
   one: the player, not the game, takes this bill down / setup for 0180_the_tent and for chapter 2.
 - mood: tense
-- panels: 2 pages, 6 panels. Page 1 — (1) `over_shoulder` Bron's shoulder foreground, the board and
-  the ledger wall beyond, a single new sheet pinned among old chalk; (2) `object_insert` the bill,
+- panels: 2 pages, 6 panels. Page 1 — (1) `over_shoulder` Bron's shoulder foreground, the board in
+  its burned-lettered timber frame and the ledger wall beyond, a single new sheet pinned among old
+  chalk (no legible text in the art; the frame reads as scorched marks); (2) `object_insert` the bill,
   the burned hole where a seal should be, edges charred; (3) `portrait_inset` Tovin-Caleth, flat and
   unreadable, lights at her temple. Page 2 — (4) `two_shot` Tovin and Bron either side of the board,
   neither looking at the other, both looking at the sheet; (5) `eyes_slit` Bron's amber eyes, reading;
@@ -811,7 +815,8 @@ That is the chapter.
   are four days across the salt and there is no crossing from here. She says she will leave the bill
   up. Last line: she asks how long a bill stays good for, and the answer is until it is cleared.
 - purpose: world (the Flats exist and are out of reach; the map is about to open the wrong way) /
-  setup handed to Act II — this bill must close in chapter 6 or 9.
+  setup handed to Act II — **this bill closes in chapter 6, at `0607_bad_water_at_kettle`**
+  (DECISIONS D8.6). No scene before that may treat it as cleared.
 - mood: tense -> hope
 - lines: 10-12
 - notes: **The player takes a bill they cannot complete for four chapters and the scene must make
@@ -978,7 +983,11 @@ That is the chapter.
   superintendent will be up at first light and they can explain it to him, and he says it the way you
   say a thing you are looking forward to.
 - purpose: plot / world (the door-mouths, the leases — the first time the player hears that Kell
-  households own these doors; setup for chapter 5) / character / setup for 0280.
+  households own these doors; setup for chapter 5) / character / setup for 0280 / **plant: the season
+  survey order pinned to the rig's board carries two countersignatures, A. Crewe and O. Kerrow.**
+  Nobody reads them, nobody says them, and the player will not know either name for six chapters; the
+  paper is simply on screen. It is the only appearance of either name in Act I. Pays off at `1275`
+  and `1610`.
 - mood: sorrow -> tense
 - lines: 12-14
 - notes: The cost must be concrete and stated in money and days, not in abstractions. Marek does not
@@ -1590,7 +1599,7 @@ Optional: 0320, 0325, 0350, 0385.
 Of the 20 panel scenes, 3 already exist (001, 002, 003) and one of those (003) has finished art, so
 Act I needs **17 new generated art sheets**.
 
-### Characters my scenes require
+### Characters Act I scenes require
 
 Already in `story/characters.md`: Bron, Lyra, Zeph, Pip (Zeph's and Pip's `look` lines still need the
 Vess / care-house updates the bible asks for).
@@ -1626,7 +1635,7 @@ New minor characters this outline invents, all cheap, none load-bearing beyond A
 - Unnamed and one-line: a Pale constable at the Windrow gate, a tram conductor, a survey-office clerk
   behind a grille, a night-shift crew member.
 
-### Locations my scenes require
+### Locations Act I scenes require
 
 **Sallowgate** — guild hall main room with the stove, the bill board and the ledger wall; the hall's
 upper bunk room (twelve bunks, one lamp); the hall kitchen and stair; a third-terrace roof with a
@@ -1659,8 +1668,9 @@ camp on the salt pan with two lines of laid rail running west.
 
 1. **The Kettle bill is open.** Nessa Tull posted "Bad water at Kettle" in chapter 2 and the party
    took it and cannot reach Kettle until the crawler routes open. The bible assigns this contract to
-   chapter 2; the map does not allow it. **Chapter 6 or chapter 9 must close it**, and the scene
-   should acknowledge how long she waited.
+   chapter 2; the map does not allow it. **Chapter 6 closes it, at `0607_bad_water_at_kettle`**
+   (DECISIONS D8.6), and the scene should acknowledge how long she waited. Chapter 9's `0925` is a
+   revisit, not the clearance.
 2. **The maker's plate is in Pale custody**, confiscated on the ridge road by Sergeant Kesk with a
    receipt. Its recovery, or its reappearance in a Registry file, is available to chapter 7.
 3. **Bron asked Lyra to tell him if he is ever wrong about something he remembers, and she said she

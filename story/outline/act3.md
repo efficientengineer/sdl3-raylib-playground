@@ -20,6 +20,8 @@ Nobody joins and nobody leaves in Act III.
 - **Opens on the map:** the company roads — Vantage Tiers One to Three, Emberrow, Dunnow, Kettle,
   and a fast return to Windrow.
 - **Side contract:** "Quiet the school" (Idda Renn, Vantage). Scenes 0725, 0760, 0795.
+- **Standing rule (ch.5-9):** Lyra says nothing about the Sealed Stair inscription. It detonates at
+  `0960`, not before, and one line of recognition here destroys it.
 
 **Summary.** The party comes off the salt with forged road permits and walks up to the company city
 for the first time: six tiers of warm windows cut into a quarry face, and the only warm place in the
@@ -446,6 +448,8 @@ Emberrow.*
   north at the Flats.
 - **Side contract:** "Collection at Emberrow" (Clement Works accounts office). Scenes 0820, 0840,
   0845.
+- **Standing rule (ch.5-9):** Lyra says nothing about the Sealed Stair inscription. `0870` is the only
+  conversation she and Maren ever have and it must not touch the wall.
 
 **Summary.** Emberrow is two days south down the ravine road: nine thousand people, dying tanneries,
 smoke that sits in the cut and never leaves, and a company care-house at the top of the street that
@@ -990,7 +994,9 @@ between them. At dawn Teach gives them ten minutes he will be asked about later,
 - notes: The study number goes in the party's inventory as a physical tag and is not explained by
   anyone in this chapter — nobody in the party can chase it. Zeph may state the year and no more. Do
   not let Ket or Zeph work out what an inversion study means; that is chapter 12. Nessa may mention
-  the man who lived in her cistern house if the player cleared that bill in chapter 2.
+  the man who lived in her cistern house **if the player cleared her bill in chapter 6 at `0607`** —
+  the bill is posted in ch.2 at `0240` and cannot be cleared before ch.6 (DECISIONS D8.6). This scene
+  must play identically for a player who never took it.
 
 ### 0930_ostry_bar — PANEL — optional: no
 - when: arrival at the chapter's settled hub.
@@ -1132,8 +1138,9 @@ between them. At dawn Teach gives them ten minutes he will be asked about later,
   ring refocusing, expression flat and appalled.
 - lines: 9
 - notes: R9 — the page is diagrams and rules, never legible text. The player has heard the fifteen
-  questions once in chapter 1 and seen them cut into a wall in chapter 5; do not recap them, quote
-  three of them at most. Nobody says what it means. Ket's question — where did you learn it — is the
+  questions once in chapter 1 and seen two of them cut into a wall in chapter 5; do not recap them,
+  quote three of them at most, **verbatim from `story/canon.md` section 1** — recommended: 1, 4 and 7,
+  because 7 is the edges test and Lyra joining in on it is the beat. Ket stops after 7. Nobody says what it means. Ket's question — where did you learn it — is the
   last line of the scene. Do not let Zeph explain anything.
 
 ### 0965_a_better_prayer — TALK — optional: no

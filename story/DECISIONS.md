@@ -93,3 +93,23 @@ The outliners raised conflicts. My rulings:
    Line is "bring them back"), scene 001 replaced, 002 revised ("old magic" is a banned idea in this
    world), 003 and 003b kept. Zeph and Pip are just up the corridor during 003.
 **To reverse any of these:** tell me which; the story editor's `story/canon.md` is where they are applied.
+
+## D9. Story editor pass accepted; writing order and three notes to all scene writers
+A story editor reconciled the five outlines (written in parallel) into one story and wrote
+`story/canon.md`, which every scene writer reads after the bible. It found and fixed six real defects:
+thirteen duplicate scene ids, a side contract that could never be completed, two payoffs with no setup
+anywhere (the Vess second tone; the guild's Four Lines on the board frame), an impossible calendar in
+Act IV, and a miscount of Ket's lights. Final count: **323 scenes** (111 panel, 189 talk, 23 narration).
+**Writing order** follows quotation, not chronology: chapter 1 alone first (it owns the fifteen
+questions, the Four Lines, Bron's winter story), then 4, 5, 11; then 2, 3, 6, 10; then 7, 8, 9, 12;
+then 13, 14, 15; then the epilogue.
+**My notes to all writers, from the editor's risk list:**
+1. Bron's winter story is over-planted. It is told once in chapter 1 and retold once more only (chapter 5), not in chapter 4.
+2. Six courteous, partly-right company people blur together. Keep their temperatures distinct: Cadder
+   warm and funny, Kerrow cold, Ovey brisk to the point of rude, Teach slow and heavy, Crewe tired and
+   courteous, Sark mildly annoyed.
+3. Chapters 7-10 each end on a document. Chapters 8 and 9 must lead with their physical set-pieces and
+   keep document beats short.
+**Known risks I am accepting** (see `story/notes/editor.md`): a healer's death two-thirds through is the
+most recognisable beat in both source games, saved only by its paperwork cause; chapter 13 is the
+thinnest chapter; 111 panel sheets is at the top of the art budget.

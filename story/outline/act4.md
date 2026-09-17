@@ -1,8 +1,14 @@
 # Act IV — What the Paperwork Says (chapters 11-13)
 
 Outline for scene writers. Every entry is meant to be writable without rereading the bible.
-Dates assumed: ch.11 runs 6-11 Dust 1107, ch.12 13-16 Dust, ch.13 19-22 Dust. (See
-`story/notes/outline-act4.md` if another act has fixed different dates.)
+**Dates (fixed by the story editor; `story/canon.md` "Calendar and clock" governs).** The year has
+eight months of forty-five days. Ch.11 runs 6-11 Dust 1107 and **Lyra dies on the 9th of Dust, one
+month to the day before the anniversary of Tellwater**. Ch.12 runs 13-16 Dust. **Ch.13 runs 1-5
+Fallow** — Kerrow's two orders are dated the 20th of Dust and the evacuation of a town of seven
+thousand takes a fortnight; the party arrives for its last days. Ch.14 is the 6th of Fallow and ch.15
+the 7th-9th, which is what Act V's clock and the bible's "the game runs to the 9th of Fallow" require.
+The original draft said ch.13 ended on the 22nd of Dust *and* eighteen days before the 9th of Fallow,
+which cannot both be true on a 45-day month.
 
 Act IV is the act where the party stops asking what is true and starts asking what they do
 tomorrow. No further reveals about Bron are placed here, per bible ladder A: "ch.11-15, no
@@ -217,7 +223,7 @@ before `1165` may foreshadow a death.
 - **who:** Pip, Ollo Marrick, Hesk, Ket-Ossun, Zeph. Jory Tass in the second half.
 - **beat:** Sixty trestles, a fiddle case, and eleven years of fair bunting in a hot loft. Hesk
   says the weight of each trestle before she lifts it and is right every time; Ket refuses to
-  round the count and is at three lights and mentions it the way you would mention the weather;
+  round the count and is at four lights and mentions it the way you would mention the weather;
   Zeph is useless and knows it and narrates. Then a salvage foreman arrives with a contract to
   strip the loft for timber this afternoon, and he is within his rights, and the party fights him
   anyway. Pip, who is frightened of everything, is having the best day of her life. Last line is
@@ -248,8 +254,8 @@ before `1165` may foreshadow a death.
   1. `establishing_tall` — the dark stacked stone rings of the Dree well at night, one figure
      small on the platform.
   2. `two_shot` — Ket and Sem-Dree facing each other at the platform rail, professional, level.
-  3. `object_insert` — a row of four small lights down the side of a smooth hairless head, three
-     of them dark.
+  3. `object_insert` — a row of four small lights down the side of a smooth hairless slate-grey
+     head, two of them dark. (Sem-Dree, four of eight lit — see `story/canon.md`, Onn light counts.)
   4. `eyes_slit` — Bron's eyes, wide, no anger in them.
   5. `high_angle_down` — the square below, seen from the platform: lamps, carts, small figures.
   6. `profile_flat` — Sem-Dree in profile, entirely calm, mid-sentence.
@@ -280,8 +286,8 @@ before `1165` may foreshadow a death.
 - **notes:** **This must not read as a goodbye.** It is an argument she wins on a technicality,
   in her driest register, and it ends with her being called away mid-thought. She is not wistful,
   does not touch him, and does not look at the sky. The writer **must not invent the fifteen
-  questions** — they are written once, in chapter 1, and quoted here; if the ch.1 text does not
-  exist yet, write around the content and quote only the numbers. Bron reaching fourteen and
+  questions** — they are frozen in `story/canon.md` section 1 and quoted verbatim here. The
+  fifteenth is *"What do you want done?"*; Bron reaching fourteen and
   stopping is the whole plant.
 
 ### 1155_the_fair — PANEL — optional: no
@@ -417,8 +423,10 @@ before `1165` may foreshadow a death.
   Any writer who adds machinery here breaks hard rules 9 and 10 and the ending of the game.
   Nobody makes a speech. Nobody says "I'm sorry for your loss", "stay with me", or anything about
   memory. Lyra does not have last words in the ordinary sense: the last thing she says is an
-  answer to a numbered question. The fifteenth question and its answer come from chapter 1; do
-  not invent them. Keep Wen Arden in frame and untouched.
+  answer to a numbered question. The fifteenth question is *"What do you want done?"* — quote it
+  and the rest verbatim from `story/canon.md` section 1; do not invent them. Her answer is hers and
+  the scene writer owns it, and it must be small and practical and not about the party. Keep Wen
+  Arden in frame and untouched.
 
 ### 1180_two_days — NARRATION — optional: no
 - **when:** immediately after `1175`. Time passing.
@@ -1501,15 +1509,20 @@ stand aside.
   lights on her temples mean. She tells him exactly, with numbers — how many she had, how many she
   has, what one costs, what happens at none, how many of her people are left and how many will
   ever be made — and she is not upset, because it is a specification and she has known it for
-  twelve hundred years. Ollo feeds her, which she cannot do much with and accepts anyway out of
+  twelve hundred years. **Mid-answer the third one goes out**, and she corrects her own figure from
+  three to two without any change of tone and carries on, and that is the whole event. Ollo feeds
+  her, which she cannot do much with and accepts anyway out of
   courtesy, and then corrects him about the bread, at length, accurately. He says something kind
   and clumsy about how long that is. She says the thing about the joke, and that Arro knows it too.
-- **purpose:** character (no plot function).
+- **purpose:** character (no plot function) / **Ket's third and last light: she ends Act IV at two.**
 - **mood:** sorrow -> hope
 - **lines:** 12
 - **notes:** Ket announces her state without embarrassment and is extremely funny by accident and
   knows it. **No comfort is offered and none is wanted.** Ollo does not say anything about hope or
   finding a way. Do not mention the cradle — that is ch.14 and Ket does not raise it.
+  **Lights ledger (`story/canon.md`):** 5 at joining in ch.4, 4 at `0965` (ch.9), 3 at `1255` (ch.12),
+  2 here. That is all three spends. She is at two from the first scene of chapter 14 to the end of the
+  game and **no writer may light one back up**. Ollo must not react to it more than he would to rain.
 
 ### 1395_the_line_under_the_hills — NARRATION — optional: no
 - **when:** chapter end. Ending beat.
@@ -1519,8 +1532,8 @@ stand aside.
   Hills and linking every hall-mouth in the Basin, with a timetable, a mileage, and eleven
   stations named after doors. Where it goes, and how long it takes, and what is at the end of it.
   Then three flat facts in a row: the Long Bore was turning again by morning; a public-safety
-  warrant was discharged at noon; and the date, which is the 22nd of Dust, eighteen days before
-  the 9th of Fallow.
+  warrant was discharged at noon; and the date, which is the 5th of Fallow, four days before
+  the 9th.
 - **purpose:** plot (the map opens; the clock starts for Act V) / setup for ch.14.
 - **mood:** tense -> dread
 - **lines:** 6
@@ -1595,9 +1608,11 @@ tunnel and a flat car; the approach corridor to the inner doors at the Ninth Doo
 4. **Maren is through the inner doors and ahead of everyone**, with a plan she has stated plainly
    and cannot complete the arithmetic of. Act V inherits her exactly as she left `1385`.
 5. **The Long Bore is running again** and was never really stopped. Kerrow's warrant was discharged
-   at noon on the 22nd of Dust; she has the chair, the costed plan, and no reason to hurry.
-6. **Ket-Ossun is at two lights** if `1255` is played as written — she has spent one in Act IV.
-   No writer may light one back up. She has not yet mentioned the cradle to anybody.
+   at noon on the 5th of Fallow; she has the chair, the costed plan, and no reason to hurry.
+6. **Ket-Ossun is at two lights** at the end of Act IV. She entered ch.11 at four, spent one at
+   `1255` and the last at `1390`; the first went at `0965` in ch.9. That is the whole ledger and
+   there is nothing left to spend. No writer may light one back up. She has not yet mentioned the
+   cradle to anybody.
 7. **Cadder is unemployed and in the Basin**, relieved in the street at Braid with his own crews
    watching. Ch.15 needs him and sixty of them on the Long Bore stair; nothing in Act IV explains
    how, deliberately.
@@ -1637,7 +1652,8 @@ Taken as read at the start of chapter 11, per the bible's chapter 10 brief:
   to decide what she thinks, and by `1150` has decided it makes the prayer better.
 - Maren was cornered at the Ilder stump in chapter 9, recited the winter Bron got lost, and was
   not taken. She has been working ahead of the party toward the hills ever since.
-- Ket-Ossun is at three lights entering chapter 11. Hesk has been with the party since chapter 5
+- Ket-Ossun is at four lights entering chapter 11 (five at joining, one spent at `0965`). Hesk has
+  been with the party since chapter 5
   and has been overruled every time.
 - The Order of the Late Hour's fifteen questions were heard in full, once, in chapter 1, at a
   dying hunter's bedside in the Sallowgate hall. **Act IV quotes them and does not invent them.**
