@@ -68,3 +68,28 @@ chapter, in steps of five so scenes can be inserted (for example `0310_the_welco
 `001`, `002`, `003`, `003b`, and `p01` keep their names because scene 003's approved panel art is
 keyed to its file name. `story/playlist.md` lists every chapter's scenes in play order; the game only
 plays the `## intro` list, so art-less chapters never show up on the phone by accident.
+
+## D8. Outlines accepted; cross-act rulings
+Five act outlines came back: **322 scenes** (111 panel, 188 talk, 23 narration) across fifteen chapters
+and an epilogue, in `story/outline/act1.md` to `act5.md`. The cast file has 34 characters with looks
+that pass the art tool; `story/locations.md` has 227 ready-to-paste location lines for 32 places.
+The outliners raised conflicts. My rulings:
+1. **The Tally's fifteen questions are frozen** using Act V's text (question 7 is "What happened the day
+   before this one?", the same test that exposes a set memory; question 15 is "What do you want done?").
+   They are heard in chapter 1, found cut into a wall in chapter 5, read from a maintenance manual in
+   chapter 9, left unfinished at Lyra's death in chapter 11, and used by Bron to hold Maren together in 15.
+2. **Maren holds nothing of Bron's own past.** The bible contradicted itself; its decision 4 governs. The
+   winter she recites is her own childhood, drawn from her in 1093 and set into him.
+3. **Anneke Brae, Bron's real mother, is Kell** (the bible listed her as human; Bron is Kell).
+4. **Scene ids** may use any two-digit order number, not only steps of five, so a chapter can exceed twenty scenes.
+5. **Ket's dimming temple lights** get one central ledger so three acts do not each spend them.
+6. **Side contracts** invented by outliners for chapters 6, 11, and 13 are accepted. "Bad water at Kettle"
+   is posted in chapter 2 and can only be finished in chapter 6.
+7. **Optional panel scenes cost art**, so at most one per chapter; the rest become talk scenes.
+8. Accepted as canon from Act V's notes: giving the record to the Vess chant-lines empties Maren because a
+   stored pattern must be rehearsed to stay coherent, and once a line rehearses it she no longer has to
+   (nothing is copied); "taking the hour" is an act between two people, not a device.
+9. Act I's plan for the existing scenes: prologue revised (the party is never split: the guild's fourth
+   Line is "bring them back"), scene 001 replaced, 002 revised ("old magic" is a banned idea in this
+   world), 003 and 003b kept. Zeph and Pip are just up the corridor during 003.
+**To reverse any of these:** tell me which; the story editor's `story/canon.md` is where they are applied.
