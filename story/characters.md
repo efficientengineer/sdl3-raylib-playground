@@ -23,14 +23,14 @@ anime JRPG (Phantasy Star IV is the touchstone), never like Western tabletop fan
 ## Bron
 - role: Dwarf Fighter, party leader
 - ref: story/refs/bron.png
-- look: Bron, a short, compact, broad-shouldered young man in his early twenties with a youthful clean-shaven face, big spiky copper-red hair swept back under a white headband with long trailing ends, sharp amber eyes, a small scar through his left eyebrow, a sleeveless burnt-orange high-collared jacket over a black bodysuit, one large rounded steel shoulder plate on his left shoulder, oversized steel gauntlets, a wide belt with a round buckle, white boots, a big double-bladed axe slung on his back.
+- look: Bron, a short, compact, broad-shouldered young man in his early twenties with a youthful clean-shaven face, big spiky copper-red hair swept back under a white headband with long trailing ends and a small red cross mark at its center, sharp amber eyes, a sleeveless burnt-orange high-collared jacket worn open over a black high-necked bodysuit, black trousers, one large rounded steel shoulder plate strapped to his left shoulder, oversized segmented steel gauntlets, a brown belt with a large round silver buckle, white cuffed boots, a big axe slung on his back.
 - status: alive, in the party
 - notes: blunt, protective, distrusts magic. Speaks in short sentences. Shortest of the party after Pip, and touchy about it.
 
 ## Lyra
 - role: Human Cleric
 - ref: story/refs/lyra.png
-- look: Lyra, a tall, slender young woman with very long straight pale-gold hair, long bangs parted in the center, a thin gold circlet with a small red gem on her forehead, calm grey eyes, a white high-collared long coat with gold trim and wide gold-edged shoulder pieces, a short white half-cape, a gold sun medallion on her chest, long white gloves, a slim silver mace at her hip.
+- look: Lyra, a tall, slender young woman with very long straight pale-gold hair, long bangs parted in the center, a thin gold circlet with a small red gem on her forehead, calm grey eyes, a white high-collared long coat with gold trim and wide gold-edged shoulder pieces over a dark navy bodysuit, a short white half-cape, a gold sun medallion on her chest, long white gloves, white heeled boots, a slim silver mace at her hip.
 - status: alive, in the party
 - notes: patient, the party's conscience. Hides doubt about her order.
 

@@ -170,6 +170,14 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
      It auto-detects panels by their borders (works on dark interiors), converts non-PNG via `sips`,
      and writes nothing if the count is wrong. Escape hatches: `--boxes "x,y,w,h;..."`, `--trim N` to
      shave the white border. Pure stdlib; no Pillow on this machine.
+  4. `./story_prompt.py preview <scene>` → `story/out/<scene>.preview.html`: layers the sliced panels
+     manga-style and reveals them line by line with a dialogue box (tap or space to advance; `#all`
+     on the URL shows every panel at once). Missing panel images become labelled placeholders, so a
+     scene's pacing can be tested before any art exists. This is the reference for the in-game player.
+- Dialogue lines may carry a reveal tag, `- Lyra [2]: text`, naming the panel that appears with that
+  line. Untagged lines reveal the next unseen panel. Several lines can hold on one panel.
+- Generated reference sheets are the truth for a character: after saving one, edit the `look` line to
+  match what was actually drawn. `story/refs/style.*` is gitignored (third-party screenshot).
 - `./story_prompt.py build <scene>` is the older single-page mode (overlapping panels in one image) for
   generators without reference images. Its output cannot be sliced.
 - **Writing the next scene:** `./story_prompt.py brief ["beat"]` prints the full writer's brief

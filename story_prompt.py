@@ -12,6 +12,10 @@
   ./story_prompt.py slice  story/out/<name>.sheet.json downloaded.png [--trim N] [--boxes "x,y,w,h;..."]
                                                cut the sheet into story/panels/<scene>_pN_<shot>.png
 
+  ./story_prompt.py preview story/scenes/003_x.md
+                                               write story/out/<scene>.preview.html: panels layered manga-style and
+                                               revealed line by line with a dialogue box (placeholders if not sliced yet)
+
   Single finished page (generators without reference images):
   ./story_prompt.py build  story/scenes/001_x.md | --all    write story/out/001_x.prompt.txt + .json
 
@@ -156,8 +160,10 @@ def parse_scene(path):
     secs = h2_sections(text)
     panels = [(m.group(1), m.group(2).strip())
               for m in re.finditer(r"^\d+\.\s*([\w-]+)\s*\|\s*(.+)$", secs.get("panels", ""), flags=re.M)]
-    dialogue = [(m.group(1).strip(), m.group(2).strip())
-                for m in re.finditer(r"^- ([^:\n]+):\s*(.+)$", secs.get("dialogue", ""), flags=re.M)]
+    dialogue, reveals = [], []
+    for m in re.finditer(r"^- ([^:\[\n]+?)\s*(?:\[(\d+)\])?\s*:\s*(.+)$", secs.get("dialogue", ""), flags=re.M):
+        dialogue.append((m.group(1).strip(), m.group(3).strip()))
+        reveals.append(int(m.group(2)) if m.group(2) else None)
     meta = kv_lines(head)
     return {
         "path": path, "stem": path.stem,
@@ -165,7 +171,7 @@ def parse_scene(path):
         "meta": meta,
         "characters": [c.strip() for c in meta.get("characters", "").split(",") if c.strip()],
         "beat": squash(secs.get("beat", "")),
-        "panels": panels, "dialogue": dialogue,
+        "panels": panels, "dialogue": dialogue, "reveals": reveals,
     }
 
 
@@ -228,6 +234,9 @@ def validate(scene, style, cast):
     for c in listed:
         if c in cast and c not in mentioned:
             warn.append(f"'{c}' is listed but never named in a panel; their look will not be included")
+    for n, r in enumerate(scene["reveals"], 1):
+        if r is not None and not 1 <= r <= len(panels):
+            err.append(f"dialogue line {n} reveals panel [{r}] but the scene has {len(panels)} panels")
     for who, _ in scene["dialogue"]:
         if who.lower() not in cast:
             warn.append(f"dialogue speaker '{who}' is not in characters.md (fine for one-off NPCs)")
@@ -671,6 +680,112 @@ def cmd_slice(args):
         print(f"  wrote {out.relative_to(ROOT.parent)}  {x1-x0}x{y1-y0}{note}")
 
 
+# ───────────────────────── Browser preview (panel reveal + dialogue) ─────────────────────────
+
+STAGE_ASPECT = 1.6            # 16:10 stage; the dialogue box covers the bottom of it
+PAGE_BOTTOM = 74.0            # panels stay above this percent of the stage height
+SLOTS = {                     # shape -> (width %, [(x %, y %) for 1st, 2nd use])
+    "wide":   (52, [(4, 5), (20, 40)]),
+    "tall":   (22, [(73, 3), (5, 8)]),
+    "slit":   (60, [(20, 52), (8, 6)]),
+    "square": (17, None),     # tucked over the bottom-right corner of the previous panel
+}
+
+
+def png_size(path):
+    head = path.read_bytes()[:24]
+    return struct.unpack(">II", head[16:24]) if head[:8] == b"\x89PNG\r\n\x1a\n" else None
+
+
+def page_layout(scene, style):
+    out, used, prev = [], {}, None
+    for n, (sid, desc) in enumerate(scene["panels"], 1):
+        shape = style["shots"][sid]["shape"]
+        img = PANELS / f"{scene['stem']}_p{n}_{sid}.png"
+        size = png_size(img) if img.exists() else None
+        aspect = size[0] / size[1] if size else SHAPE_ASPECT[shape]
+        w, spots = SLOTS[shape]
+        if spots:
+            x, y = spots[min(used.get(shape, 0), len(spots) - 1)]
+        elif prev:
+            x, y = prev["x"] + prev["w"] - 7, prev["y"] + prev["h"] - 9
+        else:
+            x, y = 6, 40
+        h = w / aspect * STAGE_ASPECT
+        x = max(1, min(x, 99 - w))
+        y = max(1, min(y, PAGE_BOTTOM - h))
+        used[shape] = used.get(shape, 0) + 1
+        prev = {"n": n, "shot": sid, "x": round(x, 1), "y": round(y, 1), "w": w, "h": round(h, 1),
+                "img": f"../panels/{img.name}" if size else None, "content": desc}
+        out.append(prev)
+    return out
+
+
+PREVIEW_HTML = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__</title>
+<style>
+html,body{margin:0;height:100%;background:#000;color:#fff;font-family:ui-monospace,Menlo,monospace}
+#stage{position:relative;width:min(100vw,160vh);aspect-ratio:16/10;margin:0 auto;background:#000;overflow:hidden;
+ cursor:pointer;user-select:none;container-type:inline-size}
+.p{position:absolute;opacity:0;transform:scale(.97);transition:opacity .25s,transform .25s;box-sizing:border-box}
+.p.on{opacity:1;transform:none}
+.p img{width:100%;height:100%;display:block;image-rendering:pixelated}
+.p.ph{background:#15131f;border:.35cqw solid #fff;outline:.15cqw solid #222;outline-offset:-.5cqw;
+ display:flex;align-items:center;justify-content:center;text-align:center;font-size:1.5cqw;color:#889;padding:1cqw}
+#box{position:absolute;left:4%;right:4%;bottom:2%;height:22%;background:#0b2a7c;border:.45cqw solid #d8d8e0;
+ outline:.25cqw solid #5a5a6a;border-radius:.6cqw;box-sizing:border-box;padding:1.4cqw 2cqw;z-index:99}
+#who{color:#ffd84a;font-weight:700;font-size:2cqw;margin-bottom:.3cqw}
+#txt{font-weight:700;font-size:2.4cqw;line-height:1.3;white-space:pre-wrap}
+#arrow{position:absolute;right:1.6cqw;bottom:.6cqw;font-size:2cqw;animation:b 1s steps(2) infinite}
+@keyframes b{50%{opacity:0}}
+</style>
+<div id="stage"><div id="box"><div id="who"></div><div id="txt"></div><div id="arrow">&#9660;</div></div></div>
+<script>
+const D=__DATA__, stage=document.getElementById('stage'), who=document.getElementById('who'),
+      txt=document.getElementById('txt'), arrow=document.getElementById('arrow');
+const els=D.panels.map(p=>{const e=document.createElement('div');e.className='p'+(p.img?'':' ph');
+  e.style.cssText=`left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%`;
+  if(p.img){const i=new Image();i.src=p.img;e.appendChild(i)}else e.textContent=`P${p.n} ${p.shot}\n${p.content}`;
+  stage.insertBefore(e,document.getElementById('box'));return e});
+let line=-1,typing=null,z=1;
+function reveal(n){const e=els[n-1];if(e&&!e.classList.contains('on')){e.style.zIndex=z++;e.classList.add('on')}}
+function show(){const l=D.lines[line];reveal(l.reveal);who.textContent=l.speaker;txt.textContent='';arrow.style.display='none';
+  let i=0;typing=setInterval(()=>{txt.textContent=l.text.slice(0,++i);if(i>=l.text.length)done()},28)}
+function done(){clearInterval(typing);typing=null;txt.textContent=D.lines[line].text;arrow.style.display=''}
+function next(){if(typing)return done();
+  if(line>=D.lines.length-1){els.forEach(e=>e.classList.remove('on'));z=1;line=-1}
+  line++;show()}
+stage.onclick=next;document.onkeydown=e=>{if(e.key===' '||e.key==='Enter')next()};
+if(location.hash==='#all'){D.panels.forEach(p=>reveal(p.n));if(D.lines.length){line=D.lines.length-1;show();done()}}
+else if(D.lines.length)next();else D.panels.forEach(p=>reveal(p.n));
+</script>
+"""
+
+
+def cmd_preview(args):
+    style, cast = load_style(), load_cast()
+    for path in scene_paths(args):
+        scene = parse_scene(path)
+        err, _ = validate(scene, style, cast)
+        if err:
+            for e in err:
+                print(f"{path.name}: ERROR: {e}", file=sys.stderr)
+            sys.exit("story_prompt: scene rejected. Fix the scene file; do not bypass the rules.")
+        panels = page_layout(scene, style)
+        shown, lines = set(), []
+        for (speaker, text), tag in zip(scene["dialogue"], scene["reveals"]):
+            n = tag or next((p["n"] for p in panels if p["n"] not in shown), len(panels))
+            shown.add(n)
+            lines.append({"speaker": speaker, "text": text, "reveal": n})
+        data = {"panels": panels, "lines": lines}
+        OUT.mkdir(exist_ok=True)
+        html = OUT / f"{scene['stem']}.preview.html"
+        html.write_text(PREVIEW_HTML.replace("__TITLE__", scene["title"]).replace("__DATA__", json.dumps(data)))
+        have = sum(1 for p in panels if p["img"])
+        print(f"wrote {html.relative_to(ROOT.parent)}  ({have}/{len(panels)} panel images found, "
+              f"{len(lines)} dialogue lines). Open it in a browser; tap or press space to advance.")
+
+
 def main():
     args = sys.argv[1:]
     cmd = args[0] if args else ""
@@ -686,6 +801,8 @@ def main():
         cmd_refsheet(args[1:])
     elif cmd == "slice":
         cmd_slice(args[1:])
+    elif cmd == "preview":
+        cmd_preview(args[1:])
     else:
         print(__doc__.strip())
         sys.exit(0 if cmd in ("", "-h", "--help", "help") else 2)
