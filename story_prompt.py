@@ -42,7 +42,7 @@ STYLE_WORDS = ["gradient", "photorealistic", "3d", "blur", "glow", "painterly",
 TEXT_WORDS = ["text", "caption", "speech bubble", "lettering", "written", "inscription reading",
               "sign saying", "sign that says", "sign reading", "the words", "subtitle"]  # R9
 REQUIRED_BLOCKS = ["header", "layout", "framing", "character_design", "rendering",
-                   "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet"]
+                   "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet", "refsheet_avoid"]
 
 # ── Sheet mechanics (layout maths, not style) ──
 SHEET_MAX_PANELS = 6
@@ -513,7 +513,7 @@ def cmd_refsheet(args):
         L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)] + [""]
     L += [f"SHEET: {b['refsheet']}", "", f"CHARACTER: {c['look']}", "",
           f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {b['rendering']}", "",
-          f"AVOID: {b['negative']}"]
+          f"AVOID: {b['refsheet_avoid']}"]
     target = c.get("ref", f"story/refs/{c['name'].lower()}.png")
     OUT.mkdir(exist_ok=True)
     md = OUT / f"ref_{c['name'].lower()}.chatgpt.md"

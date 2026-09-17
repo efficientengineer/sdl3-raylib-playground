@@ -129,6 +129,16 @@ same head in strict profile. The character is identical in all three panels:
 same face, hair, outfit, and colors. No text, no labels, no color swatches.
 ```
 
+### refsheet_avoid
+
+```
+smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render,
+photorealistic, modern anime, chibi, high resolution detail, lens flare,
+glow effects, mixed pixel sizes, different outfits or colors between panels,
+scenery, props not in the description, text, letters, labels, color swatches,
+watermark, signature
+```
+
 ### negative
 
 ```
