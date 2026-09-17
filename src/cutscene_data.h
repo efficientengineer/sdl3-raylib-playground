@@ -17,13 +17,13 @@ static const CsLine CS_p01_prologue_LINES[] = {
 };
 
 static const CsPanel CS_003_the_warning_PANELS[] = {
-    { "003_the_warning_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 36.6f}, {3.0f, 2.0f, 80.0f, 28.1f} },
-    { "003_the_warning_p2_low_angle_menace.png", 0, {73.0f, 1.0f, 22.0f, 73.8f}, {61.0f, 10.0f, 36.0f, 60.3f} },
-    { "003_the_warning_p3_eyes_slit.png", 0, {20.0f, 50.0f, 60.0f, 24.0f}, {4.0f, 40.0f, 92.0f, 18.4f} },
-    { "003_the_warning_p4_two_shot.png", 1, {4.0f, 5.0f, 52.0f, 45.2f}, {3.0f, 2.0f, 80.0f, 34.8f} },
-    { "003_the_warning_p5_object_insert.png", 1, {49.0f, 41.2f, 17.0f, 27.2f}, {69.0f, 26.8f, 30.0f, 24.0f} },
-    { "003_the_warning_p6_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f} },
-    { "003_the_warning_p7_portrait_inset.png", 1, {82.0f, 40.6f, 17.0f, 33.4f}, {69.0f, 57.6f, 30.0f, 29.5f} },
+    { "003_the_warning_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 56.8f}, {3.0f, 2.0f, 80.0f, 43.7f} },
+    { "003_the_warning_p2_low_angle_menace.png", 0, {73.0f, 3.0f, 22.0f, 56.6f}, {61.0f, 10.0f, 36.0f, 46.3f} },
+    { "003_the_warning_p3_eyes_slit.png", 0, {20.0f, 52.0f, 60.0f, 20.2f}, {4.0f, 40.0f, 92.0f, 15.5f} },
+    { "003_the_warning_p4_two_shot.png", 1, {4.0f, 5.0f, 52.0f, 48.6f}, {3.0f, 2.0f, 80.0f, 37.4f} },
+    { "003_the_warning_p5_object_insert.png", 1, {49.0f, 44.6f, 17.0f, 28.8f}, {69.0f, 29.4f, 30.0f, 25.4f} },
+    { "003_the_warning_p6_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 44.0f}, {61.0f, 10.0f, 36.0f, 36.0f} },
+    { "003_the_warning_p7_portrait_inset.png", 1, {82.0f, 38.0f, 17.0f, 29.6f}, {69.0f, 36.0f, 30.0f, 26.1f} },
 };
 static const CsLine CS_003_the_warning_LINES[] = {
     { "Bron", "It's blocking the way.", 1, CS_TENSE },

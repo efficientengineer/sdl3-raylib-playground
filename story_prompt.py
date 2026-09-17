@@ -945,7 +945,9 @@ function next(){if(typing)return done();
   if(line>=D.lines.length-1){els.forEach(e=>e.classList.remove('on'));z=1;line=-1}
   line++;show()}
 stage.onclick=next;document.onkeydown=e=>{if(e.key===' '||e.key==='Enter')next()};
-if(location.hash.includes('all')){D.panels.forEach(p=>reveal(p.n));if(D.lines.length){line=D.lines.length-1;show();done()}}
+const upto=(location.hash.match(/line(\d+)/)||[])[1];
+if(upto){for(let i=0;i<Math.min(+upto,D.lines.length);i++)reveal(D.lines[i].reveal);line=Math.min(+upto,D.lines.length)-1;show();done()}
+else if(location.hash.includes('all')){D.panels.forEach(p=>reveal(p.n));if(D.lines.length){line=D.lines.length-1;show();done()}}
 else if(D.lines.length)next();else D.panels.forEach(p=>reveal(p.n));
 </script>
 """

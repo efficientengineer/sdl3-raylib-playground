@@ -211,6 +211,16 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
   by fixed relative shape sizes (`SHAPE_UNITS`) packed into staggered rows and scaled to fit, so wide
   panels are always the big ones. Two earlier search-based layout engines produced huge insets and tiny
   two-shots; don't go back to scoring functions.
+- **The ChatGPT app caps every image at about 1.5 megapixels.** Asking for 1440x2560 returned 941x1672:
+  the aspect is honored, the pixel count is not (the larger sizes in OpenAI's docs are API-only). Seven
+  panels therefore share the pixels four used to have. It still looks right in game because pixel art
+  scales cleanly, but past 8 panels, or for a scene that needs detail, make one sheet per page instead.
+- **Getting a generated image onto the Mac:** images pasted into the Claude chat are capped at the same
+  ~1.5 MP and stored as WebP in the session transcript, so prefer the original. The phone is on adb and
+  ChatGPT saves to `/sdcard/Pictures/file_*.png`: list recent files with `adb shell find /sdcard/Pictures
+  -mmin -60 -name "*.png"` and `adb pull` the newest. Keep it as `story/sheets/<scene>_vN.png`.
+- `preview` pages accept `#land-line3` (or `#port-line3`) to jump to a dialogue line with its page built,
+  which is how to check a page layout without touching the phone.
 - The export includes a scene as soon as it has any panel art; missing panels show as dark placeholder
   boxes in the game, so a scene stays playable while its sheet is being regenerated.
 - **Acting is mandatory.** A panel scene needs a `- staging:` line (fixed screen direction for the whole
