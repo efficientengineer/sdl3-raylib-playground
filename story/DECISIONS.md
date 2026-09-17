@@ -47,3 +47,24 @@ game, and an example talk scene after "The Warning". Compiled and validated; not
 ## D5. Model
 The owner asked for Opus 4.6 subagents. The agent tool only offers "opus", which resolves to the
 current Opus model. All subagents in this run use that.
+
+## D6. Story bible accepted; working title "The Fair Copy"
+**Decided:** `story/bible.md` (about 22,600 words) is accepted as the source of truth for all later
+writing. Working title: **The Fair Copy** (the company's file name for Maren Ostry, and what Bron's
+childhood is). The bible logs fifteen of its own decisions in its section 16; the ones most worth your
+eye are: Junior Director Vane renamed **Ottoline Kerrow** (name collision with a Final Fantasy
+villain); Bron's own past was **erased, not stored**, so he can never be restored; and the hard rule
+that **nothing in this world is ever copied**, only subtracted from someone.
+**Why accepted:** its sixteen hard rules for the Seam keep the evil human (the Seam never acts or
+intends; inversion kills nobody and leaves calm survivors who cannot say their names; nothing is
+undone at the end). Lyra's death is caused by one man's act of conscience and another's paperwork,
+not by a villain. The guild master is an Onn older than the company, which gives the guild weight.
+**Not yet done:** the game's title screen still says "Ancient Halls". Left until you confirm a title.
+**To reverse:** edit the bible; every later file is derived from it.
+
+## D7. Scene file naming for the full game
+**Decided:** new scenes are named `CCSS_slug.md`: two digits of chapter, two of order within the
+chapter, in steps of five so scenes can be inserted (for example `0310_the_welcome.md`). The existing
+`001`, `002`, `003`, `003b`, and `p01` keep their names because scene 003's approved panel art is
+keyed to its file name. `story/playlist.md` lists every chapter's scenes in play order; the game only
+plays the `## intro` list, so art-less chapters never show up on the phone by accident.

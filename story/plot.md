@@ -2,30 +2,45 @@
 
 Whoever writes the next scene reads this first and updates it after. Keep it short.
 Nothing here is sent to the image model.
+Full world, cast, rules and chapter plan: `story/bible.md`. That file wins any disagreement.
 
 ## Premise
-Four adventurers take contracts from a frontier town's quest board. The jobs keep
-leading back to the same sealed complex beneath the hills: the Ancient Halls.
+Four hunters of the Even Hand take a board contract to clear the entrance of the Ancient
+Halls and ask no questions. The job leads back to the Clement Works, the company that
+mines memory out of the ground under the hills — and to the night fourteen years ago when
+the town of Tellwater went blank and was rebuilt with hired employees. One of the four
+grew up in Tellwater. His childhood was issued to him.
 
 ## Setting
-Frontier fantasy with traces of a lost, more advanced age. Sandstone town above,
-cold cut-stone halls below, old mechanisms that still work. Torchlight, dust, brass.
+The Sallow Basin on Ourn: a dried inland sea, sandstone towns on the old shore terraces,
+salt flats, hill country with cut-stone halls under it. Nine skywells hold the air warm;
+two still run and the nights get colder every decade. Humans, Kell, Vess and Onn share it.
+Torchlight, dust, brass, paperwork. Year 1107 A.S. Chapter one: Sallowgate, 2nd of Turn.
 
 ## Current arc
-- arc: First descent into the Ancient Halls
-- goal: find out who reopened the Halls, and why the dead there are walking
-- tension: the party was hired by someone who already knew what was inside
+- arc: Chapter 1 — "Clear the Entrance". First descent into the Ancient Halls.
+- goal: finish the contract, get paid, find out who posted it
+- tension: the party was hired by someone who already knew what was behind the door
 
 ## Beats so far
-1. The party accepts a quest-board contract to clear the Ancient Halls entrance.
-2. At the first sealed door, Pip finds fresh scratches on the inside of the lock: it was opened from within. (scene 001)
-3. The door opens on its own. A skeleton in old hall-guard armor waits beyond it. Zeph recognises the magic as ancient. (scene 002)
+1. Guild master Tovin-Caleth lets Bron take a bill she says stinks: triple rate, seal
+   burned off, "clear the entrance, ask no questions". The Sallowgate hall needs the fee.
+2. At the first sealed door, Pip finds fresh scratches on the inside of the lock: it was
+   opened from within. (scene 001)
+3. The door opens on its own. A hall-guard's armor stands waiting beyond it, still running
+   a thousand-year-old oath. Zeph recognises it as very old work. (scene 002)
+4. The guard does not attack. It lowers its halberd across the gap and points them back up
+   the corridor. Lyra works out it is warning them, not blocking them. (scene 003)
+5. The party decide to go in anyway, with their eyes open, and to tell the others first.
+   (scene 003b)
 
 ## Open threads
-- Who posted the contract?
-- What came out through the sealed door?
+- Who burned the seal off the contract? (Answered in chapter 2: Orrin Cadder.)
 - Why is the dead guard still following its orders, and whose orders are they?
-- What is the Wandering Merchant doing this deep in the Halls?
+- What did the halls' builders seal themselves in with, a thousand years ago?
+- Why does Bron remember a winter he was cold, when Kell run hot?
 
 ## Next beat
-The guard does not attack. It lowers its halberd across the doorway and points back up the corridor, as if ordering them to leave.
+Past the guard, at the end of the corridor they were paid to clear: a canvas company tent,
+a folding table, a lamp, and a Clement Works duty clerk who looks up from his clipboard
+with mild annoyance and asks whether they have an entry chit. They were the fuse.
