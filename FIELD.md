@@ -56,6 +56,10 @@ changes it without the orchestrator.
   non-uniform spacing, a stream cutting an odd line. Nothing laid out like city blocks.
 - **The player never leaves the frame** (owner): follow mode keeps the player inside the middle
   50% of the image; fixed and rail modes pan automatically when the player nears the edge.
+- **See-through when occluded** (owner): occluder shaders (buildings, walls, props, fences, NPCs;
+  never ground or the player) cut a dithered radial hole around the player's screen position for
+  fragments that lie between the camera and the player, so the character is always visible behind
+  structures; nothing cuts when nothing blocks. Radius is a Dev slider.
 - Post-process slot: the FBO is drawn through one fullscreen pass so a tilt-shift blur (top and
   bottom bands) can be added later without restructuring. Not required in the first build.
 - Shaders are inline GLSL ES 3.00 strings in `field.cpp` (Android is the only target).
@@ -195,6 +199,8 @@ checks its work against the list at the end before handing off.
     tells there and nowhere else. Where people live on top of ancient work (the old road under the
     grass, a hall on an ancient foundation), the organic grows over the grid and the grid shows
     through in patches.
+10b. **Paths are wide.** Streets are 3–4 cells across, lanes never under 2, and a deliberate pinch
+    is still comfortable to walk (owner: the first pass was half this and felt cramped).
 11. **Roads between places** bend with the land, have a reason for every bend (a rock, a wet patch,
     an old wall), and offer side turnings that go somewhere small.
 12. **The graph-paper test.** Look at the map from above with the Dev camera. If it reads as graph

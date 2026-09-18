@@ -17,7 +17,8 @@ fi
 HASH="$(basename "$(dirname "$CXX_DIR")")"
 OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
-GAME_SRC="$SCRIPT_DIR/src/star_logic.cpp"
+# Every translation unit of libgame_logic.so. CMakeLists.txt's game_logic target must match.
+GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/field.cpp"
 
 IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
 SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"
@@ -29,23 +30,28 @@ SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v
 SDL3_INC="$CXX_DIR/_deps/sdl3-src/include"
 SDL3_BUILD_INC="$CXX_DIR/_deps/sdl3-build/include-revision"
 
-echo "=== Compiling $(basename "$GAME_SRC") ==="
-$CC -std=c++17 -O0 -g -DANDROID -DIMGUI_IMPL_OPENGL_ES3 -Dgame_logic_EXPORTS \
-    -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong \
-    -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -fPIC -fvisibility=hidden \
-    -I"$SCRIPT_DIR/src" \
-    -I"$SCRIPT_DIR/third_party" \
-    -I"$SCRIPT_DIR/third_party/imgui" \
-    -I"$SCRIPT_DIR/third_party/imgui/backends" \
-    -I"$SDL3_BUILD_INC" \
-    -I"$SDL3_INC" \
-    -c "$GAME_SRC" -o "$OBJ_DIR/game_logic.o"
+OBJS=""
+for SRC in $GAME_SRCS; do
+    OBJ="$OBJ_DIR/$(basename "${SRC%.cpp}").o"
+    OBJS="$OBJS $OBJ"
+    echo "=== Compiling $(basename "$SRC") ==="
+    $CC -std=c++17 -O0 -g -DANDROID -DIMGUI_IMPL_OPENGL_ES3 -Dgame_logic_EXPORTS \
+        -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong \
+        -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -fPIC -fvisibility=hidden \
+        -I"$SCRIPT_DIR/src" \
+        -I"$SCRIPT_DIR/third_party" \
+        -I"$SCRIPT_DIR/third_party/imgui" \
+        -I"$SCRIPT_DIR/third_party/imgui/backends" \
+        -I"$SDL3_BUILD_INC" \
+        -I"$SDL3_INC" \
+        -c "$SRC" -o "$OBJ"
+done
 
 echo "=== Linking libgame_logic.so ==="
 $CC -shared -static-libstdc++ \
     -Wl,--build-id=sha1 -Wl,--no-rosegment -Wl,--no-undefined-version \
     -Wl,--fatal-warnings -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
-    "$OBJ_DIR/game_logic.o" \
+    $OBJS \
     "$IMGUI_SO" "$SDL3_SO" \
     -lEGL -lGLESv3 -landroid -llog -latomic -lm \
     -o "$OBJ_DIR/libgame_logic.so"
@@ -75,6 +81,24 @@ done
 for f in "$SCRIPT_DIR"/story/portraits/*.png; do   # cutscene_data.h names these portrait_<name>.png
     [ -f "$f" ] || continue
     push_art "$f" "portrait_$(basename "$f")"
+done
+
+# Field maps and art (FIELD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
+# The game looks in files/field/<kind>/<id>.png first, then the APK assets, then its placeholder.
+for d in maps tiles props walkers; do
+    [ -d "$SCRIPT_DIR/story/field/$d" ] || continue
+    "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/$d"
+    HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
+    for f in "$SCRIPT_DIR"/story/field/"$d"/*; do
+        [ -f "$f" ] || continue
+        n="$(basename "$f")"
+        sz="$(stat -f %z "$f")"
+        if ! echo "$HAVE_F" | grep -qx "$n $sz"; then
+            echo "  field $d/$n"
+            "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
+            "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/$d/$n && rm /data/local/tmp/$n"
+        fi
+    done
 done
 
 LOCAL_MD5=$(md5 -q "$OBJ_DIR/libgame_logic.so")

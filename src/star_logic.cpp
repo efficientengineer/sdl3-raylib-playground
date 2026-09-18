@@ -22,6 +22,7 @@
 
 #include "game_api.h"
 #include "cutscene_data.h"
+#include "field.h"
 
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"   // host.cpp uses the same pref path for reload.flag and the .so
@@ -329,7 +330,7 @@ static void dev_send(const char *text) {
 
 // ───────────────────────── Game state ─────────────────────────
 
-enum Screen { SCR_TITLE, SCR_INTRO, SCR_END };
+enum Screen { SCR_TITLE, SCR_INTRO, SCR_END, SCR_FIELD };
 #define MAX_PANELS 12             // >= story_prompt.py's SCENE_MAX_PANELS (8), the most one scene can hold
 #define MAX_FACES 12              // distinct speaker portraits cached per scene; party scenes run to 7
 #define PANEL_IN 0.28f            // seconds for a panel to arrive
@@ -340,7 +341,10 @@ struct Star {
     int screen, scene, line;
     float line_t;                 // seconds since this line started
     float fade;                   // 1 = black, 0 = clear
-    int fade_to_scene;            // scene to cut to once faded out (-1 = none, CS_INTRO_COUNT = end)
+    int fade_to_scene;            // scene to cut to once faded out (-1 = none, CS_INTRO_COUNT = the field)
+    bool to_field;                // this scene was started from the field, so it returns there when it ends
+    bool from_field;              // set for the one fade that carries us from the field into that scene
+    Field *field;                 // the walkable world; created on the first field frame
     bool panel_on[MAX_PANELS];
     float panel_t[MAX_PANELS];
     int panel_z[MAX_PANELS], z_next;
@@ -639,6 +643,46 @@ static void draw_end(Star *st, int w, int h, float dt) {
     if (ImGui::IsMouseClicked(0) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && st->title_t > 0.8f) { st->screen = SCR_TITLE; st->title_t = 0; }
 }
 
+// ───────────────────────── The world ─────────────────────────
+// Title -> intro -> field. The field owns its own renderer, controls and dialogue box (field.cpp);
+// the only things it hands back are "play this talk scene" and "the player walked into an encounter
+// zone", because those belong to the game, not the map.
+
+static int scene_by_id(const char *id) {
+    for (int i = 0; i < CS_INTRO_COUNT; i++) if (!strcmp(CS_INTRO[i].id, id)) return i;
+    return -1;
+}
+
+static void enter_field(Star *st) {
+    if (!st->field) st->field = field_create();
+    star_free_textures(st);                       // the page art goes; the field has its own
+    st->screen = SCR_FIELD;
+    st->to_field = false;
+    st->from_field = false;
+    mus_start(CS_WONDER);
+}
+
+static void draw_field(Star *st, int w, int h, float dt) {
+    if (!st->field) st->field = field_create();
+    FieldEvent ev;
+    field_tick(st->field, w, h, dt, dev.open, &ev);
+    if (ev.kind == FE_SCENE) {
+        int idx = scene_by_id(ev.arg);
+        if (idx >= 0 && CS_INTRO[idx].line_count > 0) { st->fade_to_scene = idx; st->from_field = true; }
+        else {                                    // the scene isn't written (or isn't in the playlist) yet
+            char msg[160];
+            snprintf(msg, sizeof(msg), "(scene \"%s\" is not in the playlist yet)", ev.arg);
+            field_message(st->field, msg);
+        }
+    } else if (ev.kind == FE_ZONE) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "encounter %s", ev.arg);   // battle is the next stream, not this one
+        dev_send(msg);
+    }
+    char warn[192];
+    if (field_take_warning(st->field, warn, sizeof(warn))) dev_send(warn);   // framing watchdog
+}
+
 // Small dev overlay: a corner button opening the phone <-> dev message log plus scene test controls.
 static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGuiStyle &s = ImGui::GetStyle();
@@ -668,6 +712,8 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     if (ImGui::Button("Next scene") && st->screen == SCR_INTRO) { st->fade_to_scene = st->scene + 1; dev.open = false; }
     ImGui::SameLine();
     if (ImGui::Button("Title")) { st->screen = SCR_TITLE; st->title_t = 0; dev.open = false; }
+    ImGui::SameLine();
+    if (ImGui::Button("Field")) { st->fade_to_scene = -1; st->fade = 0.0f; enter_field(st); dev.open = false; }
     static const char *mood_names[CS_MOOD_COUNT] = {"wonder", "dread", "tense", "confront", "sorrow", "hope"};
     ImGui::SameLine();
     ImGui::TextDisabled("  mood:");
@@ -679,6 +725,11 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
         if (cur) ImGui::PopStyleColor();
     }
     ImGui::Separator();
+    if (st->screen == SCR_FIELD && st->field) {              // coordinates, nav view and the live camera
+        char zone_line[224];
+        if (field_dev_ui(st->field, zone_line, sizeof(zone_line))) dev_send(zone_line);
+        ImGui::Separator();
+    }
     float input_h = ImGui::GetFrameHeightWithSpacing() + 4 * k;
     ImGui::BeginChild("##msgs", ImVec2(0, -input_h));
     for (int i = 0; i < dev.count; i++) {
@@ -715,6 +766,7 @@ static void *game_create(float dpi_scale) {
 static void game_destroy(void *state) {
     Star *st = (Star *)state;
     star_free_textures(st);
+    if (st->field) { field_destroy(st->field); st->field = nullptr; }
     if (au_stream) { SDL_DestroyAudioStream(au_stream); au_stream = nullptr; }
     free(st);
 }
@@ -722,14 +774,20 @@ static void game_destroy(void *state) {
 static void game_on_save_event(void *) {}
 static int game_wants_quit(void *) { return 0; }
 
-// Hot reload keeps your place: screen, scene, and line survive, so a dialogue or music edit can be
-// judged on the exact line you were looking at. Anything else is rebuilt from those three numbers.
-struct ReloadBlob { uint32_t magic; int32_t screen, scene, line; };
-#define RELOAD_MAGIC 0x31525453u   // 'STR1'
+// Hot reload keeps your place: screen, scene and line survive, so a dialogue or music edit can be
+// judged on the exact line you were looking at, and the field keeps the map, the spot on the navmesh
+// and whatever camera the owner was tuning. Everything else is rebuilt from those few numbers.
+struct ReloadBlob { uint32_t magic; int32_t screen, scene, line, to_field, has_field; FieldSave field; };
+#define RELOAD_MAGIC 0x35525453u   // 'STR5' — bumped again as the field's save layout grew
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
-    ReloadBlob b = { RELOAD_MAGIC, st->screen, st->scene, st->line };
+    ReloadBlob b;
+    memset(&b, 0, sizeof(b));
+    b.magic = RELOAD_MAGIC;
+    b.screen = st->screen; b.scene = st->scene; b.line = st->line;
+    b.to_field = st->to_field ? 1 : 0;
+    if (st->field) { b.has_field = 1; field_save(st->field, &b.field); }
     if (buf && buf_size >= sizeof(b)) memcpy(buf, &b, sizeof(b));
     return sizeof(b);
 }
@@ -739,13 +797,22 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     ReloadBlob b;
     if (size < sizeof(b)) return;
     memcpy(&b, buf, sizeof(b));
-    if (b.magic != RELOAD_MAGIC) return;               // blob from the old game or an older layout: start at the title
+    if (b.magic != RELOAD_MAGIC) return;               // blob from the old game or an older layout: title
     st->fade = 0.0f;
+    bool want_field = (b.screen == SCR_FIELD) || (b.to_field && b.has_field);
+    if (b.has_field && want_field) {                   // field_restore validates every field it reads
+        if (!st->field) st->field = field_create();
+        field_restore(st->field, &b.field);
+    }
     if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_INTRO_COUNT && CS_INTRO[b.scene].line_count > 0) {
         int line = b.line < 0 ? 0 : b.line >= CS_INTRO[b.scene].line_count ? CS_INTRO[b.scene].line_count - 1 : b.line;
         star_goto(st, b.scene, line, true);
+        st->to_field = (b.to_field && st->field);
     } else if (b.screen == SCR_END) {
         st->screen = SCR_END;
+    } else if (b.screen == SCR_FIELD) {
+        st->screen = SCR_FIELD;                        // the map is already loaded; GL objects rebuild lazily
+        mus_start(CS_WONDER);
     }
 }
 
@@ -759,6 +826,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     case SCR_TITLE: draw_title(st, w, h, dt); break;
     case SCR_INTRO: draw_scene(st, w, h, dt); break;
     case SCR_END:   draw_end(st, w, h, dt); break;
+    case SCR_FIELD: draw_field(st, w, h, dt); break;
     }
 
     // Fades between scenes: to black, cut, back up. Music keeps playing across the cut.
@@ -768,9 +836,15 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             st->fade = 1.0f;
             int next = st->fade_to_scene;
             st->fade_to_scene = -1;
-            while (next < CS_INTRO_COUNT && CS_INTRO[next].line_count <= 0) next++;   // nothing to show, nothing to tap
-            if (next < CS_INTRO_COUNT) star_goto(st, next, 0, false);
-            else { st->screen = SCR_END; st->title_t = 0; star_free_textures(st); mus_start(CS_HOPE); }
+            if (st->to_field && !st->from_field) {                    // a field conversation just ended
+                enter_field(st);
+            } else {
+                bool came = st->from_field;
+                st->from_field = false;
+                while (next < CS_INTRO_COUNT && CS_INTRO[next].line_count <= 0) next++;   // nothing to tap
+                if (next < CS_INTRO_COUNT) { star_goto(st, next, 0, false); st->to_field = came; }
+                else enter_field(st);                                 // the intro is over: out into Halm
+            }
         }
     } else if (st->fade > 0.0f) {
         st->fade -= dt / 0.6f;

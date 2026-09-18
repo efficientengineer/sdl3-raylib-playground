@@ -19,6 +19,13 @@ for f in story/portraits/*.png; do
     cmp -s "$f" "$d" || cp "$f" "$d"
 done
 
+# Field maps and art (FIELD.md): bundled under assets/field/<kind>/, which is where the game looks
+# after the phone's files/ copy that fast_reload.sh pushes.
+if [ -d story/field ]; then
+    mkdir -p android/app/src/main/assets/field
+    rsync -a --delete story/field/ android/app/src/main/assets/field/
+fi
+
 export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
 cd android
 ./gradlew assembleDebug "$@"
@@ -26,5 +33,5 @@ cd ..
 
 "$ADB" -s "$PHONE" install -r android/app/build/outputs/apk/debug/app-debug.apk
 # A stale hot-reloaded lib in files/ would override the freshly installed APK lib.
-"$ADB" -s "$PHONE" shell "run-as $PKG sh -c 'rm -f files/libgame_logic.so files/libgame_logic.so.* files/reload.flag; rm -rf files/cutscenes'" || true
+"$ADB" -s "$PHONE" shell "run-as $PKG sh -c 'rm -f files/libgame_logic.so files/libgame_logic.so.* files/reload.flag; rm -rf files/cutscenes files/field'" || true
 "$ADB" -s "$PHONE" shell am start -n "$PKG/.MainActivity"
