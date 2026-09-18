@@ -6,6 +6,10 @@ ground: grass
 wall: cliff
 edges: fence
 landmark: the six posts set in a crooked arc round the ladder house
+splat: hart_yard_splat.png 8
+splat_layers: grass:1 dirt:1:0.15 stone:8:0.6 plank:6:0.4
+tile_scale: 1 1 2 1
+splat_blend: dither
 
 ## tiles
 d dirt
@@ -64,6 +68,10 @@ p plank
 # one low fixed shot: you walk into the yard, not across it. The ladder house holds the frame.
 0 0 24 18 fixed 11.5 8.5 28.0 11.5 0.9 8.5 32
 
+## sweeps
+# generated from the open navmesh edges; the walkable edge is each wall's inner face
+fence box:0.22:0.75:fence_wood:fence_top caps 8.99 16.99, 9.28 14.55, 7.33 14.72, 5.89 10.83, 4.87 6.12, 11.50 4.49, 17.72 6.32, 17.11 10.19, 18.04 13.39, 13.52 14.11, 13.02 14.19
+
 ## buildings
 2.4 5.4 3.0 2.6 2.6 ladder_house rot -68.4
 
@@ -91,11 +99,11 @@ p plank
 1.2 11.0 tree_a
 
 ## npcs
-10 9 hart N Hart say:Six posts. You'll meet all six before you meet me.
+10 9 hart N Hart say:hart_yard.hart
 
 ## exits
 10 15 3 1 halm 22 5 S
 
 ## triggers
-16 3 6 3 message The posts are wrapped in straw and worn through at shoulder height.
+16 3 6 3 message hart_yard.practice_posts
 

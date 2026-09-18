@@ -18,8 +18,11 @@ Maps: `story/field/maps/halm.map`, `story/field/maps/hart_yard.map`.
 - **Navmesh movement** with a walker radius, so nothing clips into a fence or a wall.
 - **Camera zones** — follow / fixed / rail per zone, with a framing *guarantee*.
 - **See-through occluders** — a dithered circle cut out of whatever stands between camera and player.
-- **Visible blockers** — every open navmesh edge grows a fence, hedge or wall automatically, except
-  where the terrain, a building or an **exit** already explains itself.
+- **Structures** — profiles swept along paths or revolved: walls, kerbs, steps, a bridge, a well ring.
+  Every open navmesh edge gets one, except where the terrain, a building or an **exit** explains itself.
+- **Splat-mapped ground** — four blended layers with per-layer hardness and height masks, no per-cell
+  tile grid.
+- **Examine-to-read** — a "!" over the player's head, and the interact press opens the box.
 - **Organic map layout** built to FIELD.md's "Map design rules" (checklist at the end of this file).
 - Touch controls, NPC talk scenes through the existing cutscene player, map exits, message triggers,
   zone triggers logged to the Dev messages.
@@ -161,48 +164,188 @@ The owner's request: see the character when something is in front of them, and o
 
 ---
 
-## Visible blockers
+## Structures — profiles, sweeps and lathes
 
-Rule: **every unshared navmesh edge gets something standing on it**, unless the world already says no.
+Nothing in the world is a paper-thin strip. A **profile** is a 2D cross-section; sweep it along a path
+and you get a wall, a kerb, a bridge or a flight of steps; revolve it about a vertical axis and you get
+a well ring, a column or a tower. Walls are just the simplest case.
 
-- Kind per polygon (`| fence` / `| hedge` / `| wall` / `| none`), defaulting to `## meta`'s
-  `edges: <kind>`. Both shipped maps use `edges: fence`, with `| wall` on the well square's kerb, the
-  grain yard and Hart's terrace, and `| hedge` along the streets.
-- The strip is a **mesh that follows the edge exactly**, one quad per edge, standing at the navmesh's
-  own vertex heights so it follows a slope. Heights: fence 0.55, hedge 0.75, wall 0.85. The texture
-  tiles once per map unit along the edge.
-- **Skipped automatically** where a blocker would be wrong:
-  - the height grid differs across the edge → it is already a cliff step;
-  - the outward side is inside a building footprint (+0.6) → it is already a wall;
-  - the edge is inside or within **0.5 of an exit rectangle** → it is the way out, not a wall. In Halm
-    the gate through Hart's terrace wall is therefore a real gap, flanked by two `gate_post` props,
-    with the dirt road painted through it and continuing off the north edge of the map, so walking out
-    looks like walking down a road.
-- Dev toggle **Blockers** draws a red line along every unshared edge, raised 0.3, so a map author can
-  see at a glance what is blocked and where a fence was skipped. Where grass should be open, extend
-  the navmesh instead of deleting the fence.
+### `## profiles` (and the shared `story/field/profiles.md`, loaded first)
+
+```
+## profiles
+id: x y tile scale, x y tile scale, ... [closed]
+```
+
+`x` is sideways in the plane perpendicular to the path (a **radius** for a lathe), `y` is up, and the
+tile and scale belong to the segment **starting** at that point. `closed` joins the last point to the
+first. `story/field/profiles.md` is loaded before every map, so cross-sections can be shared.
+
+**Built-ins**, usable inline wherever a profile id is expected — they are cached under their spec:
+
+| spec | shape |
+|---|---|
+| `box:w:h[:side:top]` | a rectangle: what a wall is |
+| `slab:w:h[:tile]` | the same, read as a tread or a plinth |
+| `kerb:w:h[:tile]` | a chamfered kerb |
+| `bridge:w:h[:deck:parapet]` | a deck with a parapet each side |
+| `stair:rise:run:n[:tile]` | a staircase **cross-section**: n steps rising sideways, for a stair swept along its width |
+| `ring:radius:h:thickness[:tile]` | an annulus, for lathes |
+
+### `## sweeps`
+
+```
+## sweeps
+id profile [spline] [caps] [along S] [scale s0 s1]  x z [h], x z [h], ...
+```
+
+- The path is in map units. A third number on a point is an **explicit height**; without one the base
+  follows the terrain, so a wall climbs the hill and a stair or a bridge can be told exactly where to be.
+- `spline` runs a Catmull-Rom through the points, resampled every ~0.5 cells.
+- `caps` closes the ends with the profile polygon (a fan from the profile's centroid — profiles are
+  small and star-shaped; a genuinely concave cap would need ear clipping).
+- `along` scales the texture repeat along the path (1 = one tile per cell); `scale s0 s1` lerps the
+  whole profile's size from the start of the path to the end.
+- Joins are **mitred**: the profile's `x` is stretched by 1/cos of the half-angle, clamped at sharp
+  corners. Light is baked per face from that face's own normal. Sweeps are see-through occluders.
+
+### `## lathes`
+
+```
+## lathes
+id profile x z [h] [segments]
+```
+
+The profile revolved about the vertical axis at `x z`, `segments` around (default 16). Used in Halm for
+the well ring under the well sprite.
+
+### Blockers
+
+Every unshared navmesh edge still gets something standing on it; `_generate.py` now emits those as
+**sweeps with a box profile**. It chains the open edges into runs (refusing to join two boundaries that
+merely touch at a vertex, which would zig-zag) and offsets each run **outward by w/2**, so the walkable
+edge is exactly the wall's inner face and the walker radius does the rest. An edge is left open when:
+
+- the height grid differs across it → it is already a cliff step;
+- it is inside a building footprint (+0.8) → it is already a wall;
+- it is inside or within 0.7 of an **exit** rectangle → it is the way out. Halm's gate through Hart's
+  terrace wall is a real gap, flanked by two short square posts (two-point box sweeps), with the road
+  painted through it and off the north edge of the map.
+
+`## walls` (`id w h tex_side tex_top [cap] [spline] x z, ...`) is kept as **sugar**: it builds a
+`box:w:h:side:top` profile and one sweep. A map with no sweeps at all falls back to the engine's old
+one-quad-per-edge strips.
+
+### The three uses in the shipped maps
+
+- **Halm's square** — the low walls round the lopsided square and the kerb round the well island are
+  box sweeps; the well itself sits inside a **lathe** ring (`ring:1.05:0.42:0.22:wall_stone`, 20 segments).
+- **Buildings** — every building in both maps is a `house` profile swept along its length (see below).
+  *(Stone steps up the hill road were tried and removed: quantised sweep heights read as a stack of
+  slabs, not a stair. The ramp is a smooth slope again, in the navmesh and on screen. The `stair`
+  profile stays in the built-ins for the Stair landmark, where a proper stair cross-section swept
+  along a curve is the right shape.)*
+- **The stream** — `fordbridge`, a `bridge:3.20:0.22:plank:wall_stone` sweep with explicit heights so
+  the deck arcs, where the ford lane crosses the water. The lane's navmesh now runs across it.
+
+The `{{STAIR}}` landmark on `stair_shrine` is meant to be built the same way: a `stair` profile swept
+along a curve with explicit heights, so the bottom step can be wider than a town and thirty feet up.
+
+## Ground — the splat map
+
+Per-cell tile ids made every cell boundary read as a grid. The ground is now one pass over a **splat
+map**: an RGBA image over the whole map whose four channels weight four ground textures.
+
+```
+## meta
+splat: halm_splat.png 8                                  # file, texels per cell
+splat_layers: grass:1 dirt:1:0.15 stone:8:0.6 plank:6:0.4  # name[:hardness[:height influence]]
+tile_scale: 1 1 2 1                                      # cells one tile of that layer spans
+splat_blend: dither                                      # `hard <n>` still works as a default hardness
+```
+
+- The splat is sampled **once, bilinear, in world UV** over the whole map; each layer is sampled in
+  world space at its own repeat scale (stone at `2` spans two cells, so it does not repeat per cell).
+  Five samples per ground pixel, no more: the height mask rides in the tile's alpha.
+- Channel order is `splat_layers`. **Whatever the four channels leave unused goes to layer 0**, so a
+  hand-painter can paint only the roads and leave grass as the base.
+- **Per-layer hardness.** Weights are contrasted around the winner — `pow(w_i / max(w), sharpness_i)`
+  — so each layer meets its neighbour at its own hardness: `grass:1` and `dirt:1` blend smoothly into
+  each other while `stone:8` cuts a crisp edge against either.
+- **Height-aware blending** (this is what makes the edge pixel-art rather than splat-resolution).
+  Every tile texture carries a **height mask in its alpha channel**, packed at load from
+  `story/field/tiles/<id>_h.png` if the pipeline supplies one, else contrast-stretched from the tile's
+  own luminance. The effective weight is `w_i + (height - 0.5) * k_i`. Where the square's cobbles fade
+  into dirt, the mortar and moss between the slabs lose first and the slab faces hold out longest, so
+  the boundary follows the artwork one pixel at a time. `dither` breaks ties with an ordered 4×4
+  pattern so it stays pixel art.
+- **Water** is still a cell type of its own, drawn in a separate pass with its scrolling UV; the
+  shoreline is painted into the splat as a dirt bank along the stream.
+- `## ground` is now **legacy**: it still marks the water cells, and if a map has no splat PNG the
+  engine rasterises one from it at load with a one-cell soft falloff, which already beats hard tiling.
+- **Authoring**: `_generate.py` writes the splat from the same desire lines the streets come from —
+  road cores at full dirt, stone inside the square, the grain yard and the terrace, verges fading over
+  a cell, worn patches at the well and at every building's door, a bank along the stream. Run it with
+  `--keep-splat` to leave a hand-painted PNG alone. The PNG lives in `story/field/maps/` and is pushed
+  and bundled like any other field art, so it can be painted and hot reloaded.
+- Dev: a **dither** slider, plus **hard** and **height** sliders per layer, live.
 
 ---
 
-## 3D buildings
+## Examining, and where the words come from
+
+- `message` triggers and NPC talks **never fire on entry**. When the player stands in a message
+  rectangle (or within 0.6 cells of it, facing it) or in front of an NPC, a **"!" billboard** bobs over
+  the player's head and the right-half **interact tap** opens the box or starts the talk. The mark is
+  the prop id `mark_examine`, so art can replace it.
+- Still firing on entry, because they are transitions, not reading: **exits**, `scene` triggers,
+  `zone` triggers, and the new `trap` trigger kind.
+- **No prose is authored in the engine or in a map.** A `message` trigger's argument and an NPC's
+  `say:` argument are **ids** into `src/field_text.h`, which `./story_prompt.py export` generates from
+  `story/field/text.md`. An id with no entry shows as `[the.id]` in the dialogue box, on purpose.
+
+Ids these two maps use, for the writer:
+
+| id | where |
+|---|---|
+| `halm.well` | the well in the square (exists) |
+| `halm.guild_hall_door` | the guild hall door (exists) |
+| `hart_yard.practice_posts` | the post line in Hart's yard (exists) |
+| `halm.marta` | villager by the square |
+| `halm.ostler` | villager on the west street |
+| `halm.grainwife` | villager at the grain yard gate |
+| `halm.gate_watch` | villager at the hill gate |
+| `hart_yard.hart` | Hart, in his yard |
+
+---
+
+## 3D buildings — a house profile swept along its length
 
 ```
 ## buildings
-# x z w d h id [rot deg]   footprint in map units, height in world units, +Z face = front
-21.9 13.2 5.0 3.4 3.6 guild_hall rot -28.4
+# x z w d h id [rot deg] [pitch p] [eave e]
+22.4 12.2 5.0 3.4 3.6 guild_hall rot 60.9 pitch 0.85 eave 0.42
 ```
 
-- A box `w × d` cells on the ground (the height grid under the footprint centre), `h` **world units**
-  tall, with a gabled roof whose ridge runs along the box's local X and rises `min(w,d) × 0.34`, with
-  a 0.16 eave overhang. Gable triangles close the ±X ends.
-- **`rot`** is a yaw in degrees about the footprint centre. Billboards don't care; the box mesh, the
-  occlusion ray test and the "is this edge behind a wall" test all work in the box's local frame.
-- **Front is the +Z face** — the one the default camera looks at. (FIELD.md's brief said "toward −Z /
-  the camera"; the camera sits at +Z and looks along −Z, so the face it sees is +Z. Same face.)
-- Buildings block nothing. The navmesh already excludes them (the map generator asserts it); doors are
-  ordinary trigger rectangles.
-- Vertex-baked light per face, computed from the **rotated** normal against the sun (+X, −Z), so a
-  building turned off the grid is still lit correctly. No realtime lighting (CLAUDE.md).
+A building is no longer a box with a gable stuck on: it is the **`house` profile** — floor line, wall
+up to the eave, a soffit out over the overhang, the roof pitch up to the ridge and down the other side
+— swept along the building's **length**. So:
+
+- the two long walls and the roof slopes come from the swept profile (`<id>_side.png` on the walls and
+  soffits, `<id>_roof.png` on the slopes);
+- the **end caps are the gable ends**. The **front** cap (the first path point, the face the default
+  camera looks at) takes `<id>_front.png` stretched once over the profile's bounding box, so a painted
+  door and windows land exactly where the artist put them — including up into the gable. The back cap
+  takes `<id>_side.png`.
+- `rot` turns the whole thing about the footprint centre; `pitch` is the roof's rise per unit run
+  (default 0.55) and `eave` the overhang (default 0.18). Both are optional, so every existing
+  `## buildings` line and the art contract are unchanged.
+- The base is sampled once at the footprint centre, so a house stands level on a slope.
+- Buildings block nothing; the navmesh already excludes them.
+
+Silhouettes are deliberately not uniform: the guild hall has a steeper pitch and a deeper eave, and
+Hart's **ladder house is an L** — two `## buildings` entries with the same id and different rotations,
+which is all a wing takes.
 
 ### Face-texture contract (for the art pipeline's future `building` command)
 
@@ -228,10 +371,11 @@ wipes `files/field` after install so a stale push can't shadow the APK.
 
 | kind | size | notes |
 |---|---|---|
-| `tiles/<id>.png` | 64×64 opaque, seamless | `grass dirt stone plank water cliff wall_plaster wall_timber`. Mipmapped, `GL_REPEAT`, nearest mag. |
+| `tiles/<id>.png` | 64×64 opaque, seamless | ground and vertical faces. Mipmapped, `GL_REPEAT`, nearest mag. Ground: `grass dirt stone plank water`. Cliff faces: `cliff wall_plaster wall_timber`. **Wall boxes (new): `wall_stone`, `wall_stone_top`, `fence_wood`, `fence_top`, `hedge`, `hedge_top`** — the `_top` ones are seen from above and tile along the wall's length; the others are seen front-on. |
+| `tiles/<id>_h.png` | 64×64, optional | height mask for a ground layer; if absent it is derived from the tile's own luminance. See "Ground splat". |
 | `props/<id>.png` | any, **alpha** | 1 px = 1 internal px at 64 px/cell. Bottom opaque row is the ground line, horizontal centre the anchor. |
 | `walkers/<id>.png` | 4 rows (S,W,E,N) × 4 cols of 32×48 | `falke ottilie hart stolz villager_a villager_b clerk` |
-| `edges/<kind>.png` | 64×64 **alpha**, tiles horizontally | new: `fence hedge wall` |
+| `edges/<kind>.png` | 64×64 **alpha**, tiles horizontally | legacy fallback strips only: `fence hedge wall` |
 | `buildings/<id>_{front,side,roof}.png` | see table above | new |
 | `maps/<name>.map` | text | pushed and bundled the same way |
 
@@ -323,14 +467,25 @@ the one deliberate pinch (2.1 cells, still comfortable), and 0.95–1.24 for the
    bounce the player straight back.
 8. Nav vertex heights are **half-steps**, matching `## height`; building heights are **world units**
    (they aren't terrain).
-9. `src/field.cpp` is ~2340 lines rather than the ~1200 the brief asked for; the navmesh, camera zones,
+10. `## ground` is legacy; the ground is a splat map (see "Ground — the splat map"), and blockers are
+    extruded boxes rather than FIELD.md's unstated strips.
+11. `src/field.cpp` is ~2700 lines rather than the ~1200 the brief asked for; the navmesh, camera zones,
    buildings, blockers and see-through all arrived after that budget was set.
 
 ---
 
-## Still stubbed
+## Still stubbed / open
 
 - `zone` triggers only log `encounter <table>` to the Dev messages. Battle is the next stream.
+- `trap` triggers fire their text on entry and do nothing else yet.
+- **The player draws as a flat coloured block**, because `story/field/walkers/falke.png` on the device
+  is a 631-byte stub: a solid rectangle with transparent margins, not a 4x4 walk sheet. The engine is
+  loading it correctly — delete it and the procedural placeholder figure comes back, or ship the real
+  sheet. (The "!" mark and the interact press work correctly on top of it, which is how it was
+  identified.) The engine rejects sprites with **no** transparency outright and logs
+  `field: <kind>/<id>.png has no transparency, ignoring it`; this one has margins, so it passes.
+- Ground tile PNGs on the device currently read cyan/pink; that is the pipeline's palette, not the
+  engine. Every missing asset logs `field: no <kind> art for "<id>", drawing the placeholder`.
 - No post-process pass yet (the FBO is drawn straight through).
 - NPCs don't walk; they stand and face a fixed direction.
 - One Halm NPC ("Hunter", x22 z19) is wired to the real scene `003b_after_the_warning` to prove the
@@ -367,10 +522,12 @@ the one deliberate pinch (2.1 cells, still comfortable), and 0.95–1.24 for the
 === Linking libgame_logic.so ===
 === Pushing to device ===
   field maps/halm.map
+  field maps/halm_splat.png
   field maps/hart_yard.map
+  field maps/hart_yard_splat.png
 === Setting reload flag ===
 === Waiting for host to apply reload ===
-09-18 12:34:47.502 14873 14896 I QuestGlory: Hot reload SUCCESS (401888 bytes, gen 1)
+09-18 13:17:54.809 29060 29113 I QuestGlory: Hot reload SUCCESS (428784 bytes, gen 1)
 === Done ===
 ```
 

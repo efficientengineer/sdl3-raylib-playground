@@ -91,6 +91,7 @@ for d in maps tiles props walkers; do
     HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
     for f in "$SCRIPT_DIR"/story/field/"$d"/*; do
         [ -f "$f" ] || continue
+        case "$f" in *.png|*.map) ;; *) continue;; esac   # authoring scripts stay off the phone
         n="$(basename "$f")"
         sz="$(stat -f %z "$f")"
         if ! echo "$HAVE_F" | grep -qx "$n $sz"; then

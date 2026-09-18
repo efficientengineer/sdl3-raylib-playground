@@ -46,6 +46,11 @@ changes it without the orchestrator.
   textured box with a roof, faces from `story/field/buildings/<id>_front.png`, `_side.png`,
   `_roof.png` (sizes in `src/FIELD_NOTES.md`). Houses, halls and sheds are buildings; small things
   (well, cart, barrel, posts, trees) stay billboards.
+- **Structures are profile sweeps and lathes** (owner): a 2D cross-section profile (segments each
+  with a tile id) swept along a polyline/spline path with per-point height, or revolved around an
+  axis. Walls are the `box` profile; built-ins also include `stair`, `bridge`, `kerb`, `bank`.
+  The Stair landmark is a stair profile swept along a curve with explicit heights. Ground splat
+  blending is per layer (grass/dirt smooth, stone hard) with height-based per-pixel edges.
 - **Impassable must look impassable** (owner): every open unshared navmesh edge gets a fence, hedge,
   wall, rock line, water edge or cliff step drawn on it (`| fence` / `| hedge` flags on nav lines
   instance a strip along the edge; the Dev "Show blockers" toggle draws every bare edge in red).

@@ -20,6 +20,7 @@
 #include "imgui.h"
 #include "stb_image.h"          // implementation is in star_logic.cpp; this is declarations only
 #include "field.h"
+#include "field_text.h"
 
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"
@@ -35,6 +36,12 @@
 #define F_POLYS 128
 #define F_POLY_V 8
 #define F_ZONES 24
+#define F_WALLS 64
+#define F_WALL_PTS 48
+#define F_PROFS 48
+#define F_PROF_PTS 40
+#define F_SWEEPS 64
+#define F_LATHES 16
 
 #define FBO_W 1024              // widest internal buffer; the used width tracks the screen aspect
 #define FBO_H 360               // FIELD.md's 640x360, height fixed, width filled to the phone's 20:9
@@ -185,6 +192,12 @@ static void gen_tile(const char *id, Img *im) {
     else if (!strcmp(id, "cliff")) { base_r = 104; base_g = 92; base_b = 78; stripe = true; }
     else if (!strcmp(id, "wall_plaster")) { base_r = 186; base_g = 172; base_b = 144; }
     else if (!strcmp(id, "wall_timber")) { base_r = 182; base_g = 168; base_b = 140; }
+    else if (!strcmp(id, "wall_stone")) { base_r = 132; base_g = 128; base_b = 120; blocky = true; }
+    else if (!strcmp(id, "wall_stone_top")) { base_r = 148; base_g = 144; base_b = 134; blocky = true; }
+    else if (!strcmp(id, "fence_wood")) { base_r = 132; base_g = 98; base_b = 62; plank = true; }
+    else if (!strcmp(id, "fence_top")) { base_r = 112; base_g = 84; base_b = 54; plank = true; }
+    else if (!strcmp(id, "hedge")) { base_r = 58; base_g = 98; base_b = 52; }
+    else if (!strcmp(id, "hedge_top")) { base_r = 68; base_g = 112; base_b = 58; }
 
     for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) {
         float n = snoise((float)x, (float)y, 8, seed) * 0.6f + snoise((float)x, (float)y, 16, seed + 1) * 0.4f;
@@ -215,6 +228,12 @@ static void gen_tile(const char *id, Img *im) {
         img_rect(im, 4, 0, 10, 64, col(78, 56, 36));
         img_rect(im, 42, 0, 48, 64, col(78, 56, 36));
     }
+    if (!strcmp(id, "hedge") || !strcmp(id, "hedge_top"))   // leafy clumps, so it is not flat green
+        for (int i = 0; i < 160; i++) {
+            int x = (int)(frnd(i, 7, seed) * 60), y = (int)(frnd(i, 8, seed) * 60);
+            img_disc(im, (float)x, (float)y, 3.0f, 2.4f, col(base_r + (int)(frnd(i, 9, seed) * 40) - 12,
+                                                            base_g + (int)(frnd(i, 10, seed) * 44) - 10, base_b - 4));
+        }
     if (!strcmp(id, "water"))                            // highlights, so the UV scroll reads as flow
         for (int i = 0; i < 40; i++) {
             int x = (int)(frnd(i, 5, seed) * 57), y = (int)(frnd(i, 6, seed) * 63);
@@ -224,7 +243,7 @@ static void gen_tile(const char *id, Img *im) {
 
 // ───────────────────────── placeholder props ─────────────────────────
 
-enum { PK_HOUSE, PK_HALL, PK_SHED, PK_TREE, PK_WELL, PK_CART, PK_FENCE, PK_POST, PK_BARREL, PK_SIGN, PK_STONE, PK_LADDER, PK_GATE };
+enum { PK_HOUSE, PK_HALL, PK_SHED, PK_TREE, PK_WELL, PK_CART, PK_FENCE, PK_POST, PK_BARREL, PK_SIGN, PK_STONE, PK_LADDER, PK_GATE, PK_BENCH, PK_YARDWALL, PK_MARK, PK_MISSING };
 struct PropDef { const char *id; short w, h; short kind; unsigned char r, g, b; };
 static const PropDef PROP_DEFS[] = {
     { "house_a",       192, 184, PK_HOUSE,  196, 180, 150 },
@@ -242,14 +261,17 @@ static const PropDef PROP_DEFS[] = {
     { "sign",           44,  68, PK_SIGN,   132, 102,  64 },
     { "milestone",      36,  52, PK_STONE,  136, 134, 128 },
     { "gate_post",      40, 132, PK_GATE,   120,  92,  58 },
+    { "yard_wall",     128,  84, PK_YARDWALL,126, 122, 114 },
+    { "scale_bench",    96,  64, PK_BENCH,  128,  98,  62 },
+    { "mark_examine",   20,  28, PK_MARK,   255, 245, 210 },
 };
 
 static void gen_prop(const char *id, Img *im) {
     const PropDef *d = nullptr;
     for (unsigned i = 0; i < sizeof(PROP_DEFS) / sizeof(PROP_DEFS[0]); i++)
         if (!strcmp(PROP_DEFS[i].id, id)) { d = &PROP_DEFS[i]; break; }
-    PropDef fallback = { id, 64, 96, PK_STONE, 140, 130, 120 };
-    if (!d) d = &fallback;
+    PropDef fallback = { id, 64, 64, PK_MISSING, 255, 0, 255 };   // unmistakable: art is missing
+    if (!d) { d = &fallback; SDL_Log("field: no prop recipe or art for \"%s\"", id); }
     int W = d->w, H = d->h, seed = (int)fhash(d->w, d->h, id[0]);
     *im = img_new(W, H);
     Col body = col(d->r, d->g, d->b), dark = col(d->r * 6 / 10, d->g * 6 / 10, d->b * 6 / 10);
@@ -335,6 +357,25 @@ static void gen_prop(const char *id, Img *im) {
         img_rect(im, 2, 6, W - 2, H / 2 + 2, body);
         img_rect(im, 8, 14, W - 8, 18, dark);
         img_rect(im, 8, 24, W - 14, 28, dark);
+    } break;
+    case PK_YARDWALL: {
+        img_rect(im, 0, 12, W, H - 3, body);
+        for (int y = 12; y < H - 3; y += 14) img_rect(im, 0, y, W, y + 2, dark);
+        img_rect(im, 0, 8, W, 14, col(d->r + 14, d->g + 14, d->b + 14));    // coping
+    } break;
+    case PK_BENCH: {
+        img_rect(im, 4, H - 26, W - 4, H - 18, body);
+        img_rect(im, 10, H - 18, 18, H - 3, dark);
+        img_rect(im, W - 18, H - 18, W - 10, H - 3, dark);
+    } break;
+    case PK_MARK: {                                               // the examine "!"
+        img_rect(im, W / 2 - 3, 3, W / 2 + 3, H - 12, body);
+        img_rect(im, W / 2 - 3, H - 8, W / 2 + 3, H - 2, body);
+    } break;
+    case PK_MISSING: {                                            // magenta/black hazard checker
+        for (int y = 0; y < H; y++) for (int x = 0; x < W; x++)
+            img_put(im, x, y, ((x / 8 + y / 8) & 1) ? col(255, 0, 255) : col(20, 20, 20));
+        img_rect(im, 0, H / 2 - 3, W, H / 2 + 3, col(255, 255, 0));
     } break;
     default: {
         img_disc(im, W * 0.5f, (float)H, W * 0.46f, H * 0.80f, body);
@@ -509,6 +550,42 @@ static FTex ftex_upload(unsigned char *px, int w, int h, bool repeat, bool mip) 
     return t;
 }
 
+// Ground layers blend by height as well as by weight, so every tile texture carries a height mask in
+// its **alpha channel**: from `story/field/tiles/<id>_h.png` if the pipeline supplies one, else
+// contrast-stretched from the tile's own luminance (slab faces bright/high, mortar and moss dark/low).
+// Tiles are opaque, so the alpha was free and the shader still costs one sample per layer.
+static void pack_height(const char *id, unsigned char *px, int w, int h) {
+    char rel[256];
+    snprintf(rel, sizeof(rel), "field/tiles/%s_h.png", id);
+    size_t sz = 0;
+    void *data = field_read(rel, &sz);
+    if (data) {
+        int mw = 0, mh = 0, mc = 0;
+        unsigned char *m = stbi_load_from_memory((const unsigned char *)data, (int)sz, &mw, &mh, &mc, 4);
+        SDL_free(data);
+        if (m) {
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) {
+                int sx = mw == w ? x : x * mw / w, sy = mh == h ? y : y * mh / h;
+                px[((size_t)y * w + x) * 4 + 3] = m[((size_t)sy * mw + sx) * 4];
+            }
+            stbi_image_free(m);
+            return;
+        }
+    }
+    int lo = 255, hi = 0;
+    for (int i = 0; i < w * h; i++) {
+        int l = (px[i * 4] * 77 + px[i * 4 + 1] * 151 + px[i * 4 + 2] * 28) >> 8;
+        if (l < lo) lo = l;
+        if (l > hi) hi = l;
+    }
+    int span = hi - lo < 8 ? 8 : hi - lo;
+    for (int i = 0; i < w * h; i++) {
+        int l = (px[i * 4] * 77 + px[i * 4 + 1] * 151 + px[i * 4 + 2] * 28) >> 8;
+        int v = (l - lo) * 255 / span;
+        px[i * 4 + 3] = (unsigned char)(v < 0 ? 0 : v > 255 ? 255 : v);
+    }
+}
+
 // kind is "tiles" / "props" / "walkers"; falls back to the generated placeholder when the file is absent.
 static FTex art_load(const char *kind, const char *id) {
     char rel[256];
@@ -521,14 +598,30 @@ static FTex art_load(const char *kind, const char *id) {
         int w = 0, h = 0, n = 0;
         unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)size, &w, &h, &n, 4);
         SDL_free(data);
-        if (px) { FTex t = ftex_upload(px, w, h, rep, rep); stbi_image_free(px); return t; }
+        if (px) {
+            // A sprite with no transparent pixel anywhere is not a sprite — it is a stub or a sheet
+            // saved without its alpha, and drawing it gives a solid rectangle the size of its box.
+            // Fall back to the placeholder and say so, rather than putting a coloured block in the town.
+            bool clear = false;
+            if (!tile) for (int i = 0; i < w * h && !clear; i++) if (px[i * 4 + 3] < 250) clear = true;
+            if (tile || clear) {
+                if (tile) pack_height(id, px, w, h);
+                FTex t = ftex_upload(px, w, h, rep, rep);
+                stbi_image_free(px);
+                return t;
+            }
+            stbi_image_free(px);
+            SDL_Log("field: %s/%s.png has no transparency, ignoring it", kind, id);
+        }
     }
+    SDL_Log("field: no %s art for \"%s\", drawing the placeholder", kind, id);
     Img im = {nullptr, 0, 0};
     if (tile) gen_tile(id, &im);
     else if (!strcmp(kind, "walkers")) gen_walker(id, &im);
     else if (!strcmp(kind, "edges")) gen_edge(id, &im);
     else if (!strcmp(kind, "buildings")) gen_bface(id, &im);
     else gen_prop(id, &im);
+    if (tile) pack_height(id, im.p, im.w, im.h);
     FTex t = ftex_upload(im.p, im.w, im.h, rep, rep);
     free(im.p);
     return t;
@@ -540,7 +633,7 @@ struct FTile { char id[24]; FTex tex; bool water; };
 struct FProp { short x, y, w, d; char id[24]; int art; };
 struct FNpc { short x, y; int facing; char walker[24]; char name[32]; char scene[48]; char say[160]; int art; };
 struct FExit { short x, y, w, h; char map[32]; short sx, sy; int facing; bool inside; };
-enum { TG_MESSAGE, TG_SCENE, TG_ZONE };
+enum { TG_MESSAGE, TG_SCENE, TG_ZONE, TG_TRAP };
 struct FTrig { short x, y, w, h; int kind; char arg[160]; bool inside; };
 
 // A convex navmesh polygon: vertices in map units with per-vertex height, so a ramp is one sloped
@@ -555,11 +648,31 @@ struct NavPoly {
 };
 
 // A 3D building: a box with a gabled roof. It blocks nothing; the navmesh already excludes it.
-struct Bld { float x, z, w, d, h, rot; char id[24]; int a_front, a_side, a_roof; };
+struct Bld { float x, z, w, d, h, rot, pitch, eave; char id[24]; int a_front, a_side, a_roof; };
 
 // A run of world triangles that shares one texture: edge strips and building faces, appended to the
 // static world buffer after the tiles and walls.
 struct GeoRange { int art, first, count; bool alpha; };
+
+// A PROFILE is a 2D cross-section in the plane perpendicular to a path: x sideways, y up, with a
+// tile and a repeat scale per segment. Sweep it along a path and you get a wall, a kerb, a bridge or
+// a staircase; revolve it about a vertical axis and you get a well ring, a column or a tower.
+struct FProfile {
+    char id[24];
+    int n, closed;
+    float x[F_PROF_PTS], y[F_PROF_PTS], scale[F_PROF_PTS];
+    int art[F_PROF_PTS];
+};
+
+struct FSweep {
+    int prof, spline, caps, n;
+    int cap_art0, cap_art1;              // per-end cap texture; -1 = the profile's first tile
+    float along, s0, s1;                 // texture repeat along the path; profile scale start/end
+    float px[F_WALL_PTS], pz[F_WALL_PTS], py[F_WALL_PTS];
+    unsigned char fixed_y[F_WALL_PTS];   // 1 = the map gave an explicit height here
+};
+
+struct FLathe { int prof, segs; float x, z, y; unsigned char fixed_y; };
 
 struct FVert { float x, y, z, u, v; unsigned char r, g, b, a; };
 
@@ -575,9 +688,20 @@ struct Field {
     NavPoly polys[F_POLYS]; int poly_count;
     CamZone zones[F_ZONES]; int zone_count;
     Bld blds[48]; int bld_count;
-    GeoRange geo[192]; int geo_count;
+    FProfile profs[F_PROFS]; int prof_count;
+    FSweep sweeps[F_SWEEPS]; int sweep_count;
+    FLathe lathes[F_LATHES]; int lathe_count;
+    GeoRange geo[640]; int geo_count;
     char edge_kind[16];                  // map-wide default for open navmesh edges
     char landmark[96];                   // FIELD.md rule 9: the one memorable thing on this map
+    // Ground splat: four weighted layers over the whole map instead of one tile id per cell.
+    char splat_file[64]; int splat_n;    // texels per cell
+    int layer_tile[4];                   // index into f->tiles
+    float layer_cells[4];                // how many cells one tile of that layer spans
+    float layer_sharp[4], layer_hk[4];   // per layer: 1 = smooth, 8+ = a crisp edge; height influence
+    float splat_dither;
+    FTex splat_tex;
+    int floor_first, floor_count;        // every non-water ground quad, drawn in one splat pass
     short spawn_x, spawn_y; int spawn_f;
 
     struct { char key[48]; FTex tex; } art[F_ART];
@@ -600,6 +724,8 @@ struct Field {
     bool gl_ready;
     GLuint prog, vao, vbo_world, vbo_spr, fbo, fbo_tex, fbo_depth;
     GLint u_mvp, u_uvoff, u_tex, u_alpha, u_see, u_occl;
+    GLuint sprog;
+    GLint s_mvp, s_splat, s_lay[4], s_scale, s_map, s_blend, s_sharp, s_hk;
     FTex white;
     int range_first[F_TILES], range_count[F_TILES];
     int wall_first, wall_count;
@@ -610,6 +736,7 @@ struct Field {
     bool act_on; SDL_FingerID act_id; float act_t; bool run, tapped;
 
     char msg[256], msg_who[40]; float msg_t;
+    int exam_trig, exam_npc;   // what the interact press would open, -1 for none
 };
 
 static const char *FIELD_MAPS[] = { "halm", "hart_yard" };
@@ -811,6 +938,89 @@ static int wall_buffer(Field *f, int poly, float *px, float *pz, float r) {
     return poly;
 }
 
+static int art_get(Field *f, const char *kind, const char *id);
+static float grid_h(Field *f, float x, float z);
+
+// A profile is looked up by name, or built on the spot from a spec: `box:w:h[:side:top]`,
+// `slab:w:h[:tile]`, `kerb:w:h[:tile]`, `bridge:w:h[:deck:parapet]`, `stair:rise:run:n[:tile]`.
+// Built-ins are cached under their spec string, so repeats cost nothing.
+static void prof_pt(FProfile *p, Field *f, float x, float y, const char *tile, float sc);
+
+static int profile_get(Field *f, const char *spec) {
+    for (int i = 0; i < f->prof_count; i++) if (!strcmp(f->profs[i].id, spec)) return i;
+    if (!strchr(spec, ':') || f->prof_count >= F_PROFS) return -1;
+    char buf[80];
+    snprintf(buf, sizeof(buf), "%s", spec);
+    char *a[6] = {buf, nullptr, nullptr, nullptr, nullptr, nullptr};
+    int na = 1;
+    for (char *c = buf; *c && na < 6; c++) if (*c == ':') { *c = 0; a[na++] = c + 1; }
+    FProfile *p = &f->profs[f->prof_count];
+    memset(p, 0, sizeof(*p));
+    snprintf(p->id, sizeof(p->id), "%s", spec);
+    p->closed = 1;
+    float w = na > 1 ? (float)atof(a[1]) : 0.4f, h = na > 2 ? (float)atof(a[2]) : 0.8f;
+    if (w < 0.02f) w = 0.4f;
+    if (h < 0.02f) h = 0.8f;
+    if (!strcmp(a[0], "box") || !strcmp(a[0], "slab")) {
+        const char *side = na > 3 ? a[3] : "wall_stone", *top = na > 4 ? a[4] : (na > 3 ? a[3] : "wall_stone_top");
+        prof_pt(p, f, -w / 2, 0, side, 1); prof_pt(p, f, -w / 2, h, top, 1);
+        prof_pt(p, f, w / 2, h, side, 1);  prof_pt(p, f, w / 2, 0, side, 1);
+    } else if (!strcmp(a[0], "kerb")) {
+        const char *tl = na > 3 ? a[3] : "wall_stone";
+        prof_pt(p, f, -w / 2, 0, tl, 1); prof_pt(p, f, -w / 2, h * 0.7f, tl, 1);
+        prof_pt(p, f, -w * 0.3f, h, tl, 1); prof_pt(p, f, w * 0.3f, h, tl, 1);
+        prof_pt(p, f, w / 2, h * 0.7f, tl, 1); prof_pt(p, f, w / 2, 0, tl, 1);
+    } else if (!strcmp(a[0], "bridge")) {
+        const char *deck = na > 3 ? a[3] : "plank", *par = na > 4 ? a[4] : "wall_stone";
+        float pw = w * 0.10f, ph = h * 1.6f;
+        prof_pt(p, f, -w / 2, 0, par, 1);          prof_pt(p, f, -w / 2, h + ph, par, 1);
+        prof_pt(p, f, -w / 2 + pw, h + ph, par, 1); prof_pt(p, f, -w / 2 + pw, h, deck, 1);
+        prof_pt(p, f, w / 2 - pw, h, par, 1);      prof_pt(p, f, w / 2 - pw, h + ph, par, 1);
+        prof_pt(p, f, w / 2, h + ph, par, 1);      prof_pt(p, f, w / 2, 0, par, 1);
+    } else if (!strcmp(a[0], "house")) {
+        // house:width:wallheight:pitch:eave[:side:roof] — floor, wall, soffit, roof to the ridge,
+        // and back down. Swept along the building's length, so the end caps are its gable ends.
+        float pitch = na > 3 ? (float)atof(a[3]) : 0.55f, eave = na > 4 ? (float)atof(a[4]) : 0.18f;
+        const char *side = na > 5 ? a[5] : "wall_plaster", *roof = na > 6 ? a[6] : "wall_timber";
+        if (pitch < 0.05f) pitch = 0.55f;
+        if (eave < 0.0f) eave = 0.0f;
+        float hw2 = w * 0.5f, ridge = h + (hw2 + eave) * pitch;
+        prof_pt(p, f, -hw2, 0, side, 1);
+        prof_pt(p, f, -hw2, h, side, 1);
+        prof_pt(p, f, -hw2 - eave, h, roof, 1);
+        prof_pt(p, f, 0, ridge, roof, 1);
+        prof_pt(p, f, hw2 + eave, h, side, 1);
+        prof_pt(p, f, hw2, h, side, 1);
+        prof_pt(p, f, hw2, 0, side, 1);
+    } else if (!strcmp(a[0], "ring")) {          // ring:radius:height:thickness[:tile] — for lathes
+        float thick = na > 3 ? (float)atof(a[3]) : 0.18f;
+        const char *tl = na > 4 ? a[4] : "wall_stone";
+        if (thick < 0.02f) thick = 0.18f;
+        prof_pt(p, f, w - thick, 0, tl, 1); prof_pt(p, f, w - thick, h, tl, 1);
+        prof_pt(p, f, w, h, tl, 1);         prof_pt(p, f, w, 0, tl, 1);
+    } else if (!strcmp(a[0], "stair")) {
+        float rise = w, run = h;                                  // stair:rise:run:n[:tile]
+        int steps = na > 3 ? atoi(a[3]) : 4;
+        const char *tl = na > 4 ? a[4] : "wall_stone";
+        if (steps < 1) steps = 1;
+        if (steps > (F_PROF_PTS - 4) / 2) steps = (F_PROF_PTS - 4) / 2;
+        prof_pt(p, f, 0, 0, tl, 1);
+        for (int i = 0; i < steps; i++) {
+            prof_pt(p, f, i * run, (i + 1) * rise, tl, 1);
+            prof_pt(p, f, (i + 1) * run, (i + 1) * rise, tl, 1);
+        }
+        prof_pt(p, f, steps * run, 0, tl, 1);
+    } else return -1;
+    return f->prof_count++;
+}
+
+static void prof_pt(FProfile *p, Field *f, float x, float y, const char *tile, float sc) {
+    if (p->n >= F_PROF_PTS) return;
+    p->x[p->n] = x; p->y[p->n] = y; p->scale[p->n] = sc > 0.01f ? sc : 1.0f;
+    p->art[p->n] = art_get(f, "tiles", tile);
+    p->n++;
+}
+
 // ───────────────────────── map parsing ─────────────────────────
 
 static int art_get(Field *f, const char *kind, const char *id) {
@@ -852,13 +1062,24 @@ static int split_toks(char *s, char **t, int max) {
 }
 
 static void field_free_map(Field *f) {
+    if (f->splat_tex.id) { glDeleteTextures(1, &f->splat_tex.id); f->splat_tex.id = 0; }
     for (int i = 0; i < f->tile_count; i++) if (f->tiles[i].tex.id) glDeleteTextures(1, &f->tiles[i].tex.id);
     for (int i = 0; i < f->art_count; i++) if (f->art[i].tex.id) glDeleteTextures(1, &f->art[i].tex.id);
     f->tile_count = 0; f->art_count = 0; f->wall_tile = 0;
     f->prop_count = f->npc_count = f->exit_count = f->trig_count = 0;
     f->poly_count = 0; f->zone_count = 0; f->bld_count = 0; f->geo_count = 0;
+    f->prof_count = 0; f->sweep_count = 0; f->lathe_count = 0;
     snprintf(f->edge_kind, sizeof(f->edge_kind), "fence");
     f->landmark[0] = 0;
+    f->splat_file[0] = 0;
+    f->splat_n = 8;
+    f->splat_dither = 0.0f;
+    for (int i = 0; i < 4; i++) {
+        f->layer_cells[i] = 1.0f; f->layer_tile[i] = 0;
+        f->layer_sharp[i] = 1.0f; f->layer_hk[i] = 0.0f;
+    }
+    if (f->splat_tex.id) glDeleteTextures(1, &f->splat_tex.id);
+    f->splat_tex.id = 0;
     memset(f->hgt, 0, sizeof(f->hgt));
     memset(f->gnd, 0, sizeof(f->gnd));
 }
@@ -871,16 +1092,57 @@ static void zone_defaults(CamZone *z) {
     z->yaw = 0; z->pitch = 50; z->fov = 30; z->dist = 13; z->height = 0.8f;
 }
 
+// `id: x y tile scale, ... [closed]` — used by the map's `## profiles` and by the shared
+// story/field/profiles.md, which is loaded first so maps can reuse cross-sections.
+static void parse_profile_line(Field *f, char *line) {
+    char *c = strchr(line, ':');
+    if (!c || f->prof_count >= F_PROFS) return;
+    *c = 0;
+    FProfile *pf = &f->profs[f->prof_count];
+    memset(pf, 0, sizeof(*pf));
+    snprintf(pf->id, sizeof(pf->id), "%s", line);
+    if (strstr(c + 1, "closed")) pf->closed = 1;
+    char *v = c + 1;
+    while (*v && pf->n < F_PROF_PTS) {
+        float x = 0, y = 0, sc = 1;
+        char tl[24] = "wall_stone";
+        if (sscanf(v, " %f %f %23s %f", &x, &y, tl, &sc) < 3) break;
+        prof_pt(pf, f, x, y, tl, sc);
+        char *cm = strchr(v, ',');
+        if (!cm) break;
+        v = cm + 1;
+    }
+    if (pf->n >= 2) f->prof_count++;
+}
+
+static void load_shared_profiles(Field *f) {
+    size_t sz = 0;
+    char *text = (char *)field_read("field/profiles.md", &sz);
+    if (!text) return;
+    char *p = text;
+    while (p && *p) {
+        char *nl = strchr(p, '\n');
+        if (nl) *nl = 0;
+        char *line = p;
+        p = nl ? nl + 1 : nullptr;
+        while (*line == ' ' || *line == '-') line++;
+        if (line[0] && line[0] != '#' && strchr(line, ':')) parse_profile_line(f, line);
+    }
+    SDL_free(text);
+}
+
 static void parse_map(Field *f, char *text) {
     char *gchars = (char *)calloc(FM_W * FM_H, 1);
     if (!gchars) return;
     signed char legend[128];
     memset(legend, -1, sizeof(legend));
     char wall_id[24] = "cliff", ground_id[24] = "grass";
+    char layer_id[4][24] = {"", "dirt", "stone", "plank"};
     int section = -1, row_h = 0, row_g = 0;
-    enum { S_META, S_HEIGHT, S_GROUND, S_TILES, S_PROPS, S_NPCS, S_EXITS, S_TRIGGERS, S_NAV, S_CAMERAS, S_BLDS };
+    enum { S_META, S_HEIGHT, S_GROUND, S_TILES, S_PROPS, S_NPCS, S_EXITS, S_TRIGGERS, S_NAV, S_CAMERAS, S_BLDS, S_WALLS, S_PROFS, S_SWEEPS, S_LATHES };
     f->mw = 16; f->mh = 16; f->spawn_x = 8; f->spawn_y = 8; f->spawn_f = 0;
 
+    load_shared_profiles(f);
     char *p = text;
     while (p && *p) {
         char *nl = strchr(p, '\n');
@@ -895,7 +1157,10 @@ static void parse_map(Field *f, char *text) {
                       !strncmp(s, "props", 5) ? S_PROPS : !strncmp(s, "npcs", 4) ? S_NPCS :
                       !strncmp(s, "exits", 5) ? S_EXITS : !strncmp(s, "triggers", 8) ? S_TRIGGERS :
                       !strncmp(s, "nav", 3) ? S_NAV : !strncmp(s, "cameras", 7) ? S_CAMERAS :
-                      !strncmp(s, "buildings", 9) ? S_BLDS : -1;
+                      !strncmp(s, "buildings", 9) ? S_BLDS :
+                      !strncmp(s, "walls", 5) ? S_WALLS :
+                      !strncmp(s, "profiles", 8) ? S_PROFS : !strncmp(s, "sweeps", 6) ? S_SWEEPS :
+                      !strncmp(s, "lathes", 6) ? S_LATHES : -1;
             continue;
         }
         if (line[0] == '#') continue;                         // a whole-line comment, in any section
@@ -929,6 +1194,33 @@ static void parse_map(Field *f, char *text) {
             else if (!strcmp(line, "wall")) snprintf(wall_id, sizeof(wall_id), "%s", v);
             else if (!strcmp(line, "edges")) snprintf(f->edge_kind, sizeof(f->edge_kind), "%s", v);
             else if (!strcmp(line, "landmark")) snprintf(f->landmark, sizeof(f->landmark), "%s", v);
+            else if (!strcmp(line, "splat")) { int nn = 8; sscanf(v, "%63s %d", f->splat_file, &nn); f->splat_n = nn > 0 ? nn : 8; }
+            else if (!strcmp(line, "splat_layers")) {
+                // `grass:1 dirt:1 stone:8:0.6 plank:8:0.4` — name[:sharpness[:height influence]]
+                char raw[4][40] = {"", "", "", ""};
+                sscanf(v, "%39s %39s %39s %39s", raw[0], raw[1], raw[2], raw[3]);
+                for (int i = 0; i < 4; i++) {
+                    if (!raw[i][0]) continue;
+                    char *c1 = strchr(raw[i], ':');
+                    if (c1) {
+                        *c1 = 0;
+                        char *c2 = strchr(c1 + 1, ':');
+                        if (c2) { *c2 = 0; f->layer_hk[i] = (float)atof(c2 + 1); }
+                        f->layer_sharp[i] = (float)atof(c1 + 1);
+                        if (f->layer_sharp[i] < 1.0f) f->layer_sharp[i] = 1.0f;
+                    }
+                    snprintf(layer_id[i], sizeof(layer_id[i]), "%s", raw[i]);
+                }
+            }
+            else if (!strcmp(line, "tile_scale")) sscanf(v, "%f %f %f %f", &f->layer_cells[0], &f->layer_cells[1], &f->layer_cells[2], &f->layer_cells[3]);
+            else if (!strcmp(line, "splat_blend")) {
+                char mode[16] = "smooth", extra[16] = "";
+                float sh = 1.0f;
+                sscanf(v, "%15s %f %15s", mode, &sh, extra);
+                if (!strcmp(mode, "hard"))                       // legacy: a default for layers with no :n
+                    for (int i = 0; i < 4; i++) if (f->layer_sharp[i] <= 1.001f) f->layer_sharp[i] = sh > 0.2f ? sh : 6.0f;
+                f->splat_dither = strstr(v, "dither") ? 0.18f : 0.0f;
+            }
         } break;
         case S_TILES: {
             n = split_toks(line, tok, 4);
@@ -992,6 +1284,94 @@ static void parse_map(Field *f, char *text) {
             } else break;
             f->zone_count++;
         } break;
+        case S_PROFS: parse_profile_line(f, line); break;
+        case S_SWEEPS: {
+            // id profile [spline] [caps] [along S] [scale s0 s1]  x z [h], x z [h], ...
+            char save[440];
+            snprintf(save, sizeof(save), "%s", line);
+            n = split_toks(line, tok, 12);
+            if (n < 3 || f->sweep_count >= F_SWEEPS) break;
+            FSweep *sw = &f->sweeps[f->sweep_count];
+            memset(sw, 0, sizeof(*sw));
+            sw->along = 1.0f; sw->s0 = 1.0f; sw->s1 = 1.0f;
+            sw->prof = profile_get(f, tok[1]);
+            int first = 2;
+            while (first < n) {
+                if (!strcmp(tok[first], "spline")) { sw->spline = 1; first++; }
+                else if (!strcmp(tok[first], "caps")) { sw->caps = 1; first++; }
+                else if (!strcmp(tok[first], "along") && first + 1 < n) { sw->along = (float)atof(tok[first + 1]); first += 2; }
+                else if (!strcmp(tok[first], "scale") && first + 2 < n) {
+                    sw->s0 = (float)atof(tok[first + 1]); sw->s1 = (float)atof(tok[first + 2]); first += 3;
+                } else break;
+            }
+            int seen = 0, skip = -1;
+            for (int i = 0; save[i]; i++) {
+                if (save[i] != ' ' && (i == 0 || save[i - 1] == ' ')) seen++;
+                if (seen == first + 1) { skip = i; break; }
+            }
+            if (skip < 0 || sw->prof < 0) break;
+            char *v = save + skip;
+            while (*v && sw->n < F_WALL_PTS) {
+                float x = 0, z = 0, hh = 0;
+                int got = sscanf(v, " %f %f %f", &x, &z, &hh);
+                if (got < 2) break;
+                sw->px[sw->n] = x; sw->pz[sw->n] = z;
+                sw->py[sw->n] = hh; sw->fixed_y[sw->n] = (got >= 3) ? 1 : 0;
+                sw->n++;
+                char *cm = strchr(v, ',');
+                if (!cm) break;
+                v = cm + 1;
+            }
+            if (sw->n >= 2) f->sweep_count++;
+        } break;
+        case S_LATHES: {
+            // id profile x z [h] [segments]
+            n = split_toks(line, tok, 7);
+            if (n < 4 || f->lathe_count >= F_LATHES) break;
+            FLathe *la = &f->lathes[f->lathe_count];
+            memset(la, 0, sizeof(*la));
+            la->prof = profile_get(f, tok[1]);
+            la->x = (float)atof(tok[2]); la->z = (float)atof(tok[3]);
+            if (n > 4) { la->y = (float)atof(tok[4]); la->fixed_y = 1; }
+            la->segs = n > 5 ? atoi(tok[5]) : 16;
+            if (la->segs < 4) la->segs = 4;
+            if (la->segs > 48) la->segs = 48;
+            if (la->prof >= 0) f->lathe_count++;
+        } break;
+        case S_WALLS: {
+            // Sugar for a box sweep: id w h tex_side tex_top [cap] [spline] x z, ...
+            char save[400];
+            snprintf(save, sizeof(save), "%s", line);
+            n = split_toks(line, tok, 9);
+            if (n < 6 || f->sweep_count >= F_SWEEPS) break;
+            char spec[80];
+            snprintf(spec, sizeof(spec), "box:%s:%s:%s:%s", tok[1], tok[2], tok[3], tok[4]);
+            FSweep *sw = &f->sweeps[f->sweep_count];
+            memset(sw, 0, sizeof(*sw));
+            sw->along = 1.0f; sw->s0 = 1.0f; sw->s1 = 1.0f;
+            sw->prof = profile_get(f, spec);
+            int first = 5;
+            while (first < n && (!strcmp(tok[first], "cap") || !strcmp(tok[first], "spline"))) {
+                if (!strcmp(tok[first], "cap")) sw->caps = 1; else sw->spline = 1;
+                first++;
+            }
+            int seen = 0, skip = -1;
+            for (int i = 0; save[i]; i++) {
+                if (save[i] != ' ' && (i == 0 || save[i - 1] == ' ')) seen++;
+                if (seen == first + 1) { skip = i; break; }
+            }
+            if (skip < 0 || sw->prof < 0) break;
+            char *v = save + skip;
+            while (*v && sw->n < F_WALL_PTS) {
+                float x = 0, z = 0;
+                if (sscanf(v, " %f %f", &x, &z) < 2) break;
+                sw->px[sw->n] = x; sw->pz[sw->n] = z; sw->n++;
+                char *cm = strchr(v, ',');
+                if (!cm) break;
+                v = cm + 1;
+            }
+            if (sw->n >= 2) f->sweep_count++;
+        } break;
         case S_BLDS: {
             // x z w d h id — footprint in map units, height in world units, gabled roof.
             n = split_toks(line, tok, 8);
@@ -1003,12 +1383,39 @@ static void parse_map(Field *f, char *text) {
             if (b->w < 0.5f) b->w = 1; if (b->d < 0.5f) b->d = 1;
             if (b->h < 0.5f) b->h = 2.0f;
             snprintf(b->id, sizeof(b->id), "%s", tok[5]);
-            for (int i = 6; i + 1 < n; i++) if (!strcmp(tok[i], "rot")) b->rot = (float)atof(tok[i + 1]);
+            b->pitch = 0.55f; b->eave = 0.18f;
+            for (int i = 6; i + 1 < n; i++) {
+                if (!strcmp(tok[i], "rot")) b->rot = (float)atof(tok[i + 1]);
+                else if (!strcmp(tok[i], "pitch")) b->pitch = (float)atof(tok[i + 1]);
+                else if (!strcmp(tok[i], "eave")) b->eave = (float)atof(tok[i + 1]);
+            }
             char face[48];
             snprintf(face, sizeof(face), "%s_front", b->id); b->a_front = art_get(f, "buildings", face);
             snprintf(face, sizeof(face), "%s_side", b->id);  b->a_side = art_get(f, "buildings", face);
             snprintf(face, sizeof(face), "%s_roof", b->id);  b->a_roof = art_get(f, "buildings", face);
             f->bld_count++;
+            // The box-with-a-gable is gone: a building is a `house` cross-section swept along its
+            // length, so its end caps are its gable ends and the front cap carries the painted face.
+            if (f->sweep_count < F_SWEEPS) {
+                char spec[160], sd[48], rf[48];
+                snprintf(sd, sizeof(sd), "%s_side", b->id);
+                snprintf(rf, sizeof(rf), "%s_roof", b->id);
+                snprintf(spec, sizeof(spec), "house:%.3f:%.3f:%.3f:%.3f:%s:%s", b->w, b->h, b->pitch, b->eave, sd, rf);
+                FSweep *sw = &f->sweeps[f->sweep_count];
+                memset(sw, 0, sizeof(*sw));
+                sw->along = 1.0f; sw->s0 = 1.0f; sw->s1 = 1.0f; sw->caps = 1;
+                sw->prof = profile_get(f, spec);
+                sw->cap_art0 = b->a_front;
+                sw->cap_art1 = b->a_side;
+                float cx = b->x + b->w * 0.5f, cz = b->z + b->d * 0.5f;
+                float c = cosf(b->rot * DEG), sn = sinf(b->rot * DEG), hd = b->d * 0.5f;
+                sw->px[0] = cx - sn * hd; sw->pz[0] = cz + c * hd;      // front, the face with the door
+                sw->px[1] = cx + sn * hd; sw->pz[1] = cz - c * hd;      // back
+                sw->py[0] = sw->py[1] = grid_h(f, cx, cz);              // one base: a house is level
+                sw->fixed_y[0] = sw->fixed_y[1] = 1;
+                sw->n = 2;
+                if (sw->prof >= 0) f->sweep_count++;
+            }
         } break;
         case S_PROPS: {
             n = split_toks(line, tok, 8);
@@ -1063,7 +1470,8 @@ static void parse_map(Field *f, char *text) {
             FTrig *t = &f->trigs[f->trig_count++];
             memset(t, 0, sizeof(*t));
             t->x = (short)atoi(tok[0]); t->y = (short)atoi(tok[1]); t->w = (short)atoi(tok[2]); t->h = (short)atoi(tok[3]);
-            t->kind = !strcmp(tok[4], "scene") ? TG_SCENE : !strcmp(tok[4], "zone") ? TG_ZONE : TG_MESSAGE;
+            t->kind = !strcmp(tok[4], "scene") ? TG_SCENE : !strcmp(tok[4], "zone") ? TG_ZONE :
+                      !strcmp(tok[4], "trap") ? TG_TRAP : TG_MESSAGE;
             if (n >= 6) {                                     // the arg is the rest of the original line,
                 int seen = 0, skip = -1;                      // so message text keeps its spaces
                 for (int i = 0; save[i]; i++) {
@@ -1083,12 +1491,68 @@ static void parse_map(Field *f, char *text) {
     if (f->mh > FM_H) f->mh = FM_H;
     int def = tile_get(f, ground_id);
     f->wall_tile = tile_get(f, wall_id);
+    if (!layer_id[0][0]) snprintf(layer_id[0], sizeof(layer_id[0]), "%s", ground_id);
+    for (int i = 0; i < 4; i++) {
+        f->layer_tile[i] = tile_get(f, layer_id[i]);
+        if (f->layer_cells[i] < 0.05f) f->layer_cells[i] = 1.0f;
+    }
     for (int y = 0; y < f->mh; y++) for (int x = 0; x < f->mw; x++) {
         char c = gchars[y * FM_W + x];
         signed char t = (c && (unsigned char)c < 128) ? legend[(int)(unsigned char)c] : -1;
         f->gnd[y][x] = (unsigned char)((c == 0 || c == '.' || t < 0) ? def : t);
     }
     free(gchars);
+    // The ground splat: the PNG if the map has one, otherwise rasterised from the legacy `## ground`
+    // grid with a one-cell soft falloff, so an old map still beats hard per-cell tiling.
+    {
+        char rel[160];
+        size_t sz = 0;
+        void *data = nullptr;
+        if (f->splat_file[0]) {
+            snprintf(rel, sizeof(rel), "field/maps/%s", f->splat_file);
+            data = field_read(rel, &sz);
+            if (!data) SDL_Log("field: splat %s not found, rasterising %s instead", f->splat_file, "## ground");
+        }
+        if (data) {
+            int w = 0, h = 0, nc = 0;
+            unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
+            SDL_free(data);
+            if (px) {
+                f->splat_tex = ftex_upload(px, w, h, false, false);
+                glBindTexture(GL_TEXTURE_2D, f->splat_tex.id);      // bilinear: that is the whole point
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                stbi_image_free(px);
+            }
+        }
+        if (!f->splat_tex.id) {
+            int n = f->splat_n, W = f->mw * n, H = f->mh * n;
+            unsigned char *px = (unsigned char *)calloc((size_t)W * H * 4, 1);
+            if (px) {
+                for (int ty = 0; ty < H; ty++) for (int tx = 0; tx < W; tx++) {
+                    float wx = (tx + 0.5f) / n, wz = (ty + 0.5f) / n, acc[4] = {0, 0, 0, 0}, tot = 0;
+                    for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
+                        int cx = (int)wx + dx, cz = (int)wz + dz;
+                        if (cx < 0 || cz < 0 || cx >= f->mw || cz >= f->mh) continue;
+                        float d = sqrtf((cx + 0.5f - wx) * (cx + 0.5f - wx) + (cz + 0.5f - wz) * (cz + 0.5f - wz));
+                        float k = 1.0f - d / 1.45f;
+                        if (k <= 0) continue;
+                        int l = 0;
+                        for (int i = 0; i < 4; i++) if (f->gnd[cz][cx] == f->layer_tile[i]) { l = i; break; }
+                        acc[l] += k; tot += k;
+                    }
+                    unsigned char *o = px + ((size_t)ty * W + tx) * 4;
+                    for (int i = 0; i < 4; i++) o[i] = (unsigned char)(tot > 0 ? acc[i] / tot * 255.0f : (i == 0 ? 255 : 0));
+                }
+                f->splat_tex = ftex_upload(px, W, H, false, false);
+                glBindTexture(GL_TEXTURE_2D, f->splat_tex.id);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                free(px);
+            }
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
     mesh_link(f);
     if (!f->poly_count) SDL_Log("field: %s has no ## nav section; nothing is walkable", f->map_name);
     if (!f->zone_count) {                                     // a default zone covering the map is required
@@ -1162,6 +1626,11 @@ static void quad(FVert **v, int *n, int cap, const float *a, const float *b, con
     pushv(v, n, cap, d[0], d[1], d[2], u0, v1, s1);
 }
 
+static float face_shade(float nx, float nz) {                 // sun from (+X, -Z)
+    float d = (nx * 0.7071f - nz * 0.7071f);
+    return 0.60f + 0.50f * (0.5f + 0.5f * d);
+}
+
 static void tri3(FVert **v, int *n, int cap, const float *a, const float *b, const float *c,
                  float ua, float va, float ub, float vb, float uc, float vc, float sh) {
     pushv(v, n, cap, a[0], a[1], a[2], ua, va, sh);
@@ -1196,65 +1665,157 @@ static bool near_exit(Field *f, float x, float z, float pad) {
     return false;
 }
 
-// A box with a gabled roof, at any yaw. Vertex colours bake the light per face from the rotated
-// normal (sun from +X, -Z), so a building turned off the grid still reads correctly lit.
-// `front` is the box's local +Z face.
-static void bpt(const Bld *b, float lx, float lz, float y, float *o) {
-    float c = cosf(b->rot * DEG), sn = sinf(b->rot * DEG);
-    float cx = b->x + b->w * 0.5f, cz = b->z + b->d * 0.5f;
-    o[0] = cx + lx * c - lz * sn;
-    o[1] = y;
-    o[2] = cz + lx * sn + lz * c;
-}
-static float face_shade(float nx, float nz) {                 // sun from (+X, -Z)
-    float d = (nx * 0.7071f - nz * 0.7071f);
-    return 0.60f + 0.50f * (0.5f + 0.5f * d);
-}
-
-static void emit_building(Field *f, Bld *b, FVert **w, int *n, int cap) {
-    float y0 = grid_h(f, b->x + b->w * 0.5f, b->z + b->d * 0.5f);
-    float hw = b->w * 0.5f, hd = b->d * 0.5f, yt = y0 + b->h;
-    float rise = fminf(b->w, b->d) * 0.34f, yr = yt + rise;
-    float c = cosf(b->rot * DEG), sn = sinf(b->rot * DEG);
-    float s_front = face_shade(-sn, c), s_back = face_shade(sn, -c);
-    float s_px = face_shade(c, sn), s_nx = face_shade(-c, -sn);
-    GeoRange *g;
-    float a[3], bb[3], cc[3], dd[3];
-
-    g = &f->geo[f->geo_count++]; g->art = b->a_front; g->first = *n; g->alpha = false;
-    bpt(b, -hw, hd, yt, a); bpt(b, hw, hd, yt, bb); bpt(b, hw, hd, y0, cc); bpt(b, -hw, hd, y0, dd);
-    quad(w, n, cap, a, bb, cc, dd, 0, 0, 1, 1, s_front, s_front * 0.86f);
-    g->count = *n - g->first;
-
-    g = &f->geo[f->geo_count++]; g->art = b->a_side; g->first = *n; g->alpha = false;
-    bpt(b, hw, -hd, yt, a); bpt(b, -hw, -hd, yt, bb); bpt(b, -hw, -hd, y0, cc); bpt(b, hw, -hd, y0, dd);
-    quad(w, n, cap, a, bb, cc, dd, 0, 0, b->w, b->h, s_back, s_back * 0.86f);
-    bpt(b, hw, hd, yt, a); bpt(b, hw, -hd, yt, bb); bpt(b, hw, -hd, y0, cc); bpt(b, hw, hd, y0, dd);
-    quad(w, n, cap, a, bb, cc, dd, 0, 0, b->d, b->h, s_px, s_px * 0.86f);
-    bpt(b, -hw, -hd, yt, a); bpt(b, -hw, hd, yt, bb); bpt(b, -hw, hd, y0, cc); bpt(b, -hw, -hd, y0, dd);
-    quad(w, n, cap, a, bb, cc, dd, 0, 0, b->d, b->h, s_nx, s_nx * 0.86f);
-    // Gables close the ends the ridge runs into: the ridge is along local X, so they sit on the X faces.
-    bpt(b, hw, hd, yt, a); bpt(b, hw, -hd, yt, bb); bpt(b, hw, 0.0f, yr, cc);
-    tri3(w, n, cap, a, bb, cc, 0, 0, b->d, 0, b->d * 0.5f, -rise, s_px);
-    bpt(b, -hw, -hd, yt, a); bpt(b, -hw, hd, yt, bb); bpt(b, -hw, 0.0f, yr, cc);
-    tri3(w, n, cap, a, bb, cc, 0, 0, b->d, 0, b->d * 0.5f, -rise, s_nx);
-    g->count = *n - g->first;
-
-    g = &f->geo[f->geo_count++]; g->art = b->a_roof; g->first = *n; g->alpha = false;
-    {
-        float ov = 0.16f, ey = yt - ov * 0.4f, ehw = hw + ov, ehd = hd + ov;
-        float slope = sqrtf(hd * hd + rise * rise);
-        float rn = rise / sqrtf(hd * hd + rise * rise), rf = hd / sqrtf(hd * hd + rise * rise);
-        float sf = face_shade(-sn * rf, c * rf + rn * 0.0f), sb = face_shade(sn * rf, -c * rf);
-        bpt(b, -ehw, 0.0f, yr, a); bpt(b, ehw, 0.0f, yr, bb); bpt(b, ehw, ehd, ey, cc); bpt(b, -ehw, ehd, ey, dd);
-        quad(w, n, cap, a, bb, cc, dd, 0, 0, b->w + 2 * ov, slope, sf + 0.12f, sf);
-        bpt(b, ehw, 0.0f, yr, a); bpt(b, -ehw, 0.0f, yr, bb); bpt(b, -ehw, -ehd, ey, cc); bpt(b, ehw, -ehd, ey, dd);
-        quad(w, n, cap, a, bb, cc, dd, 0, 0, b->w + 2 * ov, slope, sb + 0.12f, sb);
+// Sweep a profile along a path. Corners are mitred (the profile's x is stretched by 1/cos of the
+// half-angle, clamped), the base follows the terrain unless the map gave an explicit height, and each
+// face is lit from its own normal. This is what walls, kerbs, bridges and stairs are all made of.
+static void emit_sweep(Field *f, FSweep *sw, FVert **w, int *n, int cap) {
+    if (sw->prof < 0 || sw->prof >= f->prof_count) return;
+    FProfile *pf = &f->profs[sw->prof];
+    const int MAXP = F_WALL_PTS * 4;
+    float xs[MAXP], zs[MAXP], ys[MAXP], len[MAXP], nx[MAXP], nz[MAXP], mit[MAXP];
+    int np = 0;
+    if (sw->spline && sw->n >= 3) {
+        for (int i = 0; i + 1 < sw->n && np < MAXP - 2; i++) {
+            int i0 = i > 0 ? i - 1 : 0, i2 = i + 1, i3 = (i + 2 < sw->n) ? i + 2 : sw->n - 1;
+            float seg = sqrtf((sw->px[i2] - sw->px[i]) * (sw->px[i2] - sw->px[i]) +
+                              (sw->pz[i2] - sw->pz[i]) * (sw->pz[i2] - sw->pz[i]));
+            int steps = (int)(seg / 0.5f) + 1;
+            for (int k = 0; k < steps && np < MAXP - 2; k++) {
+                float t = (float)k / steps, t2 = t * t, t3 = t2 * t;
+                #define CR(A) (0.5f * ((2 * A[i]) + (-A[i0] + A[i2]) * t + \
+                        (2 * A[i0] - 5 * A[i] + 4 * A[i2] - A[i3]) * t2 + \
+                        (-A[i0] + 3 * A[i] - 3 * A[i2] + A[i3]) * t3))
+                xs[np] = CR(sw->px); zs[np] = CR(sw->pz);
+                ys[np] = (sw->fixed_y[i] || sw->fixed_y[i2]) ? CR(sw->py) : grid_h(f, xs[np], zs[np]);
+                #undef CR
+                np++;
+            }
+        }
+        xs[np] = sw->px[sw->n - 1]; zs[np] = sw->pz[sw->n - 1];
+        ys[np] = sw->fixed_y[sw->n - 1] ? sw->py[sw->n - 1] : grid_h(f, xs[np], zs[np]);
+        np++;
+    } else {
+        for (int i = 0; i < sw->n && i < MAXP; i++) {
+            xs[i] = sw->px[i]; zs[i] = sw->pz[i];
+            ys[i] = sw->fixed_y[i] ? sw->py[i] : grid_h(f, xs[i], zs[i]);
+        }
+        np = sw->n < MAXP ? sw->n : MAXP;
     }
-    g->count = *n - g->first;
+    if (np < 2) return;
+
+    float run = 0.0f;
+    for (int i = 0; i < np; i++) {
+        float dx, dz;
+        if (i == 0) { dx = xs[1] - xs[0]; dz = zs[1] - zs[0]; }
+        else if (i == np - 1) { dx = xs[np - 1] - xs[np - 2]; dz = zs[np - 1] - zs[np - 2]; }
+        else {
+            float ax = xs[i] - xs[i - 1], az = zs[i] - zs[i - 1], la = sqrtf(ax * ax + az * az) + 1e-6f;
+            float bx = xs[i + 1] - xs[i], bz = zs[i + 1] - zs[i], lb = sqrtf(bx * bx + bz * bz) + 1e-6f;
+            dx = ax / la + bx / lb; dz = az / la + bz / lb;
+        }
+        float l = sqrtf(dx * dx + dz * dz) + 1e-6f;
+        dx /= l; dz /= l;
+        nx[i] = -dz; nz[i] = dx;
+        mit[i] = 1.0f;
+        if (i > 0 && i < np - 1) {
+            float ax = xs[i] - xs[i - 1], az = zs[i] - zs[i - 1], la = sqrtf(ax * ax + az * az) + 1e-6f;
+            float c = (-az / la) * nx[i] + (ax / la) * nz[i];
+            mit[i] = 1.0f / fmaxf(0.35f, fabsf(c));
+        }
+        if (i) run += sqrtf((xs[i] - xs[i - 1]) * (xs[i] - xs[i - 1]) + (zs[i] - zs[i - 1]) * (zs[i] - zs[i - 1]));
+        len[i] = run;
+    }
+
+    int segs = pf->closed ? pf->n : pf->n - 1;
+    for (int sgi = 0; sgi < segs; sgi++) {
+        int j = (sgi + 1) % pf->n;
+        if (f->geo_count >= (int)(sizeof(f->geo) / sizeof(f->geo[0]))) return;
+        GeoRange *g = &f->geo[f->geo_count++];
+        g->art = pf->art[sgi]; g->first = *n; g->alpha = false;
+        float px0 = pf->x[sgi], py0 = pf->y[sgi], px1 = pf->x[j], py1 = pf->y[j];
+        float plen = sqrtf((px1 - px0) * (px1 - px0) + (py1 - py0) * (py1 - py0)) * pf->scale[sgi];
+        for (int i = 0; i + 1 < np; i++) {
+            float sc0 = sw->s0 + (sw->s1 - sw->s0) * (np > 1 ? (float)i / (np - 1) : 0.0f);
+            float sc1 = sw->s0 + (sw->s1 - sw->s0) * (np > 1 ? (float)(i + 1) / (np - 1) : 0.0f);
+            float a[3] = {xs[i] + nx[i] * px0 * mit[i] * sc0, ys[i] + py0 * sc0, zs[i] + nz[i] * px0 * mit[i] * sc0};
+            float b[3] = {xs[i + 1] + nx[i + 1] * px0 * mit[i + 1] * sc1, ys[i + 1] + py0 * sc1, zs[i + 1] + nz[i + 1] * px0 * mit[i + 1] * sc1};
+            float c[3] = {xs[i + 1] + nx[i + 1] * px1 * mit[i + 1] * sc1, ys[i + 1] + py1 * sc1, zs[i + 1] + nz[i + 1] * px1 * mit[i + 1] * sc1};
+            float d[3] = {xs[i] + nx[i] * px1 * mit[i] * sc0, ys[i] + py1 * sc0, zs[i] + nz[i] * px1 * mit[i] * sc0};
+            float ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2];
+            float fx2 = d[0] - a[0], fy2 = d[1] - a[1], fz2 = d[2] - a[2];
+            float fnx = ey * fz2 - ez * fy2, fny = ez * fx2 - ex * fz2, fnz = ex * fy2 - ey * fx2;
+            float fl = sqrtf(fnx * fnx + fny * fny + fnz * fnz) + 1e-6f;
+            float sh = face_shade(fnx / fl, fnz / fl) * (0.82f + 0.24f * fabsf(fny / fl));
+            quad(w, n, cap, a, b, c, d, len[i] * sw->along, 0.0f, len[i + 1] * sw->along, plen, sh, sh * 0.92f);
+        }
+        g->count = *n - g->first;
+    }
+
+    if (sw->caps && pf->closed && pf->n >= 3) {     // fan from the profile's centroid: profiles are small
+        float cxp = 0, cyp = 0, x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f;
+        for (int k = 0; k < pf->n; k++) {
+            cxp += pf->x[k]; cyp += pf->y[k];
+            if (pf->x[k] < x0) x0 = pf->x[k];
+            if (pf->x[k] > x1) x1 = pf->x[k];
+            if (pf->y[k] < y0) y0 = pf->y[k];
+            if (pf->y[k] > y1) y1 = pf->y[k];
+        }
+        cxp /= pf->n; cyp /= pf->n;
+        float sx2 = 1.0f / fmaxf(0.01f, x1 - x0), sy2 = 1.0f / fmaxf(0.01f, y1 - y0);
+        for (int e = 0; e < 2; e++) {
+            if (f->geo_count >= (int)(sizeof(f->geo) / sizeof(f->geo[0]))) return;
+            GeoRange *g = &f->geo[f->geo_count++];
+            int ca = e ? sw->cap_art1 : sw->cap_art0;
+            g->art = ca >= 0 ? ca : pf->art[0];
+            g->first = *n; g->alpha = false;
+            int i = e ? np - 1 : 0;
+            float sc = e ? sw->s1 : sw->s0;
+            float ctr[3] = {xs[i] + nx[i] * cxp * sc, ys[i] + cyp * sc, zs[i] + nz[i] * cxp * sc};
+            float cu = (cxp - x0) * sx2, cv = 1.0f - (cyp - y0) * sy2;
+            for (int k = 0; k < pf->n; k++) {
+                int k2 = (k + 1) % pf->n;
+                float a[3] = {xs[i] + nx[i] * pf->x[k] * sc, ys[i] + pf->y[k] * sc, zs[i] + nz[i] * pf->x[k] * sc};
+                float b[3] = {xs[i] + nx[i] * pf->x[k2] * sc, ys[i] + pf->y[k2] * sc, zs[i] + nz[i] * pf->x[k2] * sc};
+                tri3(w, n, cap, ctr, a, b, cu, cv,
+                     (pf->x[k] - x0) * sx2, 1.0f - (pf->y[k] - y0) * sy2,
+                     (pf->x[k2] - x0) * sx2, 1.0f - (pf->y[k2] - y0) * sy2, e ? 0.92f : 0.80f);
+            }
+            g->count = *n - g->first;
+        }
+    }
 }
 
-// Every open (unshared) navmesh edge gets something standing on it, unless the terrain already says
+// The same profile revolved about a vertical axis: x is the radius. Wells, columns, towers, domes.
+static void emit_lathe(Field *f, FLathe *la, FVert **w, int *n, int cap) {
+    if (la->prof < 0 || la->prof >= f->prof_count) return;
+    FProfile *pf = &f->profs[la->prof];
+    float base = la->fixed_y ? la->y : grid_h(f, la->x, la->z);
+    int segs = pf->closed ? pf->n : pf->n - 1;
+    for (int sgi = 0; sgi < segs; sgi++) {
+        int j = (sgi + 1) % pf->n;
+        if (f->geo_count >= (int)(sizeof(f->geo) / sizeof(f->geo[0]))) return;
+        GeoRange *g = &f->geo[f->geo_count++];
+        g->art = pf->art[sgi]; g->first = *n; g->alpha = false;
+        float r0 = pf->x[sgi], y0 = pf->y[sgi], r1 = pf->x[j], y1 = pf->y[j];
+        float plen = sqrtf((r1 - r0) * (r1 - r0) + (y1 - y0) * (y1 - y0)) * pf->scale[sgi];
+        for (int k = 0; k < la->segs; k++) {
+            float t0 = (float)k / la->segs * 6.2831853f, t1 = (float)(k + 1) / la->segs * 6.2831853f;
+            float c0 = cosf(t0), s0 = sinf(t0), c1 = cosf(t1), s1 = sinf(t1);
+            float a[3] = {la->x + c0 * r0, base + y0, la->z + s0 * r0};
+            float b[3] = {la->x + c1 * r0, base + y0, la->z + s1 * r0};
+            float c[3] = {la->x + c1 * r1, base + y1, la->z + s1 * r1};
+            float d[3] = {la->x + c0 * r1, base + y1, la->z + s0 * r1};
+            float mid = (t0 + t1) * 0.5f;
+            float sh = face_shade(cosf(mid), sinf(mid));
+            float u0 = (float)k / la->segs * 6.2831853f * fmaxf(r0, r1);
+            float u1 = (float)(k + 1) / la->segs * 6.2831853f * fmaxf(r0, r1);
+            quad(w, n, cap, a, b, c, d, u0, 0.0f, u1, plen, sh, sh * 0.94f);
+        }
+        g->count = *n - g->first;
+    }
+}
+
+// Every open (unshared) navmesh edge gets something standing on it, unless the terrain already says// Every open (unshared) navmesh edge gets something standing on it, unless the terrain already says
 // "no" — a height step or a building wall. Invisible walls in the middle of grass were the complaint.
 static void emit_edges(Field *f, FVert **w, int *n, int cap) {
     static const char *KINDS[3] = {"fence", "hedge", "wall"};
@@ -1296,21 +1857,33 @@ static void emit_edges(Field *f, FVert **w, int *n, int cap) {
 // Vertex colours bake the light (CLAUDE.md: no realtime lighting). Sun from +X, -Z.
 static void build_world(Field *f) {
     f->geo_count = 0;
-    int cap = f->mw * f->mh * 26 + F_POLYS * F_POLY_V * 6 + 48 * 66 + 64;
+    int cap = f->mw * f->mh * 26 + F_POLYS * F_POLY_V * 6 + 48 * 66 + F_SWEEPS * F_WALL_PTS * 4 * 8 + F_LATHES * 48 * 8 * 6 + 64;
     FVert *buf = (FVert *)malloc(sizeof(FVert) * (size_t)cap);
     if (!buf) return;
     FVert *w = buf;
     int n = 0;
-    for (int t = 0; t < f->tile_count; t++) {
+    // One pass for every non-water cell: the splat shader decides what each pixel of it is.
+    f->floor_first = n;
+    for (int y = 0; y < f->mh; y++) for (int x = 0; x < f->mw; x++) {
+        if (f->tiles[f->gnd[y][x]].water) continue;
+        float h = f->hgt[y][x] * HALF_STEP;
+        float s = 0.86f + 0.035f * f->hgt[y][x] + 0.05f * frnd(x, y, 11);
+        float a[3] = {(float)x, h, (float)y}, b[3] = {x + 1.0f, h, (float)y};
+        float c[3] = {x + 1.0f, h, y + 1.0f}, d[3] = {(float)x, h, y + 1.0f};
+        quad(&w, &n, cap, a, b, c, d, (float)x, (float)y, x + 1.0f, y + 1.0f, s, s);
+    }
+    f->floor_count = n - f->floor_first;
+    for (int t = 0; t < f->tile_count; t++) {          // water still gets its own scrolling pass
         f->range_first[t] = n;
-        for (int y = 0; y < f->mh; y++) for (int x = 0; x < f->mw; x++) {
-            if (f->gnd[y][x] != t) continue;
-            float h = f->hgt[y][x] * HALF_STEP;
-            float s = 0.86f + 0.035f * f->hgt[y][x] + 0.05f * frnd(x, y, 11);
-            float a[3] = {(float)x, h, (float)y}, b[3] = {x + 1.0f, h, (float)y};
-            float c[3] = {x + 1.0f, h, y + 1.0f}, d[3] = {(float)x, h, y + 1.0f};
-            quad(&w, &n, cap, a, b, c, d, (float)x, (float)y, x + 1.0f, y + 1.0f, s, s);
-        }
+        if (f->tiles[t].water)
+            for (int y = 0; y < f->mh; y++) for (int x = 0; x < f->mw; x++) {
+                if (f->gnd[y][x] != t) continue;
+                float h = f->hgt[y][x] * HALF_STEP;
+                float s = 0.86f + 0.035f * f->hgt[y][x];
+                float a[3] = {(float)x, h, (float)y}, b[3] = {x + 1.0f, h, (float)y};
+                float c[3] = {x + 1.0f, h, y + 1.0f}, d[3] = {(float)x, h, y + 1.0f};
+                quad(&w, &n, cap, a, b, c, d, (float)x, (float)y, x + 1.0f, y + 1.0f, s, s);
+            }
         f->range_count[t] = n - f->range_first[t];
     }
     f->wall_first = n;
@@ -1334,9 +1907,10 @@ static void build_world(Field *f) {
         }
     }
     f->wall_count = n - f->wall_first;
-    emit_edges(f, &w, &n, cap);
-    for (int i = 0; i < f->bld_count && f->geo_count + 3 <= (int)(sizeof(f->geo) / sizeof(f->geo[0])); i++)
-        emit_building(f, &f->blds[i], &w, &n, cap);
+    // Authored sweeps win: the automatic strips are only the fallback for a map with none.
+    for (int i = 0; i < f->sweep_count; i++) emit_sweep(f, &f->sweeps[i], &w, &n, cap);
+    for (int i = 0; i < f->lathe_count; i++) emit_lathe(f, &f->lathes[i], &w, &n, cap);
+    if (!f->sweep_count) emit_edges(f, &w, &n, cap);
     glBindBuffer(GL_ARRAY_BUFFER, f->vbo_world);
     glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, buf, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -1378,6 +1952,51 @@ static const char *FS =
     "  o = vec4(t.rgb * v_col.rgb, 1.0);\n"
     "}\n";
 
+// Ground: one splat texture (bilinear, once over the whole map) weighting four tile textures that
+// each repeat in world space. Per-cell tile ids made every cell boundary read; this does not.
+static const char *SVS =
+    "#version 300 es\n"
+    "layout(location=0) in vec3 a_pos;\n"
+    "layout(location=1) in vec2 a_uv;\n"
+    "layout(location=2) in vec4 a_col;\n"
+    "uniform mat4 u_mvp;\n"
+    "out vec2 v_uv; out vec4 v_col;\n"
+    "void main(){ v_uv = a_uv; v_col = a_col; gl_Position = u_mvp * vec4(a_pos,1.0); }\n";
+static const char *SFS =
+    "#version 300 es\n"
+    "precision mediump float;\n"
+    "in vec2 v_uv; in vec4 v_col;\n"
+    "uniform sampler2D u_splat, u_l0, u_l1, u_l2, u_l3;\n"
+    "uniform vec4 u_scale;   // tiles per cell for each layer\n"
+    "uniform vec4 u_sharp;   // per layer: 1 = smooth into its neighbour, 8+ = a crisp edge\n"
+    "uniform vec4 u_hk;      // per layer: how much its height mask (the alpha) pushes the edge\n"
+    "uniform vec2 u_map;     // map size in cells\n"
+    "uniform vec2 u_blend;   // x unused, y = dither amount\n"
+    "out vec4 o;\n"
+    "float bayer(vec2 p){\n"
+    "  int m[16] = int[16](0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);\n"
+    "  return float(m[int(mod(p.y,4.0))*4 + int(mod(p.x,4.0))]) / 16.0;\n"
+    "}\n"
+    "void main(){\n"
+    "  vec4 w = texture(u_splat, v_uv / u_map);\n"
+    "  w.x += max(0.0, 1.0 - (w.x + w.y + w.z + w.w));        // whatever is left is layer 0\n"
+    "  vec4 t0 = texture(u_l0, v_uv * u_scale.x);\n"
+    "  vec4 t1 = texture(u_l1, v_uv * u_scale.y);\n"
+    "  vec4 t2 = texture(u_l2, v_uv * u_scale.z);\n"
+    "  vec4 t3 = texture(u_l3, v_uv * u_scale.w);\n"
+    "  // Height-aware weights: a tile's raised pixels hold on longer than its cracks, so the edge\n"
+    "  // follows the artwork instead of the splat map's resolution.\n"
+    "  vec4 hgt = vec4(t0.a, t1.a, t2.a, t3.a) - 0.5;\n"
+    "  vec4 e = max(w + hgt * u_hk, vec4(0.0));\n"
+    "  if (u_blend.y > 0.001) e = max(e + (bayer(gl_FragCoord.xy) - 0.5) * u_blend.y, vec4(0.0));\n"
+    "  float m = max(max(e.x, e.y), max(e.z, e.w));\n"
+    "  // Contrast around the winner, each layer at its own sharpness: a hard layer wins its pair.\n"
+    "  vec4 p = pow(e / max(m, 1e-4), u_sharp);\n"
+    "  p /= max(p.x + p.y + p.z + p.w, 1e-4);\n"
+    "  vec3 c = p.x * t0.rgb + p.y * t1.rgb + p.z * t2.rgb + p.w * t3.rgb;\n"
+    "  o = vec4(c * v_col.rgb, 1.0);\n"
+    "}\n";
+
 static GLuint make_shader(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, nullptr);
@@ -1405,6 +2024,26 @@ static void field_gl_init(Field *f) {
     f->u_alpha = glGetUniformLocation(f->prog, "u_alpha");
     f->u_see = glGetUniformLocation(f->prog, "u_see");
     f->u_occl = glGetUniformLocation(f->prog, "u_occl");
+
+    {
+        GLuint sv = make_shader(GL_VERTEX_SHADER, SVS), sf = make_shader(GL_FRAGMENT_SHADER, SFS);
+        f->sprog = glCreateProgram();
+        glAttachShader(f->sprog, sv); glAttachShader(f->sprog, sf);
+        glLinkProgram(f->sprog);
+        GLint sok = 0;
+        glGetProgramiv(f->sprog, GL_LINK_STATUS, &sok);
+        if (!sok) { char log[1024]; glGetProgramInfoLog(f->sprog, sizeof(log), nullptr, log); SDL_Log("field splat link: %s", log); }
+        glDeleteShader(sv); glDeleteShader(sf);
+        f->s_mvp = glGetUniformLocation(f->sprog, "u_mvp");
+        f->s_splat = glGetUniformLocation(f->sprog, "u_splat");
+        const char *ln[4] = {"u_l0", "u_l1", "u_l2", "u_l3"};
+        for (int i = 0; i < 4; i++) f->s_lay[i] = glGetUniformLocation(f->sprog, ln[i]);
+        f->s_scale = glGetUniformLocation(f->sprog, "u_scale");
+        f->s_map = glGetUniformLocation(f->sprog, "u_map");
+        f->s_blend = glGetUniformLocation(f->sprog, "u_blend");
+        f->s_sharp = glGetUniformLocation(f->sprog, "u_sharp");
+        f->s_hk = glGetUniformLocation(f->sprog, "u_hk");
+    }
 
     glGenVertexArrays(1, &f->vao);
     glGenBuffers(1, &f->vbo_world);
@@ -1827,6 +2466,32 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
     glBindVertexArray(f->vao);
     glBindBuffer(GL_ARRAY_BUFFER, f->vbo_world);
     set_attribs();
+
+    if (f->floor_count && f->splat_tex.id) {           // the ground, as four blended layers
+        glUseProgram(f->sprog);
+        glUniformMatrix4fv(f->s_mvp, 1, GL_FALSE, f->mvp);
+        glUniform2f(f->s_map, (float)f->mw, (float)f->mh);
+        glUniform2f(f->s_blend, 0.0f, f->splat_dither);
+        glUniform4f(f->s_sharp, f->layer_sharp[0], f->layer_sharp[1], f->layer_sharp[2], f->layer_sharp[3]);
+        glUniform4f(f->s_hk, f->layer_hk[0], f->layer_hk[1], f->layer_hk[2], f->layer_hk[3]);
+        glUniform4f(f->s_scale, 1.0f / f->layer_cells[0], 1.0f / f->layer_cells[1],
+                    1.0f / f->layer_cells[2], 1.0f / f->layer_cells[3]);
+        glUniform1i(f->s_splat, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, f->splat_tex.id);
+        for (int i = 0; i < 4; i++) {
+            glUniform1i(f->s_lay[i], i + 1);
+            glActiveTexture(GL_TEXTURE1 + i);
+            glBindTexture(GL_TEXTURE_2D, f->tiles[f->layer_tile[i]].tex.id);
+        }
+        glDrawArrays(GL_TRIANGLES, f->floor_first, f->floor_count);
+        for (int i = 0; i < 4; i++) { glActiveTexture(GL_TEXTURE1 + i); glBindTexture(GL_TEXTURE_2D, 0); }
+        glActiveTexture(GL_TEXTURE0);
+        glUseProgram(f->prog);
+        glUniform1i(f->u_tex, 0);
+        glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
+    }
+
     glUniform1f(f->u_alpha, 0.0f);
     for (int t = 0; t < f->tile_count; t++) {
         if (!f->range_count[t]) continue;
@@ -1861,15 +2526,15 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
     v_norm(uv);
     glUniform1f(f->u_alpha, 0.5f);                                  // discard, so no blend sorting
     int n = 0, dn = 0;
-    struct Draw { int art, first; };
-    static Draw draws[F_PROPS + F_NPCS + 4];
+    struct Draw { int art, first; bool occl; };
+    static Draw draws[F_PROPS + F_NPCS + 8];
     for (int i = 0; i < f->prop_count && dn < (int)(sizeof(draws) / sizeof(draws[0])); i++) {
         FProp *pr = &f->props[i];
         if (pr->art < 0) continue;
         FTex *tx = &f->art[pr->art].tex;
         float bx, bz;
         int hh = prop_base(f, pr, &bx, &bz);
-        draws[dn].art = pr->art; draws[dn].first = n; dn++;
+        draws[dn].art = pr->art; draws[dn].first = n; draws[dn].occl = true; dn++;
         push_billboard(f, &n, bx, hh * HALF_STEP, bz, sv, uv,
                        tx->w / PX_PER_CELL, tx->h / PX_PER_CELL, 0, 0, 1, 1, 1.0f);
     }
@@ -1893,8 +2558,19 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
         if (art < 0) continue;
         FTex *tx = &f->art[art].tex;
         int row = facing_row(face, fx, fz, rx, rz);
+        if (player && !f->msg[0] && (f->exam_trig >= 0 || f->exam_npc >= 0) &&
+            dn + 1 < (int)(sizeof(draws) / sizeof(draws[0]))) {
+            int mk = art_get(f, "props", "mark_examine");
+            if (mk >= 0) {
+                FTex *mt = &f->art[mk].tex;
+                float bob = 0.03f * sinf(f->water_t * 5.0f);
+                draws[dn].art = mk; draws[dn].first = n; draws[dn].occl = false; dn++;
+                push_billboard(f, &n, wx, base + tx->h / 4.0f / PX_PER_CELL + 0.12f + bob, wz, sv, uv,
+                               mt->w / PX_PER_CELL, mt->h / PX_PER_CELL, 0, 0, 1, 1, 1.0f);
+            }
+        }
         float fw = tx->w / 4.0f, fh = tx->h / 4.0f;
-        draws[dn].art = art; draws[dn].first = n; dn++;
+        draws[dn].art = art; draws[dn].first = n; draws[dn].occl = !player; dn++;
         push_billboard(f, &n, wx, base, wz, sv, uv, fw / PX_PER_CELL, fh / PX_PER_CELL,
                        frame * 0.25f, row * 0.25f, frame * 0.25f + 0.25f, row * 0.25f + 0.25f, 1.0f);
     }
@@ -1903,7 +2579,7 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
         glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
         set_attribs();
         for (int i = 0; i < dn; i++) {
-            glUniform1f(f->u_occl, i == dn - 1 ? 0.0f : 1.0f);   // the player's own quad never cuts
+            glUniform1f(f->u_occl, draws[i].occl ? 1.0f : 0.0f);   // the player and its mark never cut
             glBindTexture(GL_TEXTURE_2D, f->art[draws[i].art].tex.id);
             glDrawArrays(GL_TRIANGLES, draws[i].first, 6);
         }
@@ -2066,6 +2742,17 @@ void field_message(Field *f, const char *text) {
     f->msg_t = 0;
 }
 
+// Prose lives in story/field/text.md and reaches the game through the generated src/field_text.h.
+// A map only ever names an id; an id with no entry shows as "[the.id]", which is the point.
+static void field_say(Field *f, const char *who, const char *id) {
+    const char *text = nullptr;
+    for (int i = 0; i < FIELD_TEXT_COUNT; i++) if (!strcmp(FIELD_TEXT[i].id, id)) { text = FIELD_TEXT[i].text; break; }
+    if (text) snprintf(f->msg, sizeof(f->msg), "%s", text);
+    else snprintf(f->msg, sizeof(f->msg), "[%s]", id);
+    snprintf(f->msg_who, sizeof(f->msg_who), "%s", who ? who : "");
+    f->msg_t = 0;
+}
+
 static void fire(FieldEvent *ev, int kind, const char *arg) {
     if (ev->kind != FE_NONE) return;
     ev->kind = kind;
@@ -2125,16 +2812,39 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
     f->see_r += (see_target - f->see_r) * (1.0f - expf(-dt / 0.09f));
     if (f->see_r < 0.4f) f->see_r = 0.0f;
 
-    // Triggers fire once on entry and re-arm when the player leaves the rect. Map units, not cells.
+    // Only transitions fire on entry: scenes, encounter zones and traps. Anything you *read* waits
+    // for the interact press, and announces itself with a "!" over the player's head instead.
+    f->exam_trig = f->exam_npc = -1;
+    float best = 1e9f;
+    const float fwx[4] = {0, -1, 1, 0}, fwz[4] = {1, 0, 0, -1};
     for (int i = 0; i < f->trig_count; i++) {
         FTrig *t = &f->trigs[i];
         bool in = f->px >= t->x && f->pz >= t->y && f->px < t->x + t->w && f->pz < t->y + t->h;
-        if (in && !t->inside) {
-            if (t->kind == TG_MESSAGE) field_message(f, t->arg);
-            else if (t->kind == TG_SCENE) fire(ev, FE_SCENE, t->arg);
-            else fire(ev, FE_ZONE, t->arg);
+        if (t->kind == TG_SCENE || t->kind == TG_ZONE || t->kind == TG_TRAP) {
+            if (in && !t->inside) {
+                if (t->kind == TG_SCENE) fire(ev, FE_SCENE, t->arg);
+                else if (t->kind == TG_ZONE) fire(ev, FE_ZONE, t->arg);
+                else field_say(f, nullptr, t->arg);                  // trap: on entry, for later
+            }
+            t->inside = in;
+            continue;
         }
         t->inside = in;
+        float cx = f->px < t->x ? t->x : (f->px > t->x + t->w ? t->x + t->w : f->px);
+        float cz = f->pz < t->y ? t->y : (f->pz > t->y + t->h ? t->y + t->h : f->pz);
+        float dx = cx - f->px, dz = cz - f->pz, d = sqrtf(dx * dx + dz * dz);
+        if (!in) {                                                   // just outside: must be facing it
+            if (d > 0.6f) continue;
+            if (d > 1e-4f && (dx / d) * fwx[f->facing & 3] + (dz / d) * fwz[f->facing & 3] < 0.25f) continue;
+        }
+        if (d < best) { best = d; f->exam_trig = i; }
+    }
+    for (int i = 0; i < f->npc_count; i++) {
+        float ex = f->npcs[i].x + 0.5f - f->px, ez = f->npcs[i].y + 0.5f - f->pz;
+        float d = sqrtf(ex * ex + ez * ez);
+        if (d > 1.8f || d < 1e-3f) continue;
+        if ((ex / d) * fwx[f->facing & 3] + (ez / d) * fwz[f->facing & 3] < 0.25f) continue;
+        if (d < best) { best = d; f->exam_npc = i; f->exam_trig = -1; }
     }
     for (int i = 0; i < f->exit_count; i++) {
         FExit *e = &f->exits[i];
@@ -2152,26 +2862,12 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
     // The action button: dismiss the box, else talk to whoever is in front.
     if (f->tapped) {
         if (f->msg[0]) { f->msg[0] = 0; f->msg_who[0] = 0; }
-        else {
-            const float wx[4] = {0, -1, 1, 0}, wz[4] = {1, 0, 0, -1};
-            int best = -1;
-            float bd = 2.0f;
-            for (int i = 0; i < f->npc_count; i++) {
-                float ex = f->npcs[i].x + 0.5f - f->px, ez = f->npcs[i].y + 0.5f - f->pz;
-                float d = sqrtf(ex * ex + ez * ez);
-                if (d > 1.8f || d < 1e-3f) continue;
-                if ((ex / d) * wx[f->facing & 3] + (ez / d) * wz[f->facing & 3] < 0.25f) continue;
-                if (d < bd) { bd = d; best = i; }
-            }
-            if (best >= 0) {
-                FNpc *np = &f->npcs[best];
-                if (np->scene[0]) fire(ev, FE_SCENE, np->scene);
-                else {
-                    snprintf(f->msg, sizeof(f->msg), "%s", np->say[0] ? np->say : "...");
-                    snprintf(f->msg_who, sizeof(f->msg_who), "%s", np->name);
-                    f->msg_t = 0;
-                }
-            }
+        else if (f->exam_npc >= 0) {
+            FNpc *np = &f->npcs[f->exam_npc];
+            if (np->scene[0]) fire(ev, FE_SCENE, np->scene);
+            else field_say(f, np->name, np->say[0] ? np->say : "missing.line");
+        } else if (f->exam_trig >= 0) {
+            field_say(f, nullptr, f->trigs[f->exam_trig].arg);
         }
     }
 
@@ -2262,6 +2958,21 @@ bool field_dev_ui(Field *f, char *out, int cap) {
     ImGui::SameLine();
     ImGui::SliderFloat("radius px", &f->see_radius, 12.0f, 140.0f, "%.0f");
     ImGui::SliderFloat("walk radius", &f->walk_radius, 0.0f, 0.8f, "%.2f cells");
+    ImGui::Text("ground splat");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(140);
+    ImGui::SliderFloat("dither", &f->splat_dither, 0.0f, 0.5f, "%.2f");
+    for (int i = 0; i < 4; i++) {
+        char a[24], b[24];
+        const char *nm = f->tiles[f->layer_tile[i]].id;
+        snprintf(a, sizeof(a), "%s hard", nm);
+        snprintf(b, sizeof(b), "%s height", nm);
+        ImGui::SetNextItemWidth(220);
+        ImGui::SliderFloat(a, &f->layer_sharp[i], 1.0f, 16.0f, "%.1f");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(220);
+        ImGui::SliderFloat(b, &f->layer_hk[i], 0.0f, 1.2f, "%.2f");
+    }
     return printed;
 }
 
