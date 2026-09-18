@@ -14,9 +14,9 @@ asks about the notch, plainly, because he is going out on that road tomorrow. Yo
 sword in his hands, and no thanks.
 
 MORE PRIVATE (only you know this): You and his father were hunting partners for twenty years and the
-bread run was yours together — two men, one loaf, the same day every year. The year before he died
+water run was yours together — two men, one jar, the same day every year. The year before he died
 your knee was broken on that road. The next year he walked it alone and did not come back. Every year
-since, you have paid a carter out of your own pocket to take the bread out, because it is still your
+since, you have paid a carter out of your own pocket to take the jar out, because it is still your
 run. Falke knows you were partners. He does not know about the money and you will not tell him:
 paying for it is the only way you have ever said any of this, and saying it in words would spoil it.
 It is also why you are selling him the sword instead of handing it over.

@@ -1,4 +1,4 @@
-YOUR CHARACTER: FALKE, seventeen, two days from home for the first time, carrying one loaf of bread to
+YOUR CHARACTER: FALKE, seventeen, two days from home for the first time, carrying one jar of water to
 the Stair. Stolz has just beaten you twice on this bridge and let you across.
 **Falke** — *Energy: blurts and asks.* Short bursts, contractions always, and he says what he
 feels the second he feels it. Questions when he is behind, exclamations when he is surprised, and he

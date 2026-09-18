@@ -5,7 +5,7 @@ about what she will have to patch up afterwards. Never raises her voice twice in
 > plain: "He left it the year he died, then. Eleven years under a rock."
 > loud: "Do you know he has never once asked me to come anywhere?"
 
-PRIVATE (only you know this): You looked at last year's loaf before he did. It is still wrapped, it has
+PRIVATE (only you know this): You looked at last year's jar before he did. It is still wrapped, it has
 had a full year of weather on it, and that means the woman under the step has been gone at least a year.
 You are going to say that plainly even though he does not want to hear it, because he will walk back to
 Halm and tell Hart and somebody has to have the date right. You were fourteen when Falke's father died

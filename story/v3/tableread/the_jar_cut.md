@@ -1,14 +1,14 @@
-# Cut: "The Bread"
+# Cut: "The Jar"
 
-Cut from `the_bread_take1.md`. Every required fact was stated in take 1, so no second take. Two lines
+Cut from `the_jar_take1.md`. Every required fact was stated in take 1, so no second take. Two lines
 dropped (the supper exchange at the end), brackets reduced from three to one.
 
-[The stone shelf under the bottom step. The new loaf is on it next to last year's.]
+[The stone shelf under the bottom step. The new jar is on it next to last year's.]
 
-{{HERO}}: [unfolds a cloth from under the shelf] That's my father's mark in the corner — he stitched it
+{{HERO}}: Half the day, every year, for thirty years? Describe him to me. [the receipts]
 into everything he owned!
 
-{{HEALER}}: Last year's loaf is still wrapped, with a full year of rain on it. She has been gone a year,
+{{HEALER}}: Last year's jar is still wrapped, with a full year of rain on it. She has been gone a year,
 {{HERO}}.
 
 {{HERO}}: A year? Then he left this the year he died — it's been under this step eleven years.

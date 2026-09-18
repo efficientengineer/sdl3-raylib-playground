@@ -1,5 +1,5 @@
-YOUR CHARACTER: FALKE, seventeen. You have just put the year's loaf on the stone shelf under the bottom
-step of the Stair. The job is done. You have just pulled a folded cloth out from under the shelf.
+YOUR CHARACTER: FALKE, seventeen. You have just put the year's jar on the stone shelf under the bottom
+step of the Stair. The job is done. The shrine's oldest woman has just started talking about a hunter.
 **Falke** — *Energy: blurts and asks.* Short bursts, contractions always, and he says what he
 feels the second he feels it. Questions when he is behind, exclamations when he is surprised, and he
 repeats the fact he just heard back as a question before he reacts to it. Never asks for pity.

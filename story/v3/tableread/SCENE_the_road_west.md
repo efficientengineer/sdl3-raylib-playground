@@ -4,11 +4,11 @@
 The bridge on the west road, the second day out from Halm. It is the only crossing and it is packed with
 people walking west — carters, hunters, whole families. Stolz is standing on the bridge wall in a new
 coat, paid to keep the crossing clear for them, and he has just fought Falke across it and let him
-through. Falke and Ottilie are carrying one loaf of bread to the Stair, which is off this road to the
+through. Falke and Ottilie are carrying one jar of water to the Stair, which is off this road to the
 north; everyone else on the bridge is going past where they are going.
 
 Stolz signed for the coast escort in Halm yesterday morning, then sold it on to another hunter the same
-morning and signed with the lord of the western city instead: eighty coin a week. The bread run Falke is
+morning and signed with the lord of the western city instead: eighty coin a week. The water run Falke is
 walking was posted only because every carter in the valley took the same wages. Falke's father died on
 that road eleven years ago and Hart has paid to keep the run going ever since. Hart has never vouched
 for Falke at the guild.
@@ -21,7 +21,7 @@ for Falke at the guild.
 5. He is walking to the mountain that is a door, to ask the ancients for it.
 6. People have asked the ancients for a thousand years and they have never answered anyone.
 7. The lord has someone who can make them answer.
-8. Falke is carrying a loaf of bread and Stolz is riding in a cart.
+8. Falke is carrying a sealed jar of water and Stolz is riding in a cart.
 
 ## Rules
 Three to six lines total. One beat: Falke finds out where this whole road is walking and why. Plain:

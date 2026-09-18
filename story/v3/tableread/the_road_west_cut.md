@@ -1,7 +1,7 @@
 # Cut: "The Road West"
 
 Cut from `the_road_west_take1.md`. Every required fact was stated in take 1, so no second take. Two lines
-dropped ({{HERO}}'s "one loaf, thirty coin" and {{HEALER}}'s coin count); pronouns opened out to names.
+dropped ({{HERO}}'s "one jar, thirty coin" and {{HEALER}}'s coin count); pronouns opened out to names.
 
 [The bridge. {{RIVAL}} is standing on the wall in a new coat.]
 
@@ -19,7 +19,7 @@ hadn't heard?
 thousand years!
 
 {{RIVAL}}: The mountain that's a door, and he has someone who can make them answer. You walk your one
-loaf — I ride, cart three!
+jar — I ride, cart three!
 
 ---
 Lines: 6. Brackets: 1. Beat: {{HERO}} finds out where this whole road is walking and why.

@@ -1,5 +1,5 @@
 YOUR CHARACTER: FALKE, seventeen, hunter's apprentice. You have just come from the guild hall, where the
-clerk wrote your name on the bread run, and you are in Hart's yard shouting up a ladder.
+clerk wrote your name on the water run, and you are in Hart's yard shouting up a ladder.
 **Falke** — *Energy: blurts and asks.* Short bursts, contractions always, and he says what he
 feels the second he feels it. Questions when he is behind, exclamations when he is surprised, and he
 repeats the fact he just heard back as a question before he reacts to it. Never asks for pity.

@@ -1,7 +1,7 @@
 # Table read: "The Sword" (test)
 
 ## Situation (all actors know this)
-Halm, evening, Hart's one-room kitchen. Hart has the guild ledger open. The bread goes out to the
+Halm, evening, Hart's one-room kitchen. Hart has the guild ledger open. The water goes out to the
 Stair on the same day every year and that day is tomorrow, so Falke leaves at dawn. Hart posted the
 job himself this morning, because for eleven years he has quietly paid a carter to run it and this
 year no carter came — every carter and hunter in the valley has walked west for eighty coin a week,

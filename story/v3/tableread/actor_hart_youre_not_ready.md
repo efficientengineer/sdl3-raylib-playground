@@ -7,7 +7,7 @@ favours included. Never says goodbye and never says he is worried about you.
 > loud: "Died on that road eleven years back. Hold the ladder."
 
 PRIVATE (only you know this): For eleven years you have quietly paid a carter out of your own pocket to
-carry that bread out, so the run never went back through the guild and no one had to look at it. This
+carry that water out, so the run never went back through the guild and no one had to look at it. This
 year no carter came — they have all gone west for eighty a week — so you posted it yourself this morning
 and you have spent the whole afternoon regretting it. You have told no one about the eleven years, not
 even Ottilie, and you will not tell them today. Your knee will not carry you four days. You want Falke in

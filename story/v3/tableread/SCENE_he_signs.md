@@ -5,10 +5,11 @@ Hart's yard, late afternoon, the same day. He came down off the roof and made Fa
 posts for an hour while he and Ottilie argued about him within earshot. Now Ottilie is holding the guild
 book open and Hart is sitting on the bottom rung of the ladder with his bad knee out straight.
 
-Hart has given in: he is signing the bread run over to Falke. It leaves at dawn — the bread goes out on
+Hart has given in: he is signing the water run over to Falke. It leaves at dawn — the water goes out on
 the same day every year and that day is tomorrow. Two days west, two days back, thirty coin. No carter
 came for it this year because every carter in the valley has walked west for eighty coin a week, and no
-hunter will vouch for a man on the run that killed Falke's father eleven years ago. Hart has paid to keep
+carters' convoy runs this year, and a lone walker on that road dies, which killed Falke's father
+eleven years ago. Hart has paid to keep
 that run going somehow for all eleven of those years and has never discussed it with either of them.
 Falke has never been more than one day's walk from Halm. Ottilie has walked the west road twice.
 
@@ -20,9 +21,9 @@ know what she does.
 1. Ottilie will go with him; she is a healer and she has walked that road twice.
 2. Hart has never once asked Ottilie to come anywhere.
 3. Hart signs the job over to Falke.
-4. Two days west; the bread goes on the stone shelf under the bottom step; then straight back.
+4. Two days west; the water goes on the stone shelf under the bottom step; then straight back.
 5. The Stair is a staircase the ancients built.
-6. A woman lives under it and takes the bread once a year.
+6. A woman lives under it and takes the jar once a year.
 7. Do not touch the stone and do not go past her shelf.
 8. Falke asks Ottilie to come with him, out loud, in words — and she answers.
 

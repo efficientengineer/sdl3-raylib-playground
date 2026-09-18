@@ -11,12 +11,12 @@ Raw transcripts: `*_take1.md`, `*_take2.md`. Cuts: `*_cut.md`.
 
 > CLERK: The coast escort is gone. {{RIVAL}} signed for it an hour ago and left at noon.
 > {{HERO}}: An hour? I was standing here at the bell! What else is there?
-> CLERK: One sheet, and {{MENTOR}} posted it this morning. The bread goes out to the {{STAIR}} on the
+> CLERK: One sheet, and {{MENTOR}} posted it this morning. The water goes out to the {{STAIR}} on the
 > same day every year, and that day is tomorrow, so it leaves at dawn. Two days there, two days back,
 > thirty coin.
-> {{HERO}}: Thirty? For carrying a loaf? Who has to vouch for me on it?
-> CLERK: The rule is waived on this one. No hunter in this valley will vouch for a man on that run,
-> because the last hunter who walked it died on that road eleven years ago — and every carter who
+> {{HERO}}: Thirty? For carrying a jar? Who has to vouch for me on it?
+> CLERK: It is not a guild job. There is no carters' convoy this year,
+> because a lone walker on that road dies, which is what happened eleven years ago — and every carter who
 > would have taken it instead is walking west for eighty a week.
 > {{HERO}}: The last hunter who walked it was my father. I'll take it!
 
@@ -25,16 +25,16 @@ Raw transcripts: `*_take1.md`, `*_take2.md`. Cuts: `*_cut.md`.
 > CLERK: The rule is that you sign before the bell. {{RIVAL}} signed for the coast escort an hour ago
 > and left at noon.
 > {{HERO}}: An hour? I stood right here at the bell! What's that last sheet on the board?
-> CLERK: The bread run out to the {{STAIR}}. {{MENTOR}} carried it in himself this morning — thirty
+> CLERK: The water run out to the {{STAIR}}. {{MENTOR}} carried it in himself this morning — thirty
 > coin, two days out, two days back, and it leaves at dawn.
-> {{HERO}}: {{MENTOR}} posted it himself? Then where's the carter who takes the bread every year?
-> CLERK: There is no carter. Every carter who would take the bread walked west to the lord's city for
-> eighty coin a week — and the rule that a hunter must vouch for you is waived on this one, because no
-> hunter will vouch for a man on that run. The last hunter who walked it died on that road eleven
+> {{HERO}}: {{MENTOR}} posted it himself? Then where's the carter who takes the jar every year?
+> CLERK: There is no carter. Every carter who would take the jar walked west to the lord's city for
+> eighty coin a week — and it is not a guild job and needs no guarantor, because no
+> convoy runs this year. A man walking that road alone dies, which is what happened eleven
 > years ago.
-> {{HERO}}: The road that killed my father? Write my name on it — I take the bread, I leave at dawn!
+> {{HERO}}: The road that killed my father? Write my name on it — I take the jar, I leave at dawn!
 
-**Verdict — actors, narrowly.** "Then where's the carter who takes the bread every year?" turns the
+**Verdict — actors, narrowly.** "Then where's the carter who takes the jar every year?" turns the
 exodus from a clause in a lecture into an answer the player asked for, which is rule 5.
 The writer still owns the last line: "The last hunter who walked it was my father. I'll take it!" is
 cleaner than the cut's version, and should be pasted over it.
@@ -45,21 +45,21 @@ cleaner than the cut's version, and should be pasted over it.
 
 **Writer**
 
-> {{HERO}}: You put the bread run on the board this morning and you never said a word to me!
+> {{HERO}}: You put the water run on the board this morning and you never said a word to me!
 > {{MENTOR}}: Taking it back down before dark. Forget you saw it.
 > {{HERO}}: It goes out tomorrow or it doesn't go at all! Who else is left to carry it — you, on that knee?
-> {{MENTOR}}: Your father walked that bread out thirty years. Died on that road eleven years back. I'm
+> {{MENTOR}}: Your father walked that water out thirty years. Died on that road eleven years back. I'm
 > not putting you on it.
 > {{HERO}}: You haven't even told me I'm not ready yet. You're saving it.
 > {{MENTOR}}: I'm saving it. Hold the ladder.
 
 **Actors (cut, from take 2)**
 
-> {{HERO}}: You put the bread run on the board this morning and never told me — my name's on it now!
+> {{HERO}}: You put the water run on the board this morning and never told me — my name's on it now!
 > {{MENTOR}}: Posted it myself. Coming back off that board before dark. You're not walking it.
 > {{HEALER}}: It leaves at dawn tomorrow or it does not go at all. Every carter took the western work —
 > who is left to walk it?
-> {{MENTOR}}: Your father walked that bread thirty years. Died on that road eleven years back. Not
+> {{MENTOR}}: Your father walked that water thirty years. Died on that road eleven years back. Not
 > putting you on it!
 > {{HERO}}: He died on that road? Eleven years and you never told me how — and there's no one else to
 > walk it!
@@ -79,9 +79,9 @@ doing something other than holding a ladder.
 
 > {{HEALER}}: I will go with him. I am a healer, I have walked that road twice — and do you know he has
 > never once asked me to come anywhere?
-> {{MENTOR}}: [signing the job over to him] Two days west. Bread on the stone shelf under the step. Straight back.
+> {{MENTOR}}: [signing the job over to him] Two days west. Jar on the stone shelf under the step. Straight back.
 > {{HERO}}: What's at the step? I've never been out that far.
-> {{MENTOR}}: A staircase the ancients built. A woman lives under it and takes the bread once a year.
+> {{MENTOR}}: A staircase the ancients built. A woman lives under it and takes the jar once a year.
 > Don't touch the stone. Don't go past her shelf.
 > {{HERO}}: A woman lives under it? {{HEALER}} — will you come with me?
 > {{HEALER}}: Yes!
@@ -89,12 +89,12 @@ doing something other than holding a ladder.
 **Actors (cut, from take 2)**
 
 > {{HEALER}}: Sign it, {{MENTOR}}. The run leaves at dawn — and I am the one who patches whoever goes.
-> {{MENTOR}}: [signs without looking up] Two days west. Bread on the stone shelf under the bottom step.
+> {{MENTOR}}: [signs without looking up] Two days west. Jar on the stone shelf under the bottom step.
 > Then straight back.
 > {{HERO}}: Two days west, alone? What is the {{STAIR}}, exactly? Tell me plainly, before I walk it.
-> {{MENTOR}}: Staircase the ancients built, woman living under it who takes the bread once a year.
+> {{MENTOR}}: Staircase the ancients built, woman living under it who takes the jar once a year.
 > Don't touch the stone, don't go past her shelf.
-> {{HERO}}: A woman takes the bread once a year? {{HEALER}} — come with me. You've walked that road twice!
+> {{HERO}}: A woman takes the jar once a year? {{HEALER}} — come with me. You've walked that road twice!
 > {{HEALER}}: Yes — four days, not two: two west, two back. I am a healer, and he has never once asked
 > me to come anywhere!
 
@@ -146,7 +146,7 @@ decided this hours ago without a line admitting it.
 > {{RIVAL}}: To walk west with him! He wants rain on his city every year for the rest of his life, and
 > he's going to the mountain to ask the ancients for it.
 > {{HERO}}: Ask them? People have asked the ancients for a thousand years and they've never answered anyone!
-> {{RIVAL}}: He's got someone who can make them answer. You're carrying a loaf of bread and I'm riding
+> {{RIVAL}}: He's got someone who can make them answer. You're carrying a sealed jar of water and I'm riding
 > in a cart. Enjoy the walk!
 
 **Actors (cut, from take 1)**
@@ -160,7 +160,7 @@ decided this hours ago without a line admitting it.
 > {{HERO}}: Rain every year? Who's he asking — the ancients? They've never answered one person in a
 > thousand years!
 > {{RIVAL}}: The mountain that's a door, and he has someone who can make them answer. You walk your one
-> loaf — I ride, cart three!
+> jar — I ride, cart three!
 
 **Verdict — a draw, leaning actors.** Splitting the lord's plan across two boasts instead of one speech
 makes {{RIVAL}} sound like a man repeating what he has been told, which is what he is; "twelve weeks"
@@ -169,31 +169,29 @@ The writer's exit is better: "Enjoy the walk!" beats the cut's cart number as a 
 
 ---
 
-## 6. The Bread
+## 6. The Jar
 
 **Writer**
 
-> {{HERO}}: [pulling a folded cloth out from under the shelf] This is my father's cloth — that's his
-> mark stitched in the corner!
+> {{HERO}}: Half the day? Every year, for thirty years? Describe him to me.
 > {{HEALER}}: He left it the year he died, then. Eleven years under a rock.
 > {{HERO}}: He walked out here every year for thirty years and sat under this step. She knew him thirty
 > years. Did he ever tell you that?
-> {{HEALER}}: He never told anyone. And she has not taken the bread for a year, {{HERO}}. Whatever
+> {{HEALER}}: He never told anyone. And she has not taken the jar for a year, {{HERO}}. Whatever
 > happened to her, she has been gone that long.
 > {{HERO}}: He talked to her more than he talked to me.
 
 **Actors (cut, from take 1)**
 
-> {{HERO}}: [unfolds a cloth from under the shelf] That's my father's mark in the corner — he stitched
-> it into everything he owned!
-> {{HEALER}}: Last year's loaf is still wrapped, with a full year of rain on it. She has been gone a
+> {{HERO}}: Half the day? Every year, for thirty years? Describe him to me.
+> {{HEALER}}: Last year's jar is still wrapped, with a full year of rain on it. She has been gone a
 > year, {{HERO}}.
 > {{HERO}}: A year? Then he left this the year he died — it's been under this step eleven years.
 > {{HEALER}}: Thirty years he sat under this step, and he told no one. She knew him longer than you did.
 > {{HERO}}: Thirty years and he never once said her name to me? He talked to her every year and gave me
 > the weather!
 
-**Verdict — actors.** {{HEALER}} reasons from the object in front of her — wrapped loaf, a year of rain,
+**Verdict — actors.** {{HEALER}} reasons from the object in front of her — wrapped jar, a year of rain,
 therefore a year gone — instead of announcing a conclusion, and "she knew him longer than you did" is
 crueller and truer than "he never told anyone."
 "He talked to her every year and gave me the weather" is the same feeling as the writer's last line with

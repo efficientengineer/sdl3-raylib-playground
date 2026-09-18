@@ -256,6 +256,6 @@ BAN: "he swung this all day"
 5. **{{HEALER}}:** Ask me, then.
 6. **{{MENTOR}}:** Badly. He swung at a thing he should have run from and liked that it worked.
 7. **{{HEALER}}:** Pay him, {{HERO}}. He will stand there all night at six coin an hour.
-8. **{{RIVAL}}:** You'll be up all night with a loaf and I'll be in a cart.
+8. **{{RIVAL}}:** You'll be up all night with a jar and I'll be in a cart.
 9. **{{HEALER}}:** Wrapped, untouched, a year in the weather.
 10. **{{HERO}}:** Pack the fire. We're going west before it stops.

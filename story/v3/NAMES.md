@@ -18,7 +18,7 @@ Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 | `{{RIVAL}}` | Stolz | Nineteen, better, right about it. Takes the lord's coin in chapter one. |
 | `{{VILLAIN}}` | Durst | The young lord in the west. Bought a caretaker, had the {{SECOND_MOON}} moved, and is walking to {{THE_DOOR}}. |
 | `{{HOME_TOWN}}` | Halm | Nine streets, a grain yard, a well. Where the hero starts. |
-| `{{CARETAKER}}` | *(unnamed yet)* | One of the people the ancients made. Few left, all old. Took the bread at the {{STAIR}} for generations; bought and taken west before chapter one. |
+| `{{CARETAKER}}` | *(unnamed yet)* | One of the people the ancients made. Few left, all old. Took the water at the {{STAIR}} for generations; bought and taken west before chapter one. |
 | `{{STAIR}}` | *(descriptive)* | A staircase the width of a town, down out of the cloud, stopping thirty feet above an empty field. The ancients' work nearest {{HOME_TOWN}}. |
 | `{{SECOND_MOON}}` | *(descriptive)* | A moon that isn't a moon. Held one quarter of the sky for a thousand years until last spring. |
 | `{{THE_DOOR}}` | *(descriptive)* | The mountain that is a door. The one place the ancients can be woken or overruled; the end of the pilgrimage. |
@@ -81,7 +81,13 @@ Never says "I don't know" without immediately saying what he does know.
 always, jokes by understatement. Given anything she tells you what it is worth and who is watching it.
 Never says thank you.
 > plain: "Someone's been here. Cart tracks, a day old."
-> loud: "That rope's worth more than the bread and you're leaving it!"
+> loud: "That rope's worth more than the water and you're leaving it!"
+
+## Rename note
+
+The year's offering was called "the bread" and "the loaf" in earlier drafts; it is now a sealed jar of
+water from {{HOME_TOWN}}'s own well, carried unopened. The father's cloth under the shelf was cut.
+Grep the v3 files for "bread", "loaf" and "cloth" and expect zero hits outside this note.
 
 ## Rules
 
