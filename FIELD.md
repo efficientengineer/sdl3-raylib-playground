@@ -26,9 +26,14 @@ changes it without the orchestrator.
   as one full-screen image, nearest-filtered. UI (joystick, dialogue box, Dev) stays ImGui on top.
 - Internal resolution: **640x360** (landscape). Letterbox/pillarbox to the window with integer or
   nearest scaling; `dpi_scale` is not involved. This is what makes it look like pixel art.
-- Camera: perspective, **fixed yaw** (looks along +Z of the map), pitch about **50° down**, FOV about
-  **30°** (long lens, Octopath-flat). Follows the player with a small lag. Pitch, FOV, distance and
-  height are **live sliders in the Dev overlay** so the owner can tune the angle on the phone.
+- Camera: perspective, per-map **camera zones** (`## cameras`, rectangles in map units, the zone the
+  player stands in wins, blends over ~0.4 s). Fields must vary (owner): not always a scrolling
+  side-on view — some areas push movement into the screen with the character shrinking into the
+  distance like FF7/FF8 field screens. Modes: `follow yaw pitch fov dist height` (Octopath default:
+  pitch ~50°, FOV ~30°, small lag); `fixed cx cy cz tx ty tz fov [pan]` (camera stays put, FF7
+  style); `rail ax ay az bx by bz tx ty tz fov` (slides along a segment with the player's progress,
+  looking at T). The joystick is screen-relative in every mode, so controls never invert. Dev
+  sliders edit the current zone live and "print zone" logs the map line to paste back.
 - Geometry generated from the map at load: one floor quad per cell at its height, wall quads on every
   height discontinuity (textured with the wall tile, repeated per height step), water cells as floor
   quads with a scrolling UV. Vertex colours bake the light: faces away from the sun (sun from +X, -Z)
@@ -63,9 +68,16 @@ sun: 1 -1            # optional
 ## triggers           # x y w h kind arg                 kinds: message <text> | scene <scene-id> | zone <encounter-table>
 ```
 
-Rules: a walker can step to a neighbouring cell if the height difference is at most **one half-step**
-and the cell is not blocked (wall tile, solid prop, another walker, water). Height above the ground
-is drawn, never simulated: no jumping, no falling. Cells are 1.0 units; a half-step is 0.25 units.
+**Movement is a navmesh, not colliders** (owner's call: lighter and more bug-resistant than 3D
+movement against colliders). Each map has a `## nav` section: convex polygons in map units,
+`id: x z h, x z h, x z h[, ...]` (3–8 vertices, counter-clockwise, each vertex with its own height, so
+a ramp is just a sloped polygon). Adjacency comes from shared edges at load. A walker's state is
+(polygon, x, z); height is interpolated from the polygon's plane. Motion that leaves a polygon
+through a shared edge crosses into the neighbour; through an unshared edge it slides along the edge.
+Obstacles are simply where the mesh isn't: the height grid, walls and props are rendering only and
+block nothing. Walkers push out of each other by radius, then re-resolve against the mesh. The Dev
+overlay draws the mesh as a wireframe with polygon ids, because maps are authored by hand. No jumping,
+no falling. Cells are 1.0 units; a half-step is 0.25 units.
 
 ## Art contract — `story/field/`
 
@@ -89,19 +101,30 @@ Every file is a PNG with alpha (sprites) or opaque (tiles). The engine looks for
 
 ## Pipeline commands (`story_prompt.py`)
 
-- `tiles <id> [<id>...]` → one ChatGPT package per request: a sheet of bordered 1:1 cells on black,
-  each labelled by position in the prompt (never in the image), asking for seamless top-down (ground)
-  or front-on (wall) pixel-art tiles in the locked style, with the style reference attached. Slicing
-  uses the existing border detection, then nearest-neighbour resize to 64x64 (stdlib, like `slice`).
-- `props <id> [<id>...]` → a sheet of bordered cells on **flat magenta** (so alpha can be keyed at
-  slice time), one object per cell, front three-quarter view from slightly above matching the camera
-  pitch, with the cell's intended footprint stated in cells. Slice: detect, key magenta to alpha, trim
-  to opaque bounds, write `props/<id>.png`.
-- `walker <Name>` → attaches the character's reference sheet, asks for the 4x4 walk sheet on magenta
-  in a bordered grid; slice into the 32x48 frame layout.
-- All three append to `story/field/manifest.md` and follow the same rule as `sheet`: a prompt that
-  breaks the layout rules exits non-zero. Style text comes from `story/STYLE.md`'s locked blocks;
-  never hand-write it.
+**The template sheet (owner's idea).** The tool does not ask ChatGPT to invent a layout. It **writes a
+template PNG** — a flat magenta canvas with white-bordered slots already drawn, each slot with its
+number painted in the corner (a tiny built-in pixel font; the tool has a stdlib PNG codec, no
+Pillow) — and the package tells the owner to attach the template as the first image. The prompt then
+says "fill slot 1 with …, slot 2 with …" and "keep the borders and numbers exactly where they are,
+draw nothing outside a slot, leave the magenta untouched". Slicing reads the slot boxes from the
+package's JSON (the tool made them, so it knows them; no border detection needed), keys magenta to
+alpha, trims to the opaque bounds, and writes the files. If the returned image is not the template's
+size, scale the boxes proportionally first.
+
+- `tiles <id> [<id>...]` → template of square slots on **black** (tiles are opaque), prompt asks for
+  seamless top-down (ground) or front-on (wall) pixel-art tiles in the locked style, style reference
+  attached. Slice: known boxes, then nearest-neighbour resize to 64x64.
+- `props <id> [<id>...]` → template of slots sized to each prop's stated footprint on **magenta**, one
+  object per slot, front three-quarter view from slightly above matching the camera pitch, ground
+  contact at the slot's bottom edge. Slice: known boxes, key magenta, trim, write `props/<id>.png`.
+- `walker <Name>` → template of the 4x4 frame grid (32x48 frames scaled up 4x so ChatGPT has pixels to
+  work with) on magenta, the character's reference sheet attached, rows labelled S/W/E/N in the
+  prompt. Slice: known boxes, key magenta, nearest-neighbour downscale to 32x48, write the sheet.
+- All three write `story/out/<name>.template.png`, `story/out/<name>.chatgpt.md` and
+  `story/out/<name>.sheet.json`, append to `story/field/manifest.md`, and follow the same rule as
+  `sheet`: a prompt that breaks the rules exits non-zero. Style text comes from `story/STYLE.md`'s
+  locked blocks; never hand-write it. `slice` grows a mode for these packages (or they get their own
+  `cut` subcommand); the owner's loop is generate → pull the PNG → one command.
 
 ## Game flow
 

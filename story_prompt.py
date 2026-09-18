@@ -15,6 +15,15 @@
   ./story_prompt.py portraits                  cut each character's reference sheet down to story/portraits/<name>.png
                                                (the middle head-and-shoulders panel; shipped as portrait_<name>.png)
 
+  Field art (FIELD.md): the tool draws the sheet's layout itself as a template PNG, ChatGPT only fills
+  the numbered slots, and cutting needs no border detection because the boxes are in the package JSON.
+  ./story_prompt.py tiles  grass dirt water    story/out/tiles_....template.png + .chatgpt.md + .sheet.json
+  ./story_prompt.py props  well cart sign      slots sized by each prop's footprint in map cells
+  ./story_prompt.py walker Bron                the 4x4 walk grid (rows S W E N), the ref sheet attached
+  ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png
+                                               key the magenta, cut the slots, write story/field/tiles|props|walkers/
+                                               and regenerate story/field/manifest.md ('slice' redirects here)
+
   ./story_prompt.py preview story/scenes/003_x.md
                                                write story/out/<scene>.preview.html: panels layered manga-style and
                                                revealed line by line with a dialogue box (placeholders if not sliced yet)
@@ -967,6 +976,8 @@ def cmd_slice(args):
     if len(pos) != 2:
         die('usage: slice story/out/<name>.sheet.json <image> [--trim N] [--boxes "x,y,w,h;..."]')
     manifest, image = json.loads(Path(pos[0]).read_text()), Path(pos[1]).expanduser()
+    if manifest.get("kind") in FIELD_KINDS:              # a field template package: the boxes are known
+        return cmd_cut(pos)                              # --trim and --boxes mean nothing here
     if not image.exists():
         die(f"{image} not found")
     w, h, ch, rows = read_png(image)
@@ -1390,6 +1401,755 @@ def write_packages_index(by_chapter, refs, cast):
     (PACKAGES / "README.md").write_text("\n".join(L))
 
 
+# ───────────────────────── Field art: template sheets (tiles, props, walkers) ─────────────────────────
+#
+# The template sheet, from FIELD.md: the tool does not ask ChatGPT to invent a layout. It draws the
+# sheet itself — a flat magenta (props, walkers) or black (tiles) canvas with white-bordered slots and
+# a painted number beside each — and the prompt says "fill slot 1 with ..., keep the borders and the
+# numbers exactly where they are, draw nothing outside a slot". Cutting the returned image needs no
+# border detection: the boxes are in the package's .sheet.json because this tool put them there.
+#
+# The numbers sit in the gutter just outside each slot's top-left corner, never inside it: the cut
+# takes the pixels inside the border, and a digit drawn inside would end up baked into the tile.
+
+FIELD = ROOT / "field"
+FIELD_DIRS = {"tile": FIELD / "tiles", "prop": FIELD / "props", "walker": FIELD / "walkers"}
+FIELD_DOCS = {"tile": FIELD / "tiles.md", "prop": FIELD / "props.md", "walker": FIELD / "walkers.md"}
+FIELD_MANIFEST = FIELD / "manifest.md"
+FIELD_KINDS = ("tiles", "props", "walker")          # the three commands; singular forms key the dicts above
+
+CELL_PX = 64                          # a map cell is 64 internal pixels (FIELD.md, "Art contract")
+TILE_PX = 64                          # every tile is 64x64 and seamless
+WALK_W, WALK_H = 32, 48               # one walker frame
+WALK_FACINGS = ("S", "W", "E", "N")   # row order
+WALK_STEPS = ("stand", "step-left", "stand", "step-right")   # column order
+WALK_MIN_SCALE = 4                    # frames drawn at least 4x up so ChatGPT has pixels to work with
+TILE_KINDS = ("ground", "wall")
+
+MAGENTA, BLACK, WHITE = (255, 0, 255), (0, 0, 0), (255, 255, 255)
+KEY_HARD, KEY_SOFT = 56, 180          # RGB distance to magenta: <= hard is background, <= soft fades out
+#   A half-and-half blend of a mid tone with magenta lands around 130, so the soft band has to reach
+#   past that or every sprite keeps a pink outline. The band only applies to magenta-hued pixels.
+SLOT_BORDER = 3                       # white border drawn inside each slot rectangle
+SLOT_MARGIN, SLOT_GUTTER = 52, 48     # canvas margin, gap between slots (the numbers live in the gap)
+SLOT_MIN = 96                         # an inner slot smaller than this is not worth asking for
+CUT_PAD = 2                           # extra pixels shaved off each side when cutting, for soft borders
+DIGIT_SCALE, DIGIT_GAP = 6, 8         # 3x5 digits at 6x are 18x30: they survive a regeneration
+TEMPLATE_CANVASES = ((1536, 1024, "landscape, 1536x1024"), (1024, 1536, "portrait, 1024x1536"))
+
+# Expected props and their box in map cells (W across, H tall). props.md's own '- footprint:' line wins;
+# this table is the fallback, and an id in neither gets 1x1 and a warning.
+PROP_FOOTPRINTS = {
+    "house_a": (3, 3), "house_b": (2, 3), "guild_hall": (4, 3), "grain_shed": (3, 3),
+    "ladder_house": (3, 3), "well": (1, 2), "cart": (2, 2), "barrel": (1, 1),
+    "practice_post": (1, 2), "fence": (2, 1), "tree_a": (2, 3), "tree_b": (1, 2),
+    "sign": (1, 2), "milestone": (1, 1),
+}
+DEFAULT_FOOTPRINT = (1, 1)
+
+# A 3x5 bitmap font, drawn scaled. Slot numbers only, so digits are all it needs.
+DIGIT_FONT = {
+    "0": ("111", "101", "101", "101", "111"), "1": ("010", "110", "010", "010", "111"),
+    "2": ("111", "001", "111", "100", "111"), "3": ("111", "001", "111", "001", "111"),
+    "4": ("101", "101", "111", "001", "001"), "5": ("111", "100", "111", "001", "111"),
+    "6": ("111", "100", "111", "101", "111"), "7": ("111", "001", "001", "010", "010"),
+    "8": ("111", "101", "111", "101", "111"), "9": ("111", "101", "111", "001", "111"),
+}
+
+
+# ── the description files ──
+
+def field_entries(path, what):
+    """{id: {'desc': one line, plus any '- key: value'}} from story/field/<what>.md."""
+    if not path.exists():
+        die(f"{path.relative_to(ROOT.parent)} not found; it holds one '## <id>' entry per {what}")
+    out = {}
+    for name, body in h2_sections(path.read_text()).items():
+        if not re.fullmatch(r"[a-z0-9_]+", name):
+            die(f"{path.name}: '## {name}' is not a usable id (lower case, digits and underscores only)")
+        desc = next((squash(l) for l in body.splitlines()
+                     if l.strip() and not re.match(r"^\s*- [\w ]+?:", l)), "")
+        out[name] = {"desc": desc, **kv_lines(body)}
+    if not out:
+        die(f"{path.name}: no '## <id>' entries")
+    return out
+
+
+def field_look(entry, name, where):
+    """A walker's look line, checked the same way characters.md is."""
+    look = entry.get("look", "")
+    bad = [w for w in LOOK_BANNED if re.search(rf"\b{w}\b", look, flags=re.I)]
+    if bad:
+        die(f"{where}: {name}'s look contains {bad}. Describe only what is visible (see characters.md, "
+            f"'Design direction').")
+    return look
+
+
+def check_description(text, ident, where):
+    """Descriptions obey R8 and R9 like a panel does: no style words, nothing written on anything."""
+    low = text.lower()
+    for w in STYLE_WORDS:
+        if re.search(rf"\b{re.escape(w)}\b", low):
+            die(f"{where}: '{ident}' contains the style word '{w}'. Style comes from STYLE.md, never from a description.")
+    for w in TEXT_WORDS:
+        if re.search(rf"\b{re.escape(w)}\b", low):
+            die(f"{where}: '{ident}' asks for written words ('{w}'). Image models mangle letters; describe the object instead.")
+
+
+# ── drawing the template ──
+
+def new_canvas(w, h, rgb):
+    return [bytearray(bytes(rgb) * w) for _ in range(h)]
+
+
+def fill_rect(rows, x, y, w, h, rgb):
+    W = len(rows[0]) // 3
+    x0, y0, x1, y1 = max(0, x), max(0, y), min(W, x + w), min(len(rows), y + h)
+    if x1 <= x0 or y1 <= y0:
+        return
+    span = bytes(rgb) * (x1 - x0)
+    for yy in range(y0, y1):
+        rows[yy][x0 * 3:x1 * 3] = span
+
+
+def stroke_rect(rows, x, y, w, h, t, rgb):
+    fill_rect(rows, x, y, w, t, rgb)
+    fill_rect(rows, x, y + h - t, w, t, rgb)
+    fill_rect(rows, x, y + t, t, h - 2 * t, rgb)
+    fill_rect(rows, x + w - t, y + t, t, h - 2 * t, rgb)
+
+
+def draw_digits(rows, text, x, y, scale, rgb):
+    """The slot number, 3x5 pixels a digit, scaled. Returns the width drawn."""
+    cx = x
+    for chsym in text:
+        glyph = DIGIT_FONT.get(chsym)
+        if glyph:
+            for gy, line in enumerate(glyph):
+                for gx, on in enumerate(line):
+                    if on == "1":
+                        fill_rect(rows, cx + gx * scale, y + gy * scale, scale, scale, rgb)
+        cx += 4 * scale
+    return cx - x
+
+
+def draw_template(W, H, bg, slots):
+    rows = new_canvas(W, H, bg)
+    for s in slots:
+        x, y, w, h = s["box"]
+        stroke_rect(rows, x, y, w, h, SLOT_BORDER, WHITE)
+        draw_digits(rows, str(s["n"]), x, y - DIGIT_GAP - 5 * DIGIT_SCALE, DIGIT_SCALE, WHITE)
+    return rows
+
+
+# ── slot layout ──
+
+def pack_cells(sizes, W, H, u, margin=SLOT_MARGIN, gutter=SLOT_GUTTER):
+    """Boxes for slots of (w, h) cells at u pixels per cell, packed into rows. None if it overflows.
+
+    Slots in a row are bottom-aligned, so props of different heights stand on one ground line."""
+    avail = W - 2 * margin
+    rows, cur, used = [], [], 0.0
+    for i, (cw, chh) in enumerate(sizes):
+        w = cw * u
+        if w > avail:
+            return None
+        if cur and used + gutter + w > avail:
+            rows.append(cur)
+            cur, used = [], 0.0
+        used += (gutter if cur else 0) + w
+        cur.append(i)
+    rows.append(cur)
+    out, y = [None] * len(sizes), float(margin)
+    for row in rows:
+        rh = max(sizes[i][1] * u for i in row)
+        x = float(margin)
+        for i in row:
+            w, h = sizes[i][0] * u, sizes[i][1] * u
+            out[i] = (int(x), int(y + rh - h), int(w), int(h))
+            x += w + gutter
+        y += rh + gutter
+    return out if y - gutter <= H - margin else None
+
+
+def layout_cells(sizes, ids):
+    """Pick the canvas and the cell size that make the slots biggest. (W, H, label, u, boxes)."""
+    best = None
+    for W, H, label in TEMPLATE_CANVASES:
+        lo, hi = 1.0, float(max(W, H))
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            if pack_cells(sizes, W, H, mid):
+                lo = mid
+            else:
+                hi = mid
+        boxes = pack_cells(sizes, W, H, lo)
+        if boxes:
+            dy = (H - max(b[1] + b[3] for b in boxes) - SLOT_MARGIN) // 2      # sit the block in the canvas
+            boxes = [(x, y + dy, w, h) for x, y, w, h in boxes]
+        if boxes and (best is None or lo > best[3]):
+            best = (W, H, label, lo, boxes)
+    if best is None:
+        die(f"{len(sizes)} slots do not fit on any template canvas. Split them across two packages: "
+            f"{', '.join(ids)}")
+    W, H, label, u, boxes = best
+    small = min(min(b[2], b[3]) for b in boxes) - 2 * SLOT_BORDER
+    if small < SLOT_MIN:
+        die(f"{len(sizes)} slots leave the smallest one {small}px across, under {SLOT_MIN}px: ChatGPT has "
+            f"nothing to draw with. Split them across two packages: {', '.join(ids)}")
+    return W, H, label, u, boxes
+
+
+def layout_walker():
+    """The 4x4 frame grid: the largest whole-number upscale of a 32x48 frame that fits a canvas."""
+    gutter = SLOT_GUTTER
+    best = None
+    for W, H, label in TEMPLATE_CANVASES:
+        s = min((W - 2 * SLOT_MARGIN - 3 * gutter) // (4 * WALK_W),
+                (H - 2 * SLOT_MARGIN - 3 * gutter) // (4 * WALK_H))
+        if s >= WALK_MIN_SCALE and (best is None or s > best[3]):
+            best = (W, H, label, s)
+    if best is None:
+        die(f"a 4x4 grid of {WALK_W}x{WALK_H} frames at {WALK_MIN_SCALE}x does not fit any template canvas")
+    W, H, label, s = best
+    fw, fh = WALK_W * s, WALK_H * s
+    gw, gh = 4 * fw + 3 * gutter, 4 * fh + 3 * gutter
+    ox, oy = (W - gw) // 2, (H - gh) // 2
+    boxes = [(ox + c * (fw + gutter), oy + r * (fh + gutter), fw, fh) for r in range(4) for c in range(4)]
+    return W, H, label, s, boxes
+
+
+def inner_box(box):
+    x, y, w, h = box
+    t = SLOT_BORDER
+    return (x + t, y + t, w - 2 * t, h - 2 * t)
+
+
+# ── the package ──
+
+def field_attachments(style, template, ref, warn):
+    """[(path, note)] in attach order: the template, the style reference, then a character sheet."""
+    out = [(template, "TEMPLATE. Redraw this exact image with every numbered slot filled in and "
+                      "everything else left untouched. It is the canvas, not a reference.")]
+    sp = existing(style["refs"].get("style"))
+    if sp:
+        out.append((sp, "STYLE reference. " + style["refs"].get("style_note", "")))
+    else:
+        warn.append(f"no style reference at {style['refs'].get('style')}; the prompt text carries the style alone")
+    if ref:
+        out.append(ref)
+    return out
+
+
+TEMPLATE_RULES = (
+    "TEMPLATE RULES: Return the whole template at the same size and proportions as the image I "
+    "attached. Every white slot border and every slot number stays exactly where it is, the same size "
+    "and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is "
+    "left as it is: the margins, the gutters between the slots, and the background behind the numbers. "
+    "Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the "
+    "slots. No text, no labels, no captions, no arrows, no colour swatches, no signature."
+)
+
+
+def write_field_package(kind, name, canvas_label, W, H, bg, slots, prompt, attach, after, out_file=None):
+    OUT.mkdir(exist_ok=True)
+    template = OUT / f"{name}.template.png"
+    write_png(template, W, H, 3, draw_template(W, H, bg, slots))
+    manifest = OUT / f"{name}.sheet.json"
+    manifest.write_text(json.dumps({
+        "template": name, "kind": kind, "canvas": [W, H], "canvas_label": canvas_label,
+        "background": list(bg), "border": SLOT_BORDER, "out": out_file, "slots": slots, "prompt": prompt,
+    }, indent=2) + "\n")
+    md = OUT / f"{name}.chatgpt.md"
+    md.write_text(package(f"{kind} template {name}", attach, prompt, after))
+    return template, manifest, md
+
+
+def field_after(manifest, lines):
+    return lines + ["", "When it passes, download the image and cut it up:", "", "```",
+                    f"./story_prompt.py cut {manifest.relative_to(ROOT.parent)} ~/Downloads/<file>.png", "```"]
+
+
+def cmd_tiles(args):
+    ids = [a.lower() for a in args if not a.startswith("--")]
+    if not ids:
+        die("usage: tiles <id> [<id>...]   (ids come from story/field/tiles.md)")
+    entries, style, warn = field_entries(FIELD_DOCS["tile"], "tile"), load_style(), []
+    ids = dedupe_ids(ids, warn)
+    missing = [i for i in ids if i not in entries]
+    if missing:
+        die(f"no entry in story/field/tiles.md for: {', '.join(missing)}. Add a '## <id>' with a one-line "
+            f"description and a '- kind: ground' or '- kind: wall' line.")
+    for i in ids:
+        if not entries[i]["desc"]:
+            die(f"story/field/tiles.md: '## {i}' has no description line")
+        if entries[i].get("kind", "") not in TILE_KINDS:
+            die(f"story/field/tiles.md: '## {i}' has '- kind: {entries[i].get('kind', '(none)')}'; "
+                f"use one of: {', '.join(TILE_KINDS)}")
+        check_description(entries[i]["desc"], i, "story/field/tiles.md")
+
+    W, H, label, u, boxes = layout_cells([(1, 1)] * len(ids), ids)
+    slots = [{"n": n, "id": i, "kind": entries[i]["kind"], "box": list(boxes[n - 1]),
+              "inner": list(inner_box(boxes[n - 1])), "target": [TILE_PX, TILE_PX],
+              "out": str((FIELD_DIRS["tile"] / f"{i}.png").relative_to(ROOT.parent))}
+             for n, i in enumerate(ids, 1)]
+    name = package_name("tiles", ids)
+    b = style["blocks"]
+    attach = field_attachments(style, OUT / f"{name}.template.png", None, warn)
+    L = [f"Create ONE image: the attached template with all {len(ids)} numbered slots filled in. "
+         f"Canvas: {label}, the same size as the template.", b["header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "",
+          "WHAT THESE ARE: ground and wall textures for a 2.5D field map, one per slot. Each slot is "
+          "filled edge to edge with its texture, right up to the white border, with no frame, no "
+          "vignette, no border of its own and no empty corner. Every tile is SEAMLESS: the right edge "
+          "continues into the left edge and the bottom edge into the top, so a floor tiled with copies "
+          "of it shows no seam and no repeating landmark. Keep the detail even: no single large feature "
+          "that the eye can count across a field, no object, no character, no shadow of anything "
+          "outside the tile. All of these tiles belong to one valley town and share one palette and one "
+          "pixel size.", "",
+          f"A ground tile is seen straight down from directly above. A wall tile is seen level from the "
+          f"front, is the face of a step in the ground, and repeats upward as well as sideways. In game "
+          f"every tile is {TILE_PX}x{TILE_PX} pixels, so keep the pixels large and the shapes simple.", "",
+          "SLOTS:"]
+    for s in slots:
+        e = entries[s["id"]]
+        view = "seen straight down from directly above" if e["kind"] == "ground" else \
+               "seen level from the front, the face of a step in the ground"
+        L.append(f"Slot {s['n']} ({s['id']}), {e['kind']} tile, {s['inner'][2]}x{s['inner'][3]} px in the "
+                 f"template: {e['desc'].rstrip('.')}. {view.capitalize()}, seamless on all four edges.")
+    L += ["", f"RENDERING: {b['rendering']}", "",
+          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, a border or "
+          f"frame inside a slot, a visible seam at a tile edge, one big feature in the middle of a tile, "
+          f"objects or characters, changing the size of the image"]
+    prompt = "\n".join(L)
+    template, manifest, md = write_field_package(
+        "tiles", name, label, W, H, BLACK, slots, prompt, attach, field_after(manifest_path(name), [
+            f"- [ ] All {len(ids)} slots filled, every border and number still exactly where it was",
+            "- [ ] Nothing drawn in the gutters; the black between the slots is still flat black",
+            "- [ ] Each tile fills its slot to the border, with no frame and no empty corner",
+            "- [ ] Tiling test: the left edge of a tile would meet its right edge without a seam",
+            "- [ ] No text, labels or swatches anywhere", "",
+            "If one tile fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot and "
+            "the whole template exactly as it is. <what was wrong>\"."]))
+    report_field(kind_rows("tile", slots, name), warn, md, template, f"{len(ids)} tiles, {label}")
+
+
+def cmd_props(args):
+    ids = [a.lower() for a in args if not a.startswith("--")]
+    if not ids:
+        die("usage: props <id> [<id>...]   (ids come from story/field/props.md)")
+    entries, style, warn = field_entries(FIELD_DOCS["prop"], "prop"), load_style(), []
+    ids = dedupe_ids(ids, warn)
+    missing = [i for i in ids if i not in entries]
+    if missing:
+        die(f"no entry in story/field/props.md for: {', '.join(missing)}. Add a '## <id>' with a one-line "
+            f"description and a '- footprint: WxH' line.")
+    cells = []
+    for i in ids:
+        if not entries[i]["desc"]:
+            die(f"story/field/props.md: '## {i}' has no description line")
+        check_description(entries[i]["desc"], i, "story/field/props.md")
+        cells.append(footprint_of(i, entries[i], warn))
+
+    W, H, label, u, boxes = layout_cells(cells, ids)
+    slots = [{"n": n, "id": i, "cells": list(cells[n - 1]), "box": list(boxes[n - 1]),
+              "inner": list(inner_box(boxes[n - 1])),
+              "target": [cells[n - 1][0] * CELL_PX, cells[n - 1][1] * CELL_PX],
+              "out": str((FIELD_DIRS["prop"] / f"{i}.png").relative_to(ROOT.parent))}
+             for n, i in enumerate(ids, 1)]
+    name = package_name("props", ids)
+    b = style["blocks"]
+    attach = field_attachments(style, OUT / f"{name}.template.png", None, warn)
+    L = [f"Create ONE image: the attached template with all {len(ids)} numbered slots filled in. "
+         f"Canvas: {label}, the same size as the template.", b["header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "",
+          "WHAT THESE ARE: single objects for a 2.5D field map, one object per slot, each cut out "
+          "against the flat magenta. The magenta is not a backdrop, it is empty space: it runs right up "
+          "to the edge of the object on every side. No ground, no grass, no paving, no base plate, no "
+          "cast shadow, no glow, no scenery and no second object in a slot.", "",
+          "CAMERA, the same for every slot: a front three-quarter view from slightly above, looking "
+          "about fifty degrees down, as if all of these objects stood in one town seen from one fixed "
+          "camera. The object sits upright, centred left to right, and touches the bottom edge of its "
+          "slot, because that line is where it meets the ground in game.", "",
+          f"SCALE: a slot is a grid of map cells, {CELL_PX} pixels to the cell in game, and each slot "
+          f"below says how many cells it is. Objects share one scale across the sheet: a four-cell hall "
+          f"is four times the width of a one-cell barrel and is drawn with the same size of pixel.", "",
+          "SLOTS:"]
+    for s in slots:
+        cw, chh = s["cells"]
+        L.append(f"Slot {s['n']} ({s['id']}), {cw} x {chh} cells, {s['inner'][2]}x{s['inner'][3]} px in the "
+                 f"template: {entries[s['id']]['desc'].rstrip('.')}. Front three-quarter view from above, "
+                 f"standing on the bottom edge of the slot, magenta on every other side.")
+    L += ["", f"RENDERING: {b['rendering']}", "",
+          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
+          f"grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a "
+          f"scene or background inside a slot, two objects in one slot, changing the size of the image"]
+    prompt = "\n".join(L)
+    template, manifest, md = write_field_package(
+        "props", name, label, W, H, MAGENTA, slots, prompt, attach, field_after(manifest_path(name), [
+            f"- [ ] All {len(ids)} slots filled, every border and number still exactly where it was",
+            "- [ ] The magenta is untouched outside the slots, and comes right up to each object",
+            "- [ ] No ground, shadow, base plate or scenery under or behind an object",
+            "- [ ] Every object stands on the bottom edge of its slot and shares one camera angle",
+            "- [ ] One scale across the sheet: the big buildings really are bigger than the barrel", "",
+            "If one prop fails, reply in the same chat: \"Redraw only slot 2 and keep every other slot and "
+            "the whole template exactly as it is. <what was wrong>\"."]))
+    report_field(kind_rows("prop", slots, name), warn, md, template, f"{len(ids)} props, {label}")
+
+
+def cmd_walker(args):
+    names = [a for a in args if not a.startswith("--")]
+    if len(names) != 1:
+        die("usage: walker <Name>   (a character from characters.md, or an id from story/field/walkers.md)")
+    style, cast, warn = load_style(), load_cast(), []
+    written = names[0]
+    ident = re.sub(r"[^a-z0-9_]", "", written.lower())
+    handle = resolve_name(written, cast)
+    ref = None
+    if handle:
+        c = cast[handle]
+        look, who = c["look"], c["name"]
+        rp = existing(c.get("ref"))
+        if not rp:
+            die(f"{c['name']} has no reference sheet at {c.get('ref')}, so a walk sheet would not match the "
+                f"portrait. Generate it first: ./story_prompt.py refsheet {c['name']}")
+        ref = (rp, f"CHARACTER reference for {c['name']}. The walker is this character: keep the face, hair, "
+                   f"outfit, and colors identical to this image in every frame. Use it for the design only; "
+                   f"ignore its background and its three-panel layout.")
+    else:
+        others = field_entries(FIELD_DOCS["walker"], "walker")
+        if ident not in others:
+            die(f"'{written}' is neither a name in characters.md (a handle or an '- alias:') nor an id in "
+                f"story/field/walkers.md. A story name that has moved on (see story/v3/NAMES.md) belongs on "
+                f"an '- alias:' line of its existing entry, not on a renamed heading; a one-off NPC belongs "
+                f"in story/field/walkers.md.")
+        look, who = field_look(others[ident], ident, "story/field/walkers.md"), ident
+        if not look:
+            die(f"story/field/walkers.md: '## {ident}' has no '- look:' line")
+        check_description(look, ident, "story/field/walkers.md")
+        warn.append(f"{ident} has no reference sheet; the look line carries the design alone")
+
+    W, H, label, s, boxes = layout_walker()
+    slots = []
+    for n, box in enumerate(boxes, 1):
+        r, c_ = (n - 1) // 4, (n - 1) % 4
+        slots.append({"n": n, "id": f"{ident}_{WALK_FACINGS[r].lower()}{c_ + 1}", "row": r, "col": c_,
+                      "facing": WALK_FACINGS[r], "step": WALK_STEPS[c_], "box": list(box),
+                      "inner": list(inner_box(box)), "target": [WALK_W, WALK_H],
+                      "out": str((FIELD_DIRS["walker"] / f"{ident}.png").relative_to(ROOT.parent))})
+    name = f"walker_{ident}"
+    b = style["blocks"]
+    attach = field_attachments(style, OUT / f"{name}.template.png", ref, warn)
+    fw, fh = slots[0]["inner"][2], slots[0]["inner"][3]
+    L = [f"Create ONE image: the attached template with all 16 numbered slots filled in. "
+         f"Canvas: {label}, the same size as the template.", b["header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "",
+          f"WHAT THIS IS: a walking sprite sheet for {who} in a 2.5D field map, 16 frames of one "
+          f"character, cut out against the flat magenta. The magenta is empty space, not a backdrop: it "
+          f"runs right up to the figure on every side. No ground, no shadow, no scenery, no props that "
+          f"are not part of the costume.", "",
+          "THE GRID, four rows of four frames, read left to right, top to bottom:",
+          f"Row 1 (slots 1-4), facing S: the character walks toward the camera, seen from the front.",
+          f"Row 2 (slots 5-8), facing W: walks to the viewer's left, seen in side view from their right side.",
+          f"Row 3 (slots 9-12), facing E: walks to the viewer's right, seen in side view from their left side. "
+          f"This is row 2 mirrored, and the costume details stay on the correct side of the body.",
+          f"Row 4 (slots 13-16), facing N: walks away from the camera, seen from behind.", "",
+          "THE COLUMNS, the same four poses in every row: column 1 standing still with both feet "
+          "together; column 2 mid-stride with the left leg forward and the right arm forward; column 3 "
+          "the same standing pose as column 1, identical to it; column 4 mid-stride with the right leg "
+          "forward and the left arm forward. Frames 1 and 3 must match each other exactly, because the "
+          "game plays them as 1, 2, 3, 4 in a loop.", "",
+          f"FRAMING, the same in all 16 frames: the character is drawn at the same size, upright and "
+          f"centred left to right, with the feet on the bottom edge of the frame and a small gap of "
+          f"magenta above the head. The head does not move up or down between frames, so the sheet does "
+          f"not bob when it is played. Each frame is {fw}x{fh} pixels here and is squeezed down to "
+          f"{WALK_W}x{WALK_H} in game, so keep the pixels large, the silhouette clear and the face simple: "
+          f"a few pixels of eye, no fine detail.", "",
+          f"CHARACTER: {look}", ""]
+    if ref:
+        L += ["The character must match the attached reference sheet exactly: same face, hair, outfit, "
+              "colors and marks, in all sixteen frames.", ""]
+    L += [f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {b['rendering']}", "",
+          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
+          f"shadow under the feet, a different size or costume between frames, the head bobbing between "
+          f"frames, a background inside a frame, changing the size of the image"]
+    prompt = "\n".join(L)
+    out_file = str((FIELD_DIRS["walker"] / f"{ident}.png").relative_to(ROOT.parent))
+    template, manifest, md = write_field_package(
+        "walker", name, label, W, H, MAGENTA, slots, prompt, attach, field_after(manifest_path(name), [
+            "- [ ] All 16 slots filled, every border and number still exactly where it was",
+            "- [ ] Rows in the order S, W, E, N; columns stand, step-left, stand, step-right",
+            "- [ ] Slots 1 and 3 of each row are the same pose; the head sits at the same height in all 16",
+            "- [ ] Feet on the bottom edge, magenta right up to the figure, no shadow and no ground",
+            "- [ ] Hair, outfit, colors and marks match the reference sheet in every frame", "",
+            "If one row fails, reply in the same chat: \"Redraw only slots 5 to 8 and keep every other slot "
+            "and the whole template exactly as it is. <what was wrong>\"."]),
+        out_file=out_file)
+    report_field([{"id": ident, "kind": "walker", "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": name}],
+                 warn, md, template, f"16 frames at {s}x, {label}")
+
+
+def dedupe_ids(ids, warn):
+    out = []
+    for i in ids:
+        if i in out:
+            warn.append(f"'{i}' listed twice; one slot is enough")
+        else:
+            out.append(i)
+    return out
+
+
+def package_name(kind, ids):
+    head = "-".join(ids[:3])
+    return f"{kind}_{head}" + (f"-plus{len(ids) - 3}" if len(ids) > 3 else "")
+
+
+def manifest_path(name):
+    return OUT / f"{name}.sheet.json"
+
+
+def footprint_of(i, entry, warn):
+    m = re.fullmatch(r"\s*(\d+)\s*x\s*(\d+)\s*", entry.get("footprint", ""))
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    if i in PROP_FOOTPRINTS:
+        return PROP_FOOTPRINTS[i]
+    warn.append(f"'{i}' has no '- footprint: WxH' line and is not in PROP_FOOTPRINTS; "
+                f"drawn at {DEFAULT_FOOTPRINT[0]}x{DEFAULT_FOOTPRINT[1]} cells")
+    return DEFAULT_FOOTPRINT
+
+
+def kind_rows(kind, slots, package):
+    seen, rows = set(), []
+    for s in slots:
+        if s["id"] in seen:
+            continue
+        seen.add(s["id"])
+        rows.append({"id": s["id"], "kind": kind, "target": f"{s['target'][0]}x{s['target'][1]}",
+                     "package": package})
+    return rows
+
+
+def report_field(rows, warn, md, template, what):
+    write_field_manifest(rows)
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {template.relative_to(ROOT.parent)}  ({what})")
+    print(f"      {md.relative_to(ROOT.parent)}  — attach the template first, then paste the prompt")
+    print(f"      {FIELD_MANIFEST.relative_to(ROOT.parent)} updated")
+
+
+# ── the manifest ──
+
+def read_manifest_rows():
+    """The rows already in story/field/manifest.md: every id ever requested keeps its package name."""
+    rows = {}
+    if not FIELD_MANIFEST.exists():
+        return rows
+    for line in FIELD_MANIFEST.read_text().splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip().strip("`") for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4 or cells[0] in ("id", "") or set(cells[0]) <= set("-: "):
+            continue
+        rows[(cells[1], cells[0])] = {"id": cells[0], "kind": cells[1], "target": cells[2], "package": cells[3]}
+    return rows
+
+
+def write_field_manifest(new_rows=()):
+    """Regenerate story/field/manifest.md: every id ever requested, plus every id the docs declare."""
+    rows = read_manifest_rows()
+    declared = []
+    tiles = field_entries(FIELD_DOCS["tile"], "tile") if FIELD_DOCS["tile"].exists() else {}
+    props = field_entries(FIELD_DOCS["prop"], "prop") if FIELD_DOCS["prop"].exists() else {}
+    walkers = field_entries(FIELD_DOCS["walker"], "walker") if FIELD_DOCS["walker"].exists() else {}
+    for i in tiles:
+        declared.append({"id": i, "kind": "tile", "target": f"{TILE_PX}x{TILE_PX}", "package": "-"})
+    for i, e in props.items():
+        cw, chh = footprint_of(i, e, [])
+        declared.append({"id": i, "kind": "prop", "target": f"{cw * CELL_PX}x{chh * CELL_PX}", "package": "-"})
+    for i in walkers:
+        declared.append({"id": i, "kind": "walker", "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": "-"})
+    for r in declared:                                   # a declared id keeps whatever package asked for it
+        key = (r["kind"], r["id"])
+        r["package"] = rows.get(key, {}).get("package", "-")
+        rows[key] = r
+    for r in new_rows:
+        rows[(r["kind"], r["id"])] = dict(r)
+
+    L = ["# story/field/manifest.md — every field art id",
+         "",
+         "Generated by `./story_prompt.py tiles|props|walker|cut`. The engine does not read it; people and",
+         "agents do. `package` is the last template sheet that asked for the id, `-` if none has yet.",
+         "Sizes are the target the pipeline writes; the last column is what is actually on disk.",
+         ""]
+    for kind, title, note in (("tile", "Tiles", f"{TILE_PX}x{TILE_PX}, opaque, seamless on all four edges"),
+                              ("prop", "Props", f"alpha, {CELL_PX} px to a map cell, standing on the bottom row"),
+                              ("walker", "Walkers", f"alpha, 4 rows (S, W, E, N) x 4 columns of "
+                                                    f"{WALK_W}x{WALK_H} frames")):
+        group = sorted((r for (k, _), r in rows.items() if k == kind), key=lambda r: r["id"])
+        L += [f"## {title} — {note}", "", "| id | kind | target | package | file |", "| --- | --- | --- | --- | --- |"]
+        for r in group:
+            f = FIELD_DIRS[kind] / f"{r['id']}.png"
+            size = png_size(f) if f.exists() else None
+            state = f"yes, {size[0]}x{size[1]}" if size else ("yes" if f.exists() else "missing")
+            L.append(f"| `{r['id']}` | {r['kind']} | {r['target']} | `{r['package']}` | {state} |")
+        if not group:
+            L.append("| — | | | | |")
+        L.append("")
+    FIELD.mkdir(parents=True, exist_ok=True)
+    FIELD_MANIFEST.write_text("\n".join(L))
+
+
+# ── cutting a returned template ──
+
+def key_magenta(rows, w, h, ch):
+    """RGBA rows with the magenta keyed out: flat magenta goes transparent, the fringe fades.
+
+    A pixel is background when it is nearer to magenta than to any colour the art would use, which in
+    practice means near-magenta AND magenta-hued (red and blue both above green). The fringe ChatGPT
+    leaves around an object is a blend of the object with the magenta, so it gets a part alpha and the
+    magenta is taken back out of the colour; otherwise every sprite would have a pink outline."""
+    out = []
+    for y in range(h):
+        src, dst = rows[y], bytearray(w * 4)
+        for x in range(w):
+            r, g, b = src[x * ch], src[x * ch + 1], src[x * ch + 2]
+            d = ((r - 255) ** 2 + g * g + (b - 255) ** 2) ** 0.5
+            if d <= KEY_HARD:
+                continue                                        # leave the pixel at 0,0,0,0
+            a = 255
+            if d < KEY_SOFT and r > g and b > g:
+                a = int(255 * (d - KEY_HARD) / (KEY_SOFT - KEY_HARD))
+                if a < 64:                                      # mostly magenta: call it background
+                    continue
+                f = a / 255.0                                   # un-matte: observed = f*colour + (1-f)*magenta
+                r = min(255, max(0, int((r - 255 * (1 - f)) / f)))
+                g = min(255, max(0, int(g / f)))
+                b = min(255, max(0, int((b - 255 * (1 - f)) / f)))
+            dst[x * 4:x * 4 + 4] = bytes((r, g, b, a))
+        out.append(dst)
+    return out
+
+
+def crop(rows, ch, x, y, w, h):
+    return [bytearray(rows[yy][x * ch:(x + w) * ch]) for yy in range(y, y + h)]
+
+
+def resize_nn(rows, w, h, ch, nw, nh):
+    out = []
+    for y in range(nh):
+        src = rows[min(h - 1, y * h // nh)]
+        dst = bytearray(nw * ch)
+        for x in range(nw):
+            sx = min(w - 1, x * w // nw)
+            dst[x * ch:(x + 1) * ch] = src[sx * ch:(sx + 1) * ch]
+        out.append(dst)
+    return out
+
+
+def opaque_bounds(rows, w, h):
+    x0, y0, x1, y1 = w, h, 0, 0
+    for y in range(h):
+        line = rows[y]
+        for x in range(w):
+            if line[x * 4 + 3]:
+                x0, x1 = min(x0, x), max(x1, x)
+                y0, y1 = min(y0, y), max(y1, y)
+    return None if x1 < x0 else (x0, y0, x1 - x0 + 1, y1 - y0 + 1)
+
+
+def scaled_inner(slot, sx, sy, w, h):
+    """A slot's inner box in the returned image, with a couple of pixels shaved off for soft borders."""
+    ix, iy, iw, ih = slot["inner"]
+    x0 = int(round(ix * sx)) + CUT_PAD
+    y0 = int(round(iy * sy)) + CUT_PAD
+    x1 = int(round((ix + iw) * sx)) - CUT_PAD
+    y1 = int(round((iy + ih) * sy)) - CUT_PAD
+    if x0 < 0 or y0 < 0 or x1 > w or y1 > h or x1 - x0 < 8 or y1 - y0 < 8:
+        die(f"slot {slot['n']} falls outside the image; is this the right file for this package?")
+    return x0, y0, x1 - x0, y1 - y0
+
+
+def cmd_cut(args):
+    pos = [a for a in args if not a.startswith("--")]
+    if len(pos) != 2:
+        die("usage: cut story/out/<name>.sheet.json <image>")
+    data = json.loads(Path(pos[0]).read_text())
+    image = Path(pos[1]).expanduser()
+    kind = data.get("kind")
+    if kind not in FIELD_KINDS:
+        die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
+    if not image.exists():
+        die(f"{image} not found")
+    slots, (tw, th) = data["slots"], data["canvas"]
+    expect = 16 if kind == "walker" else len(slots)
+    if len(slots) != expect:
+        die(f"{pos[0]} has {len(slots)} slots, expected {expect}; nothing written")
+    w, h, ch, rows = read_png(image)
+    sx, sy = w / tw, h / th
+    if abs((w / h) / (tw / th) - 1) > 0.06:
+        die(f"{image.name} is {w}x{h}, the template is {tw}x{th}: a different shape, so the slot boxes "
+            f"would not line up. Ask ChatGPT to redraw the template at its own proportions. Nothing written.")
+    print(f"{image.name}: {w}x{h}, template {tw}x{th} ({sx:.2f}x), {len(slots)} slot(s), kind {kind}")
+
+    if kind == "tiles":
+        FIELD_DIRS["tile"].mkdir(parents=True, exist_ok=True)
+        for s in slots:
+            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+            px = resize_nn(crop(rows, ch, x, y, bw, bh), bw, bh, ch, TILE_PX, TILE_PX)
+            if ch == 4:                                   # a tile is opaque: drop the alpha channel
+                px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
+            out = ROOT.parent / s["out"]
+            write_png(out, TILE_PX, TILE_PX, 3, px)
+            print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  {TILE_PX}x{TILE_PX}")
+    elif kind == "props":
+        FIELD_DIRS["prop"].mkdir(parents=True, exist_ok=True)
+        for s in slots:
+            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch)
+            bounds = opaque_bounds(px, bw, bh)
+            if not bounds:
+                print(f"  slot {s['n']} {s['id']}: nothing but background in the slot; not written", file=sys.stderr)
+                continue
+            cx, cy, cw, chh = bounds
+            px = crop(px, 4, cx, cy, cw, chh)
+            k = s["target"][0] / bw                       # the slot is the cell grid: bring it back to 64 px a cell
+            nw, nh = max(1, round(cw * k)), max(1, round(chh * k))
+            px = resize_nn(px, cw, chh, 4, nw, nh)
+            out = ROOT.parent / s["out"]
+            write_png(out, nw, nh, 4, px)
+            print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> trimmed {cw}x{chh} -> "
+                  f"{out.relative_to(ROOT.parent)}  {nw}x{nh}")
+    else:
+        FIELD_DIRS["walker"].mkdir(parents=True, exist_ok=True)
+        sheet = [bytearray(WALK_W * 4 * 4) for _ in range(WALK_H * 4)]
+        for s in slots:
+            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch)
+            px = resize_nn(px, bw, bh, 4, WALK_W, WALK_H)
+            ox, oy = s["col"] * WALK_W, s["row"] * WALK_H
+            for r in range(WALK_H):
+                sheet[oy + r][ox * 4:(ox + WALK_W) * 4] = px[r]
+        out = ROOT.parent / data["out"]
+        write_png(out, WALK_W * 4, WALK_H * 4, 4, sheet)
+        print(f"  16 frames -> {out.relative_to(ROOT.parent)}  {WALK_W * 4}x{WALK_H * 4} "
+              f"(rows {', '.join(WALK_FACINGS)})")
+
+    kinds = {"tiles": "tile", "props": "prop", "walker": "walker"}
+    rows_out = ([{"id": data["template"].split("_", 1)[1], "kind": "walker",
+                  "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": data["template"]}]
+                if kind == "walker" else kind_rows(kinds[kind], slots, data["template"]))
+    write_field_manifest(rows_out)
+    print(f"{FIELD_MANIFEST.relative_to(ROOT.parent)} updated")
+
+
 # ───────────────────────── Export to the game ─────────────────────────
 
 GAME_HEADER = ROOT.parent / "src" / "cutscene_data.h"
@@ -1498,6 +2258,14 @@ def main():
         cmd_portraits(args[1:])
     elif cmd == "slice":
         cmd_slice(args[1:])
+    elif cmd == "tiles":
+        cmd_tiles(args[1:])
+    elif cmd == "props":
+        cmd_props(args[1:])
+    elif cmd == "walker":
+        cmd_walker(args[1:])
+    elif cmd == "cut":
+        cmd_cut(args[1:])
     elif cmd == "preview":
         cmd_preview(args[1:])
     elif cmd == "export":
