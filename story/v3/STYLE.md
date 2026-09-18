@@ -4,7 +4,7 @@ Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
 ## The checklist
 
-Run every scene against all twelve before it is written, and again before it is done.
+Run every scene against all thirteen before it is written, and again before it is done.
 Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game Storytelling*.
 
 0. **Plain.** After every clip a twelve-year-old could say what just happened, why, and what happens
@@ -15,6 +15,11 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
    died on that road eleven years ago" beats "he never once came straight home." Keep the one quip
    per clip and keep the quip plain too. The model is Phantasy Star IV: *"Zio destroyed Molcum. We
    must go to Tonoe."* This rule outranks every other rule in this file.
+0b. **Voice rides on clarity, never instead of it.** Once the fact is stated outright, say it in the
+   speaker's voice from `NAMES.md`. Every fact in the plain draft must survive the voicing.
+   Plain: "{{MENTOR}} has vouched for {{RIVAL}} four times. He has never vouched for you."
+   In the clerk's voice: "The rule is that every job needs a hunter who will vouch for you.
+   {{MENTOR}} has vouched for {{RIVAL}} four times this year. He has never once vouched for you."
 1. **The player holds the controller.** A clip exists only when play cannot carry the beat, and it
    never repeats what play just showed.
 2. **One sentence, always.** At any moment the player can say what they are doing and why they care,
