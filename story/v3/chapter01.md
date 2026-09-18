@@ -6,22 +6,21 @@ All names are tokens. See `NAMES.md`. Party this chapter: {{HERO}} and {{HEALER}
 ## Goal
 Sign for work before the bell stops.
 
-## Play: Chase + first fight — across town to the guild hall (6 min)
-**Area.** {{HOME_TOWN}}: nine streets, a grain yard, a well. The board closes on the last stroke of
-the bell and the bell is already ringing — you can hear it from wherever you stand, and the strokes
-are the timer. A third of the town has walked west this year: the carters' yard is empty, two shops
-are shuttered.
-**In the way.** The straight lane to the hall is corked by a loaded cart no one is coming back for,
-and behind it a slow line of families leaving with their beds on their backs. You can shove through
-the crowd and lose strokes, or go over the grain-yard wall.
-**The enemy.** Three lids in the grain shed on the short way: grey discs the width of a dinner plate
-that walk on their rims and tip up on edge to roll at you one after another. They are between you and
-the gap in the far wall. Tipping up is the guard-break window, which is the whole combat system.
-**What failing costs.** Lids can't kill you; they can eat your strokes. Lose the fight badly and
-you come in after the bell and the clerk makes you stand while he finishes closing the ledger.
-**What it feels like.** Running late in a town that is emptying out, past people who have already
-given up on it.
-**Find:** a grain sack in the shed the baker buys on your way past — your starting money.
+## Play: Across town to the guild hall (6 min)
+**Map.** {{HOME_TOWN}}, nine streets, and the bell already ringing — the strokes are the clock and the
+board closes on the last one. The straight lane to the hall is corked by a loaded cart no one is
+coming back for, with a line of families queued behind it carrying their beds. The fork: shove through
+the queue and lose strokes, or go over the grain-yard wall and fight your way out of the shed.
+**Encounters.** Lids in the grain shed, three of them, one behind another, tipping up on edge to roll
+at you in a straight line and unable to turn once they do. They drop grain and a coin or two. The only
+encounter in town, and it teaches the guard-break window.
+**Hazards / events.** The cart. Climb it and it shifts and the family shouts at you, which costs a
+stroke; the wall is the answer and the game wants you to work that out in about four seconds.
+**Optional.** Four coin under the well bucket, and a grain sack in the shed the baker buys on your way
+past — between them, the difference between paying {{MENTOR}} in full tonight and owing him two.
+**What failing costs.** Lids cannot kill you, they eat strokes. Come in after the last stroke and the
+clerk makes you stand while he finishes closing the ledger before he will speak to you.
+**Feel.** Running late through a town that is packing up.
 
 ## Clip: The Board
 
@@ -47,15 +46,16 @@ alone died on it eleven years ago, and he was my father. I'll take it!
 ## Goal
 Stop {{MENTOR}} pulling the job back off the board.
 
-## Play: Talk + climb — {{MENTOR}}'s yard (3 min)
-**Area.** Up the hill past the fence he made you rebuild twice. Six practice posts, a water barrel, a
-ladder against the house.
-**In the way.** He is on the roof and will not come down, so the whole argument is shouted upward
-while {{HEALER}} holds the ladder and refuses to let you climb it.
-**What can go wrong.** Nothing yet. This is the rest before the road, and it is meant to be funny.
-**Find:** your father's hunter badge at the bottom of the water barrel.
-**World note:** he posted the run this morning with his own money because no convoy came, and the man
-who pays for a job can pull it back until dawn. That is the only reason you are up this hill.
+## Play: {{MENTOR}}'s yard (3 min)
+**Map.** Up the hill past the fence he made you rebuild twice; six practice posts, a water barrel, and
+a ladder against the house with him at the top of it.
+**Encounters.** None. This is the rest, and it is meant to be funny.
+**Hazards / events.** He will not come down, so the argument is shouted upward while {{HEALER}} holds
+the ladder and will not let you climb it.
+**Optional.** Your father's hunter badge at the bottom of the water barrel. Wear it and three people
+on the road tomorrow talk to you who otherwise walk past.
+**World note.** He posted the run this morning with his own money because no convoy came, and the man
+who pays for a job can pull it back until dawn. That is why you are up this hill.
 
 ## Clip: You're Not Ready
 
@@ -76,14 +76,15 @@ putting you on it.
 
 {{MENTOR}}: I'm saving it. Hold the ladder.
 
-## Play: Tutorial fight — the practice posts (4 min)
-**Area.** The yard, six posts, last light.
-**What you do.** He comes down and works you on the posts while he and {{HEALER}} argue about you
-behind your back, loudly enough to hear every word.
-**Mechanics.** The guard-break window, which is the whole combat system: he moves the sixth post.
-**What failing costs.** Swing early three times and he stops the lesson early, which costs you the
-warm version of the next clip. He signs either way.
-**What it feels like.** Being talked about in the third person while doing press-ups.
+## Play: The practice posts (4 min)
+**Map.** The same yard, six posts, last light.
+**Encounters.** The posts. He works you through the guard-break window on all six and moves the sixth,
+while he and {{HEALER}} argue about you behind your back loud enough to hear every word.
+**Hazards / events.** None.
+**Optional.** Hit all six clean and he throws the rope into the kitchen shop for nothing, which is one
+purchase you no longer have to choose between.
+**What failing costs.** Swing early three times and he ends the lesson, which costs you the warm
+version of the next clip. He signs either way.
 
 ## Clip: He Signs
 
@@ -103,14 +104,17 @@ Don't touch the stone. Don't go past her shelf.
 
 {{HEALER}}: Yes! And he has never once asked me to come anywhere until today.
 
-## Play: Explore + shop — {{MENTOR}}'s kitchen (3 min)
-**Area.** Supper, one room, door propped open, the neighbour's goat in the yard.
-**What you do.** Touch anything and he tells you what it is and what it cost. The sword is already on
-the table with a stone beside it, which he will not explain.
-**Shop:** rope, a waterskin, food. Spend carefully — you need six coin in the next clip and you will
-not have it.
-**Unlocks:** your father's sword. Long reach and fast, and the only weapon in the game that can
-break; the notch in the blade is where it breaks.
+## Play: {{MENTOR}}'s kitchen (3 min)
+**Map.** Supper, one room, door propped open, the neighbour's goat in the yard. Touch anything and he
+tells you what it is and what it cost. The sword is already on the table with a stone beside it.
+**Encounters.** None.
+**Shop.** Rope, a waterskin, a food bag — and you cannot afford all three and the sword, which is the
+point. Rope gets you over the washed-out culvert tomorrow. The waterskin is the only water between the
+river and the ridge. The food bag is the cooked meal at camp, which is a free heal before the ambush.
+**Optional.** Ask about the stone beside the sword and he tells you to mind your own business, twice,
+in two different ways.
+**Unlocks:** your father's sword. Long reach and fast, the only weapon in the game that can break, and
+the notch is where it breaks.
 
 ## Clip: The Sword
 
@@ -124,31 +128,44 @@ break; the notch in the blade is where it breaks.
 
 {{HERO}}: There's a notch in the blade. How did he put a notch in it?
 
-{{MENTOR}}: Followers, at the fire. He'd stand over me and swing instead of waking me. Worked every
-year I was there to be woken. Year he was on his own, he was the one lying down. Notch stays.
+{{MENTOR}}: Sheets, north of the river. One drops on you and you're held until somebody cuts you out.
+He'd wade into them instead of walking round. Twenty years I was there to cut him out. Year he walked
+alone there was no one. Notch stays.
 
 {{HEALER}}: Pay him, {{HERO}}. He will stand there all night at six coin an hour.
 
 ## Goal
 Walk the jar two days west to the {{STAIR}}.
 
-## Play: Travel — the crowded road, morning of day one (8 min)
-**Area.** The west road, wide and flat, and packed: handcarts, families, a man leading four goats, a
-woman who has written the lord's name on a board and is carrying it.
-**In the way.** The crowd itself. You move at their pace, and the verge is mud, so the hour is spent
-squeezing past people who all think you are going the same place they are.
-**No enemy here.** This stretch is safe because it is full. That is the point of it.
-**What you do.** Talk. Nine conversations, all of them about eighty coin a week, the rain in the
-west, and who is left at home.
-**What it feels like.** Busy and hopeful and wrong, and you are the only two walking against the
-grain of it.
+## Play: The west road, morning of day one (12 min)
+**Map.** (1) The road out of the valley, wide, flat and packed: handcarts, families, a man leading
+four goats, a woman carrying a board with the lord's name painted on it. (2) The verges and the old
+roadbed, where the crowd thins and the walking is in long grass at the side. (3) The culvert, washed
+out in the spring, the queue backed up at it, the river bridge visible beyond.
+**Encounters.** Thumbs on the verges, four to six at a time, hopping in to take one item out of your
+pack and running for the ditch — kill them before they reach it or it is gone, and they drop what they
+took plus somebody else's spoon. Milestones standing in the row of real markers on segment 2, one or
+two, motionless until you walk past and then falling on you for one enormous hit; the seam opens a
+finger's width first, so a player who is looking gets a free round. They drop old road iron the smith
+pays well for.
+**Hazards / events.** (1) **The culvert.** The road is out and the queue is going the long way round,
+which costs you the morning and two more encounters. Rope puts you straight down and up in one move.
+(2) **The pedlar** working the queue, who sells rope at triple price if you did not buy any, and who
+is robbed by a thumb while he is talking to you. Kill the thumb and he hands you the rope.
+**Optional.** A chest in the ditch under the broken culvert, reachable only on the rope: a **healing
+charm**, which {{HEALER}} can spend once per fight for the rest of the game.
+**What failing costs.** A thumb that reaches the ditch keeps what it took, and what it takes is
+random: the waterskin, the food bag, or the job sheet, which you then have to explain at the shrine.
+**Feel.** Busy, hopeful, wrong, and you are the only two walking against the grain of it.
 
-## Play: Boss — {{RIVAL}} on the bridge (5 min)
-**Area.** The river bridge, the only crossing, backed up with carts.
-**In the way.** {{RIVAL}}, paid to keep the span moving, who will not let two hunters push in.
-**Mechanics.** A duel. He breaks your guard twice on purpose before the fight is winnable, and you
-can lose it without a game over — losing only means you cross behind everyone.
-**What it feels like.** The first person all day who knows your name, and it is him.
+## Play: The bridge (5 min)
+**Map.** One segment: the river bridge, the only crossing for a day in either direction, backed up
+with carts and kept moving by a man in a new coat.
+**Encounters.** None. The bridge is the busiest place in the chapter and nothing comes near it.
+**Boss.** {{RIVAL}}. One on one, no healing allowed, and he breaks your guard twice on purpose before
+the fight is winnable, so the player learns the window under pressure.
+**Hazards / events.** Lose and you cross at the back of the queue, an hour gone.
+**What failing costs.** That hour is daylight, and daylight is one fewer encounter after dark.
 
 ## Clip: The Road West
 
@@ -173,36 +190,54 @@ riding in a cart. Enjoy the walk!
 ## Goal
 Leave the road and cross the empty country to the {{STAIR}}.
 
-## Play: Travel + fight — off the road, afternoon of day one (10 min)
-**Area.** Past the bridge the crowd keeps west along the river. The jar path turns off north across
-open grass, and in about ten steps the noise of the road stops. Nothing ahead but grass to the
-horizon and one ridge on it.
-**Why it is dangerous now and was not an hour ago.** The convoy used to leave the road here too — but
-a convoy leaves it twenty strong and takes its own night with it. Two people leave it as two people.
-**The enemy.** Followers: bone-white, taller than you when they straighten, three legs, a flat orange
-band where a face should be. Four of them pick you up within the hour and none of them attack. They
-pace you at two hundred strides all afternoon and one more joins every time you stop. Kill the one at
-the back, the one keeping the count, and the rest lose their number and scatter; leave it and the
-group grows. You cannot outwalk them.
-**What failing costs.** Every follower still standing at dusk is a follower at the fire tonight.
-**What it feels like.** Being followed politely by four fence posts that have all day.
+## Play: North off the road, afternoon of day one (15 min)
+**Map.** (1) The turning: past the bridge the crowd keeps west along the river, the jar path goes north
+into open grass, and in ten steps the noise of the road stops. (2) The grass, flat and shoulder-high,
+the ridge on the horizon. (3) The ford, wide and shallow and faster than it looks. (4) The low hills
+under the ridge, broken ground, a cave mouth off the path.
+**Encounters.** The densest stretch in the chapter, and constant. Sheets in the flat grass, one or
+two, lying still until a corner lifts and one wraps a party member, who cannot act until the other
+cuts them out over two rounds; they drop blue skin the shrine families buy. Followers in threes to
+fives, the big one at the back putting the others back on their feet until you kill it — the
+priority-target lesson — and it drops a healing draught. Gongs, always alone, always near a piece of
+old road: it strikes itself, the note hits everyone wherever they stand, and it cannot sound twice
+running, so the round after the note is yours.
+**Why the road was safe and this is not.** No cleverness in it: out here you fight everything that
+finds you and there is no one within half a day to help. The convoy crossed this grass twenty strong
+with its own healer. Two people cross it as two people. One person crosses it as one.
+**Hazards / events.** (1) **The rockslide.** Coming through the low hills the slope lets go behind you
+and shuts the way back. No returning to the road, and the short path over the shoulder is buried, so
+you camp on the ridge tonight instead of pushing on. (2) **The ford.** Wade at the obvious place and
+the current takes the food bag off your back; there are stepping stones a hundred strides upstream if
+you walk the bank and look.
+**Optional.** The cave mouth in the low hills, a roped descent: **knuckles**, the hardest fight in the
+chapter, armoured on top, soft underneath, open only when it rocks back to swing. It drops **the
+second sword** — worse than your father's, and it does not break.
+**What failing costs.** No waterskin and you both reach the ridge dry and start the night at reduced
+stamina. No food bag and there is no cooked meal at camp, so no free heal before the ambush.
+**Feel.** The noise of the world stops in ten steps and does not come back.
 
-## Play: Camp — the ridge, night one (4 min)
-**Area.** A dip under the ridge, out of the wind, one fire. From here the {{STAIR}} comes into view: a staircase as wide as a town coming down out of the cloud and stopping thirty feet above
-an empty field, half a day off. Nothing holds it up.
-**What you do.** Build the fire, set the watch. The game explains the watch as two names and a turn,
-and {{HEALER}} takes the first one because you are asleep on your feet. Followers only take what is
-lying down and will not come in on anyone on their feet, so a watch is one of you upright all night
-and the other one close enough to shake.
-**What it feels like.** Quiet, and too big, and orange bands in the grass at the edge of the light.
+## Play: Camp on the ridge, night one (5 min)
+**Map.** A dip under the ridge, out of the wind, one fire. From up here the {{STAIR}} comes into view
+for the half day ahead: a staircase as wide as a town coming down out of the cloud and stopping thirty
+feet above an empty field, with nothing holding it up. The camera holds on it.
+**Encounters.** None while you set up. Build the fire, cook if you still have the food bag, take the
+watches — {{HEALER}} takes the first because you are asleep on your feet.
+**Hazards / events.** **The ambush**, scripted, once: followers and a sheet come into the firelight in
+the small hours and you fight them half awake at a penalty. One hard fight, and the plainest possible
+statement of why the run takes two people.
+**Optional.** Sit up with her instead of sleeping: three more lines about {{MENTOR}}, and a worse
+start to the ambush.
+**What failing costs.** Lose and they take what is left of the food and you walk day two empty. The
+jar cannot be lost; the game will not take it from you.
 
 ## Clip: The Fire
 
 [Under the ridge. {{HEALER}} has the first watch. The {{STAIR}} is a shape against the sky behind them.]
 
-{{HERO}}: They're still out there. I counted six of them stood in the grass.
+{{HERO}}: My arms have gone. How many was that today?
 
-{{HEALER}}: Six. Sleep anyway — I wake you at the turn, and then you get to count them for me.
+{{HEALER}}: Nineteen, and I patched you four times, twice for the same arm. Sleep — I wake you at the turn.
 
 {{HERO}}: Did you know my father? Properly, I mean. You were in {{MENTOR}}'s yard.
 
@@ -213,35 +248,28 @@ run: he came home a day late off it. Every year.
 
 {{HEALER}}: {{MENTOR}} used to stand at the gate and count. Sleep.
 
-## Play: Fight — the followers at the fire (6 min)
-**Area.** The same dip, in the dark, firelight out to about ten strides and nothing past it.
-**The enemy.** Every follower you let gather this afternoon, coming in from three sides at once.
-Their tell is three seconds long: they go flat, the orange bands go dark, and the grass stops moving.
-**Mechanics.** The watch is the fight. They come for the sleeper and walk straight past the one who
-is standing, so the whole fight is the three seconds of the tell: whoever is upright gets one round
-to haul the other one onto his feet. Both standing, two people win this. This is where the player
-understands why the run needs two, and why a man on his own dies lying down.
-**What failing costs.** Lose and they take the food; you walk day two hungry and {{HEALER}} has
-nothing to cook. The jar cannot be lost — the game will not take it from you.
-**What it feels like.** The thing that killed his father, arriving on schedule, and it looks like nothing.
-
 ## Goal
 Put the jar on the shelf under the {{STAIR}}.
 
-## Play: Travel + explore — day two and the shrine (8 min)
-**Area.** Half a day of grass with the {{STAIR}} growing in front of you until it stops being a shape
-and becomes a wall you cannot see the top of. Then six houses, a well, and pilgrims.
-**In the way.** Nothing, and that is the strange part. A ring of sitters — knee-high, four-armed,
-the same pale grey as the {{STAIR}}, facing outward, spaced evenly in the grass — has been there
-longer than the six houses have. Followers will not cross a line of them. Walk between two and a thin
-green line brightens down each spine until you are through. Ask anyone at the shrine why and they
-will say the sitters were here first and change the subject.
+## Play: Day two and the shrine (10 min)
+**Map.** (1) Half a day of grass with the {{STAIR}} growing in front of you until it stops being a
+shape and becomes a wall you cannot see the top of. (2) The sitters' ring: knee-high, four-armed,
+shrine-grey, facing outward, evenly spaced, there longer than the houses have been — walk between two
+and a green line brightens down each spine until you are through. (3) The shrine: six houses, a well,
+pilgrims, and a stall selling rubbings of the bottom step.
+**Encounters.** Segment 1 only, and heavy: followers and gongs again, plus one last sheet on the flat
+before the ring. Nothing crosses the sitters' line, so from segment 2 on the game stops spawning
+entirely — the first quiet since the bridge.
+**Hazards / events.** Ask anyone at the shrine why nothing comes in and they say the sitters were here
+first and change the subject. Three people, three different subjects.
+**Optional.** Under the shelf, if you crawl: **twenty old jar seals**, one for every year a hunter
+carried it, kept by somebody who is not here any more to keep them.
 **What you do.** Put the jar on the stone shelf, sealed, the way you were told. The job is done and
 the screen says so, with a day and a half of chapter left.
-**Find:** last year's jar still sealed on the shelf; a rope hanging from the bottom step; cart tracks
-in the grass; eleven carters' receipts nailed inside the shrine door, every one of them paid by
-{{MENTOR}}; and the shrine's oldest woman, who talks to anyone who will stand still.
-**What it feels like.** Arriving somewhere holy and finding it is a village with a gift shop.
+**Find:** last year's jar still sealed; a rope hanging from the bottom step; cart tracks in the grass;
+eleven carters' receipts nailed inside the shrine door, every one paid by {{MENTOR}}; and the shrine's
+oldest woman, who talks to anyone who will stand still.
+**Feel.** Somewhere holy that turns out to be a village with a gift stall.
 
 ## Clip: The Jar
 
@@ -261,13 +289,13 @@ the carter never noticed.
 {{HEALER}}: She knew him longer than you did. And {{MENTOR}} has paid to keep this going for eleven
 years without telling either of us.
 
-## Play: Camp — night under the {{STAIR}} (2 min)
-**Area.** A fire and two bedrolls at the foot of it. The stone goes up past where the firelight
-reaches and keeps going.
-**What you do.** Nothing. No watch tonight — this is the release after two days of being followed.
-**See:** the {{SECOND_MOON}} beside the edge of the {{STAIR}}. The camera holds, and it moves west a
-finger's width while you watch. Every bell in the shrine starts ringing.
-**What it feels like.** Two days of being followed, over — for about nine seconds.
+## Play: Night under the {{STAIR}} (2 min)
+**Map.** A fire and two bedrolls at the foot of it, inside the sitters' ring. The stone goes up past
+where the firelight reaches and keeps going.
+**Encounters.** None, and the game says so: no watch tonight.
+**Hazards / events.** **The moon.** The {{SECOND_MOON}} sits beside the edge of the {{STAIR}}, the
+camera holds, and it moves west a finger's width while you watch. Every bell in the shrine starts.
+**What failing costs.** Nothing. This is the release, and it lasts about nine seconds.
 
 ## Goal
 Go west and catch the lord before the moon stops moving.

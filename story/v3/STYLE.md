@@ -48,10 +48,15 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
     answer all four in your notes, and the answers must live in the world rather than in the plot's
     convenience. A job no one has taken for months needs a reason it went untaken. A road only
     these four can walk needs everyone else to be somewhere, for a reason, today.
-12. **Play blocks are designed, not labelled.** Each one names the area, what is in the way, the
-    enemy and how it behaves, what failing costs, and what it feels like. A day of travel is a day of
-    play: at least one area, one fight, and a camp if it is a night. If the text says a road is
-    dangerous, the player meets the danger, and it is the same danger the story says killed people.
+12. **Play blocks are designed, not labelled.** Every block uses this shape:
+    **Map** — the 2-4 segments in order, one line each, like a Phantasy Star IV field: what you see and
+    where the path forks. **Encounters** — 3-4 creatures from the bestiary, which segment each appears
+    in, group sizes, each one's single behaviour in a clause, and what it drops. Encounters are visible
+    on the field and frequent; the player fights a lot. **Hazards / events** — one or two scripted
+    things that use what the player bought or failed to buy. **Optional** — one or two, with the reward
+    named. **Boss** — one line, where there is one. **What failing costs.** **Feel** — one short line,
+    or cut it. A day of travel is a day of play. If the text says a road is dangerous, the danger is
+    encounters the player fights, not a creature with a clever rule.
 13. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
     or in the next clip.
 

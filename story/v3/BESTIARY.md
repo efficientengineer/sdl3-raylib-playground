@@ -1,82 +1,106 @@
 # BESTIARY — chapter one
 
-Three creatures, no more. Names are what people in the valley actually call them, so they are common
-words and the owner can rename any of them in one line. Nothing here is a real animal with a new
-head. The planet has been healing on its own since the ancients shut everything down and walked away,
-and these are what grew into the gap, or what came down off the {{STAIR}} and stayed.
+Eight creatures, grouped by where they live. Names are what people in the valley call them: common
+words, easy to rename in one line. None of them is a real animal with a new head. The planet has been
+healing on its own since the ancients shut everything down and walked away, so these are what grew
+into the gap, what came up out of the old roads, or what came down off the {{STAIR}} and stayed.
 
 No one explains a creature's biology in dialogue. Villagers know what it does, not what it is.
 
+Encounters are visible on the field and frequent, Phantasy Star IV style. The player fights a lot.
+
 ---
 
-## Lids
+## Town and the grain yard
 
-**Name.** They look like a pot lid walking, so that is what they are called.
-
+### Lids
 **Silhouette.** A flat grey disc the width of a dinner plate, walking on its rim on dozens of short
-legs, with a hot pink vent puckered in the middle of its back that opens and shuts as it breathes.
-Slate grey and hot pink. From the side it is a coin rolling; from above it is a plate with a mouth.
-
-**Where it lives, what it eats.** Grain stores, mill floors, dry cellars, anywhere a town keeps seed.
-It eats grain and it eats the sacks. A shed with lids in it is a shed with no harvest in it.
-
-**The one behaviour that is the whole fight.** It tips up onto its rim and rolls at you in a straight
-line, fast, and it cannot turn while it is rolling. Three of them go one after another so there is
-always one coming.
-
-**Its tell.** It stands up on its edge before it rolls. That moment is the guard-break window, and it
-is the same window every enemy in the game uses, which is why the tutorial is lids.
+legs, a hot pink vent puckered in the middle of its back. Slate grey and hot pink.
+**Lives on.** Grain, sacks, seed stores. A shed with lids in it is a shed with no harvest in it.
+**The fight.** It tips up onto its edge and rolls at you in a straight line and cannot turn while it
+rolls. Groups of three, one behind another.
+**Tell.** It stands up on its rim. That is the guard-break window and every enemy in the game uses it.
+**Drops.** Grain, one or two coin.
 
 ---
 
-## Followers
+## The crowded road and its verges
 
-**Name.** They follow. That is the entire name and it is the entire warning.
+### Thumbs
+**Silhouette.** A fist-sized lump of pale yellow flesh that walks on one thick thumb, hopping. Two
+black eye-dots on the knuckle. Butter yellow and black.
+**Lives on.** Whatever falls off a cart. There have never been so many of them as this year.
+**The fight.** It hops in, takes one item out of your pack, and hops for the ditch. Kill it before it
+gets there or the item is gone for good. Groups of four to six, and they go for different pockets.
+**Tell.** It stops hopping and sits still, which means it has chosen whose pack.
+**Drops.** What it took, plus junk it took off somebody else — a spoon, a boot, a sealed letter.
 
-**Silhouette.** Bone-white, taller than a man when it straightens, built like a folded umbrella
-walking on three thin legs. No head: a flat orange band runs across the front of the body where a
-face would be, and the body splits open down the middle when it feeds. Bone-white and burnt orange.
-Standing in grass it is a fence post. Moving, it is wrong.
-
-**Where it lives, what it eats.** The open country north of the river, where the ancients' roads used
-to run and the grass has taken them back. It eats things that have stopped moving. It is patient
-about that.
-
-**The one behaviour that is the whole fight.** Followers only take what is lying down. They will not
-come in on a man on his feet, however many of them there are — they come for the sleeper, and nothing
-else in the camp interests them. So a watch works: the one who is upright has the three seconds of
-the tell to get the sleeper on his feet, and once both are standing it is a fight two people win.
-A man alone has to sleep sometime and there is no one to wake him. That is why the run takes two, why
-{{MENTOR}}'s knee ended his half of it — he cannot walk two days off the road any more — and why
-{{HERO}}'s father did not come back the year he walked it alone.
-They also count, in the small sense: the group grows by one every time a walker stops, so the number
-you let gather by day is the number at the fire that night. Kill the one at the back, the one keeping
-the count, and the rest scatter.
-
-**Its tell.** Before they come in they go flat into the grass and the orange band goes dark. The
-grass stops moving. That is the only warning and it lasts about three seconds.
-
-**Fighting them wrong.** The right move on watch is to wake the other one. {{HERO}}'s father would
-stand over {{MENTOR}} and swing instead, every year, and every year it worked, and there is a notch
-in the sword from the last time it did.
+### Milestones
+**Silhouette.** A waist-high grey post standing at the verge among the real ones, which splits down
+the front to a deep red seam when it moves. Grey and deep red.
+**Lives on.** The ancients' old roadbed under the modern road. It has not moved in a long time.
+**The fight.** It does nothing until you walk past it, then it falls on you. One huge hit, very slow
+to get up again. Never more than two, and they are always in a row of ordinary markers.
+**Tell.** The seam opens a finger's width as you approach, so a player who is looking can pick it out.
+**Drops.** Old road iron, worth real money to the smith.
 
 ---
 
-## Sitters
+## The empty country north of the river
 
-**Name.** They sit.
+### Followers
+**Silhouette.** Bone-white, taller than a man when it straightens, built like a folded umbrella on
+three thin legs, with a flat orange band where a face should be. Bone-white and burnt orange.
+**Lives on.** Open grass where the ancients' roads used to run. It trails walkers in plain sight and
+is not subtle about it.
+**The fight.** Groups of three to five. The big one at the back does not attack: it puts the others
+back on their feet, over and over, until you kill it. Standard priority-target lesson.
+**Tell.** The back one's band burns brighter each time it mends another.
+**Drops.** Banding, which sells; the back one drops a healing draught.
 
+### Sheets
+**Silhouette.** A man-sized sheet of pale blue skin lying flat over the grass, which lifts at one
+corner and stands up like a held-out blanket. Pale blue and bone white.
+**Lives on.** Flat ground. It lies still and waits to be walked over.
+**The fight.** It wraps one party member and that character cannot act until the other one cuts them
+out — two rounds of sawing. Alone, being wrapped is the end of it. Groups of one or two, and they
+never appear together with something slow.
+**Tell.** One corner lifts about a second before it takes anybody.
+**Drops.** Blue skin, which the shrine families buy for waterproofing.
+
+### Gongs
+**Silhouette.** A hollow bronze dome the size of a stool, walking on four thin legs, with a violet
+clapper visible up inside it. Bronze and violet.
+**Lives on.** Nothing anyone has established. It is always alone and always near a ruin.
+**The fight.** It strikes itself, and the note hits the whole party wherever they stand. It cannot sound twice
+in a row, so the round after the note is the round you get.
+**Tell.** It goes still and the clapper swings up.
+**Drops.** Bronze, and rarely a cracked rim the shrine will trade for.
+
+---
+
+## The ridge
+
+### Knuckles
+**Silhouette.** A boulder-sized grey fist that walks on its knuckles, with sulphur-yellow moss down
+the back of the hand. Grey and sulphur yellow.
+**Lives on.** The hill caves, and it does not leave them. It has never been seen on open ground.
+**The fight.** Armoured on top, soft underneath; it has to lift a knuckle to move, and that is the
+only moment you can hurt it. Slow, enormous damage, always alone. The optional fight of the chapter.
+**Tell.** It rocks back before it swings, which is also when the underside shows.
+**Drops.** The second sword — worse than your father's, and it does not break.
+
+---
+
+## The field under the {{STAIR}}
+
+### Sitters
 **Silhouette.** Knee-high, four short arms, the same pale grey as the {{STAIR}}, folded down into
-itself like a chair no one unfolded. A ring of them sits in the grass around the shrine's ground,
-spaced evenly, facing out, and they have sat there longer than the six families have been there.
-Pale grey with one thin line of green light down the spine, so faint you see it only at night.
-
-**Where it lives, what it eats.** Here. Nothing anyone has ever seen.
-
-**The one behaviour that is the whole fight.** There is no fight. Sitters do not move and cannot be
-hurt, and followers will not cross a line of them. The shrine's ground is the only safe grass for two
-days in any direction and no one at the shrine can tell you why — they will say the sitters were here
-first and change the subject.
-
-**Its tell.** Walk between two of them and the green line brightens for as long as you are in the
-gap, and goes out behind you.
+itself like a chair no one unfolded, with one thin green line down the spine. Pale grey and green.
+**Lives on.** Here, and nothing anyone has ever seen it eat.
+**The fight.** There is none. Sitters do not move and cannot be hurt, and nothing else will cross a
+line of them. A ring of them faces outward around the shrine's ground, evenly spaced, and has since
+before the six families arrived — which is why the shrine is the only safe grass for two days in any
+direction, and why no one there will discuss it.
+**Tell.** The green line brightens while you stand in the gap between two of them, and goes out
+behind you.

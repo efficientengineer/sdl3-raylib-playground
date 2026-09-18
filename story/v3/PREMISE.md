@@ -59,8 +59,9 @@ on that shore, and a caretaker comes twice a year to keep it going.
 
 Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. He and the father were hunting partners for
 twenty years and the water run was theirs together: two men and one sealed jar, every year, on the
-same day, off the road and across empty country where the followers trail a walker all day and take
-whoever is lying down at night. Two people can wake each other; a man alone has to sleep sometime.
+same day, off the road and across two days of empty country they had to fight their way over. A pair
+cut each other loose and patch each other up; a man on his own fights everything alone, which is what
+killed {{HERO}}'s father the year he walked it by himself.
 In the twentieth year {{MENTOR}}'s knee was broken on that road. The next year the father
 walked it alone and did not come back. Since then {{MENTOR}} has paid a carter out of his own pocket
 every year to put the jar on the convoy, because it is still his run in his head and money is the only way he
