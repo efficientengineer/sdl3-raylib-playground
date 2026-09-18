@@ -4,160 +4,166 @@ All names are tokens. See `NAMES.md`. Party this chapter: {{HERO}} and {{HEALER}
 {{SCHOLAR}} and {{THIEF}} arrive in chapter two.
 
 ## Goal
-Get to the guild hall before the good work is signed for.
+Get a job at the guild hall.
 
 ## Play: Explore + first fight — the town (5 min)
-Nine streets, a grain yard, a well; six of eleven townsfolk say your father's name before yours.
-**Fight:** three shed-rats behind the grain shed, dog-sized, charging in a line. Teaches attack timing.
+{{HOME_TOWN}} is nine streets, a grain yard and a well. Everyone talks about your father first.
+**Fight:** three rats the size of dogs behind the grain shed. They charge in a line. Teaches attack timing.
 **Find:** a grain sack the baker buys, which is your money. **Unlocks:** the guild hall.
 
 ## Clip: The Board
 
-[The guild hall. The board is bare except for one sheet.]
+[The guild hall. One sheet is left on the board.]
 
-CLERK: Coast escort went at the bell. {{RIVAL}} signed for it.
+CLERK: The coast escort is taken. {{RIVAL}} signed for it an hour ago.
 
-{{HERO}}: Put me down for the next one. {{MENTOR}} guarantees me.
+{{HERO}}: Put me down for the next one.
 
-CLERK: {{MENTOR}} against {{RIVAL}}, four times this year. Against you, nothing. Not one line, ever.
+CLERK: Every job needs a hunter who will vouch for you. {{MENTOR}} has vouched for {{RIVAL}} four
+times this year. He has never vouched for you.
 
-CLERK: One job needs no guarantor. The year's bread carried out to the {{STAIR}} and back. Thirty
-coin, four months on the board.
+{{HERO}}: What is left?
 
-{{HERO}}: I'll take it. Write it down before I think about it.
+CLERK: One job. Carry this year's bread to the {{STAIR}} and come back. Two days there, two days
+back, thirty coin. It has been up four months because it is boring.
+
+{{HERO}}: I will get his name. Hold it for me.
 
 ## Goal
-Get {{MENTOR}} to guarantee the bread run.
+Get {{MENTOR}} to vouch for you.
 
 ## Play: Talk + climb — {{MENTOR}}'s yard (3 min)
-Up the hill past the fence he made you rebuild twice. He is on his own roof with a hammer and a knee
-that has no business up a ladder; {{HEALER}} is holding the ladder.
-**Find:** your father's badge in the water barrel, and a bread cloth with a mark stitched on it.
-**Unlocks:** the argument.
+{{MENTOR}} trained your father, then {{HEALER}}, then you. He is on his roof fixing tiles, his knee
+is bad, and he will not come down.
+**Find:** your father's hunter badge in the water barrel. **Unlocks:** the argument.
 
 ## Clip: You're Not Ready
 
-[{{MENTOR}} is on the ridge of his own roof and has no intention of coming down for this.]
+[{{MENTOR}} is on his roof nailing down tiles. {{HEALER}} is holding the ladder.]
 
-{{HERO}}: The bread run to the {{STAIR}}. Two days west, two back. I need your name on it.
+{{HERO}}: Vouch for me at the guild. The job is carrying this year's bread to the {{STAIR}}. Two days
+west, two days back.
 
 {{MENTOR}}: No.
 
-{{HERO}}: It's thirty coin to walk to a step and walk home.
+{{HERO}}: It is thirty coin for walking to a step and walking home.
 
-{{MENTOR}}: It was your father's run. He did it thirty years and never once came straight home.
+{{MENTOR}}: Your father carried that bread for thirty years. He died on that road eleven years ago.
+I am not signing you onto it.
 
-{{HERO}}: You haven't said I'm not ready yet. You're saving it.
+{{HERO}}: You have not told me I am not ready yet. You are saving it.
 
-{{MENTOR}}: I'm saving it.
+{{MENTOR}}: I am saving it. Hold the ladder.
 
-## Play: Tutorial fight — the posts (4 min)
-He comes down and puts you on the six practice posts while he and {{HEALER}} argue behind you, in barks.
-**Mechanics:** the guard-break window, which is the whole combat system. Losing costs you only the
-good version of the argument.
-**Unlocks:** his name in the guild book, under yours.
+## Play: Tutorial fight — the practice posts (4 min)
+He climbs down and makes you hit the six posts while he and {{HEALER}} argue about you behind your
+back. You can hear all of it.
+**Mechanics:** the guard-break window, which is the whole combat system. Losing costs you nothing.
+**Unlocks:** his name in the guild book.
 
 ## Clip: He Signs
 
-[{{HEALER}} has the book. {{MENTOR}} is on the bottom rung because the knee has finished for the day.]
+[{{HEALER}} is holding the guild book open. {{MENTOR}} is sitting on the bottom rung of the ladder.]
 
-{{HEALER}}: I'll go with him. Two days out, two back, and I carry the kit.
+{{HEALER}}: I will go with him. I am a healer, I have walked that road twice, and he has never once
+asked me to come anywhere.
 
-{{HERO}}: I didn't think you'd want to come to a step in a field.
+{{MENTOR}}: [writing his name in the book] Two days west. Put the bread on the stone shelf under the
+step and come straight back.
 
-{{HEALER}}: Ask me, then.
+{{HERO}}: What is at the step?
 
-{{HERO}}: Do you want to come to a step in a field?
+{{MENTOR}}: A staircase the ancients built. A woman lives under it and takes the bread once a year.
+Do not touch the stone and do not go past her shelf.
 
-{{MENTOR}}: [taking the book] Bread on the shelf under the step and straight home. No one puts a hand
-on that stone.
+{{HERO}}: {{HEALER}}, will you come with me?
 
-## Play: Explore + shop — his kitchen, supper (3 min)
-Door propped open, pot on, the goat in the yard where it should not be. He comments on everything you touch.
-**Shop:** rope, a waterskin, bad advice. Money matters in the next clip, so spend carefully.
-**Unlocks:** the axe — slower, much harder hitting, and the only weapon in the game that can break.
+{{HEALER}}: Yes.
+
+## Play: Explore + shop — {{MENTOR}}'s kitchen (3 min)
+Supper. He stays at the table and tells you what everything in the room is if you touch it.
+**Shop:** rope, a waterskin, food. Spend carefully; you need coin in the next scene.
+**Unlocks:** your father's axe — slow, heavy, and the only weapon in the game that can break.
 
 ## Clip: The Axe
 
-[{{MENTOR}} has the guild ledger open and a pen.]
+[{{MENTOR}}'s kitchen. He has the guild ledger open in front of him.]
 
-{{MENTOR}}: Six coin for the axe, and I want it tonight.
+{{MENTOR}}: Take your father's axe with you. Six coin.
 
-{{HERO}}: I've got four and whatever the baker gave me.
+{{HERO}}: You are charging me for my father's axe.
 
-{{MENTOR}}: [writing] Four and the baker's. You own an axe. The notch stays.
+{{MENTOR}}: I have kept it eleven years. I want paying for the keeping.
 
-{{HERO}}: How did he get it?
+{{HERO}}: There is a notch in the blade.
 
-{{MENTOR}}: Badly. He swung at a thing he should have run from and liked that it worked.
+{{MENTOR}}: He hit something he should have run from. It worked, so he did it again, and the second
+time it killed him. I am not grinding that notch out.
 
-{{HEALER}}: You are charging him for his father's axe.
+{{HEALER}}: Pay him. He will not stop.
 
 ## Goal
-Carry the bread to the {{STAIR}}.
+Walk two days west and put the bread on the shelf under the {{STAIR}}.
 
 ## Play: Travel + fight — the west road (10 min)
-Out at first light with the loaf in a cloth. Open country, and the road busier than it should be:
-everyone on it is walking the same way and further.
-**Fight:** ridge dogs in packs of four; the howler at the back calls another dog every two turns
-until it dies. **See:** from the ridge, half a day off, the {{STAIR}} — a staircase the width of a
-town coming down out of the cloud and stopping thirty feet above an empty field. The camera holds.
-**Unlocks:** the bridge, and the queue on it.
+Two days of open country. The road is crowded and everyone on it is walking west, past where you are going.
+**Fight:** wild dogs in packs of four. The one at the back howls and calls another dog every two
+turns, so kill it first.
+**See:** from the ridge, the {{STAIR}} — a staircase as wide as a town, coming down out of the cloud
+and stopping thirty feet above an empty field. Nothing holds it up.
 
 ## Play: Boss — {{RIVAL}} on the bridge (5 min)
-The span is full of people walking west with handcarts and {{RIVAL}} is being paid to keep the road
-clear for them.
-**Mechanics:** a duel. He guard-breaks you twice on purpose before the fight is winnable, and the
-game lets you lose it without a game over.
-**Unlocks:** the far bank, and the last thing he says.
+The only crossing, full of people walking west. {{RIVAL}} is paid to keep it clear for them.
+**Mechanics:** a one-on-one fight. He breaks your guard twice before it can be won, and you can lose
+it without a game over. **Unlocks:** the far bank.
 
 ## Clip: The Road West
 
-[{{RIVAL}} on the parapet in a coat none of them could afford.]
+[The bridge. {{RIVAL}} is standing on the wall in a new coat.]
 
-{{HERO}}: Where did you get a coat.
+{{HERO}}: Where did you get that coat?
 
-{{RIVAL}}: The lord in the west is hiring anyone who can walk and carry. I sold the coast escort the
-same morning I signed for it.
+{{RIVAL}}: The lord of the western city is paying hunters. I sold the coast escort to someone else
+and signed with him the same morning.
 
-{{HEALER}}: Hiring for what?
+{{HEALER}}: Paying you to do what?
 
-{{RIVAL}}: He wants rain on his city every year for the rest of his life, and he's walking to the
-mountain to get it. Half the country is walking with him.
+{{RIVAL}}: To walk west with him. He wants rain on his city every year for the rest of his life, and
+he is going to the mountain to ask the ancients for it.
 
-{{RIVAL}}: You'll be up all night with a loaf and I'll be in a cart.
+{{HERO}}: People have asked the ancients for a thousand years. They have never answered anyone.
 
-## Goal
-Put the bread on the shelf under the {{STAIR}}.
+{{RIVAL}}: He has someone who can make them answer. You will be up all night carrying a loaf of
+bread. I will be in a cart.
 
-## Play: Explore — the shrine (4 min)
-Six houses and a well at the foot of it. The families sell food, beds and stories; every story is
-about the woman who lives under the step and takes the bread. From here the {{STAIR}} is a wall and
-you cannot see the top of it in daylight.
-**Do:** put the loaf on the stone shelf; the corner of the screen says the job is done.
-**Find:** last year's loaf still wrapped beside it, a rope hanging off the bottom step that should
-have slid off, cart tracks turning in the grass, and a cloth folded under the shelf you reach by kneeling.
+## Play: Explore — the shrine at the {{STAIR}} (4 min)
+Six families live off the pilgrims here, and they all say the same thing: a woman lives under the
+bottom step, she is one of the people the ancients made, and once a year she takes the bread.
+**Do:** put your loaf on the stone shelf. The job is done and the screen says so.
+**Find:** last year's loaf still wrapped, a rope hanging from the bottom step, cart tracks in the
+grass, and a cloth folded under the shelf.
 
 ## Clip: The Bread
 
-[The shelf under the bottom step. The new loaf sits beside last year's.]
+[The stone shelf under the bottom step. The new loaf is on it next to last year's.]
 
-{{HERO}}: [pulling a folded cloth out from under the shelf] That's my father's mark on it.
+{{HERO}}: [pulling a folded cloth out from under the shelf] This cloth is my father's. That is his
+mark on the corner.
 
-{{HEALER}}: It's been under there eleven years, then.
+{{HEALER}}: He left it here the year he died, then.
 
-{{HERO}}: He carried the bread out thirty years and sat under here. {{MENTOR}} said he never came
-straight home.
+{{HERO}}: He walked out here every year for thirty years and sat under this step. The woman who lives
+here knew him for thirty years.
 
-{{HEALER}}: So she knew him. Better than the town did.
+{{HEALER}}: She has not taken the bread for a year. Whatever happened to her, she has been gone that long.
 
-{{HERO}}: And she's a year gone, and I'm the one who noticed.
+{{HERO}}: My father talked to her more than he talked to me.
 
-## Play: Travel — night at the foot of the {{STAIR}} (2 min)
-A fire, two bedrolls, and stone going up past where the firelight reaches.
-**See:** the {{SECOND_MOON}} sits against the edge of the {{STAIR}}, and while the camera holds it
-moves a finger's width west. Every bell in the shrine starts at once.
+## Play: Travel — night under the {{STAIR}} (2 min)
+A fire and two bedrolls. The stone goes up past where the firelight reaches.
+**See:** the {{SECOND_MOON}} beside the edge of the {{STAIR}}. The camera holds, and it moves west a
+finger's width while you watch. Every bell in the shrine starts ringing.
 **Unlocks:** the road west.
 
 ## Goal
-Go west, and catch him before the moon stops moving.
+Go west and catch the lord before the moon stops moving.

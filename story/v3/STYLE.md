@@ -4,9 +4,17 @@ Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
 ## The checklist
 
-Run every scene against all eleven before it is written, and again before it is done.
-(1-10 after Evan Skolnick, *Video Game Storytelling*; 11 is the owner's.)
+Run every scene against all twelve before it is written, and again before it is done.
+Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game Storytelling*.
 
+0. **Plain.** After every clip a twelve-year-old could say what just happened, why, and what happens
+   next. Lines state facts and intentions directly. No line that works only by implication: not
+   "{{MENTOR}} against {{RIVAL}}, four times this year. Against you, nothing" — write "{{MENTOR}} has
+   vouched for {{RIVAL}} four times. He has never vouched for you." No folksy idiom, no country
+   cadence, no proverb-shaped lines. Put the reason inside the line where the player needs it: "He
+   died on that road eleven years ago" beats "he never once came straight home." Keep the one quip
+   per clip and keep the quip plain too. The model is Phantasy Star IV: *"Zio destroyed Molcum. We
+   must go to Tonoe."* This rule outranks every other rule in this file.
 1. **The player holds the controller.** A clip exists only when play cannot carry the beat, and it
    never repeats what play just showed.
 2. **One sentence, always.** At any moment the player can say what they are doing and why they care,
