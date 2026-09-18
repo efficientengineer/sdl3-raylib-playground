@@ -3,10 +3,16 @@
 
 // What the world says when you look at it. A map's `message` trigger names an id; the
 // engine looks it up here. Sorted by id, so a binary search is safe.
-struct FieldText { const char *id; const char *text; };
+// name is the display name to draw over the box, or "" when the line has no speaker.
+struct FieldText { const char *id; const char *text; const char *name; };
 static const FieldText FIELD_TEXT[] = {
-    { "halm.guild_hall_door", "[halm.guild_hall_door: TODO]" },
-    { "halm.well", "[halm.well: TODO]" },
-    { "hart_yard.practice_posts", "[hart_yard.practice_posts: TODO]" },
+    { "halm.gate_watch", "Hart is up on his own roof with that knee and he will not be told. Go up if you like; he'll shout at you from there.", "Watch at the hill gate" },
+    { "halm.grainwife", "Something's in the shed again and it eats the sacks as well as the grain. If you're going in there, go in loud.", "Woman at the grain gate" },
+    { "halm.guild_hall_door", "One sheet left on the board inside, and the bell is still going. The water run out to the stair, thirty coin, leaves at dawn.", "" },
+    { "halm.marta", "My sister went west in the spring and sends eighty coin a week to a house with no one in it. I'm not walking that far to watch it rain.", "Bleibe" },
+    { "halm.ostler", "Eleven carts used to stand in that yard and I had work on every one of them. Ask me what I do now  -  go on, ask.", "Wagen" },
+    { "halm.well", "Capped, roped, and the rope is new. One sealed jar of this water goes west to the stair every year, and the town has never been told what it is for.", "" },
+    { "hart_yard.hart", "Hand me the short nails and don't start. Whatever you came up here to ask, the answer is the same as it was at the bell.", "Hart" },
+    { "hart_yard.practice_posts", "Six posts, all split at the same height, and that height is your shoulder. The sixth one has been moved since yesterday.", "" },
 };
-#define FIELD_TEXT_COUNT 3
+#define FIELD_TEXT_COUNT 8

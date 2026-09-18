@@ -1,7 +1,7 @@
 # NAMES — the token table
 
 Naming style: plain German words used as names, the way Frieren does it (Stark, Fern, Himmel), plus
-real old German given names (Ottilie). Avoid words Frieren already uses. Meanings: Falke = falcon,
+real old German given names (Ottilie). Avoid words Frieren already uses. Meanings: Falke = falcon, Bleibe = a place to stay, Wagen = cart,
 Ottilie = given name, Hart = hard, Stolz = pride, Frage = question, Elster = magpie, Durst = thirst,
 Halm = grain stalk.
 
@@ -17,6 +17,8 @@ Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 | `{{MENTOR}}` | Hart | The old hunter. Bad knee, guild ledger, one chair, a roof he should not be on. |
 | `{{RIVAL}}` | Stolz | Nineteen, better, right about it. Takes the lord's coin in chapter one. |
 | `{{VILLAIN}}` | Durst | The young lord in the west. Bought a caretaker, had the {{SECOND_MOON}} moved, and is walking to {{THE_DOOR}}. |
+| `{{VILLAGER_1}}` | Bleibe | Woman by the square in {{HOME_TOWN}}. Her sister went west; she stayed. Minor. |
+| `{{VILLAGER_2}}` | Wagen | Kept the carters' horses in {{HOME_TOWN}} and has no work now the convoy is gone. Minor. |
 | `{{HOME_TOWN}}` | Halm | Nine streets, a grain yard, a well. Where the hero starts. |
 | `{{CARETAKER}}` | *(unnamed yet)* | One of the people the ancients made. Few left, all old. Took the water at the {{STAIR}} for generations; bought and taken west before chapter one. |
 | `{{STAIR}}` | *(descriptive)* | A staircase the width of a town, down out of the cloud, stopping thirty feet above an empty field. The ancients' work nearest {{HOME_TOWN}}. |
@@ -91,7 +93,7 @@ Grep the v3 files for "bread", "loaf" and "cloth" and expect zero hits outside t
 
 ## Rules
 
-- Fourteen named things exist in the whole game. Adding a fifteenth is a decision, not a convenience.
+- Sixteen named things exist in the whole game; the two minor villagers are the only ones that may be cut without a rewrite. Adding a fifteenth is a decision, not a convenience.
 - Speaker labels are tokens too: `{{HERO}}: line`, never `BRON: line`.
 - Role-only speakers stay plain English and get no token: `CLERK`, `SOLDIER`, `BAKER`.
 - After any rename, grep the v3 files for the retired name and expect zero hits.

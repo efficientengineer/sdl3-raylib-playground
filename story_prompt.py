@@ -265,7 +265,8 @@ def names_table():
 
 # Files whose text is tokenised. Everything here is substituted when it is consumed, never rewritten.
 def tokenised_files():
-    out = sorted(SCENES.glob("*.md")) + [CAST, PLOT, ROOT / "playlist.md"] + list(FIELD_DOCS.values())
+    out = (sorted(SCENES.glob("*.md")) + [CAST, PLOT, ROOT / "playlist.md", FIELD_TEXT]
+           + list(FIELD_DOCS.values()))
     return [p for p in out if p.exists()]
 
 
@@ -1765,6 +1766,7 @@ FIELD_TEXT = FIELD / "text.md"        # examine text: '## <map>.<id>' -> one or 
 V3_STYLE, SMELLS = ROOT / "v3" / "STYLE.md", ROOT / "v3" / "SMELLS.md"   # the BAN: lists
 TEXT_MAX_SENTENCES = 2                # it is a box on a phone that a thumb dismisses
 TODO_RE = re.compile(r"^\[[\w.]+:\s*TODO\]$")   # a placeholder the writer has not filled yet
+FIELD_NAME_MAX = 24                   # '- name:' is drawn over the box, like a speaker name
 FIELD_KINDS = ("tiles", "props", "walker", "building")   # the four commands
 KIND_DIR = {"tiles": "tile", "props": "prop", "walker": "walker", "building": "building"}
 
@@ -2578,18 +2580,24 @@ def sentence_count(text):
 
 
 def load_field_text():
-    """{id: {'text': substituted, 'raw': as written, 'note': the '- what:' line, 'unknown': [tokens]}}."""
+    """{id: {...}} from story/field/text.md: the line itself, and the speaker name if it carries one.
+
+    `- name:` is the name the game prints over the box — an NPC's display name is story, the same as
+    the line is — and takes tokens like everything else. `- what:` is the writer's own note and is
+    never exported."""
     out = {}
     if not FIELD_TEXT.exists():
         return out
-    for name, body in h2_sections(FIELD_TEXT.read_text()).items():
-        if "." not in name:
+    for ident, body in h2_sections(FIELD_TEXT.read_text()).items():
+        if "." not in ident:
             continue                                     # the file's own prose headings
         raw = next((squash(l) for l in body.splitlines()
                     if l.strip() and not re.match(r"^\s*- [\w ]+?:", l)), "")
+        kv = kv_lines(body)
         unknown, unnamed = [], []
-        out[name] = {"raw": raw, "text": detok(raw, unknown, unnamed), "unknown": unknown,
-                     "unnamed": unnamed, **kv_lines(body)}
+        out[ident] = {**kv, "raw": raw, "text": detok(raw, unknown, unnamed),
+                      "name_raw": kv.get("name", ""), "name": detok(kv.get("name", ""), unknown, unnamed),
+                      "unknown": unknown, "unnamed": unnamed}
     return out
 
 
@@ -2616,6 +2624,13 @@ def check_field_text():
         for tok in e["unknown"]:
             err.append(f"{where}: unknown name token {{{{{tok}}}}}: it has no row in "
                        f"{NAMES_FILE.relative_to(ROOT.parent)}")
+        if e["name"]:                                    # a display name is a name, not a sentence
+            if len(e["name"]) > FIELD_NAME_MAX:
+                warn.append(f"{where}: '- name: {e['name']}' is {len(e['name'])} characters; the box "
+                            f"draws about {FIELD_NAME_MAX}")
+            m = DOUBLE_ARTICLE.search(e["name"])
+            if m:
+                err.append(f"{where}: '- name:' reads '{m.group(0)}' after name substitution")
         if TODO_RE.match(e["raw"]):
             warn.append(f"{where}: still a placeholder; the game will show it in brackets")
             continue                                     # the rest is for text somebody has written
@@ -3581,10 +3596,12 @@ def export_field_text():
            "#pragma once", "",
            "// What the world says when you look at it. A map's `message` trigger names an id; the",
            "// engine looks it up here. Sorted by id, so a binary search is safe.",
-           "struct FieldText { const char *id; const char *text; };",
+           "// name is the display name to draw over the box, or \"\" when the line has no speaker.",
+           "struct FieldText { const char *id; const char *text; const char *name; };",
            "static const FieldText FIELD_TEXT[] = {"]
     for ident in sorted(entries):
-        out.append(f"    {{ {c_str(ident)}, {c_str(entries[ident]['text'])} }},")
+        e = entries[ident]
+        out.append(f"    {{ {c_str(ident)}, {c_str(e['text'])}, {c_str(e['name'])} }},")
     out += ["};", f"#define FIELD_TEXT_COUNT {len(entries)}", ""]
     GAME_FIELD_TEXT.write_text("\n".join(out))
     todo = sum(1 for e in entries.values() if TODO_RE.match(e["raw"]))

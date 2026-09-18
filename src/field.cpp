@@ -2744,12 +2744,22 @@ void field_message(Field *f, const char *text) {
 
 // Prose lives in story/field/text.md and reaches the game through the generated src/field_text.h.
 // A map only ever names an id; an id with no entry shows as "[the.id]", which is the point.
+//
+// The generated struct is growing a third field, `name`. These two overloads pick it up the moment it
+// lands and return "" until then, so the build is green whichever version of the header is present:
+// the `int` overload is the better match when `e.name` exists, and falls back to the `long` one.
+template <typename T> static auto ft_name(const T &e, int) -> decltype(e.name) { return e.name; }
+template <typename T> static const char *ft_name(const T &, long) { return ""; }
+
 static void field_say(Field *f, const char *who, const char *id) {
-    const char *text = nullptr;
-    for (int i = 0; i < FIELD_TEXT_COUNT; i++) if (!strcmp(FIELD_TEXT[i].id, id)) { text = FIELD_TEXT[i].text; break; }
+    const char *text = nullptr, *name = nullptr;
+    for (int i = 0; i < FIELD_TEXT_COUNT; i++)
+        if (!strcmp(FIELD_TEXT[i].id, id)) { text = FIELD_TEXT[i].text; name = ft_name(FIELD_TEXT[i], 0); break; }
     if (text) snprintf(f->msg, sizeof(f->msg), "%s", text);
     else snprintf(f->msg, sizeof(f->msg), "[%s]", id);
-    snprintf(f->msg_who, sizeof(f->msg_who), "%s", who ? who : "");
+    // The writer owns the speaker's name; the map's Name column is only a fallback.
+    const char *speaker = (name && name[0]) ? name : who;
+    snprintf(f->msg_who, sizeof(f->msg_who), "%s", speaker ? speaker : "");
     f->msg_t = 0;
 }
 

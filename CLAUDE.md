@@ -484,9 +484,11 @@ leave the background untouched, no text.
   read it; the engine does not.
 - **Examine text is story, so it lives in the story tree**, not in the maps and not in the engine:
   `story/field/text.md`, one `## <map>.<id>` heading (`## halm.well`) per line of text, the text under
-  it, tokens expected. A map's `message` trigger names the id; `export` writes `src/field_text.h`
-  (`struct FieldText { const char *id; const char *text; }`, `FIELD_TEXT[]` sorted by id,
-  `FIELD_TEXT_COUNT`) with the names substituted, and `check --all` validates it: two sentences at
+  it, tokens expected, and an optional `- name:` — an NPC's display name is story too, so it lives
+  here and takes tokens like everything else. A map's `message` trigger names the id; `export` writes
+  `src/field_text.h` (`struct FieldText { const char *id; const char *text; const char *name; }`,
+  `FIELD_TEXT[]` sorted by id, `name` empty when the line has no speaker, `FIELD_TEXT_COUNT`) with the
+  names substituted, and `check --all` validates it: two sentences at
   most, no unknown token, and nothing on the `BAN:` lists in `story/v3/STYLE.md` and
   `story/v3/SMELLS.md` — which the tool reads rather than copies, so "nobody" fails wherever it is
   written. A line left as `[halm.well: TODO]` is exported as it stands, so an unwritten line shows on
