@@ -550,6 +550,7 @@ order: build and height, skin, hair, ears, eyes.
 
 ## Nona
 - role: baker of Thurn; the face of the three hundred and forty
+- alias: Nine
 - ref: story/refs/nona.png
 - people: Kell of Thurn
 - voice: Delighted, exact and completely present about the oven, the mix, the heat and the fat being wrong this week; cannot see why last week would matter and is not troubled by being asked.

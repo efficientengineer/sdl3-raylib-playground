@@ -27,8 +27,13 @@ kept for reference and **no longer built**; don't add features there.
 - **Speaker portraits** are drawn at one end of the dialogue box in panel *and* talk scenes, with the
   text narrowed to fit and the name still in yellow. They slide in when the speaker changes. The
   first speaker in a scene takes the left, the second the right, later speakers alternate, and a
-  speaker keeps their side for the whole scene. A line with no portrait (a narrator, an NPC with no
-  reference sheet) draws the box exactly as it was before portraits existed.
+  speaker keeps their side for the whole scene. A line with no portrait (an NPC with no reference
+  sheet) draws the box exactly as it was before portraits existed.
+- **`Narrator` is a reserved speaker.** A line whose speaker is `Narrator` is document text, not
+  somebody talking: in a panel or talk scene the game draws the box with **no name and no portrait**
+  and centres the text; in a narration scene it is the text over black as before. It takes no
+  left/right side, never gets a portrait, and the validator treats it as always known (no NPC
+  warning). The generated header defines `CS_NARRATOR` and `star_logic.cpp` tests against it.
 - **Panel art** comes from `story/panels/`, portraits from `story/portraits/` (generated, gitignored).
   `fast_reload.sh` pushes new or changed PNGs to the phone's `files/cutscenes/`; `deploy.sh` bundles
   them into the APK assets. Portraits ship under the name `portrait_<name>.png`. The game looks in
@@ -69,6 +74,8 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py sheet <scene>  # scene file → ChatGPT package (prompt + refs to attach) in story/out/
 ./story_prompt.py slice <sheet.json> <img>  # cut the generated shot sheet into story/panels/
 ./story_prompt.py portraits      # refs sheets → story/portraits/<name>.png (dialogue-box portraits)
+./story_prompt.py stats          # per chapter: scenes by type, panels, lines, optional scenes, art
+./story_prompt.py packages       # every panel scene's sheet + every refsheet → story/packages/ (tracked)
 ```
 
 ## Shader pipeline
@@ -223,6 +230,29 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
   exist; a not-yet-generated image is only a warning). `sheet` and `build` refuse a talk scene;
   `check`, `brief`, `export`, and `preview` handle it. Any speaker name works — one not in
   `characters.md` is a one-off NPC and just gets no portrait.
+- **Handles and aliases.** A `## Name` in `characters.md` is the **handle**: the word a writer types
+  in panel text and on a `characters:` line, matched case-insensitively as a whole word, which is why
+  handles are never common words. A character known on screen by a different name gets an optional
+  `- alias: Name[, Name...]` line. An alias may be used as a dialogue **speaker** and on a
+  `characters:` line (it resolves to the handle for the portrait, the left/right side, and the
+  cast-membership check), and the game prints it as the speaker name. Aliases are **never** matched
+  inside panel descriptions — that is the whole point: `Nona` is called `Nine` on screen, and a handle
+  of `Nine` would false-match "the Nine Doors". Two characters may not share an alias, an alias may
+  not be another character's handle, and `Narrator` is reserved.
+- **Chapter numbering.** A scene file is `<chapter><scene>_slug.md` in four digits: `0105` is chapter 1,
+  `1595` chapter 15, `16xx` the epilogue. The intro files written before that scheme (`p01_prologue`,
+  `001`-`003b`) count as chapter 1. `stats` and `packages` group by it.
+- **`stats`** prints, per chapter, the scene count by type, panels, dialogue lines, optional scenes
+  (`- optional: yes`) and which panel scenes have art, then the totals, the number of distinct
+  speakers, and every speaker that is neither a handle, nor an alias, nor `Narrator` — the one-off
+  NPCs, with the scenes that use them. Run it before a continuity pass.
+- **`packages`** runs `sheet` for every panel scene in `story/scenes/` and `refsheet` for every cast
+  entry, and collects the `*.chatgpt.md` files in **`story/packages/` (tracked, unlike `story/out/`)**
+  with a generated `README.md` index: per chapter, each scene's package, its panel count and how much
+  art exists, then the reference sheets in the cast designer's priority order (parsed from
+  `story/notes/cast-designer-2.md` §5). A scene that fails validation is reported at the end and does
+  not stop the run, so it is safe to run while chapters are still being written. Regenerate after any
+  change to a scene, `characters.md`, or `STYLE.md`; never edit the files in `story/packages/`.
 - **Portraits.** `./story_prompt.py portraits` cuts every character's reference sheet down to its
   middle panel (the head-and-shoulders portrait the `refsheet` block asks for) and writes
   `story/portraits/<name>.png`. It reuses the same border detection as `slice`, needs exactly three
@@ -273,7 +303,8 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
   rebuild every scene with `build --all` so old prompts don't drift from new ones.
 - Rule thresholds live in both `STYLE.md` (prose) and the top of `story_prompt.py` (constants). Change both.
 - Dialogue is never rendered into images; the game draws it. `story/out/` is generated and gitignored;
-  `story/refs/` and `story/panels/` are kept.
+  `story/refs/`, `story/panels/` and `story/packages/` are kept (the last is generated but tracked, so
+  the owner can pick up any scene's package without running the tool).
 
 ## Index
 
@@ -283,4 +314,5 @@ Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style i
 - `third_party/` — single-header libs (stb, par_shapes, FastNoiseLite, sokol)
 - `android/` — Gradle project, SDLActivity, reuses root CMake
 - `story/` — `STYLE.md` (locked art rules), `characters.md`, `plot.md`, `scenes/`, `panels/`, `refs/`,
-  `portraits/` (generated from `refs/`, gitignored); `story_prompt.py` builds prompts and exports
+  `portraits/` (generated from `refs/`, gitignored), `packages/` (generated by `packages`, tracked);
+  `story_prompt.py` builds prompts and exports

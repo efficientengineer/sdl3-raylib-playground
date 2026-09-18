@@ -22,6 +22,12 @@
   ./story_prompt.py export                     write src/cutscene_data.h from story/playlist.md for the game
                                                (scenes whose panels are not all generated yet are skipped)
 
+  ./story_prompt.py stats                      per chapter: scenes by type, panels, dialogue lines, optional
+                                               scenes, panel art; then totals and the one-off NPC speakers
+  ./story_prompt.py packages                   run sheet for every panel scene and refsheet for every cast
+                                               entry, collect the packages in story/packages/ with a README
+                                               index (one failing scene does not stop the run)
+
 Scene types (the '- type:' meta line): panels (default, manga page), narration (text over
 black), talk (dialogue box over black or a dimmed backdrop panel, with speaker portraits).
 
@@ -60,6 +66,7 @@ STYLE_WORDS = ["gradient", "photorealistic", "3d", "blur", "glow", "painterly",
 TEXT_WORDS = ["text", "caption", "speech bubble", "lettering", "written", "inscription reading",
               "sign saying", "sign that says", "sign reading", "the words", "subtitle"]  # R9
 MOODS = ["wonder", "dread", "tense", "confront", "sorrow", "hope"]      # music moods; order = CsMood enum in the game
+NARRATOR = "narrator"                               # speaker for an unattributed box: no name, no portrait
 LOOK_BANNED = ["dwarf", "dwarven", "halfling", "hobbit", "elf", "elven", "gnome", "orc", "fighter",
                "rogue", "cleric", "wizard", "ranger", "barbarian", "paladin", "beard", "bearded"]  # see characters.md
 REQUIRED_BLOCKS = ["header", "layout", "framing", "acting", "character_design", "rendering",
@@ -164,10 +171,53 @@ def load_cast():
                 die(f"characters.md: {name.title()}'s look contains {bad}. Race, class, and beard words pull image "
                     f"models toward Western fantasy. Describe only what is visible (see 'Design direction').")
             # h2_sections lowercases; recover the display name from the look or title-case it
-            cast[name] = {"name": name.title(), **kv}
+            cast[name] = {"name": name.title(), **kv,
+                          "aliases": [a.strip() for a in kv.get("alias", "").split(",") if a.strip()]}
     if not cast:
         die("characters.md: no characters with a 'look' line")
+    claimed = {}
+    for handle, c in cast.items():
+        for a in c["aliases"]:
+            key = a.lower()
+            if key in cast:
+                die(f"characters.md: {c['name']}'s alias '{a}' is already a '## ' handle")
+            if key == NARRATOR:
+                die(f"characters.md: '{a}' cannot be an alias; the game reserves it for boxes with no speaker")
+            if key in claimed:
+                die(f"characters.md: alias '{a}' is claimed by both {claimed[key]} and {c['name']}")
+            claimed[key] = c["name"]
     return cast
+
+
+def alias_map(cast):
+    """{display name lowercased: handle} for every '- alias:' name in characters.md.
+
+    An alias is a display name only: a dialogue speaker, a name on a scene's 'characters:' line, and
+    the name the game prints over the box. Aliases are deliberately NOT matched inside panel
+    descriptions, where an alias like 'Nine' would fire on 'the Nine Doors'; panel text matches the
+    '## Handle' alone, which is why the handles are never common words."""
+    return {a.lower(): handle for handle, c in cast.items() for a in c["aliases"]}
+
+
+def resolve_name(name, cast, aliases=None):
+    """The cast handle behind a written name: the handle itself, or one of its aliases. None if neither."""
+    key = name.strip().lower()
+    if key in cast:
+        return key
+    return (alias_map(cast) if aliases is None else aliases).get(key)
+
+
+def is_narrator(speaker):
+    return speaker.strip().lower() == NARRATOR
+
+
+def unknown_speakers(scene, cast, aliases=None):
+    """Speakers who are neither a handle, nor an alias, nor the Narrator: the one-off NPCs, in order."""
+    out = []
+    for who, _ in scene["dialogue"]:
+        if not is_narrator(who) and not resolve_name(who, cast, aliases) and who not in out:
+            out.append(who)
+    return out
 
 
 def parse_scene(path):
@@ -210,18 +260,35 @@ def parse_scene(path):
     }
 
 
-def speaker_sides(scene):
+def speaker_sides(scene, cast=None):
     """{speaker lowercased: 0 left / 1 right}. The first distinct speaker takes the left, the
-    second the right, later ones alternate; a speaker keeps their side for the whole scene."""
-    sides = {}
+    second the right, later ones alternate; a speaker keeps their side for the whole scene.
+
+    The Narrator has no portrait, so it takes no side and does not use up one of the two ends.
+    A character called by an alias in one line and by their handle in another keeps one side."""
+    sides, order = {}, {}
+    aliases = alias_map(cast) if cast else {}
     for who, _ in scene["dialogue"]:
-        sides.setdefault(who.strip().lower(), len(sides) % 2)
+        key = who.strip().lower()
+        if is_narrator(who):
+            sides[key] = 0
+            continue
+        ident = (resolve_name(who, cast, aliases) if cast else None) or key
+        if ident not in order:
+            order[ident] = len(order) % 2
+        sides[key] = order[ident]
     return sides
 
 
-def portrait_file(speaker):
-    """story/portraits/<name>.png for a speaker, or None if it has not been generated."""
-    p = PORTRAITS / f"{re.sub(r'[^a-z0-9_-]', '', speaker.strip().lower())}.png"
+def portrait_file(speaker, cast=None):
+    """story/portraits/<handle>.png for a speaker, or None when there is none.
+
+    A speaker written as an alias uses the portrait of the handle it resolves to; the Narrator never
+    has one (the game draws that line as a box with no name and no portrait)."""
+    if is_narrator(speaker):
+        return None
+    key = (resolve_name(speaker, cast) if cast else None) or speaker.strip().lower()
+    p = PORTRAITS / f"{re.sub(r'[^a-z0-9_-]', '', key)}.png"
     return p if p.exists() else None
 
 
@@ -250,6 +317,7 @@ def validate(scene, style, cast):
     """Returns (errors, warnings). Errors block the build."""
     err, warn = [], []
     shots, panels = style["shots"], scene["panels"]
+    aliases = alias_map(cast)
 
     for n, mood in enumerate(scene["moods"], 1):
         if mood and mood not in MOODS:
@@ -277,9 +345,8 @@ def validate(scene, style, cast):
                                f"(check story/scenes/{bd[0]}.md and its panel count)")
                 elif not bd[2].exists():
                     warn.append(f"backdrop panel {bd[2].name} has not been generated yet; the game shows black")
-            for who, _ in scene["dialogue"]:
-                if who.lower() not in cast:
-                    warn.append(f"dialogue speaker '{who}' is not in characters.md (fine for one-off NPCs)")
+        for who in unknown_speakers(scene, cast, aliases):
+            warn.append(f"dialogue speaker '{who}' is not in characters.md (fine for one-off NPCs)")
         return err, warn
 
     if not scene["meta"].get("location"):
@@ -314,10 +381,13 @@ def validate(scene, style, cast):
             if not PUNCH_SCALES & set(scales):
                 err.append(f"R5 anchor and punch: {where} has no punch panel (close, extreme, or insert)")
 
-    listed = [c.lower() for c in scene["characters"]]
-    for c in listed:
-        if c not in cast:
-            err.append(f"R6 known cast: '{c}' is not in characters.md")
+    listed = []                                        # handles; a 'characters:' entry may be an alias
+    for c in scene["characters"]:
+        handle = resolve_name(c, cast, aliases)
+        if handle is None:
+            err.append(f"R6 known cast: '{c.lower()}' is not in characters.md")
+        elif handle not in listed:
+            listed.append(handle)
     mentioned = set()
     for n, (sid, desc) in enumerate(panels, 1):
         for c in names_in(desc, cast):
@@ -355,14 +425,13 @@ def validate(scene, style, cast):
                 if re.search(rf"\b{re.escape(w)}\b", note.lower()):
                     err.append(f"R8 no style leakage: panel {n} acting line for {c.title()} contains '{w}'")
     for c in listed:
-        if c in cast and c not in mentioned:
+        if c not in mentioned:
             warn.append(f"'{c}' is listed but never named in a panel; their look will not be included")
     for n, r in enumerate(scene["reveals"], 1):
         if r is not None and not 1 <= r <= len(panels):
             err.append(f"dialogue line {n} reveals panel [{r}] but the scene has {len(panels)} panels")
-    for who, _ in scene["dialogue"]:
-        if who.lower() not in cast:
-            warn.append(f"dialogue speaker '{who}' is not in characters.md (fine for one-off NPCs)")
+    for who in unknown_speakers(scene, cast, aliases):
+        warn.append(f"dialogue speaker '{who}' is not in characters.md (fine for one-off NPCs)")
     return err, warn
 
 
@@ -1099,9 +1168,10 @@ def cmd_preview(args):
                 print(f"{path.name}: ERROR: {e}", file=sys.stderr)
             sys.exit("story_prompt: scene rejected. Fix the scene file; do not bypass the rules.")
         panels = page_layout(scene, style, "land")
-        sides = speaker_sides(scene)
-        lines = [{"speaker": who, "text": text, "reveal": n, "side": sides[who.strip().lower()],
-                  "portrait": (lambda p: f"../portraits/{p.name}" if p else None)(portrait_file(who))}
+        sides = speaker_sides(scene, cast)
+        lines = [{"speaker": "" if is_narrator(who) else who, "text": text, "reveal": n,
+                  "side": sides[who.strip().lower()],
+                  "portrait": (lambda p: f"../portraits/{p.name}" if p else None)(portrait_file(who, cast))}
                  for (who, text), n in zip(scene["dialogue"], reveal_plan(scene))]
         bd = backdrop_panel(scene) if scene["talk"] else None
         data = {"panels": panels, "port": page_layout(scene, style, "port"), "lines": lines,
@@ -1112,6 +1182,212 @@ def cmd_preview(args):
         have = sum(1 for p in panels if p["img"])
         print(f"wrote {html.relative_to(ROOT.parent)}  ({have}/{len(panels)} panel images found, "
               f"{len(lines)} dialogue lines). Open it in a browser; tap or press space to advance.")
+
+
+# ───────────────────────── Chapters, stats, and ChatGPT packages ─────────────────────────
+
+EPILOGUE = 16                                       # chapter number the epilogue files are numbered in
+PACKAGES = ROOT / "packages"                        # tracked; story/out/ is the scratch copy
+CAST_NOTES = ROOT / "notes" / "cast-designer-2.md"  # holds the reference sheet priority order
+
+
+def chapter_of(stem):
+    """Chapter number from a scene file name, or None for the template (which is not a scene).
+
+    The numbering is <chapter><scene> in four digits: 0105 is chapter 1, 1595 chapter 15, 16xx the
+    epilogue. The intro files written before that scheme ('p01_prologue', '001'-'003b') are chapter 1."""
+    if stem.startswith("000"):
+        return None
+    m = re.match(r"(\d+)", stem)
+    if not m:
+        return 1                                    # p01_prologue and anything else unnumbered
+    return int(m.group(1)[:2]) if len(m.group(1)) >= 4 else 1
+
+
+def chapter_label(ch):
+    return f"ch{ch:02d}" + (" (epilogue)" if ch == EPILOGUE else "")
+
+
+def all_scenes():
+    """[(chapter, scene)] for every scene file, in file order, skipping the template."""
+    out = []
+    for path in sorted(SCENES.glob("*.md")):
+        ch = chapter_of(path.stem)
+        if ch is not None:
+            out.append((ch, parse_scene(path)))
+    return out
+
+
+def is_optional(scene):
+    return scene["meta"].get("optional", "no").lower() in ("yes", "true", "1")
+
+
+def panel_art(scene):
+    """(panels with art, panels in the scene) for a panel scene."""
+    have = sum(1 for n, (sid, _) in enumerate(scene["panels"], 1) if panel_file(scene, n, sid).exists())
+    return have, len(scene["panels"])
+
+
+def cmd_stats(args):
+    cast = load_cast()
+    aliases = alias_map(cast)
+    chapters, speakers, oneoffs = {}, {}, {}
+    for ch, scene in all_scenes():
+        c = chapters.setdefault(ch, {"kinds": {}, "panels": 0, "lines": 0, "optional": [], "art": []})
+        c["kinds"][scene["kind"]] = c["kinds"].get(scene["kind"], 0) + 1
+        c["panels"] += len(scene["panels"])
+        c["lines"] += len(scene["dialogue"])
+        if is_optional(scene):
+            c["optional"].append(scene["stem"])
+        if scene["kind"] == "panels" and scene["panels"]:
+            have, total = panel_art(scene)
+            if have:
+                c["art"].append(f"{scene['stem']} {have}/{total}")
+        for who, _ in scene["dialogue"]:
+            speakers[who] = speakers.get(who, 0) + 1
+            if not is_narrator(who) and not resolve_name(who, cast, aliases):
+                oneoffs.setdefault(who, []).append(scene["stem"])
+
+    kinds = sorted({k for c in chapters.values() for k in c["kinds"]}, key=lambda k: (k not in SCENE_KINDS, k))
+    head = f"{'chapter':<14}{'scenes':>7}" + "".join(f"{k:>11}" for k in kinds) + \
+           f"{'panels':>8}{'lines':>8}{'optional':>10}{'art':>6}"
+    print(head)
+    print("-" * len(head))
+    tot = {"scenes": 0, "panels": 0, "lines": 0, "optional": 0, "art": 0, "kinds": {}}
+    for ch in sorted(chapters):
+        c = chapters[ch]
+        n = sum(c["kinds"].values())
+        print(f"{chapter_label(ch):<14}{n:>7}" + "".join(f"{c['kinds'].get(k, 0):>11}" for k in kinds) +
+              f"{c['panels']:>8}{c['lines']:>8}{len(c['optional']):>10}{len(c['art']):>6}")
+        tot["scenes"] += n
+        for k in kinds:
+            tot["kinds"][k] = tot["kinds"].get(k, 0) + c["kinds"].get(k, 0)
+        for key in ("panels", "lines"):
+            tot[key] += c[key]
+        tot["optional"] += len(c["optional"])
+        tot["art"] += len(c["art"])
+    print("-" * len(head))
+    print(f"{'total':<14}{tot['scenes']:>7}" + "".join(f"{tot['kinds'].get(k, 0):>11}" for k in kinds) +
+          f"{tot['panels']:>8}{tot['lines']:>8}{tot['optional']:>10}{tot['art']:>6}")
+    print()
+    for ch in sorted(chapters):
+        c = chapters[ch]
+        if c["optional"]:
+            print(f"{chapter_label(ch)} optional: {', '.join(c['optional'])}")
+        if c["art"]:
+            print(f"{chapter_label(ch)} panel art: {', '.join(c['art'])}")
+    print(f"\ndistinct speakers: {len(speakers)}  "
+          f"({len(speakers) - len(oneoffs)} cast or Narrator, {len(oneoffs)} one-off)")
+    if oneoffs:
+        print("one-off speakers (neither a handle, nor an alias, nor Narrator):")
+        for who in sorted(oneoffs, key=lambda w: (-len(oneoffs[w]), w.lower())):
+            print(f"  {who:<16}{len(oneoffs[who]):>3} line(s) in {', '.join(sorted(set(oneoffs[who])))}")
+
+
+def refsheet_priority(cast):
+    """[(handle, tier)] in the cast designer's order, then everyone that file does not rank.
+
+    Parsed from story/notes/cast-designer-2.md '## 5. Reference sheet priority', whose items look
+    like '1. Zeph - 2. Pip - ... 12. Tibb and Sela'. Anything unparsable is simply not ranked."""
+    order, ranked = [], set()
+    if CAST_NOTES.exists():
+        body = next((b for name, b in h2_sections(CAST_NOTES.read_text()).items()
+                     if "reference sheet priority" in name), "")
+        parts = re.split(r"^\*\*(Tier [^*]+)\*\*\s*$", body, flags=re.M)         # [prose, tier, items, ...]
+        for i in range(1, len(parts), 2):
+            tier = squash(parts[i])
+            for item in re.findall(r"\d+\.\s*([^·]+)", squash(parts[i + 1])):   # items split on the middot
+                for word in re.findall(r"[A-Z][a-z]+", item):                    # '12. Tibb and Sela', notes and all
+                    handle = word.lower()
+                    if handle in cast and handle not in ranked:
+                        ranked.add(handle)
+                        order.append((handle, tier))
+    return order + [(h, "unranked") for h in cast if h not in ranked]
+
+
+def run_quiet(fn, args):
+    """Run a command function with its output swallowed. (ok, message); die() is a failure, not the end."""
+    import contextlib
+    import io
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            fn(args)
+        return True, ""
+    except SystemExit as e:
+        why = [l for l in buf.getvalue().splitlines() if "ERROR" in l] or [squash(str(e.code or "rejected"))]
+        return False, "; ".join(why)
+    except Exception as e:                                      # one bad scene must not stop the run
+        return False, f"{type(e).__name__}: {e}"
+
+
+def cmd_packages(args):
+    """sheet for every panel scene + refsheet for every cast entry, collected in story/packages/."""
+    cast = load_cast()
+    PACKAGES.mkdir(parents=True, exist_ok=True)
+    failures, by_chapter, sheets, fresh = [], {}, 0, set()
+    for ch, scene in all_scenes():
+        if scene["kind"] != "panels" or not scene["panels"]:
+            continue
+        ok, msg = run_quiet(cmd_sheet, [str(scene["path"])])
+        src = OUT / f"{scene['stem']}.chatgpt.md"
+        if ok and src.exists():
+            (PACKAGES / src.name).write_text(src.read_text())
+            fresh.add(src.name)
+            sheets += 1
+        else:
+            failures.append((scene["path"].name, msg or "no package written"))
+        by_chapter.setdefault(ch, []).append((scene, ok and src.exists(), src.name))
+    refs = []
+    for handle, tier in refsheet_priority(cast):
+        ok, msg = run_quiet(cmd_refsheet, [handle])
+        src = OUT / f"ref_{handle}.chatgpt.md"
+        if ok and src.exists():
+            (PACKAGES / src.name).write_text(src.read_text())
+            fresh.add(src.name)
+            refs.append((handle, tier, src.name))
+        else:
+            failures.append((f"refsheet {handle}", msg or "no package written"))
+    stale = [p for p in sorted(PACKAGES.glob("*.chatgpt.md")) if p.name not in fresh]
+    for p in stale:                                             # a renamed or deleted scene leaves one behind
+        p.unlink()
+    write_packages_index(by_chapter, refs, cast)
+    print(f"wrote {len(fresh)} package(s) into {PACKAGES.relative_to(ROOT.parent)}/ "
+          f"({sheets} shot sheets, {len(refs)} reference sheets)"
+          + (f", removed {len(stale)} stale" if stale else ""))
+    print(f"index: {(PACKAGES / 'README.md').relative_to(ROOT.parent)}")
+    if failures:
+        print(f"\n{len(failures)} failure(s):", file=sys.stderr)
+        for what, why in failures:
+            print(f"  {what}: {why}", file=sys.stderr)
+
+
+def write_packages_index(by_chapter, refs, cast):
+    L = ["# story/packages — generated ChatGPT packages", "",
+         "Written by `./story_prompt.py packages`. One file per panel scene (the shot sheet that draws it)",
+         "and one per cast entry (the character reference sheet). Do not edit these by hand: rerun the",
+         "command after any change to a scene file, `characters.md`, or `STYLE.md`.", "",
+         "## Panel scenes, by chapter", "",
+         "`art` counts the panels already cut into `story/panels/`.", ""]
+    for ch in sorted(by_chapter):
+        rows = by_chapter[ch]
+        drawn = sum(1 for scene, _, _ in rows if panel_art(scene)[0] == len(scene["panels"]))
+        L += [f"### {chapter_label(ch)} — {len(rows)} panel scenes, {drawn} fully drawn", "",
+              "| scene | package | panels | art |", "| --- | --- | --- | --- |"]
+        for scene, ok, name in rows:
+            have, total = panel_art(scene)
+            art = "none" if not have else ("**all**" if have == total else f"{have}/{total}")
+            link = f"[{name}]({name})" if ok else "_failed, see the command output_"
+            L.append(f"| `{scene['stem']}` | {link} | {total} | {art} |")
+        L.append("")
+    L += ["## Reference sheets, in the cast designer's priority order", "",
+          f"Order from `{CAST_NOTES.relative_to(ROOT.parent)}`, section 5. `unranked` means that file does",
+          "not list the character; generate those last.", "",
+          "| # | character | tier | package |", "| --- | --- | --- | --- |"]
+    for n, (handle, tier, name) in enumerate(refs, 1):
+        L.append(f"| {n} | {cast[handle]['name']} | {tier} | [{name}]({name}) |")
+    L.append("")
+    (PACKAGES / "README.md").write_text("\n".join(L))
 
 
 # ───────────────────────── Export to the game ─────────────────────────
@@ -1142,10 +1418,12 @@ def cmd_export(args):
            "struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen",
            "struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood;  // reveal 0 = none",
            "                const char *portrait; CsSide side; };  // portrait file, or nullptr when the speaker has none",
+           f'#define CS_NARRATOR "{NARRATOR.title()}"              '
+           "// speaker of an unattributed box: no name drawn, never a portrait",
            "struct CsScene { const char *id; const char *title; bool narration;   // narration == (kind == CS_NARRATION)",
            "                 CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr",
            "                 const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };", ""]
-    table, mood = [], "tense"
+    table, mood, emitted = [], "tense", set()
     for stem in stems:
         path = SCENES / f"{stem}.md"
         if not path.exists():
@@ -1156,6 +1434,9 @@ def cmd_export(args):
             for e in err:
                 print(f"{path.name}: ERROR: {e}", file=sys.stderr)
             sys.exit("story_prompt: scene rejected. Fix the scene file; do not bypass the rules.")
+        if not scene["dialogue"]:                               # the game advances on dialogue lines
+            print(f"skipped {stem}: no dialogue lines, so the game could never advance past it", file=sys.stderr)
+            continue
         missing = [panel_file(scene, n, sid).name for n, (sid, _) in enumerate(scene["panels"], 1)
                    if not panel_file(scene, n, sid).exists()]
         if scene["panels"] and len(missing) == len(scene["panels"]):
@@ -1165,22 +1446,26 @@ def cmd_export(args):
             print(f"{stem}: {len(missing)} of {len(scene['panels'])} panels have no art yet, shown as placeholders "
                   f"({', '.join(m.split('_', 3)[-1].removesuffix('.png') for m in missing)})", file=sys.stderr)
         ident = re.sub(r"\W", "_", stem)
-        if scene["panels"]:
-            land, port = page_layout(scene, style, "land"), page_layout(scene, style, "port")
-            out.append(f"static const CsPanel CS_{ident}_PANELS[] = {{")
-            for a, b in zip(land, port):
-                rect = lambda r: "{" + ", ".join(f"{float(r[k]):.1f}f" for k in "xywh") + "}"
-                out.append(f'    {{ "{a["file"]}", {a["page"]}, {rect(a)}, {rect(b)} }},')
-            out.append("};")
-        sides = speaker_sides(scene)                              # first speaker left, second right, then alternating
-        out.append(f"static const CsLine CS_{ident}_LINES[] = {{")
-        for (who, text), reveal, tag in zip(scene["dialogue"], reveal_plan(scene), scene["moods"]):
-            mood = tag or mood                                    # an untagged line keeps the current mood
-            pf = portrait_file(who)
-            face = c_str(f"portrait_{pf.name}") if pf else "nullptr"
-            side = "CS_RIGHT" if sides[who.strip().lower()] else "CS_LEFT"
-            out.append(f"    {{ {c_str(who)}, {c_str(text)}, {reveal}, CS_{mood.upper()}, {face}, {side} }},")
-        out += ["};", ""]
+        if ident in emitted:                                      # a playlist may play the same scene twice
+            print(f"{stem}: listed more than once; the second entry reuses the first one's tables", file=sys.stderr)
+        else:
+            emitted.add(ident)
+            if scene["panels"]:
+                land, port = page_layout(scene, style, "land"), page_layout(scene, style, "port")
+                out.append(f"static const CsPanel CS_{ident}_PANELS[] = {{")
+                for a, b in zip(land, port):
+                    rect = lambda r: "{" + ", ".join(f"{float(r[k]):.1f}f" for k in "xywh") + "}"
+                    out.append(f'    {{ "{a["file"]}", {a["page"]}, {rect(a)}, {rect(b)} }},')
+                out.append("};")
+            sides = speaker_sides(scene, cast)                    # first speaker left, second right, then alternating
+            out.append(f"static const CsLine CS_{ident}_LINES[] = {{")
+            for (who, text), reveal, tag in zip(scene["dialogue"], reveal_plan(scene), scene["moods"]):
+                mood = tag or mood                                # an untagged line keeps the current mood
+                pf = portrait_file(who, cast)                     # an alias uses its handle's portrait
+                face = c_str(f"portrait_{pf.name}") if pf else "nullptr"
+                side = "CS_RIGHT" if sides[who.strip().lower()] else "CS_LEFT"
+                out.append(f"    {{ {c_str(who)}, {c_str(text)}, {reveal}, CS_{mood.upper()}, {face}, {side} }},")
+            out += ["};", ""]
         title = re.sub(r"^(Scene \S+|Prologue):\s*", "", scene["title"])
         panels = f"CS_{ident}_PANELS, {len(scene['panels'])}" if scene["panels"] else "nullptr, 0"
         bd = backdrop_panel(scene) if scene["talk"] else None
@@ -1217,6 +1502,10 @@ def main():
         cmd_preview(args[1:])
     elif cmd == "export":
         cmd_export(args[1:])
+    elif cmd == "stats":
+        cmd_stats(args[1:])
+    elif cmd == "packages":
+        cmd_packages(args[1:])
     else:
         print(__doc__.strip())
         sys.exit(0 if cmd in ("", "-h", "--help", "help") else 2)

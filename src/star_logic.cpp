@@ -330,8 +330,8 @@ static void dev_send(const char *text) {
 // ───────────────────────── Game state ─────────────────────────
 
 enum Screen { SCR_TITLE, SCR_INTRO, SCR_END };
-#define MAX_PANELS 12
-#define MAX_FACES 6               // distinct speaker portraits cached per scene
+#define MAX_PANELS 12             // >= story_prompt.py's SCENE_MAX_PANELS (8), the most one scene can hold
+#define MAX_FACES 12              // distinct speaker portraits cached per scene; party scenes run to 7
 #define PANEL_IN 0.28f            // seconds for a panel to arrive
 #define FACE_IN 0.22f             // seconds for a portrait to slide in when the speaker changes
 #define TYPE_CPS 42.0f            // typewriter characters per second
@@ -369,6 +369,14 @@ static void star_free_textures(Star *st) {
 }
 
 static bool same_file(const char *a, const char *b) { return a == b || (a && b && !strcmp(a, b)); }
+
+#ifndef CS_NARRATOR
+#define CS_NARRATOR "Narrator"    // older cutscene_data.h; ./story_prompt.py export writes this itself
+#endif
+
+// Document text and unattributed lines: a box with no speaker name and no portrait, text centred.
+// Panel and talk scenes use it as freely as narration scenes do.
+static bool line_is_narrator(const CsLine *ln) { return ln->speaker && !strcmp(ln->speaker, CS_NARRATOR); }
 
 // The scene's portraits, loaded once in star_goto. Null file or an unknown one means "no portrait",
 // and the dialogue box is then drawn exactly as it is without one.
@@ -410,7 +418,7 @@ static void reveal_panel(Star *st, const CsScene *sc, int n, bool instant) {   /
 static void star_goto(Star *st, int scene, int line, bool instant) {
     const CsScene *sc = &CS_INTRO[scene];
     if (st->tex_scene != scene) {
-        star_free_textures(st);
+        star_free_textures(st);                 // only ever one scene's art is resident: 8 panels + portraits
         for (int i = 0; i < sc->panel_count && i < MAX_PANELS; i++) st->tex[i] = tex_load(sc->panels[i].file);
         if (sc->backdrop) st->backdrop = tex_load(sc->backdrop);
         load_faces(st, sc);
@@ -479,6 +487,7 @@ static void draw_scene(Star *st, int w, int h, float dt) {
     ImFont *font = ImGui::GetFont();
     const CsScene *sc = &CS_INTRO[st->scene];
     const CsLine *ln = &sc->lines[st->line];
+    bool narr = line_is_narrator(ln);
     bool port = h > w;
     dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
 
@@ -534,7 +543,7 @@ static void draw_scene(Star *st, int w, int h, float dt) {
     bool typing = chars < total;
     if (typing && chars > 0) {
         static int last_blip = -1;
-        if (chars / 3 != last_blip && ln->text[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, sc->narration ? 520.0f : 760.0f, 0.04f, 0.10f); }
+        if (chars / 3 != last_blip && ln->text[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, (sc->narration || narr) ? 520.0f : 760.0f, 0.04f, 0.10f); }
     }
     float arrow_x = bx1 - text_size * 1.1f;                                // moves in when a portrait sits on the right
     if (sc->narration) {
@@ -546,7 +555,8 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         float pad = text_size * 0.75f;
         float tx0 = bx0 + pad, tx1 = bx1 - pad;
         // Speaker portrait at one end of the box (Phantasy Star IV field talk), text narrowed to fit.
-        const Tex *fa = face_tex(st, ln->portrait);
+        // A Narrator line never has one: it is a document, not somebody speaking.
+        const Tex *fa = narr ? nullptr : face_tex(st, ln->portrait);
         if (fa) {
             st->face_t += dt;
             float inset = u * 2.0f, fh = (by1 - by0) - inset * 2.0f;
@@ -565,8 +575,12 @@ static void draw_scene(Star *st, int w, int h, float dt) {
             if (right) { tx1 = fx - pad * 0.6f; arrow_x = fx - text_size * 0.7f; }
             else tx0 = fx + fw + pad * 0.6f;
         }
-        dl->AddText(font, text_size * 0.92f, ImVec2(tx0, by0 + pad * 0.7f), IM_COL32(255, 216, 74, 255), ln->speaker);
-        draw_typed(dl, font, text_size, ImVec2(tx0, by0 + pad * 0.7f + text_size * 1.35f), tx1 - tx0, IM_COL32_WHITE, ln->text, chars, false);
+        if (narr) {                                                        // no name line, so the text centres instead
+            draw_typed(dl, font, text_size, ImVec2(tx0, by0 + pad), tx1 - tx0, IM_COL32(230, 232, 245, 255), ln->text, chars, true);
+        } else {
+            dl->AddText(font, text_size * 0.92f, ImVec2(tx0, by0 + pad * 0.7f), IM_COL32(255, 216, 74, 255), ln->speaker);
+            draw_typed(dl, font, text_size, ImVec2(tx0, by0 + pad * 0.7f + text_size * 1.35f), tx1 - tx0, IM_COL32_WHITE, ln->text, chars, false);
+        }
     }
     if (!typing && fmodf(st->line_t, 1.0f) < 0.6f) {                       // blinking "more" arrow
         ImVec2 c = sc->narration ? ImVec2(w * 0.5f, h * (port ? 0.72f : 0.8f)) : ImVec2(arrow_x, by1 - text_size * 0.95f);
@@ -594,7 +608,7 @@ static void draw_title(Star *st, int w, int h, float dt) {
         dl->AddRectFilled(ImVec2(x, y), ImVec2(x + 3, y + 3), with_alpha(IM_COL32(200, 210, 255, 255), tw));
     }
     float m = (float)(w < h ? w : h);
-    const char *title = "ANCIENT HALLS", *sub = "Chapter 1  -  The First Door";
+    const char *title = "THE FAIR COPY", *sub = "Chapter 1  -  Clear the Entrance";
     float ts = m * 0.115f, ss = m * 0.042f;
     ImVec2 tsz = font->CalcTextSizeA(ts, FLT_MAX, 0, title), ssz = font->CalcTextSizeA(ss, FLT_MAX, 0, sub);
     float y = h * 0.28f;
@@ -727,7 +741,7 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     memcpy(&b, buf, sizeof(b));
     if (b.magic != RELOAD_MAGIC) return;               // blob from the old game or an older layout: start at the title
     st->fade = 0.0f;
-    if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_INTRO_COUNT) {
+    if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_INTRO_COUNT && CS_INTRO[b.scene].line_count > 0) {
         int line = b.line < 0 ? 0 : b.line >= CS_INTRO[b.scene].line_count ? CS_INTRO[b.scene].line_count - 1 : b.line;
         star_goto(st, b.scene, line, true);
     } else if (b.screen == SCR_END) {
@@ -754,6 +768,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             st->fade = 1.0f;
             int next = st->fade_to_scene;
             st->fade_to_scene = -1;
+            while (next < CS_INTRO_COUNT && CS_INTRO[next].line_count <= 0) next++;   // nothing to show, nothing to tap
             if (next < CS_INTRO_COUNT) star_goto(st, next, 0, false);
             else { st->screen = SCR_END; st->title_t = 0; star_free_textures(st); mus_start(CS_HOPE); }
         }

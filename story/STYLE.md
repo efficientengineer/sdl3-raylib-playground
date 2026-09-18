@@ -44,7 +44,10 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
 - **R5 anchor and punch** — with 3 or more panels, at least one panel is an anchor
   (scale wide, full, or medium) and at least one is a punch (scale close, extreme, or insert).
 - **R6 known cast** — every character named in a scene exists in `characters.md`, and is
-  listed in the scene's `characters:` line. Their `look` is inserted verbatim.
+  listed in the scene's `characters:` line. Their `look` is inserted verbatim. In **panel text** use
+  the `## Handle` and nothing else; a `characters:` line or a dialogue speaker may also use one of
+  that character's `- alias:` names (see "The cast file" below). `Narrator` is a reserved speaker,
+  never a character: the game draws that line with no name and no portrait.
 - **R7 short panels** — a panel description is at most 40 words. It says who, doing what,
   where they look. It does not describe style.
 - **R8 no style leakage** — panel descriptions may not contain style or rendering words
@@ -59,6 +62,26 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
   `- Name: <where they look>, <expression>, <body>`. It must say where the eyes point (at a named
   target or a screen direction) and what the face is doing. "Neutral" is allowed only when written.
   Characters reacting to the same thing look at the same thing. Max 25 words per line.
+
+## The cast file (`characters.md`) format
+
+One `## Handle` per character, then `- key: value` lines. The handle is the word a scene writer
+types; `story_prompt.py` matches it case-insensitively **as a whole word inside panel descriptions**,
+so a handle is never a common word and never a word that appears in the setting ("Nine" would fire on
+"the Nine Doors"). Only `look`, `ref`, and `alias` reach the tool; `role`, `people`, `voice`,
+`status` and `notes` are for writers.
+
+- `- look:` (required) — pasted verbatim into every prompt the character appears in. Race, class and
+  beard words are rejected; see "Design direction" in `characters.md`.
+- `- ref:` — the character's reference image, made with `./story_prompt.py refsheet <Handle>`. Its
+  middle panel becomes the in-game dialogue portrait, via `./story_prompt.py portraits`.
+- `- alias: Name[, Name...]` (optional) — **display names** for a character known on screen by
+  something other than their handle. A dialogue speaker equal to an alias resolves to that character:
+  they get that character's portrait, their left/right side of the dialogue box, and no "not in
+  characters.md" warning, while the game prints the alias as the speaker name. A scene's
+  `characters:` line may list an alias too. Aliases are deliberately **not** matched inside panel
+  descriptions — that is what the handle is for, and it is why the alias exists at all. An alias may
+  not be another character's handle or alias, and may not be `Narrator`.
 
 ## Review checklist (before accepting a generated sheet)
 

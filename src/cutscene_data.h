@@ -8,6 +8,7 @@ struct CsRect { float x, y, w, h; };                 // percent of the stage
 struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen
 struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood;  // reveal 0 = none
                 const char *portrait; CsSide side; };  // portrait file, or nullptr when the speaker has none
+#define CS_NARRATOR "Narrator"              // speaker of an unattributed box: no name drawn, never a portrait
 struct CsScene { const char *id; const char *title; bool narration;   // narration == (kind == CS_NARRATION)
                  CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
