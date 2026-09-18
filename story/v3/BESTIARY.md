@@ -33,7 +33,8 @@ black eye-dots on the knuckle. Butter yellow and black.
 **The fight.** It hops in, takes one item out of your pack, and hops for the ditch. Kill it before it
 gets there or the item is gone for good. Groups of four to six, and they go for different pockets.
 **Tell.** It stops hopping and sits still, which means it has chosen whose pack.
-**Drops.** What it took, plus junk it took off somebody else — a spoon, a boot, a sealed letter.
+**Drops.** What it took. Everything they get away with goes to a hoard in the nearest drain, which is
+worth finding.
 
 ### Milestones
 **Silhouette.** A waist-high grey post standing at the verge among the real ones, which splits down
@@ -88,7 +89,8 @@ the back of the hand. Grey and sulphur yellow.
 **The fight.** Armoured on top, soft underneath; it has to lift a knuckle to move, and that is the
 only moment you can hurt it. Slow, enormous damage, always alone. The optional fight of the chapter.
 **Tell.** It rocks back before it swings, which is also when the underside shows.
-**Drops.** The second sword — worse than your father's, and it does not break.
+**Drops.** The second sword — worse than {{HERO}}'s father's, and it cannot break. See `LOOT.md` for
+what that is for.
 
 ---
 

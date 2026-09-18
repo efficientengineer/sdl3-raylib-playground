@@ -16,6 +16,12 @@ at you in a straight line and unable to turn once they do. They drop grain and a
 encounter in town, and it teaches the guard-break window.
 **Hazards / events.** The cart. Climb it and it shifts and the family shouts at you; the wall is the
 answer and the game wants you to work that out in about four seconds.
+**Optional — the teaching find.** **The weight**, a lead lump off the grain scales, sitting on the
+scale bench two steps inside the shed door with a glint on it. The way out is the gap in the far wall;
+the bench is one step the other way, so anyone who looks around at all gets it. Use in battle to
+double one character's attack for three rounds, once per fight, for the rest of the game. This is
+where the player learns that looking around pays, and it is the only item in the chapter that is easy
+to find.
 **Find:** four coin under the well bucket and a grain sack in the shed the baker buys. That is your
 money for the evening.
 **What failing costs.** Come in after the last stroke and the clerk finishes closing the ledger
@@ -51,8 +57,11 @@ a ladder against the house with him at the top of it.
 **Encounters.** None. This is the rest, and it is meant to be funny.
 **Hazards / events.** He will not come down, so the argument is shouted upward while {{HEALER}} holds
 the ladder and will not let you climb it.
-**Optional.** Your father's hunter badge at the bottom of the water barrel, and {{MENTOR}} watching
-you take it.
+**Optional.** **The brace**, a flat tin nailed under the eaves, reached by going up the ladder later
+that evening while he is inside at supper. The game never points at it and he has never mentioned it.
+Whoever wears it cannot be held, wrapped or knocked down, for the rest of the game.
+**Find:** your father's hunter badge at the bottom of the water barrel, and {{MENTOR}} watching you
+take it. A story find, worth no money.
 **World note.** He posted the run this morning with his own money because no convoy came, and the man
 who pays for a job can pull it back until dawn. That is why you are up this hill.
 
@@ -142,6 +151,9 @@ enormous hit; the seam opens a finger's width first, so a player who is looking 
 They drop old road iron the smith pays well for.
 **Hazards / events.** **The culvert.** The road is out and the queue is going the long way round.
 Rope puts you straight down and up in one move; without it you walk round with everyone else.
+**Optional.** **The tooth.** Down on the rope, in the drain under the broken culvert, is a thumbs'
+hoard — a year of everything stolen on this road. Ten per cent critical chance for whoever wears it,
+for the rest of the game, and it looks like nothing at this level.
 **What failing costs.** A thumb that reaches the ditch keeps what it took.
 
 ## Play: The bridge (5 min)
@@ -241,6 +253,9 @@ before the ring. Nothing crosses the sitters' line, so from segment 2 on the gam
 entirely — the first quiet since the bridge.
 **Hazards / events.** Ask anyone at the shrine why nothing comes in and they say the sitters were here
 first and change the subject.
+**Optional.** **The green pebble**, under one of the sitters, found only by examining the gap in the
+ring instead of walking through it. Fleeing succeeds from anything for the rest of the game, including
+fights that refuse.
 **What you do.** Put the jar on the stone shelf, sealed, the way you were told. The job is done and
 the screen says so, with a day and a half of chapter left.
 **Find:** last year's jar still sealed; a rope hanging from the bottom step; cart tracks in the grass;

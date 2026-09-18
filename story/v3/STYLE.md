@@ -57,8 +57,12 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
     named. **Boss** — one line, where there is one. **What failing costs.** **Feel** — one short line,
     or cut it. A day of travel is a day of play. If the text says a road is dangerous, the danger is
     encounters the player fights, not a creature with a clever rule. **One hazard and at most one
-    optional per area, two optionals in a whole chapter, two or three enemy kinds per area, and no
-    chained penalties.** Examples in a brief are examples, not a checklist.
+    optional per area, two or three enemy kinds per area, and no chained penalties.** Examples in a
+    brief are examples, not a checklist. **Every map hides one piece of loot off the main path with a
+    unique lasting effect — a rule change or a multiplier, never "+3 attack" — and it is missable on
+    purpose.** The exception is the first one in the game, the teaching find, which sits in plain
+    sight one step off the route so the player learns that looking around pays. Track every item in
+    `LOOT.md` before it appears in a chapter.
 13. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
     or in the next clip.
 
