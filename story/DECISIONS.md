@@ -164,3 +164,11 @@ Owner: scenes must be written with token replacement in mind, because names will
 every proper noun in story text is a token like `{{HERO}}` or `{{HOME_TOWN}}`, including speaker labels;
 `story/v3/NAMES.md` maps tokens to current names; the tool substitutes when exporting to the game and
 when building ChatGPT packages, and can render a readable copy for review.
+
+## D14. The world is 2.5D, Octopath style; props are sprites, only surfaces are tiles
+Owner (2026-09-18): after chapter one's play blocks were accepted, "we need to be able to walk around
+the world." Chose 2.5D (3D ground/walls/heights, fixed-angle perspective camera, pixel-art billboards)
+over PS4-style flat top-down, and ChatGPT-sliced sheets over PixelLab or placeholders for the art.
+Owner's refinement: tile only the big surfaces (ground, floors, walls); everything else is a sliced
+sprite, which allows more interesting shapes and compresses well. Contract in `FIELD.md`. To reverse:
+the map format and art folders survive a switch to flat top-down; only the renderer changes.
