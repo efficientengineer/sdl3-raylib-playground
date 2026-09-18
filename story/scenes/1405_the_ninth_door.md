@@ -38,7 +38,7 @@ register in front of her and says the kindest thing she has said since she joine
 - Hesk [1] {dread}: Nine doors in my cliff. I've kept the Fifth forty-four years. That's the Ninth, from behind.
 - Sefa [2]: No forcing. No cutting. That mortar has not been touched since the year it went in.
 - Hesk [2]: Not touched. Asked.
-- Bron [3]: Not the gallery. Her doors are still shut and still held. This one goes down.
+- Bron [3]: Different door. Hers is back along the flat, still shut, still held. This one goes down.
 - Ket [3]: There is no dust on that floor. A mile of stair, and somebody has swept it.
 - Hesk [4] {wonder}: ...
 - Sefa [5]: What is that you are doing?

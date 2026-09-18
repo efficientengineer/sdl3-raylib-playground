@@ -12,10 +12,13 @@ before she asks the next one. She interviews the party rather than the other way
 delighted with them. The books are indexed. She is not distressed and is not to be pitied: she simply
 notices that other people appear to have a before and she has a shelf, and she would like to know
 what the before is like. She asks Bron for his earliest thing and he names the winter and does not
-tell it, the way a man names a thing he has said often, and she writes it down. Then she asks for the thing he did every
-year, and then for the day before it, and he answers fast and well and warmly and gives her exactly
-the answer he gave Lyra in the Registry stacks, word for word, and she writes that down too. Nobody
-in the party reacts, because they have all heard it.
+tell it, the way a man names a thing he has said often, and she is not interested: eleven years of
+answers have taught her that earliest things are thin and everyone's is the same shape. What she
+collects is the small useless detail, because in her experience nobody bothers to invent one. So
+she asks for the thing he did every year, and then for the day before it, and he answers fast and
+well and warmly and gives her exactly the answer he gave Lyra in the Registry stacks, word for
+word, and one object in it delights her more than anything else she has been given this year, and
+she says why, and she is wrong. Nobody in the party reacts, because they have all heard it.
 
 ## Dialogue
 - Ilsa {wonder}: Before you say anything — how many are you, where did you come in from, and how long have I got?
@@ -27,9 +30,10 @@ in the party reacts, because they have all heard it.
 - Ilsa: I'm not sad about it. I'd only like to know what it's like, and nobody can tell me properly.
 - Ilsa: Your earliest thing. Go on. The first one you're sure of.
 - Bron: Being nine, and lost above Tellwater in the snow. That's the first one I'm sure of.
-- Ilsa: Lovely. Now the other kind. The thing you did every year. Everyone's got one of those.
+- Ilsa: Mm. Earliest ones are always thin. I've forty of those. Now the thing you did every year.
 - Bron: The autumn fair. Every year of it.
 - Ilsa: And the day before it?
 - Bron: Day before? Shutters down and the stove out. She'd not leave a fire in an empty house.
 - Bron: And I'd carry the stool down to the square the night before so we'd somewhere to sit.
-- Ilsa {sorrow}: Lovely. I'll put that one with the good ones.
+- Ilsa {sorrow}: There. The stool. Everybody gives me the fair — I've thirty fairs. Nobody ever gives me the stool.
+- Ilsa: Nobody would bother to make one up. I'll put that with the good ones.

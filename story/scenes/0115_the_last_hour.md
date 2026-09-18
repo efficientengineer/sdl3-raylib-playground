@@ -9,8 +9,12 @@
 The hour before dawn. Eleven of the twelve bunks are empty; a hunter of sixty-one is in the
 twelfth, and a sister of the Order of the Late Hour is sitting the last hour with him. She works
 through the fifteen questions of the Tally, in order, at an even pace, the way you would read a
-list. He answers the first few, laughs at the seventh, and somewhere after it he stops. She keeps
-going, because the questions were never for him. She writes nothing down. She does not cry. Her
+list. He is good company for three of them: he makes the first one funny, puts his whole mother
+into the fourth, and laughs at the seventh, because the honest answer to it is that yesterday he
+got as far as the window and back. He asks her to write that down. She does not write anything
+down. Then she asks the eighth, and the ninth, and the tenth, and he has stopped, and her hand
+closes on his while the silence is still going. She keeps asking, in order, to the end of the
+list, because the questions were never for him. She does not cry. Her
 gold sun medallion is lying open on the blanket with its fifteen points showing, and by the end her
 gloved hand is holding his. Bron is out on the landing and cannot hear any of it.
 
@@ -32,8 +36,8 @@ gloved hand is holding his. Bron is out on the landing and cannot hear any of it
 - Lyra [3]: What is your name? What name did your mother use?
 - Merrit [3]: Merrit Tack. She used Merry. Nobody else ever got away with it.
 - Lyra [4]: What did you eat last? What was the weather? What happened the day before this one?
-- Merrit [5]: Soup. No idea. And nothing at all — that's a funny thing to ask a man in a bed.
+- Merrit [4]: Soup. Couldn't tell you. And yesterday I got to that window and back, and it took me an hour. Write that down.
 - Lyra [5]: What did you do that you would do again? Who is owed something? Who owes you?
+- Merrit [5]: ...
 - Lyra [6]: What is unfinished? What should be told, and who to? Is there anything you would rather nobody knew?
-- Lyra [7]: Is there anything you want said out loud now, while there are people?
-- Lyra [7]: What do you want done?
+- Lyra [7]: Is there anything you want said out loud now, while there are people? What do you want done?

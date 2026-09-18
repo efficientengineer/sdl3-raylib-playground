@@ -13,8 +13,10 @@ seven, the reason, stated once and flatly, the decision to file it as a flood, w
 instrument, the cost per head, the study nobody circulated, and then the names, read off loose
 pages in his own hand. He is not a villain making a speech. He is a tired, courteous man reading a
 document he wrote himself, and he is relieved to be doing it. He never justifies beyond the
-arithmetic, never weeps, and never asks for anything. Two directors ask procedural questions. The
-clerk keeps writing. Kerrow does not look up.
+arithmetic, never weeps, and never asks for anything. A director asks a procedural question, which
+is the only thing anyone at the table wants to know. Bron asks two flat questions, one of which
+puts the drafter's name into the room with her standing in it, and Sefa Quill hears her own work
+read into the minute and says nothing at all. The clerk keeps writing. Kerrow does not look up.
 
 ## Panels
 1. establishing_wide | a long panelled board room, an oval table with eleven seated directors, a clerk writing at a side desk, one man standing at the head of the table at the left, four figures standing at the far end
@@ -42,8 +44,8 @@ clerk keeps writing. Kerrow does not look up.
 - Crewe [4]: Nobody decided anything at twenty-two oh two. I should like that in the minute in those words.
 - Crewe [4]: Twenty-two thirty-one. Nine seconds. Four hundred and seven residents, and four of the five crew.
 - Crewe [5] {sorrow}: I was four years old in the last Hungry Winter. I did the arithmetic. I could live with the answer, and I still can.
-- Bron [5]: What day was it filed.
-- Crewe [6]: The ninth day. A flood and a subsidence. Sefa Quill drafted the instrument in two days, at nine marks and two a head.
-- Crewe [6]: One more item. There is a study. Extraction, ninety-nine, twenty-six. It was completed and it was never circulated.
-- Director [6]: Is that study before this board?
+- Bron [5]: Who filed it.
+- Crewe [6]: I did. On the ninth day. A flood and a subsidence. Sefa Quill drafted the instrument in two days.
+- Sefa [6]: ...
+- Crewe [6]: Nine marks and two a head. One more item: a study, Extraction ninety-nine twenty-six. Completed, never circulated.
 - Crewe [7]: These are the pages. My hand, never filed. Kettle, R. — Emberrow — tannery. Brae, A. — Windrow — laundry.

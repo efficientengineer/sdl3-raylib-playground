@@ -8,20 +8,22 @@
 ## Beat
 Night, in somebody else's abandoned kitchen, with a stove that has not been lit in four days and a
 man cooking on it for six people anyway. Ollo did not know her. That is exactly why he is allowed
-to ask, and he says her name, which nobody has said out loud in two chapters, and then asks the
-question — not how did she die, not are you all right, but what was she like. The silence after it
-goes on long enough to be uncomfortable.
+to ask, and he asks it in the middle of handing out plates — not how did she die, not are you all
+right, but what was she like — and he says her name, which nobody has said out loud in two
+chapters. Two people say nothing, and the silence goes on long enough to be uncomfortable, and he
+does not take the question back.
 Then Pip answers with something small and unflattering and true, and Hesk adds a complaint, and Ket
-gives a measurement, and Zeph corrects Pip's account of a crossing on the ferry-rail, and within
-four lines it is an argument about which siding it was and whether it was six hours or four, and
-everybody eats a great deal. Ollo asks once and then shuts up and keeps filling plates. Nobody
-cries, nobody says they miss her, and nobody thanks him. Bron says one sentence at the very end and
-it is about her handwriting.
+gives a measurement, and Zeph corrects Pip's account of a crossing on the ferry-rail — and the
+argument that follows is only about her: which side of the sledge she sat on, how long, whether she
+said she was cold. Nobody argues about the sledge. Ollo asks once and then shuts up and keeps
+filling plates. Nobody cries, nobody says they miss her, and nobody thanks him. Bron says one
+sentence at the very end and it is about her handwriting.
 
 ## Dialogue
-- Ollo {sorrow}: What was Lyra like?
+- Ollo {sorrow}: Hold that, it's hot. Mind the handle. — What was Lyra like?
 - Pip: ...
-- Ollo: I'm not fishing. I've cooked for the six of you three weeks and I don't know one thing about her.
+- Hesk: ...
+- Ollo: I'm not fishing. I've fed you three weeks and nobody's said her name once. I've not even got a face for her.
 - Pip: She asked one question too many. Every single time. You'd be done, and she'd ask one more.
 - Pip: And then you'd be sat there for an hour, and it was your own fault, and she knew it was.
 - Hesk: She walked too slow. Forty-one minutes a mile with a pack on. I timed her twice to be fair about it.
@@ -29,12 +31,12 @@ it is about her handwriting.
 - Pip: On the rail out of Braid she sat on the windward crate six hours and never once said she was cold.
 - Zeph: Leeward.
 - Pip: Windward. Cassa told her not to and she did it anyway.
-- Zeph: Leeward crate, and it was not six hours, it was four, and it was the Wick run and not the Braid one.
-- Zeph: We took on water at the second siding and you were sick over the stern and blamed the bread.
-- Pip: I blamed the bread because it was the bread!
-- Hesk: It was the bread. I'd not have said, but it was.
-- Ollo: Right, that's slander, I've heard about that bread and I'm making the same bread.
-- Ket: The sixth siding out of Braid is the water stop. Not the second. You are both wrong and I have enjoyed it.
-- Zeph: ...Fine. But it was leeward.
+- Zeph: Leeward crate, four hours, and it was the Wick run. If we are doing this, get her right.
+- Ket: The Wick run. And the water stop is the sixth siding, not the second. You are both wrong.
+- Ket: She sat where she could see the rest of you and not the rail. Every crossing. I have four of them.
+- Zeph: ...
+- Pip: She was cold, though. Hands up her sleeves the whole way and she'd not say it, and I never asked her.
+- Hesk: She'd not say. She'd ask you if you were.
+- Ollo: Eat that. There's more.
 - Bron: She barred her sevens. Every one of them.
 - Bron: ...Pass me the pot. I'll do those.

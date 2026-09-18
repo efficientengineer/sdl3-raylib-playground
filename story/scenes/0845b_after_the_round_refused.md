@@ -12,14 +12,16 @@ refusing the bill at the sixth door. One of three; see `0845a` and `0845c`.**
 
 The evening after the sixth door, on the wall above the town where the ravine road comes over the
 lip. Somewhere to put it. A company clerk reached the Even Hand's hall before the party did and had
-the refusal in writing by four, which costs a hall with three bills on its board all the company
-work it will ever be offered again, and Bron has to say out loud what he has cost a woman with a
-stove and no wood. Zeph makes it worse by being accurate. Hesk's answer is not comfort and is not
-meant to be. The game passes no judgement. Nobody says they had no choice.
+the refusal in writing by four, and took the bill off the board himself. The cost is arithmetic and
+it is on the page: what is left on that board is worth about a mark and six, and nothing sealed will
+be sent to it again. Zeph works the figure out and makes it worse by being accurate. Bron does not
+say he is sorry and does not say he did it; he says the hall-keeper's own sentence back. Hesk's
+answer is not comfort and is not meant to be. The game passes no judgement. Nobody says they had no
+choice.
 
 ## Dialogue
-- Bron {sorrow}: The clerk got to the hall before we did. She had it in writing by four.
-- Bron: Three bills on that board now and no company work on it ever again. That's her stove and that's her winter, and I did that.
-- Zeph: She had four bills and three of them were rats.
-- Hesk: Then she has three bills and a stove. Go and say that to her face and don't say sorry afterwards.
+- Bron {sorrow}: A clerk had it in writing by four. He took the bill off her board himself and left the pin in it.
+- Zeph: Three left on it. Rats, rats and a wall. A mark and six for the lot, and nothing sealed goes up there again.
+- Bron: She's got a stove up there and no wood in it.
+- Hesk: Then go up and say that to her in her own room. And don't say sorry after it.
 - Bron: ...

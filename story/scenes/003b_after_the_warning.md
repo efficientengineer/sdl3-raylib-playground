@@ -14,6 +14,6 @@ and it is worse than a fight. They decide to go in anyway.
 - Bron {dread}: It's still standing there. It hasn't even shifted its grip.
 - Lyra {dread}: It won't. It's been holding that gap for a thousand years.
 - Bron: Then whatever it's holding it against is still down there.
-- Lyra {sorrow}: That's what frightens me. It sealed itself in with the thing it was afraid of.
+- Lyra {sorrow}: Every door in this hill was barred from the inside. That isn't keeping people out.
 - Bron {tense}: The contract says clear the entrance. Nobody said anything about what's behind it.
-- Lyra {hope}: Then we go in with our eyes open. And we tell the others before we take another step.
+- Lyra {hope}: Then we go in. And we go back up and tell the other two before anybody takes another step.

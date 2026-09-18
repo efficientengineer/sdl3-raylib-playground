@@ -41,5 +41,5 @@ picks up the lamp and the light goes away down the corridor and the guards do no
 - Bron [5]: How many people can have it?
 - Maren [5]: ...
 - Maren [5]: I don't know. I'm sorry. I haven't got that far. I've had two years and I can't.
-- Hesk [6]: Every door in that hill was shut from the inside. Somebody had a reason and you've not asked them.
+- Hesk [6]: That's no door of mine. Nine in my cliff, and every one shut from the inside. You've not asked them why.
 - Maren [6]: No. I haven't.

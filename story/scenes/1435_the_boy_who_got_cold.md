@@ -21,13 +21,13 @@ nobody asked for, which is how he says the thing he cannot say.
 - Hesk {sorrow}: The stone's warm. I've had my hand flat on this wall an hour and it's still warm.
 - Pip: That's the fourth time you've said it.
 - Hesk: It'll be the fifth in a minute.
-- Pip: Bron doesn't mind it. Bron likes it. — You got cold once, didn't you? You lot sleep in snowdrifts for fun.
+- Pip: Bron doesn't mind it. Bron likes it. — You got *cold*? You lot sleep in snowdrifts for fun.
 - Pip: ...
 - Pip: ...I've had that one in my mouth for a year and I never heard it once.
 - Bron: Say it. I've no quarrel with it.
 - Bron: I got lost above the fold at nine. Two nights. Bored, then frightened, then carried down.
-- Bron: It's hers. Maren Ostry's. She was nine in it, and I'm going to keep saying so out loud.
-- Bron: I'm not giving it back and I'm not putting it down. I'll just say whose it is when I tell it.
+- Bron: It's hers. Maren Ostry's. She was nine in it, and I've had the good of it for fourteen years.
+- Bron: I'm keeping it. I'll say whose it is when I tell it. That's all I'm doing about it.
 - Hesk {hope}: That's the first sensible thing anybody's said since the stair.
 - Ollo: Right. Sit down, all of you. There's bread, and there's the end of the cheese.
 - Ollo: Pip, you're having the cheese.
