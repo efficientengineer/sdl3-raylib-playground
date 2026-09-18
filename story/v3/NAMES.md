@@ -1,18 +1,23 @@
 # NAMES — the token table
 
+Naming style: plain German words used as names, the way Frieren does it (Stark, Fern, Himmel), plus
+real old German given names (Ottilie). Avoid words Frieren already uses. Meanings: Falke = falcon,
+Ottilie = given name, Hart = hard, Stolz = pride, Frage = question, Elster = magpie, Durst = thirst,
+Halm = grain stalk.
+
 Every proper noun in the v3 story text is a token in double braces, including speaker labels.
 Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 
 | Token | Current name | What it is |
 |---|---|---|
-| `{{HERO}}` | Bron | Hunter's apprentice, seventeen. Bought his father's axe. Has an introduction he doesn't know about. |
-| `{{HEALER}}` | Lyra | Healer, twenty-three. The mentor's other student. Wants to be asked along. |
-| `{{SCHOLAR}}` | Zeph | One of eight people alive who read any of the ancients' language, and the worst of them. Joins chapter two. |
-| `{{THIEF}}` | Pip | Thief, small, loud. Sends money home to a sister a caretaker keeps alive. Joins chapter two. |
-| `{{MENTOR}}` | Dorn | The old hunter. Bad knee, guild ledger, one chair, a roof he should not be on. |
-| `{{RIVAL}}` | Cray | Nineteen, better, right about it. Takes the lord's coin in chapter one. |
-| `{{VILLAIN}}` | Sevran | The young lord in the west. Bought a caretaker, had the {{SECOND_MOON}} moved, and is walking to {{THE_DOOR}}. |
-| `{{HOME_TOWN}}` | Fallow | Nine streets, a grain yard, a well. Where the hero starts. |
+| `{{HERO}}` | Falke | Hunter's apprentice, seventeen. Bought his father's axe. Has an introduction he doesn't know about. |
+| `{{HEALER}}` | Ottilie | Healer, twenty-three. The mentor's other student. Wants to be asked along. |
+| `{{SCHOLAR}}` | Frage | One of eight people alive who read any of the ancients' language, and the worst of them. Joins chapter two. |
+| `{{THIEF}}` | Elster | Thief, small, loud. Sends money home to a sister a caretaker keeps alive. Joins chapter two. |
+| `{{MENTOR}}` | Hart | The old hunter. Bad knee, guild ledger, one chair, a roof he should not be on. |
+| `{{RIVAL}}` | Stolz | Nineteen, better, right about it. Takes the lord's coin in chapter one. |
+| `{{VILLAIN}}` | Durst | The young lord in the west. Bought a caretaker, had the {{SECOND_MOON}} moved, and is walking to {{THE_DOOR}}. |
+| `{{HOME_TOWN}}` | Halm | Nine streets, a grain yard, a well. Where the hero starts. |
 | `{{CARETAKER}}` | *(unnamed yet)* | One of the people the ancients made. Few left, all old. Took the bread at the {{STAIR}} for generations; bought and taken west before chapter one. |
 | `{{STAIR}}` | *(descriptive)* | A staircase the width of a town, down out of the cloud, stopping thirty feet above an empty field. The ancients' work nearest {{HOME_TOWN}}. |
 | `{{SECOND_MOON}}` | *(descriptive)* | A moon that isn't a moon. Held one quarter of the sky for a thousand years until last spring. |
