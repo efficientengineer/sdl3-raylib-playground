@@ -4,7 +4,7 @@ Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
 ## The checklist
 
-Run every scene against all fifteen before it is written, and again before it is done.
+Run every scene against all sixteen before it is written, and again before it is done.
 Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game Storytelling*.
 
 0. **Plain.** After every clip a twelve-year-old could say what just happened, why, and what happens
@@ -48,7 +48,11 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
     answer all four in your notes, and the answers must live in the world rather than in the plot's
     convenience. A job no one has taken for months needs a reason it went untaken. A road only
     these four can walk needs everyone else to be somewhere, for a reason, today.
-12. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
+12. **Play blocks are designed, not labelled.** Each one names the area, what is in the way, the
+    enemy and how it behaves, what failing costs, and what it feels like. A day of travel is a day of
+    play: at least one area, one fight, and a camp if it is a night. If the text says a road is
+    dangerous, the player meets the danger, and it is the same danger the story says killed people.
+13. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
     or in the next clip.
 
 ## Names are tokens
@@ -65,8 +69,7 @@ whole job." A new `## Goal` goes in whenever the player's job changes.
 
 **`## Play: <kind> — <place> (<minutes>)`** — three lines, the design, in front of the player's
 hands. Kinds: explore / fight / boss / puzzle / travel / shop / talk-to-townsfolk / chase.
-Say what the player is doing, be concrete about mechanics ("the howler calls another dog every two
-turns until it dies"), then: **Find:** what's in there. **Unlocks:** a door, a road, a party member,
+Say what the player is doing, be concrete about mechanics ("a follower joins the group every time you stop"), then: **Find:** what's in there. **Unlocks:** a door, a road, a party member,
 a weapon, a clue. Every clip has a Play block in front of it. No two clips touch.
 
 **`## Clip: <title>`** — a cutscene, which means **dialogue**.
@@ -105,7 +108,7 @@ killed him and a habit that annoyed someone.
 ## Chapter density
 
 Match Phantasy Star IV's first hour: a town, a guild, one job, one companion. Per chapter, at most:
-six clips, 1,200 words, one new party member, one kind of ordinary fight plus one boss, one new
+six clips (seven if one of them is a camp on a travel day), one new party member, one kind of ordinary fight plus one boss, one new
 mechanic, one sighting of the ancients' work, one appearance by the rival. No puzzles unless the
 chapter spends its mechanic on one. If an element is there because it was fun to write, cut it.
 

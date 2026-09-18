@@ -30,7 +30,7 @@ those are the same thing.
 ## {{HERO}} — hunter's apprentice, seventeen
 
 Short, broad, red-haired, carrying an sword he paid for. His father was the best hunter in town, died
-on a job no one will describe to him, and for thirty years carried the year's water out to the
+on a job no one will describe to him, and for twenty years carried the year's water out to the
 {{STAIR}} and sat under it talking to the woman who lives there.
 {{HERO}} has no gift and no destiny. What he has, and does not know he has, is an introduction.
 **Wants:** to be a real hunter, so that people stop saying his father's name before his.
@@ -59,8 +59,9 @@ on that shore, and a caretaker comes twice a year to keep it going.
 
 Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. He and the father were hunting partners for
 twenty years and the water run was theirs together: two men and one sealed jar, every year, on the
-same day, walking a road that kills anyone who walks it alone.
-The year before the father died, {{MENTOR}}'s knee was broken on that road. The next year the father
+same day, off the road and across empty country where the followers trail a walker all day and take
+whoever is lying down at night. Two people can wake each other; a man alone has to sleep sometime.
+In the twentieth year {{MENTOR}}'s knee was broken on that road. The next year the father
 walked it alone and did not come back. Since then {{MENTOR}} has paid a carter out of his own pocket
 every year to put the jar on the convoy, because it is still his run in his head and money is the only way he
 knows to say so — and it is why he sells {{HERO}} the sword instead of giving it. {{HERO}} knows they
@@ -117,7 +118,7 @@ Beats marked **[non-default]** say how the writing avoids the version the genre 
 13. **{{RIVAL}} walks out of the coat.** He has seen the pilgrimage from inside and brings the one
    thing the party needs: the marching order, and the date {{VILLAIN}} reaches the door.
 14. **The mountain that is a door.** Both parties arrive. The caretaker is asked to choose, and before
-   she answers she tells {{HERO}} what his father said to her across thirty years — and it is all
+   she answers she tells {{HERO}} what his father said to her across twenty years — and it is all
    weather, and water, and a boy who was doing well at his letters.
 15. **Overrule it.** The door can be held shut by a caretaker standing in it, and she is the last one
     and she is tired, and {{HERO}} asks her anyway and she says yes because he asked.
