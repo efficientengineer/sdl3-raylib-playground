@@ -85,7 +85,7 @@ done
 
 # Field maps and art (FIELD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
 # The game looks in files/field/<kind>/<id>.png first, then the APK assets, then its placeholder.
-for d in maps tiles props walkers; do
+for d in maps tiles props walkers edges buildings views; do
     [ -d "$SCRIPT_DIR/story/field/$d" ] || continue
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/$d"
     HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
@@ -101,6 +101,16 @@ for d in maps tiles props walkers; do
         fi
     done
 done
+
+# --pull-views: bring the in-game "Capture view" output back into the repo for the painter.
+if [ "$1" = "--pull-views" ]; then
+    mkdir -p "$SCRIPT_DIR/story/field/views"
+    NAMES="$("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/views 2>/dev/null" | tr -d '\r')"
+    for n in $NAMES; do
+        "$ADB" -s "$DEVICE" shell "run-as $PKG cat files/field/views/$n" > "$SCRIPT_DIR/story/field/views/$n"
+        echo "  pulled views/$n"
+    done
+fi
 
 LOCAL_MD5=$(md5 -q "$OBJ_DIR/libgame_logic.so")
 "$ADB" -s "$DEVICE" push "$OBJ_DIR/libgame_logic.so" /data/local/tmp/libgame_logic.so

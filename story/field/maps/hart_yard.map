@@ -66,7 +66,7 @@ p plank
 
 ## cameras
 # one low fixed shot: you walk into the yard, not across it. The ladder house holds the frame.
-0 0 24 18 fixed 11.5 8.5 28.0 11.5 0.9 8.5 32
+yard 0 0 24 18 fixed 11.5 8.5 28.0 11.5 0.9 8.5 32
 
 ## sweeps
 # generated from the open navmesh edges; the walkable edge is each wall's inner face

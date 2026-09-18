@@ -251,6 +251,73 @@ one-quad-per-edge strips.
 The `{{STAIR}}` landmark on `stair_shrine` is meant to be built the same way: a `stair` profile swept
 along a curve with explicit heights, so the bottom step can be wider than a town and thirty feet up.
 
+## Painted backdrops (FF8 style)
+
+The 3D scene is the **block-out**. A zone can have a painting made over a capture of it; the game then
+draws the painting and uses the block-out only for depth, so sprites layer into it correctly.
+
+### Zone ids
+
+`## cameras` lines take an optional **id as the first field**:
+
+```
+## cameras
+base       0 0 40 30 follow 0 50 30 13 0.8
+square     14.0 13.5 9.0 8.0 fixed 18.60 12.00 30.00 18.60 1.20 17.40 26
+```
+
+A line that starts with a number is still parsed as before and gets the automatic id `z0`, `z1`, …
+The id is what the capture and the painting are keyed on, so zones can be reordered freely.
+
+`ortho <half-height>` may appear anywhere after the mode as an alternative to the `fov` value: the
+zone then uses an orthographic projection of that half-height in world units. Captures, painted mode
+and the framing maths all work with either.
+
+### Capture
+
+**Dev → Capture view 2x** (or **1x**), or a `capture` trigger in `## triggers`
+(`x z w d capture 2`), writes two files into the phone's `files/field/views/`:
+
+| file | what |
+|---|---|
+| `<map>_<zone>.png` | the colour view — **this is what gets painted over** |
+| `<map>_<zone>_depth.png` | linear distance from the camera, /40 world units, greyscale — reference and debug only |
+
+The capture renders the zone's shot **exactly as authored** (framing blend forced to 0), so the
+painting is made for the written camera. It is taken at the live internal resolution × the scale:
+with **fill width** on (the default) that is the screen's aspect at 360 high — 1600×720 at 2x on a
+2400×1080 phone. Turn fill width **off** before capturing for a strict 1280×720. Either is fine: the
+painting is fitted at draw time (see below), but a painting matches best when it was captured on the
+same setting it will be shown at.
+
+`./fast_reload.sh --pull-views` copies everything in `files/field/views/` into `story/field/views/`.
+
+### Painted mode
+
+If `story/field/views/<map>_<zone>_paint.png` exists (phone `files/` first, then the APK assets), that
+zone is painted. Draw order per frame:
+
+1. the painting, as a full-viewport quad with **depth test and depth writes off** — a backdrop;
+2. the whole block-out (splat ground, water, walls, sweeps, buildings, prop billboards) with
+   **colour writes off and depth writes on** — it contributes nothing but depth;
+3. walkers, NPCs and the examine mark, depth-tested as usual, so they sit correctly in the painting;
+4. the see-through cut **reverses**: a painting's pixels cannot be dithered away, so where the
+   block-out hides the player the player is drawn a second time with `GL_GREATER` depth and no depth
+   write, as a dithered silhouette — which is what the FF games do.
+
+Rules and fallbacks:
+
+- **A painted zone must be `fixed`.** A painting is one camera. A painting found on a follow or rail
+  zone logs `field: … is a painting but zone <id> is not a fixed shot, ignoring it` and is skipped.
+- **A painted camera never moves.** The framing blend and the hard clamp are disabled in a painted
+  zone or the painting would slide out of register; if the player walks off frame it only logs
+  `camera: player off frame in painted zone <id> …`.
+- The painting is resampled to the viewport with **nearest**; a different aspect is **letterboxed**
+  inside the FBO and logged once.
+- A zone with no painting stays live 3D, so the two can be mixed freely in one map.
+
+---
+
 ## Ground — the splat map
 
 Per-cell tile ids made every cell boundary read as a grid. The ground is now one pass over a **splat

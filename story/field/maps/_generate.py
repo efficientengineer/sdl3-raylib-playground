@@ -449,11 +449,12 @@ out += ["## nav",
 out += m.nav_lines() + [""]
 out += ["## cameras",
         "# rect(x z w d) then the shot. Last definition wins on overlap; a landmark is in frame in each.",
-        "0 0 40 30 follow 0 50 30 13 0.8",
-        "14.0 13.5 9.0 8.0 follow -15 52 27 11.5 0.9",
-        "17.5 6.0 8.0 8.5 fixed 19.0 8.5 19.0 22.6 2.4 5.2 30",
-        "5.5 16.5 9.0 7.0 rail 5.5 6.5 26.0 14.0 6.5 26.0 18.6 1.2 17.4 32",
-        "3.0 9.0 10.0 8.0 fixed 8.0 7.0 21.0 6.8 1.2 12.6 30", ""]
+        "# <id> x z w d <mode> ... — the id keys the capture and the painting for that zone",
+        "base 0 0 40 30 follow 0 50 30 13 0.8",
+        "square 14.0 13.5 9.0 8.0 fixed 18.60 12.00 30.00 18.60 1.20 17.40 26",
+        "hillroad 17.5 6.0 8.0 8.5 fixed 19.0 8.5 19.0 22.6 2.4 5.2 30",
+        "weststreet 5.5 16.5 9.0 7.0 rail 5.5 6.5 26.0 14.0 6.5 26.0 18.6 1.2 17.4 32",
+        "grainyard 3.0 9.0 10.0 8.0 fixed 8.0 7.0 21.0 6.8 1.2 12.6 30", ""]
 EXITS = [(21, 3, 3, 1)]
 def halm_skip(mx, mz, a, b):
     if abs(height_at(mx + 0.45, mz + 0.45) - height_at(mx - 0.45, mz - 0.45)) > 0.01: return True
@@ -551,7 +552,7 @@ yo += ["## ground"] + ["".join(ground2(x + 0.5, z + 0.5) for x in range(W2)) for
 yo += ["## nav"] + y.nav_lines() + [""]
 yo += ["## cameras",
        "# one low fixed shot: you walk into the yard, not across it. The ladder house holds the frame.",
-       "0 0 24 18 fixed 11.5 8.5 28.0 11.5 0.9 8.5 32", ""]
+       "yard 0 0 24 18 fixed 11.5 8.5 28.0 11.5 0.9 8.5 32", ""]
 yo += ["## sweeps",
        "# generated from the open navmesh edges; the walkable edge is each wall's inner face"]
 yo += wall_lines(y, "fence", lambda mx, mz, a, b: (10.0 <= mx <= 13.3 and 14.5 <= mz <= 17.2))

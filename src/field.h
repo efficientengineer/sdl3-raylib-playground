@@ -20,8 +20,11 @@ enum CamMode { CAM_FOLLOW = 0, CAM_FIXED, CAM_RAIL };
 // One camera zone: a rectangle in map units plus the shot to use inside it. The Dev sliders edit the
 // live copy of the zone the player is standing in, and "print zone" logs it back in map syntax.
 struct CamZone {
+    char id[24];                             // stable name: capture and painting files are keyed on it
     float x, z, w, d;                        // rectangle in map units
     int32_t mode;
+    int32_t ortho;                           // 1 = orthographic; `fov` is then ignored
+    float ortho_h;                           // half-height of the ortho box, in world units
     float yaw, pitch, fov, dist, height;     // follow
     float cx, cy, cz, tx, ty, tz;            // fixed: eye and target
     int32_t pan;                             // fixed: keep the position, turn to hold the player

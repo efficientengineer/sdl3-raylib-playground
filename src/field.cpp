@@ -22,6 +22,11 @@
 #include "field.h"
 #include "field_text.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBI_WRITE_NO_STDIO_SPRINTF
+#include "stb_image_write.h"
+#include <sys/stat.h>
+
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"
 
@@ -65,6 +70,16 @@ static void m_mul(float *o, const float *a, const float *b) {
         for (int i = 0; i < 4; i++)
             r[c * 4 + i] = a[i] * b[c * 4] + a[4 + i] * b[c * 4 + 1] + a[8 + i] * b[c * 4 + 2] + a[12 + i] * b[c * 4 + 3];
     memcpy(o, r, sizeof(r));
+}
+
+// Orthographic, for a zone that wants no perspective at all (FF-style painted flats).
+static void m_ortho(float *m, float half_h, float aspect, float zn, float zf) {
+    memset(m, 0, 64);
+    m[0] = 1.0f / (half_h * aspect);
+    m[5] = 1.0f / half_h;
+    m[10] = -2.0f / (zf - zn);
+    m[14] = -(zf + zn) / (zf - zn);
+    m[15] = 1.0f;
 }
 
 static void m_persp(float *m, float fovy_deg, float aspect, float zn, float zf) {
@@ -633,7 +648,7 @@ struct FTile { char id[24]; FTex tex; bool water; };
 struct FProp { short x, y, w, d; char id[24]; int art; };
 struct FNpc { short x, y; int facing; char walker[24]; char name[32]; char scene[48]; char say[160]; int art; };
 struct FExit { short x, y, w, h; char map[32]; short sx, sy; int facing; bool inside; };
-enum { TG_MESSAGE, TG_SCENE, TG_ZONE, TG_TRAP };
+enum { TG_MESSAGE, TG_SCENE, TG_ZONE, TG_TRAP, TG_CAPTURE };
 struct FTrig { short x, y, w, h; int kind; char arg[160]; bool inside; };
 
 // A convex navmesh polygon: vertices in map units with per-vertex height, so a ramp is one sloped
@@ -701,6 +716,9 @@ struct Field {
     float layer_sharp[4], layer_hk[4];   // per layer: 1 = smooth, 8+ = a crisp edge; height influence
     float splat_dither;
     FTex splat_tex;
+    FTex zone_paint[F_ZONES];            // the painted backdrop for each zone, when one exists
+    int capture_req;                     // 1 or 2 = capture this frame at that scale
+    GLuint cap_fbo, cap_tex, cap_depth; int cap_w, cap_h;
     int floor_first, floor_count;        // every non-water ground quad, drawn in one splat pass
     short spawn_x, spawn_y; int spawn_f;
 
@@ -723,9 +741,9 @@ struct Field {
 
     bool gl_ready;
     GLuint prog, vao, vbo_world, vbo_spr, fbo, fbo_tex, fbo_depth;
-    GLint u_mvp, u_uvoff, u_tex, u_alpha, u_see, u_occl;
+    GLint u_mvp, u_uvoff, u_tex, u_alpha, u_see, u_occl, u_ghost, u_depth;
     GLuint sprog;
-    GLint s_mvp, s_splat, s_lay[4], s_scale, s_map, s_blend, s_sharp, s_hk;
+    GLint s_mvp, s_splat, s_lay[4], s_scale, s_map, s_blend, s_sharp, s_hk, s_depth;
     FTex white;
     int range_first[F_TILES], range_count[F_TILES];
     int wall_first, wall_count;
@@ -951,9 +969,9 @@ static int profile_get(Field *f, const char *spec) {
     if (!strchr(spec, ':') || f->prof_count >= F_PROFS) return -1;
     char buf[80];
     snprintf(buf, sizeof(buf), "%s", spec);
-    char *a[6] = {buf, nullptr, nullptr, nullptr, nullptr, nullptr};
+    char *a[8] = {buf, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
     int na = 1;
-    for (char *c = buf; *c && na < 6; c++) if (*c == ':') { *c = 0; a[na++] = c + 1; }
+    for (char *c = buf; *c && na < 8; c++) if (*c == ':') { *c = 0; a[na++] = c + 1; }
     FProfile *p = &f->profs[f->prof_count];
     memset(p, 0, sizeof(*p));
     snprintf(p->id, sizeof(p->id), "%s", spec);
@@ -1063,6 +1081,7 @@ static int split_toks(char *s, char **t, int max) {
 
 static void field_free_map(Field *f) {
     if (f->splat_tex.id) { glDeleteTextures(1, &f->splat_tex.id); f->splat_tex.id = 0; }
+    for (int i = 0; i < F_ZONES; i++) if (f->zone_paint[i].id) { glDeleteTextures(1, &f->zone_paint[i].id); f->zone_paint[i].id = 0; }
     for (int i = 0; i < f->tile_count; i++) if (f->tiles[i].tex.id) glDeleteTextures(1, &f->tiles[i].tex.id);
     for (int i = 0; i < f->art_count; i++) if (f->art[i].tex.id) glDeleteTextures(1, &f->art[i].tex.id);
     f->tile_count = 0; f->art_count = 0; f->wall_tile = 0;
@@ -1088,6 +1107,7 @@ static void build_world(Field *f);
 
 static void zone_defaults(CamZone *z) {
     memset(z, 0, sizeof(*z));
+    snprintf(z->id, sizeof(z->id), "z");
     z->mode = CAM_FOLLOW;
     z->yaw = 0; z->pitch = 50; z->fov = 30; z->dist = 13; z->height = 0.8f;
 }
@@ -1255,18 +1275,32 @@ static void parse_map(Field *f, char *text) {
             else SDL_Log("field: nav poly %d has %d vertices, skipped", np->id, np->n);
         } break;
         case S_CAMERAS: {
-            n = split_toks(line, tok, 16);
+            n = split_toks(line, tok, 18);
             if (n < 5 || f->zone_count >= F_ZONES) break;
             CamZone *z = &f->zones[f->zone_count];
             zone_defaults(z);
-            z->x = (float)atof(tok[0]); z->z = (float)atof(tok[1]);
-            z->w = (float)atof(tok[2]); z->d = (float)atof(tok[3]);
+            // An optional stable id comes first. Capture and painting files are keyed on it, so a
+            // zone can be reordered without orphaning its painting. Old lines start with a number.
+            int b = 0;
+            if (!(tok[0][0] == '-' || tok[0][0] == '.' || (tok[0][0] >= '0' && tok[0][0] <= '9'))) {
+                snprintf(z->id, sizeof(z->id), "%s", tok[0]);
+                b = 1;
+            } else snprintf(z->id, sizeof(z->id), "z%d", f->zone_count);
+            if (n < b + 5) break;
+            z->x = (float)atof(tok[b]); z->z = (float)atof(tok[b + 1]);
+            z->w = (float)atof(tok[b + 2]); z->d = (float)atof(tok[b + 3]);
+            const char *mode = tok[b + 4];
+            for (int i = b + 5; i < n; i++) {                 // flags, wherever they sit
+                if (!strcmp(tok[i], "pan")) z->pan = 1;
+                else if (!strcmp(tok[i], "ortho") && i + 1 < n) { z->ortho = 1; z->ortho_h = (float)atof(tok[i + 1]); }
+            }
+            n -= b;
+            for (int i = 0; i + b < n + b; i++) tok[i] = tok[i + b];
             if (!strcmp(tok[4], "fixed") && n >= 12) {
                 z->mode = CAM_FIXED;
                 z->cx = (float)atof(tok[5]); z->cy = (float)atof(tok[6]); z->cz = (float)atof(tok[7]);
                 z->tx = (float)atof(tok[8]); z->ty = (float)atof(tok[9]); z->tz = (float)atof(tok[10]);
                 z->fov = (float)atof(tok[11]);
-                z->pan = (n >= 13 && !strcmp(tok[12], "pan")) ? 1 : 0;
             } else if (!strcmp(tok[4], "rail") && n >= 15) {
                 z->mode = CAM_RAIL;
                 z->ax = (float)atof(tok[5]); z->ay = (float)atof(tok[6]); z->az = (float)atof(tok[7]);
@@ -1274,8 +1308,8 @@ static void parse_map(Field *f, char *text) {
                 z->tx = (float)atof(tok[11]); z->ty = (float)atof(tok[12]); z->tz = (float)atof(tok[13]);
                 z->fov = (float)atof(tok[14]);
             } else if (!strcmp(tok[4], "fixed") || !strcmp(tok[4], "rail")) {
-                SDL_Log("field: camera zone %d: %s needs %s numbers, got %d tokens - ignored",
-                        f->zone_count, tok[4], strcmp(tok[4], "rail") ? "7" : "10", n);
+                SDL_Log("field: camera zone %s: %s needs %s numbers, got %d tokens - ignored",
+                        z->id, mode, strcmp(tok[4], "rail") ? "7" : "10", n);
                 break;
             } else if (n >= 10) {
                 z->mode = CAM_FOLLOW;
@@ -1471,7 +1505,8 @@ static void parse_map(Field *f, char *text) {
             memset(t, 0, sizeof(*t));
             t->x = (short)atoi(tok[0]); t->y = (short)atoi(tok[1]); t->w = (short)atoi(tok[2]); t->h = (short)atoi(tok[3]);
             t->kind = !strcmp(tok[4], "scene") ? TG_SCENE : !strcmp(tok[4], "zone") ? TG_ZONE :
-                      !strcmp(tok[4], "trap") ? TG_TRAP : TG_MESSAGE;
+                      !strcmp(tok[4], "trap") ? TG_TRAP :
+                      !strcmp(tok[4], "capture") ? TG_CAPTURE : TG_MESSAGE;
             if (n >= 6) {                                     // the arg is the rest of the original line,
                 int seen = 0, skip = -1;                      // so message text keeps its spaces
                 for (int i = 0; save[i]; i++) {
@@ -1555,9 +1590,30 @@ static void parse_map(Field *f, char *text) {
     }
     mesh_link(f);
     if (!f->poly_count) SDL_Log("field: %s has no ## nav section; nothing is walkable", f->map_name);
+    // A painted zone: story/field/views/<map>_<zone>_paint.png, pushed like any other field art.
+    for (int i = 0; i < f->zone_count; i++) {
+        char rel[200];
+        snprintf(rel, sizeof(rel), "field/views/%s_%s_paint.png", f->map_name, f->zones[i].id);
+        size_t sz = 0;
+        void *data = field_read(rel, &sz);
+        if (!data) continue;
+        if (f->zones[i].mode != CAM_FIXED) {
+            SDL_Log("field: %s is a painting but zone %s is not a fixed shot, ignoring it", rel, f->zones[i].id);
+            SDL_free(data);
+            continue;
+        }
+        int w = 0, h = 0, nc = 0;
+        unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
+        SDL_free(data);
+        if (!px) continue;
+        f->zone_paint[i] = ftex_upload(px, w, h, false, false);
+        stbi_image_free(px);
+        SDL_Log("field: zone %s is painted (%dx%d)", f->zones[i].id, w, h);
+    }
     if (!f->zone_count) {                                     // a default zone covering the map is required
         SDL_Log("field: %s has no ## cameras section; using the default follow shot", f->map_name);
         zone_defaults(&f->zones[0]);
+        snprintf(f->zones[0].id, sizeof(f->zones[0].id), "default");
         f->zones[0].w = (float)f->mw; f->zones[0].d = (float)f->mh;
         f->zone_count = 1;
     }
@@ -1937,6 +1993,8 @@ static const char *FS =
     "uniform sampler2D u_tex; uniform float u_alpha;\n"
     "uniform vec4 u_see;    // xy = player screen px, z = player window depth, w = radius px (0 = off)\n"
     "uniform float u_occl;  // 1 on anything that may block the player, 0 on ground and on the player\n"
+    "uniform float u_ghost; // 1 = draw this sprite as a dithered silhouette (occluded walker)\n"
+    "uniform float u_depth; // 1 = write linear depth instead of colour, for the capture pass\n"
     "out vec4 o;\n"
     "float bayer(vec2 p){\n"
     "  int m[16] = int[16](0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);\n"
@@ -1945,6 +2003,9 @@ static const char *FS =
     "void main(){\n"
     "  vec4 t = texture(u_tex, v_uv);\n"
     "  if (t.a < u_alpha) discard;\n"
+    "  if (u_depth > 0.5) { float d = 2.0*0.4*300.0/(300.4 - (2.0*gl_FragCoord.z-1.0)*299.6);\n"
+    "                       o = vec4(vec3(clamp(d/40.0,0.0,1.0)), 1.0); return; }\n"
+    "  if (u_ghost > 0.5) { if (bayer(gl_FragCoord.xy) > 0.38) discard; o = vec4(0.80,0.86,1.00,1.0); return; }\n"
     "  if (u_occl > 0.5 && u_see.w > 0.5 && gl_FragCoord.z < u_see.z - 0.0006) {\n"
     "    float d = distance(gl_FragCoord.xy, u_see.xy) / u_see.w;\n"
     "    if (d < 1.0 && bayer(gl_FragCoord.xy) + d < 1.0) discard;\n"
@@ -1972,12 +2033,15 @@ static const char *SFS =
     "uniform vec4 u_hk;      // per layer: how much its height mask (the alpha) pushes the edge\n"
     "uniform vec2 u_map;     // map size in cells\n"
     "uniform vec2 u_blend;   // x unused, y = dither amount\n"
+    "uniform float u_depth;  // 1 = write linear depth instead of colour, for the capture pass\n"
     "out vec4 o;\n"
     "float bayer(vec2 p){\n"
     "  int m[16] = int[16](0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);\n"
     "  return float(m[int(mod(p.y,4.0))*4 + int(mod(p.x,4.0))]) / 16.0;\n"
     "}\n"
     "void main(){\n"
+    "  if (u_depth > 0.5) { float d = 2.0*0.4*300.0/(300.4 - (2.0*gl_FragCoord.z-1.0)*299.6);\n"
+    "                       o = vec4(vec3(clamp(d/40.0,0.0,1.0)), 1.0); return; }\n"
     "  vec4 w = texture(u_splat, v_uv / u_map);\n"
     "  w.x += max(0.0, 1.0 - (w.x + w.y + w.z + w.w));        // whatever is left is layer 0\n"
     "  vec4 t0 = texture(u_l0, v_uv * u_scale.x);\n"
@@ -2024,6 +2088,8 @@ static void field_gl_init(Field *f) {
     f->u_alpha = glGetUniformLocation(f->prog, "u_alpha");
     f->u_see = glGetUniformLocation(f->prog, "u_see");
     f->u_occl = glGetUniformLocation(f->prog, "u_occl");
+    f->u_ghost = glGetUniformLocation(f->prog, "u_ghost");
+    f->u_depth = glGetUniformLocation(f->prog, "u_depth");
 
     {
         GLuint sv = make_shader(GL_VERTEX_SHADER, SVS), sf = make_shader(GL_FRAGMENT_SHADER, SFS);
@@ -2043,6 +2109,7 @@ static void field_gl_init(Field *f) {
         f->s_blend = glGetUniformLocation(f->sprog, "u_blend");
         f->s_sharp = glGetUniformLocation(f->sprog, "u_sharp");
         f->s_hk = glGetUniformLocation(f->sprog, "u_hk");
+        f->s_depth = glGetUniformLocation(f->sprog, "u_depth");
     }
 
     glGenVertexArrays(1, &f->vao);
@@ -2126,10 +2193,16 @@ static void zone_shot(Field *f, const CamZone *z, float u, float *eye, float *at
 }
 
 // Where the player's head lands in normalised device coordinates for a candidate shot.
+static void zone_proj(Field *f, float *proj, float fov, float aspect) {
+    CamZone *z = (f->zone_idx >= 0 && f->zone_idx < f->zone_count) ? &f->zones[f->zone_idx] : nullptr;
+    if (z && z->ortho) m_ortho(proj, z->ortho_h > 0.1f ? z->ortho_h : 6.0f, aspect, -200.0f, 400.0f);
+    else m_persp(proj, fov, aspect, 0.4f, 300.0f);
+}
+
 static bool project_head(Field *f, const float *eye, const float *at, float fov, float aspect, float *nx, float *ny) {
     float view[16], proj[16], mvp[16];
     m_look(view, eye, at);
-    m_persp(proj, fov, aspect, 0.4f, 300.0f);
+    zone_proj(f, proj, fov, aspect);
     m_mul(mvp, proj, view);
     float p[3] = {f->px, f->py + 0.9f, f->pz};
     float cx = mvp[0] * p[0] + mvp[4] * p[1] + mvp[8] * p[2] + mvp[12];
@@ -2174,8 +2247,10 @@ static void cam_update(Field *f, float dt, float aspect) {
     // rail shot: binary-search the smallest blend toward them that does it. `pan` just forces it on.
     float lim = (z->mode == CAM_FOLLOW) ? 0.50f : 0.70f;   // 0.70, not 0.80: at 0.8 a long street
                                                            // shot leaves the player half behind a prop
+    bool painted = f->zone_idx >= 0 && f->zone_paint[f->zone_idx].id != 0;
     float eye[3], at[3], fov, need = 1.0f;
-    if (!(z->mode == CAM_FIXED && z->pan)) {
+    if (painted) need = 0.0f;                              // a painting is one camera: it cannot move
+    else if (!(z->mode == CAM_FIXED && z->pan)) {
         zone_shot(f, z, 0.0f, eye, at, &fov);
         if (head_framed(f, eye, at, fov, aspect, lim)) need = 0.0f;
         else {
@@ -2215,7 +2290,14 @@ static void cam_update(Field *f, float dt, float aspect) {
     if (f->warn_cool > 0) f->warn_cool -= dt;
     float nx, ny;
     bool on = project_head(f, f->eye, f->at, f->fov, aspect, &nx, &ny) && fabsf(nx) <= 0.90f && fabsf(ny) <= 0.90f;
-    if (!on) {
+    if (!on && painted) {                                  // say so, but never move a painted camera
+        if (f->warn_cool <= 0 && !f->warn_pending) {
+            snprintf(f->warn, sizeof(f->warn), "camera: player off frame in painted zone %s at %.1f,%.1f",
+                     f->zones[f->zone_idx].id, f->px, f->pz);
+            f->warn_pending = true;
+            f->warn_cool = 4.0f;
+        }
+    } else if (!on) {
         if (f->warn_cool <= 0 && !f->warn_pending) {
             snprintf(f->warn, sizeof(f->warn), "camera: clamped onto the player at %s %.1f,%.1f zone %d u %.2f (ndc %.2f,%.2f)",
                      f->map_name, f->px, f->pz, f->zone_idx, f->frame_u, nx, ny);
@@ -2428,9 +2510,10 @@ static bool player_occluded(Field *f) {
     return false;
 }
 
-static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
-    glBindFramebuffer(GL_FRAMEBUFFER, f->fbo);
-    glViewport(0, 0, vw, vh);
+// Draws the world into whatever framebuffer and viewport are already bound. `painted` puts the
+// zone's painting down first and renders the whole block-out into depth only; `depthmode` writes
+// linear depth instead of colour, which is what the capture's depth reference is.
+static void field_draw_world(Field *f, int vw, int vh, bool painted, int depthmode) {
     glClearColor(0.10f, 0.12f, 0.17f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -2440,11 +2523,49 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
     glDisable(GL_CULL_FACE);
     glUseProgram(f->prog);
     glUniform1i(f->u_tex, 0);
+    glUniform1f(f->u_ghost, 0.0f);
+    glUniform1f(f->u_depth, (float)depthmode);
+
+    if (painted && !depthmode) {
+        // The painting, fitted into the viewport and letterboxed if the aspect differs. Identity MVP
+        // and a clip-space quad, depth off: it is a backdrop, and the block-out supplies the depth.
+        FTex *pt = &f->zone_paint[f->zone_idx];
+        float pa = (float)pt->w / (float)pt->h, va = (float)vw / (float)vh;
+        float sx = 1.0f, sy = 1.0f;
+        if (pa > va) sy = va / pa;
+        else if (pa < va) sx = pa / va;
+        static bool told = false;
+        if (!told && fabsf(pa - va) > 0.01f) {
+            SDL_Log("field: painting %dx%d does not match the %dx%d view, letterboxing", pt->w, pt->h, vw, vh);
+            told = true;
+        }
+        float id[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, id);
+        glUniform2f(f->u_uvoff, 0.0f, 0.0f);
+        glUniform1f(f->u_alpha, 0.0f);
+        glUniform1f(f->u_occl, 0.0f);
+        int qn = 0;
+        FVert *qw = f->spr;
+        float a[3] = {-sx, sy, 0.999f}, b[3] = {sx, sy, 0.999f}, c[3] = {sx, -sy, 0.999f}, d[3] = {-sx, -sy, 0.999f};
+        quad(&qw, &qn, f->spr_cap, a, b, c, d, 0, 0, 1, 1, 1.0f, 1.0f);
+        glBindVertexArray(f->vao);
+        glBindBuffer(GL_ARRAY_BUFFER, f->vbo_spr);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)qn, f->spr, GL_STREAM_DRAW);
+        set_attribs();
+        glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+        glBindTexture(GL_TEXTURE_2D, pt->id);
+        glDrawArrays(GL_TRIANGLES, 0, qn);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+        glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);   // the block-out is depth only now
+        glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
+    }
     glActiveTexture(GL_TEXTURE0);
 
     float view[16], proj[16];
     m_look(view, f->eye, f->at);
-    m_persp(proj, f->fov, (float)vw / (float)vh, 0.4f, 300.0f);
+    zone_proj(f, proj, f->fov, (float)vw / (float)vh);
     m_mul(f->mvp, proj, view);
     glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
 
@@ -2472,6 +2593,7 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
         glUniformMatrix4fv(f->s_mvp, 1, GL_FALSE, f->mvp);
         glUniform2f(f->s_map, (float)f->mw, (float)f->mh);
         glUniform2f(f->s_blend, 0.0f, f->splat_dither);
+        glUniform1f(f->s_depth, (float)depthmode);
         glUniform4f(f->s_sharp, f->layer_sharp[0], f->layer_sharp[1], f->layer_sharp[2], f->layer_sharp[3]);
         glUniform4f(f->s_hk, f->layer_hk[0], f->layer_hk[1], f->layer_hk[2], f->layer_hk[3]);
         glUniform4f(f->s_scale, 1.0f / f->layer_cells[0], 1.0f / f->layer_cells[1],
@@ -2525,7 +2647,7 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
                    sv[0] * fwdv[1] - sv[1] * fwdv[0]};              // camera up
     v_norm(uv);
     glUniform1f(f->u_alpha, 0.5f);                                  // discard, so no blend sorting
-    int n = 0, dn = 0;
+    int n = 0, dn = 0, prop_dn = 0, player_draw = -1;
     struct Draw { int art, first; bool occl; };
     static Draw draws[F_PROPS + F_NPCS + 8];
     for (int i = 0; i < f->prop_count && dn < (int)(sizeof(draws) / sizeof(draws[0])); i++) {
@@ -2538,6 +2660,7 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
         push_billboard(f, &n, bx, hh * HALF_STEP, bz, sv, uv,
                        tx->w / PX_PER_CELL, tx->h / PX_PER_CELL, 0, 0, 1, 1, 1.0f);
     }
+    prop_dn = dn;                                   // everything before this is block-out, not a walker
     for (int i = 0; i <= f->npc_count && dn < (int)(sizeof(draws) / sizeof(draws[0])); i++) {
         bool player = (i == f->npc_count);
         int art, face, frame;
@@ -2570,6 +2693,7 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
             }
         }
         float fw = tx->w / 4.0f, fh = tx->h / 4.0f;
+        if (player) player_draw = dn;
         draws[dn].art = art; draws[dn].first = n; draws[dn].occl = !player; dn++;
         push_billboard(f, &n, wx, base, wz, sv, uv, fw / PX_PER_CELL, fh / PX_PER_CELL,
                        frame * 0.25f, row * 0.25f, frame * 0.25f + 0.25f, row * 0.25f + 0.25f, 1.0f);
@@ -2579,11 +2703,25 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
         glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
         set_attribs();
         for (int i = 0; i < dn; i++) {
+            if (painted && i == prop_dn) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);   // walkers are drawn
             glUniform1f(f->u_occl, draws[i].occl ? 1.0f : 0.0f);   // the player and its mark never cut
             glBindTexture(GL_TEXTURE_2D, f->art[draws[i].art].tex.id);
             glDrawArrays(GL_TRIANGLES, draws[i].first, 6);
         }
+        // A painting's pixels cannot be dithered away, so in a painted zone the cut goes the other
+        // way: the player is drawn again where the block-out hides them, as a dithered silhouette.
+        if (painted && !depthmode && player_draw >= 0 && f->see_on) {
+            glDepthFunc(GL_GREATER);
+            glDepthMask(GL_FALSE);
+            glUniform1f(f->u_ghost, 1.0f);
+            glBindTexture(GL_TEXTURE_2D, f->art[draws[player_draw].art].tex.id);
+            glDrawArrays(GL_TRIANGLES, draws[player_draw].first, 6);
+            glUniform1f(f->u_ghost, 0.0f);
+            glDepthFunc(GL_LEQUAL);
+            glDepthMask(GL_TRUE);
+        }
     }
+    if (painted) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
     // Navmesh wireframe. The owner and the map agents author these polygons by hand, so this is not
     // an optional debug view: raised a hair off the ground, still depth-tested against the walls.
@@ -2631,11 +2769,85 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
         }
     }
 
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glUniform1f(f->u_depth, 0.0f);
+}
+
+// Writes the zone's view to files/field/views/<map>_<zone>.png plus a linear-depth reference, at
+// `scale` times the live internal resolution. That PNG is what gets painted over.
+static void field_capture(Field *f, int vw, int vh, int scale) {
+    int cw = vw * scale, ch = vh * scale;
+    if (f->cap_w != cw || f->cap_h != ch) {
+        if (f->cap_tex) { glDeleteTextures(1, &f->cap_tex); glDeleteRenderbuffers(1, &f->cap_depth); glDeleteFramebuffers(1, &f->cap_fbo); }
+        glGenTextures(1, &f->cap_tex);
+        glBindTexture(GL_TEXTURE_2D, f->cap_tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, cw, ch, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glGenRenderbuffers(1, &f->cap_depth);
+        glBindRenderbuffer(GL_RENDERBUFFER, f->cap_depth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cw, ch);
+        glGenFramebuffers(1, &f->cap_fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, f->cap_fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, f->cap_tex, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, f->cap_depth);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { SDL_Log("field: capture FBO incomplete"); return; }
+        f->cap_w = cw; f->cap_h = ch;
+    }
+    // The capture uses the zone's shot exactly as authored, not the framed one: a painting is made
+    // for the written camera, and the framing blend must not creep into it.
+    CamZone *z = &f->zones[f->zone_idx < 0 ? 0 : f->zone_idx];
+    float eye[3], at[3], fov, view[16], proj[16], saved[16];
+    memcpy(saved, f->mvp, sizeof(saved));
+    zone_shot(f, z, 0.0f, eye, at, &fov);
+    m_look(view, eye, at);
+    zone_proj(f, proj, fov, (float)cw / (float)ch);
+    m_mul(f->mvp, proj, view);
+
+    char dir[700], path[800];
+    snprintf(dir, sizeof(dir), "%sfield", pref_path()); mkdir(dir, 0755);
+    snprintf(dir, sizeof(dir), "%sfield/views", pref_path()); mkdir(dir, 0755);
+    unsigned char *px = (unsigned char *)malloc((size_t)cw * ch * 4);
+    unsigned char *row = (unsigned char *)malloc((size_t)cw * 4);
+    if (!px || !row) { free(px); free(row); memcpy(f->mvp, saved, sizeof(saved)); return; }
+    for (int pass = 0; pass < 2; pass++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, f->cap_fbo);
+        glViewport(0, 0, cw, ch);
+        field_draw_world(f, cw, ch, false, pass);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, cw, ch, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        for (int y = 0; y < ch / 2; y++) {                       // GL reads bottom-up
+            memcpy(row, px + (size_t)y * cw * 4, (size_t)cw * 4);
+            memcpy(px + (size_t)y * cw * 4, px + (size_t)(ch - 1 - y) * cw * 4, (size_t)cw * 4);
+            memcpy(px + (size_t)(ch - 1 - y) * cw * 4, row, (size_t)cw * 4);
+        }
+        snprintf(path, sizeof(path), "%sfield/views/%s_%s%s.png", pref_path(), f->map_name, z->id, pass ? "_depth" : "");
+        int ok = stbi_write_png(path, cw, ch, 4, px, cw * 4);
+        SDL_Log("field: capture %s %dx%d %s", path, cw, ch, ok ? "written" : "FAILED");
+    }
+    free(px);
+    free(row);
+    memcpy(f->mvp, saved, sizeof(saved));
+}
+
+static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
+    bool painted = f->zone_idx >= 0 && f->zone_idx < f->zone_count && f->zone_paint[f->zone_idx].id != 0;
+    float view[16], proj[16];
+    m_look(view, f->eye, f->at);
+    zone_proj(f, proj, f->fov, (float)vw / (float)vh);
+    m_mul(f->mvp, proj, view);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, f->fbo);
+    glViewport(0, 0, vw, vh);
+    field_draw_world(f, vw, vh, painted, 0);
+    if (f->capture_req) { field_capture(f, vw, vh, f->capture_req); f->capture_req = 0; }
+
     // Hand the GL state back the way ImGui's backend expects to find it.
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, win_w, win_h);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -2830,10 +3042,11 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
     for (int i = 0; i < f->trig_count; i++) {
         FTrig *t = &f->trigs[i];
         bool in = f->px >= t->x && f->pz >= t->y && f->px < t->x + t->w && f->pz < t->y + t->h;
-        if (t->kind == TG_SCENE || t->kind == TG_ZONE || t->kind == TG_TRAP) {
+        if (t->kind == TG_SCENE || t->kind == TG_ZONE || t->kind == TG_TRAP || t->kind == TG_CAPTURE) {
             if (in && !t->inside) {
                 if (t->kind == TG_SCENE) fire(ev, FE_SCENE, t->arg);
                 else if (t->kind == TG_ZONE) fire(ev, FE_ZONE, t->arg);
+                else if (t->kind == TG_CAPTURE) f->capture_req = (t->arg[0] == '1') ? 1 : 2;
                 else field_say(f, nullptr, t->arg);                  // trap: on entry, for later
             }
             t->inside = in;
@@ -2920,6 +3133,10 @@ bool field_dev_ui(Field *f, char *out, int cap) {
     ImGui::SameLine();
     bool fill = f->fill_width != 0;
     if (ImGui::Checkbox("fill width", &fill)) f->fill_width = fill ? 1 : 0;
+    ImGui::SameLine();
+    if (ImGui::Button("Capture view 2x")) f->capture_req = 2;
+    ImGui::SameLine();
+    if (ImGui::Button("1x")) f->capture_req = 1;
 
     if (!z) return false;
     const char *modes[3] = {"follow", "fixed", "rail"};

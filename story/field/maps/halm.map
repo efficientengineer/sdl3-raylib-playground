@@ -119,11 +119,12 @@ p plank
 
 ## cameras
 # rect(x z w d) then the shot. Last definition wins on overlap; a landmark is in frame in each.
-0 0 40 30 follow 0 50 30 13 0.8
-14.0 13.5 9.0 8.0 follow -15 52 27 11.5 0.9
-17.5 6.0 8.0 8.5 fixed 19.0 8.5 19.0 22.6 2.4 5.2 30
-5.5 16.5 9.0 7.0 rail 5.5 6.5 26.0 14.0 6.5 26.0 18.6 1.2 17.4 32
-3.0 9.0 10.0 8.0 fixed 8.0 7.0 21.0 6.8 1.2 12.6 30
+# <id> x z w d <mode> ... — the id keys the capture and the painting for that zone
+base 0 0 40 30 follow 0 50 30 13 0.8
+square 14.0 13.5 9.0 8.0 fixed 18.60 12.00 30.00 18.60 1.20 17.40 26
+hillroad 17.5 6.0 8.0 8.5 fixed 19.0 8.5 19.0 22.6 2.4 5.2 30
+weststreet 5.5 16.5 9.0 7.0 rail 5.5 6.5 26.0 14.0 6.5 26.0 18.6 1.2 17.4 32
+grainyard 3.0 9.0 10.0 8.0 fixed 8.0 7.0 21.0 6.8 1.2 12.6 30
 
 ## sweeps
 # id profile [spline] [caps] [along S] [scale s0 s1]  x z [h], x z [h], ...
