@@ -37,48 +37,51 @@ tokenize it in the text in the same pass.
 
 ## Voices
 
-Three habits and two sample lines each. Every sample states a plain fact. Voice changes how a thing
-is said, never whether it is said.
+Voice is energy before it is vocabulary, and **punctuation carries the energy**. Three habits, one
+plain sample, one loud sample. Every sample states a fact. Voice changes how a thing is said, never
+whether it is said. People interrupt each other with a dash.
 
-**{{HERO}}** — Blurts. Short bursts, contractions always, says the obvious thing first. Repeats the
-fact he just heard back as a flat half-sentence before he reacts to it. Talks about work and money
-because those are the things he knows. Never asks for pity and never says "please" to get something.
-> "Never once. Right. So what's left?"
-> "You're selling me my father's axe."
+**{{HERO}}** — *Energy: blurts and asks.* Short bursts, contractions always, and he says what he
+feels the second he feels it. Questions when he is behind, exclamations when he is surprised, and he
+repeats the fact he just heard back as a question before he reacts to it. Never asks for pity.
+> plain: "He walked out here every year for thirty years and sat under this step."
+> loud: "Never once? Not one job, ever?"
 
-**{{HEALER}}** — Dry and exact. Complete sentences, few contractions when she is correcting someone,
-and she corrects the number or the date rather than the point. When she could talk about anything she
-talks about what she will have to patch up afterwards. Never raises her voice, never sulks in silence.
-> "He left it the year he died, then. Eleven years under a rock."
-> "And she hasn't taken the bread for one. Whatever happened, she's been gone a year."
+**{{HEALER}}** — *Energy: precise questions, rare exclamations that land.* Complete sentences, few
+contractions when correcting, and she corrects the number or the date rather than the point. Talks
+about what she will have to patch up afterwards. Never raises her voice twice in a scene.
+> plain: "He left it the year he died, then. Eleven years under a rock."
+> loud: "Do you know he has never once asked me to come anywhere?"
 
-**{{MENTOR}}** — Clipped. Four or five words where most people use twelve, and he drops the subject
-off the front of a sentence. Puts a price on everything, favours included. Never says goodbye and
-never says he is worried about you.
-> "Kept it eleven years. I want paying for the keeping."
-> "No. Your father died on that road."
+**{{MENTOR}}** — *Energy: orders and grumbles.* Never asks a question. Fragments with the subject
+dropped off the front. Four or five words where most people use twelve. Puts a price on everything,
+favours included. Never says goodbye and never says he is worried about you.
+> plain: "Kept it eleven years. I want paying for the keeping."
+> loud: "Died on that road eleven years back. Hold the ladder."
 
-**{{RIVAL}}** — Pleased with himself. Easy long sentences, contractions, and a number in every speech:
-what he was paid, what it cost, what he has that you do not. He compliments you while beating you and
-never insults you to your face.
-> "Eighty coin a week. I signed with him the same morning."
-> "You're carrying a loaf of bread, and I'm riding in a cart."
+**{{RIVAL}}** — *Energy: gloats, and asks mocking questions.* Easy long sentences, contractions, and
+a number in every speech: what he was paid, what it cost, what he has that you do not. Compliments
+you while beating you and never insults you to your face.
+> plain: "Eighty coin a week. I signed with him the same morning."
+> loud: "Did you think he'd sign for you?"
 
-**CLERK** — Talks in rules. States the rule, then the fact, then what follows. No contractions, no
-opinions, no sympathy. Says "the rule is" the way other people say "well".
-> "The rule is that every job needs a hunter who will vouch for you."
-> "It has sat on that board four months because it is dull work."
+**CLERK** — *Energy: recites, and gets flustered when interrupted.* States the rule, then the fact,
+then what follows. No contractions and no opinions. Says "the rule is" the way other people say
+"well". When cut off he starts the sentence again from the beginning.
+> plain: "The rule is that every job needs a hunter who will vouch for you."
+> loud: "Never once. Now — there is one job left."
 
-**{{SCHOLAR}}** *(chapter two)* — Says it once for the room and once for the record. Long sentences.
-Given any subject he tells you who first wrote it down. Never says "I don't know" without immediately
-saying what he does know.
-> "That is a staircase. I am writing that down: a staircase, and no one has ever stood on it."
-> "Eight people alive read any of their language. I am the eighth best of the eight."
+**{{SCHOLAR}}** *(chapter two)* — *Energy: exclaims at everything, three questions in a row.* Says it
+once for the room and once for the record. Given any subject he tells you who first wrote it down.
+Never says "I don't know" without immediately saying what he does know.
+> plain: "Eight people alive read any of their language. I am the eighth best of the eight."
+> loud: "Who measured it? When? Did they write the number down anywhere?"
 
-**{{THIEF}}** *(chapter two)* — Fast and short. Contractions always. Jokes by understatement. Given
-anything she tells you what it is worth and who is watching it. Never says thank you.
-> "That rope's worth more than the bread is."
-> "Someone's been here. Cart tracks, a day old."
+**{{THIEF}}** *(chapter two)* — *Energy: interrupts, teases, exclaims.* Fast and short, contractions
+always, jokes by understatement. Given anything she tells you what it is worth and who is watching it.
+Never says thank you.
+> plain: "Someone's been here. Cart tracks, a day old."
+> loud: "That rope's worth more than the bread and you're leaving it!"
 
 ## Rules
 

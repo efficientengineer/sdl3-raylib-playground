@@ -4,7 +4,7 @@ Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
 ## The checklist
 
-Run every scene against all thirteen before it is written, and again before it is done.
+Run every scene against all fourteen before it is written, and again before it is done.
 Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game Storytelling*.
 
 0. **Plain.** After every clip a twelve-year-old could say what just happened, why, and what happens
@@ -20,6 +20,12 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
    Plain: "{{MENTOR}} has vouched for {{RIVAL}} four times. He has never vouched for you."
    In the clerk's voice: "The rule is that every job needs a hunter who will vouch for you.
    {{MENTOR}} has vouched for {{RIVAL}} four times this year. He has never once vouched for you."
+0c. **Energy: punctuation carries voice.** A page of calm declaratives has no characters in it.
+   Every clip needs at least one question and one exclamation that arise from what someone wants, and
+   people interrupt each other with a dash. Big feelings get said: anger, fear, wanting, hurt. Each
+   speaker's energy is fixed in `NAMES.md` — {{HERO}} blurts and asks, {{HEALER}} asks precisely and
+   rarely exclaims, {{MENTOR}} never asks a question at all, {{RIVAL}} gloats and mocks, the CLERK
+   recites and gets flustered.
 1. **The player holds the controller.** A clip exists only when play cannot carry the beat, and it
    never repeats what play just showed.
 2. **One sentence, always.** At any moment the player can say what they are doing and why they care,

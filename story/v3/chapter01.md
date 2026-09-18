@@ -17,17 +17,18 @@ Get a job at the guild hall.
 
 CLERK: The coast escort is gone. {{RIVAL}} signed for it an hour ago.
 
-{{HERO}}: Put me down for the next one.
+{{HERO}}: An hour? I was standing here at the bell! Put me down for the next one.
 
 CLERK: The rule is that every job needs a hunter who will vouch for you. {{MENTOR}} has vouched for
-{{RIVAL}} four times this year. He has never once vouched for you.
+{{RIVAL}} four times this year. He has never once vouched for—
 
-{{HERO}}: Never once. Right. So what's left?
+{{HERO}}: Never once? Not one job, ever?
 
-CLERK: One job. Carry this year's bread out to the {{STAIR}} and come back. Two days there, two days
-back, thirty coin. It has sat on that board four months because it is dull work.
+CLERK: Never once. Now — there is one job left. Carry this year's bread out to the {{STAIR}} and come
+back. Two days there, two days back, thirty coin. It has sat on that board four months because it is
+dull work.
 
-{{HERO}}: I'll take it. I'm going to get his name on it now. Hold it for me.
+{{HERO}}: I'll take it! Hold it for me, I'm going up that hill right now.
 
 ## Goal
 Get {{MENTOR}} to vouch for you.
@@ -41,17 +42,17 @@ is bad, and he will not come down.
 
 [{{MENTOR}} is on his roof nailing down tiles. {{HEALER}} is holding the ladder.]
 
-{{HERO}}: I need you to vouch for me at the guild. It's the bread run to the {{STAIR}} — two days
-west, two days back.
+{{HERO}}: Vouch for me at the guild! It's the bread run to the {{STAIR}} — two days west, two days back.
 
 {{MENTOR}}: No.
 
-{{HERO}}: It's thirty coin for walking to a step and walking home again.
+{{HERO}}: It's thirty coin for walking to a step and walking home! What is going to happen to me out
+there?
 
-{{MENTOR}}: Your father walked that bread out for thirty years. He died on that road eleven years
-back. I'm not signing you onto it.
+{{MENTOR}}: Your father walked that bread out thirty years. Died on that road eleven years back. I'm
+not signing you onto it.
 
-{{HERO}}: You haven't told me I'm not ready yet. You're saving it.
+{{HERO}}: You haven't even told me I'm not ready yet. You're saving it.
 
 {{MENTOR}}: I'm saving it. Hold the ladder.
 
@@ -65,20 +66,20 @@ back. You can hear all of it.
 
 [{{HEALER}} is holding the guild book open. {{MENTOR}} is sitting on the bottom rung of the ladder.]
 
-{{HEALER}}: I will go with him. I am a healer, I have walked that road twice, and he has never once
-asked me to come anywhere.
+{{HEALER}}: I will go with him. I am a healer, I have walked that road twice — and do you know he has
+never once asked me to come anywhere?
 
 {{MENTOR}}: [writing his name in the book] Two days west. Bread on the stone shelf under the step.
 Straight back.
 
-{{HERO}}: What's at the step? I've never been out there.
+{{HERO}}: What's at the step? I've never been out that far.
 
 {{MENTOR}}: A staircase the ancients built. A woman lives under it and takes the bread once a year.
 Don't touch the stone. Don't go past her shelf.
 
-{{HERO}}: {{HEALER}}. Will you come with me?
+{{HERO}}: A woman lives under it? {{HEALER}} — will you come with me?
 
-{{HEALER}}: Yes.
+{{HEALER}}: Yes!
 
 ## Play: Explore + shop — {{MENTOR}}'s kitchen (3 min)
 Supper. He stays at the table and tells you what everything in the room is if you touch it.
@@ -91,16 +92,16 @@ Supper. He stays at the table and tells you what everything in the room is if yo
 
 {{MENTOR}}: Take your father's axe. Six coin.
 
-{{HERO}}: You're selling me my father's axe.
+{{HERO}}: Six coin? You're selling me my own father's axe!
 
 {{MENTOR}}: Kept it eleven years. I want paying for the keeping.
 
-{{HERO}}: There's a notch in the blade.
+{{HERO}}: There's a notch in the blade. How did he put a notch in it?
 
 {{MENTOR}}: He swung at a thing he should have run from. It worked, so he did it again, and the
 second time it killed him. Notch stays.
 
-{{HEALER}}: Pay him. He will stand there all night at six coin an hour.
+{{HEALER}}: Pay him, {{HERO}}. He will stand there all night at six coin an hour.
 
 ## Goal
 Walk two days west and put the bread on the shelf under the {{STAIR}}.
@@ -121,20 +122,21 @@ it without a game over. **Unlocks:** the far bank.
 
 [The bridge. {{RIVAL}} is standing on the wall in a new coat.]
 
-{{HERO}}: Where'd you get the coat?
+{{HERO}}: Where'd you get that coat?
 
-{{RIVAL}}: The lord of the western city is paying hunters. Eighty coin a week. I sold the coast
-escort on to another hunter and signed with him the same morning.
+{{RIVAL}}: Did you honestly think he'd sign for you? The lord of the western city is paying hunters —
+eighty coin a week. I sold the coast escort on to another hunter and signed with him the same morning.
 
 {{HEALER}}: Paying you to do what, exactly?
 
-{{RIVAL}}: Walk west with him. He wants rain on his city every year for the rest of his life, and
+{{RIVAL}}: To walk west with him! He wants rain on his city every year for the rest of his life, and
 he's going to the mountain to ask the ancients for it.
 
-{{HERO}}: People have asked the ancients for a thousand years. They've never answered anyone.
+{{HERO}}: Ask them? People have asked the ancients for a thousand years and they've never answered
+anyone!
 
-{{RIVAL}}: He's got someone who can make them answer. You're carrying a loaf of bread, and I'm
-riding in a cart.
+{{RIVAL}}: He's got someone who can make them answer. You're carrying a loaf of bread and I'm riding
+in a cart. Enjoy the walk!
 
 ## Play: Explore — the shrine at the {{STAIR}} (4 min)
 Six families live off the pilgrims here, and they all say the same thing: a woman lives under the
@@ -147,15 +149,16 @@ grass, and a cloth folded under the shelf.
 
 [The stone shelf under the bottom step. The new loaf is on it next to last year's.]
 
-{{HERO}}: [pulling a folded cloth out from under the shelf] This is my father's cloth. That's his
-mark on the corner.
+{{HERO}}: [pulling a folded cloth out from under the shelf] This is my father's cloth — that's his
+mark stitched in the corner!
 
 {{HEALER}}: He left it the year he died, then. Eleven years under a rock.
 
-{{HERO}}: He walked out here every year for thirty years and sat under this step. The woman who
-lives here knew him for thirty years.
+{{HERO}}: He walked out here every year for thirty years and sat under this step. She knew him thirty
+years. Did he ever tell you that?
 
-{{HEALER}}: And she has not taken the bread for one. Whatever happened to her, she has been gone a year.
+{{HEALER}}: He never told anyone. And she has not taken the bread for a year, {{HERO}}. Whatever
+happened to her, she has been gone that long.
 
 {{HERO}}: He talked to her more than he talked to me.
 
