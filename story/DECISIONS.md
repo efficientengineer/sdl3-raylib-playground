@@ -152,3 +152,9 @@ villains with presence, and a set piece in the first ten minutes.
 **Decided:** before any rewrite, produce a plain-language feel-first treatment (no invented names) and a
 rewritten opening hour in that voice, for the owner to judge. The existing draft stays in the repo as raw
 material (cast designs, art pipeline, structure) but is not the plan.
+
+## D12. Story v3 direction accepted with corrections
+Owner: chapter one in game form is "leaps and bounds better". Corrections: still some AI smells; stop
+re-using legacy beats (the warning guard, the door that opens for Bron) just because art exists; clips
+are too long, cap at about ten lines; make the gameplay between clips explicit (what you do, how long,
+what it unlocks). The old draft (bible, outlines, 326 scenes) is now reference only.
