@@ -8,49 +8,53 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `cliff` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
-| `dirt` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
-| `grass` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `cliff` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
+| `dirt` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
+| `grass` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
 | `grass_tall` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | missing |
 | `old_road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
-| `plank` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `plank` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
 | `river_bank` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
 | `road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
 | `scree` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | missing |
 | `stair_stone` | tile | 64x64 | `story/packages/ch01/stair_shrine/tiles` | missing |
-| `stone` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
-| `wall_plaster` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
-| `wall_timber` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `stone` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
+| `wall_plaster` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
+| `wall_timber` | tile | 64x64 | `tiles_cliff-dirt-grass-plus4` | yes, 64x64 |
 | `water` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
 
 ## Props — alpha, 64 px to a map cell, standing on the bottom row
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `barrel` | prop | 64x64 | `story/packages/ch01/halm/props` | missing |
+| `barrel` | prop | 64x64 | `props_barrel-cart-fence-plus10` | yes, 58x61 |
 | `bedroll` | prop | 128x64 | `story/packages/ch01/ridge_camp/props` | missing |
 | `bridge_rail` | prop | 128x64 | `story/packages/ch01/bridge/props` | missing |
 | `campfire` | prop | 64x64 | `story/packages/ch01/ridge_camp/props` | missing |
-| `cart` | prop | 128x128 | `story/packages/ch01/halm/props` | missing |
+| `cart` | prop | 128x128 | `props_barrel-cart-fence-plus10` | yes, 127x128 |
 | `cave_mouth` | prop | 192x128 | `story/packages/ch01/north_grass/props` | missing |
 | `culvert` | prop | 192x128 | `story/packages/ch01/west_road/props` | missing |
-| `fence` | prop | 128x64 | `story/packages/ch01/halm/props` | missing |
+| `fence` | prop | 128x64 | `props_barrel-cart-fence-plus10` | yes, 122x60 |
+| `grain_shed` | prop | 192x192 | `props_barrel-cart-fence-plus10` | yes, 186x192 |
+| `guild_hall` | prop | 256x192 | `props_barrel-cart-fence-plus10` | yes, 255x186 |
+| `house_a` | prop | 192x192 | `props_barrel-cart-fence-plus10` | yes, 176x185 |
+| `house_b` | prop | 128x192 | `props_barrel-cart-fence-plus10` | yes, 116x192 |
 | `milestone` | prop | 64x64 | `story/packages/ch01/west_road/props` | missing |
 | `practice_post` | prop | 64x128 | `story/packages/ch01/hart_yard/props` | missing |
 | `ridge_rock` | prop | 192x128 | `story/packages/ch01/ridge_camp/props` | missing |
 | `rubbing_stall` | prop | 128x128 | `story/packages/ch01/stair_shrine/props` | missing |
-| `scale_bench` | prop | 128x64 | `story/packages/ch01/halm/props` | missing |
+| `scale_bench` | prop | 128x64 | `props_barrel-cart-fence-plus10` | yes, 117x60 |
 | `shrine_house` | prop | 192x128 | `story/packages/ch01/stair_shrine/props` | missing |
-| `sign` | prop | 64x128 | `story/packages/ch01/halm/props` | missing |
+| `sign` | prop | 64x128 | `props_barrel-cart-fence-plus10` | yes, 54x116 |
 | `sitter` | prop | 64x64 | `story/packages/ch01/stair_shrine/props` | missing |
 | `slide_rubble` | prop | 192x128 | `story/packages/ch01/north_grass/props` | missing |
 | `step_rope` | prop | 64x192 | `story/packages/ch01/stair_shrine/props` | missing |
 | `stone_shelf` | prop | 256x64 | `story/packages/ch01/stair_shrine/props` | missing |
-| `tree_a` | prop | 128x192 | `story/packages/ch01/halm/props` | missing |
-| `tree_b` | prop | 64x128 | `story/packages/ch01/halm/props` | missing |
+| `tree_a` | prop | 128x192 | `props_barrel-cart-fence-plus10` | yes, 127x186 |
+| `tree_b` | prop | 64x128 | `props_barrel-cart-fence-plus10` | yes, 53x136 |
 | `water_jar` | prop | 64x64 | `story/packages/ch01/stair_shrine/props` | missing |
-| `well` | prop | 64x128 | `story/packages/ch01/halm/props` | missing |
-| `yard_wall` | prop | 192x128 | `story/packages/ch01/halm/props` | missing |
+| `well` | prop | 64x128 | `props_barrel-cart-fence-plus10` | yes, 62x121 |
+| `yard_wall` | prop | 192x128 | `props_barrel-cart-fence-plus10` | yes, 186x97 |
 
 ## Walkers — alpha, 4 rows (S, W, E, N) x 4 columns of 32x48 frames
 

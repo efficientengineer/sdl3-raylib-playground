@@ -13,6 +13,23 @@ struct CsScene { const char *id; const char *title; bool narration;   // narrati
                  CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
 
+static const CsPanel CS_0110_the_board_PANELS[] = {
+    { "0110_the_board_p1_establishing_tall.png", 0, {73.0f, 3.0f, 22.0f, 62.0f}, {61.0f, 10.0f, 36.0f, 50.7f} },
+    { "0110_the_board_p2_two_shot.png", 0, {4.0f, 5.0f, 52.0f, 53.1f}, {3.0f, 2.0f, 80.0f, 40.8f} },
+    { "0110_the_board_p3_object_insert.png", 0, {49.0f, 47.7f, 17.0f, 26.3f}, {69.0f, 32.8f, 30.0f, 23.2f} },
+    { "0110_the_board_p4_portrait_inset.png", 1, {6.0f, 40.0f, 17.0f, 22.9f}, {6.0f, 40.0f, 30.0f, 20.2f} },
+    { "0110_the_board_p5_over_shoulder.png", 1, {4.0f, 5.0f, 52.0f, 36.0f}, {3.0f, 2.0f, 80.0f, 27.7f} },
+    { "0110_the_board_p6_eyes_slit.png", 1, {20.0f, 51.0f, 60.0f, 23.0f}, {4.0f, 40.0f, 92.0f, 17.6f} },
+};
+static const CsLine CS_0110_the_board_LINES[] = {
+    { "Clerk", "You made the bell. The rule is that you sign before the bell, and Stolz signed for the coast escort an hour before it and left at noon.", 1, CS_TENSE, nullptr, CS_LEFT },
+    { "Falke", "An hour before? I went over the grain-yard wall for that bell! What's the last sheet, then?", 2, CS_TENSE, "portrait_bron.png", CS_RIGHT },
+    { "Clerk", "The water run out to the stair. Hart carried it in himself this morning. Thirty coin, two days out, two days back, and it leaves at dawn.", 3, CS_WONDER, nullptr, CS_LEFT },
+    { "Falke", "Hart posted it? So where's the carters' convoy that takes the jar every year?", 4, CS_WONDER, "portrait_bron.png", CS_RIGHT },
+    { "Clerk", "There is no convoy. Every carter in the valley has walked west to the lord's city for eighty coin a week. This is not a guild job and it needs no guarantor  -  Hart is paying the thirty coin out of his own pocket.", 5, CS_DREAD, nullptr, CS_LEFT },
+    { "Falke", "Out of his own  -  and a man who walks that road alone dies! The last hunter who walked it alone died on it eleven years ago, and he was my father. I'll take it!", 6, CS_CONFRONT, "portrait_bron.png", CS_RIGHT },
+};
+
 static const CsLine CS_0130_he_signs_LINES[] = {
     { "Ottilie", "Sign it, Hart. Four days, not two  -  two west and two back  -  and I am the one who patches whoever goes.", 0, CS_TENSE, "portrait_lyra.png", CS_LEFT },
     { "Hart", "Jar on the stone shelf under the bottom step. Straight back.", 0, CS_TENSE, nullptr, CS_RIGHT },
@@ -41,6 +58,7 @@ static const CsLine CS_0160_the_fire_LINES[] = {
 };
 
 static const CsScene CS_INTRO[] = {
+    { "0110_the_board", "The Board", false, CS_PANELS, nullptr, CS_0110_the_board_PANELS, 6, CS_0110_the_board_LINES, 6 },
     { "0130_he_signs", "He Signs", false, CS_TALK, nullptr, nullptr, 0, CS_0130_he_signs_LINES, 6 },
     { "0140_the_sword", "The Sword", false, CS_TALK, nullptr, nullptr, 0, CS_0140_the_sword_LINES, 6 },
     { "0160_the_fire", "The Fire", false, CS_TALK, nullptr, nullptr, 0, CS_0160_the_fire_LINES, 6 },
