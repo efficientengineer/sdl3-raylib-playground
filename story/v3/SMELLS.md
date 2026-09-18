@@ -496,3 +496,13 @@ monument Dorn explains (C5); the confession is loneliness, admitted flatly, with
 it at all (C2, C8, C13, C24); there is no catchphrase in the scene (C1, C41); nobody says the word
 heavy (C16); nobody leaves (C37, C40); the last line is about dinner (C18, C42 — and Dorn only
 keeps the last word because it is the least benedictory sentence available to him).
+
+## Addendum from the owner (2026-09-18)
+
+**The reversal-as-revelation.** "It isn't guarding the door from us. It's still guarding us from the
+door." This line survived every build since the first draft and the owner names it as an AI smell.
+It is the "not X but Y" shape used as a plot twist: a guardian, rule, or object whose purpose turns
+out to be the mirror of what it seemed. Ban the shape, not just the line: no reveal may consist of
+flipping the object of a sentence. When a thing's purpose is revealed, it must be a different thing,
+not the inverse of the first guess. (Related: the warning guard and the door that opens for the hero
+are retired beats; existing art never justifies keeping a beat.)
