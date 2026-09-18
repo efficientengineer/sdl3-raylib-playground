@@ -56,7 +56,9 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
     things that use what the player bought or failed to buy. **Optional** — one or two, with the reward
     named. **Boss** — one line, where there is one. **What failing costs.** **Feel** — one short line,
     or cut it. A day of travel is a day of play. If the text says a road is dangerous, the danger is
-    encounters the player fights, not a creature with a clever rule.
+    encounters the player fights, not a creature with a clever rule. **One hazard and at most one
+    optional per area, two optionals in a whole chapter, two or three enemy kinds per area, and no
+    chained penalties.** Examples in a brief are examples, not a checklist.
 13. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
     or in the next clip.
 
