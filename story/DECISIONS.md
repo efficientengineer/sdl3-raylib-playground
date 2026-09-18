@@ -172,3 +172,12 @@ over PS4-style flat top-down, and ChatGPT-sliced sheets over PixelLab or placeho
 Owner's refinement: tile only the big surfaces (ground, floors, walls); everything else is a sliced
 sprite, which allows more interesting shapes and compresses well. Contract in `FIELD.md`. To reverse:
 the map format and art folders survive a switch to flat top-down; only the renderer changes.
+
+## D15. Painted backgrounds over the 3D block-out (FF8 style)
+Owner (2026-09-18): "a true 3D game might be limiting … use an ortho camera, render the scene as 3D,
+then slice it out so we can layer it, only give it the feel of 3D, like FF8." Adopted as: the 3D field
+is the block-out. Each fixed camera zone can be captured from the game, painted over by ChatGPT
+(`story_prompt.py view <map> <zone>`), and the painting is drawn as the zone's backdrop while the
+block-out renders to depth only, so sprites layer per pixel without hand-made masks. Zones without a
+painting keep the live 3D; ortho or perspective per zone. Navmesh, zones, triggers and all authored
+maps are unchanged. To reverse: delete the paintings; the 3D is still there.
