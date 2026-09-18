@@ -22,6 +22,8 @@
   ./story_prompt.py walker Bron                the 4x4 walk grid (rows S W E N), the ref sheet attached
   ./story_prompt.py building house_a           three slots a building: the front wall, a wall sample, a
                                                roof sample -> story/field/buildings/<id>_{front,side,roof}.png
+  ./story_prompt.py view   halm square         paint the engine's block-out of one camera zone:
+                                               story/field/views/<map>_<zone>.png -> ..._paint.png
   ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png [--fringe N]
                                                key the magenta (--fringe N shaves N more pixels off the
                                                edge), cut the slots, write story/field/tiles|props|walkers/
@@ -1763,6 +1765,9 @@ FIELD_DOCS = {"tile": FIELD / "tiles.md", "prop": FIELD / "props.md", "walker": 
               "building": FIELD / "buildings.md"}
 FIELD_MANIFEST = FIELD / "manifest.md"
 FIELD_TEXT = FIELD / "text.md"        # examine text: '## <map>.<id>' -> one or two sentences
+VIEWS = FIELD / "views"               # <map>_<zone>.png = the engine's block-out; _paint.png = the painting
+VIEW_SIZES = ((1280, 720), (640, 360))   # what the engine captures; anything else is a warning
+VIEW_ATTACH_MAX = 6                   # prop and building cuts attached alongside the capture
 V3_STYLE, SMELLS = ROOT / "v3" / "STYLE.md", ROOT / "v3" / "SMELLS.md"   # the BAN: lists
 TEXT_MAX_SENTENCES = 2                # it is a box on a phone that a thumb dismisses
 TODO_RE = re.compile(r"^\[[\w.]+:\s*TODO\]$")   # a placeholder the writer has not filled yet
@@ -2646,6 +2651,247 @@ def check_field_text():
     return err, warn
 
 
+# ── painted views: a finished background over the engine's block-out ──
+#
+# The owner's direction is the Final Fantasy VIII arrangement: the game keeps the 3D block-out for
+# collision, depth and camera, and what you see is a painting laid over it. So the capture is not a
+# reference for the painter to interpret — it is the layout, and nothing in it may move.
+
+def capture_path(mp, zone):
+    return VIEWS / f"{mp}_{zone}.png"
+
+
+def paint_path(mp, zone):
+    return VIEWS / f"{mp}_{zone}_paint.png"
+
+
+def captures():
+    """[(map, zone, path)] for every block-out the engine has written, paintings excluded."""
+    out = []
+    for p in sorted(VIEWS.glob("*.png")) if VIEWS.is_dir() else []:
+        if p.stem.endswith("_paint"):
+            continue
+        maps = sorted((FIELD / "maps").glob("*.map")) if (FIELD / "maps").is_dir() else []
+        mp = next((m.stem for m in maps if p.stem.startswith(m.stem + "_")), p.stem.split("_")[0])
+        out.append((mp, p.stem[len(mp) + 1:], p))
+    return out
+
+
+def map_meta(mp):
+    """The map's '## meta' block: plain 'key: value' lines, not the '- key:' the story files use."""
+    f = FIELD / "maps" / f"{mp}.map"
+    if not f.exists():
+        return {}
+    body = h2_sections(detok(f.read_text())).get("meta", "")
+    return {m.group(1).strip().lower(): m.group(2).strip()
+            for m in re.finditer(r"^\s*([\w ]+?):\s*(.+)$", body, flags=re.M)}
+
+
+def map_places(mp):
+    """{'props': [id...], 'buildings': [id...]} actually placed on a map, most-used first."""
+    f = FIELD / "maps" / f"{mp}.map"
+    out = {"props": [], "buildings": []}
+    if not f.exists():
+        return out
+    sec = None
+    for line in f.read_text().splitlines():
+        if line.startswith("## "):
+            sec = line[3:].strip().lower()
+            continue
+        if sec not in ("props", "buildings") or not line.strip() or line.lstrip().startswith("#"):
+            continue
+        bits = line.split()
+        ident = next((b for b in bits if re.fullmatch(r"[a-z][a-z0-9_]*", b)), None)
+        if ident:
+            out[sec].append(ident)
+    for k in out:
+        seen = {}
+        for i in out[k]:
+            seen[i] = seen.get(i, 0) + 1
+        out[k] = sorted(seen, key=lambda i: (-seen[i], i))
+    return out
+
+
+def view_attachments(style, cap, mp, warn):
+    """The capture first — it is the layout — then the style, then what the map puts in the scene."""
+    out = [(cap, "THE BLOCK-OUT. This is the scene to paint, from the game's own camera. It is the "
+                 "layout, not a suggestion: every object, edge, road, wall and building stays exactly "
+                 "where it is and exactly the size it is.")]
+    sp = existing(style["refs"].get("style"))
+    if sp:
+        out.append((sp, "STYLE reference. " + style["refs"].get("style_note", "")))
+    else:
+        warn.append(f"no style reference at {style['refs'].get('style')}; the prompt text carries the style alone")
+    placed = map_places(mp)
+    for kind, ids in (("buildings", placed["buildings"]), ("props", placed["props"])):
+        for i in ids:
+            if len(out) >= VIEW_ATTACH_MAX + 2:
+                break
+            f = (FIELD_DIRS["building"] / f"{i}_front.png") if kind == "buildings" else \
+                (FIELD_DIRS["prop"] / f"{i}.png")
+            if f.exists():
+                out.append((f, f"The {i.replace('_', ' ')} as it is drawn in this game. The map puts it "
+                               f"in this scene; keep its design, colours and proportions."))
+    return out
+
+
+def map_description(mp, warn):
+    """What this place is, in the words the field docs already use for it."""
+    meta, placed = map_meta(mp), map_places(mp)
+    lines = []
+    if meta.get("landmark"):
+        lines.append(f"THE PLACE: {meta['landmark'].rstrip('.')}.")
+    docs = {k: (field_entries(FIELD_DOCS[k], k) if FIELD_DOCS[k].exists() else {})
+            for k in ("tile", "prop", "building")}
+    on_map = lambda e: mp in [slug(m) for m in (e.get("map") or "").split(",")]
+    ground = [f"{i} ({e['desc'].rstrip('.')})" for i, e in docs["tile"].items()
+              if on_map(e) and e.get("kind") == "ground"]
+    if ground:
+        lines.append("THE GROUND is made of: " + "; ".join(ground) + ".")
+    for i in placed["buildings"]:
+        e = docs["building"].get(i)
+        if e:
+            lines.append(f"BUILDING {i.replace('_', ' ')}: {e['desc'].rstrip('.')}.")
+    props = [f"{i.replace('_', ' ')} ({docs['prop'][i]['desc'].rstrip('.')})"
+             for i in placed["props"] if i in docs["prop"]]
+    if props:
+        lines.append("THE THINGS STANDING IN IT: " + "; ".join(props) + ".")
+    if not lines:
+        warn.append(f"no description for '{mp}': no story/field/maps/{mp}.map with a 'landmark:' line, "
+                    f"and nothing in tiles.md, props.md or buildings.md names the map")
+    elif len(lines) > 1:
+        lines.append("That list is what this town is made of, so a block in the picture can be read for "
+                     "what it is. Only what is actually in the block-out belongs in the painting: do not "
+                     "add a building, a tree or an object because it is named here.")
+    return lines
+
+
+def cmd_view(args):
+    """One painted background per camera zone, over the capture the engine wrote."""
+    pos = [a for a in args if not a.startswith("--")]
+    if len(pos) != 2:
+        die("usage: view <map> <zone>   (the engine writes story/field/views/<map>_<zone>.png)")
+    mp, zone = slug(pos[0]), slug(pos[1])
+    cap = capture_path(mp, zone)
+    if not cap.exists():
+        die(f"no block-out at {cap.relative_to(ROOT.parent)}. The engine captures it from the game — "
+            f"stand in the zone, use the Dev panel's capture, and pull the file — and this command paints "
+            f"over what it captured, so there is nothing to do until it exists.")
+    size = png_size(cap)
+    if not size:
+        die(f"{cap.relative_to(ROOT.parent)} is not a PNG the tool can read")
+    style, warn = load_style(), []
+    if tuple(size) not in VIEW_SIZES:
+        warn.append(f"{cap.name} is {size[0]}x{size[1]}, not one of "
+                    f"{' or '.join(f'{w}x{h}' for w, h in VIEW_SIZES)}; the painting is fitted back to "
+                    f"{size[0]}x{size[1]} whatever it is")
+    attach = view_attachments(style, cap, mp, warn)
+    b = style["blocks"]
+    L = ["Paint this exact scene. The attached image is a rough 3D block-out from the game's camera: "
+         "keep every object, edge, road, wall and building EXACTLY where it is and the same size — the "
+         "game uses this layout for collision and depth, so nothing may move — and repaint it as a "
+         "finished background.", "", b["header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += [""] + map_description(mp, warn)
+    L += ["",
+          "WHAT TO CHANGE: only the surface. Flat block colours become real materials, bare boxes become "
+          "buildings with their own walls and roofs, the ground gets its grass, dirt, paving and ruts, "
+          "and the light and shadow of one time of day fall across all of it consistently. Paint in "
+          "everything a finished picture of this place would have that the block-out is too crude to "
+          "show: the grain of a wall, the wear along a road, a shutter, a hinge, a rope, a weed at the "
+          "foot of a post.", "",
+          "WHAT NOT TO CHANGE: the camera, the perspective, the frame, and the position, footprint and "
+          "height of every single thing in it. Do not move a building a few pixels to compose the shot, "
+          "do not widen a road, do not add or remove a structure, and do not crop or zoom. A player "
+          "walks this layout: anything that moves in the painting is a wall they will walk through and a "
+          "gap they will bump into.", "",
+          "NO PEOPLE, no characters, no animals: the game draws those on top as sprites, and a painted "
+          "one would stand still forever. No text, no signs with writing, no labels, no numbers, no "
+          "watermark, no user interface, no frame, no border, no vignette and no letterboxing.", "",
+          f"THE WHOLE FRAME is painted, edge to edge, 16:9, at the same size as the block-out "
+          f"({size[0]}x{size[1]}) if you can; a little smaller is fine and the tool fits it back.", "",
+          f"CAMERA AND FRAMING: {b['framing']}", "",
+          f"RENDERING: {b['rendering']}", "",
+          f"AVOID: {b['negative']}, moving anything from where the block-out puts it, changing the "
+          f"camera or the crop, people or animals, text or signs with writing, a user interface, a "
+          f"border or vignette, empty unpainted areas"]
+    prompt = "\n".join(L)
+    name = f"view_{mp}_{zone}"
+    out_file = str(paint_path(mp, zone).relative_to(ROOT.parent))
+    OUT.mkdir(exist_ok=True)
+    manifest = pkg_path(name, "sheet.json")
+    manifest.write_text(json.dumps({
+        "view": name, "kind": "view", "map": mp, "zone": zone,
+        "capture": str(cap.relative_to(ROOT.parent)), "size": list(size), "out": out_file,
+        "prompt": prompt,
+    }, indent=2) + "\n")
+    md = pkg_path(name, "chatgpt.md")
+    md.write_text(package(f"painted view {mp} / {zone}", attach, prompt, [
+        "Check the result against the block-out before accepting it — hold them side by side.", "",
+        "- [ ] Every building, wall, road edge and object is in the same place and the same size",
+        "- [ ] The camera, the crop and the horizon are unchanged",
+        "- [ ] No people, no animals, no text, no interface, no border",
+        "- [ ] Painted edge to edge, nothing left flat or unfinished",
+        "- [ ] It looks like the same world as the panels and the tiles", "",
+        "If one thing has drifted, reply in the same chat: \"The well has moved left and grown. Put it "
+        "back exactly where the block-out has it, at the same size, and keep everything else.\"", "",
+        *(return_lines(f"`{out_file}`, fitted back to {size[0]}x{size[1]}") or [
+            "When it passes, download it and fit it to the capture:", "", "```",
+            f"./story_prompt.py cut {manifest.relative_to(ROOT.parent)} ~/Downloads/<file>.png", "```"])],
+        status=[f"- block-out `{cap.relative_to(ROOT.parent)}` — **exists**, {size[0]}x{size[1]}",
+                f"- painting `{out_file}` — " + ("**exists**" if (ROOT.parent / out_file).exists()
+                                                 else "missing")]))
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {md.relative_to(ROOT.parent)}  (block-out {size[0]}x{size[1]}, {len(attach)} attachment(s))")
+
+
+def resize_box(rows, w, h, ch, nw, nh):
+    """Area-average downscale. See cut_view for why this rather than nearest."""
+    out = []
+    for y in range(nh):
+        y0, y1 = y * h // nh, max(y * h // nh + 1, (y + 1) * h // nh)
+        dst = bytearray(nw * ch)
+        for x in range(nw):
+            x0, x1 = x * w // nw, max(x * w // nw + 1, (x + 1) * w // nw)
+            n = (x1 - x0) * (y1 - y0)
+            for c in range(ch):
+                s = 0
+                for yy in range(y0, y1):
+                    row = rows[yy]
+                    for xx in range(x0, x1):
+                        s += row[xx * ch + c]
+                dst[x * ch + c] = s // n
+        out.append(dst)
+    return out
+
+
+def cut_view(data, image, nearest=False):
+    """The returned painting, fitted to the block-out's exact size. (printed, written)
+
+    Box filter by default, not nearest. The painting comes back at about 1.5 MP whatever was asked
+    for, so this is a small non-integer reduction — 1620x912 to 1280x720 is 1.27x — and nearest at a
+    non-integer ratio throws away every fourth column and row. On a straight road edge or a wall that
+    has to line up with the block-out underneath, that shows as a torn staircase; averaging keeps the
+    line where the painter put it. `--nearest` is there for a painting that came back at an exact
+    integer multiple, where nearest is the crisper answer."""
+    cap = ROOT.parent / data["capture"]
+    tw, th = data["size"]
+    w, h, ch, rows = read_png(image)
+    if abs((w / h) / (tw / th) - 1) > 0.06:
+        die(f"{image.name} is {w}x{h}, the block-out is {tw}x{th}: a different shape, so the painting "
+            f"would not line up with the layout. Ask for it again at 16:9. Nothing written.")
+    px = (resize_nn(rows, w, h, ch, tw, th) if nearest else resize_box(rows, w, h, ch, tw, th))
+    if ch == 4:                                          # a background is opaque
+        px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
+    out = ROOT.parent / data["out"]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    write_png(out, tw, th, 3, px)
+    print(f"{image.name}: {w}x{h} -> {out.relative_to(ROOT.parent)}  {tw}x{th} "
+          f"({'nearest' if nearest else 'box filter'}, block-out {cap.name})")
+
+
 # ── cutting a returned template ──
 
 def magenta_cast(r, g, b):
@@ -2838,10 +3084,14 @@ def cmd_cut(args):
         elif not a.startswith("--"):
             pos.append(a)
     if len(pos) != 2:
-        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N]")
+        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] [--nearest]")
     data = json.loads(Path(pos[0]).read_text())
     image = Path(pos[1]).expanduser()
     kind = data.get("kind")
+    if kind == "view":                                   # a painting is fitted, not cut into slots
+        if not image.exists():
+            die(f"{image} not found")
+        return cut_view(data, image, "--nearest" in args)
     if kind not in FIELD_KINDS:
         die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
     if not image.exists():
@@ -3187,6 +3437,14 @@ def cmd_packages(args):
                         "outputs": outs},
                     builder[kind], list(group), group=kind, map=mp, chapter=chap_of_map(mp))
 
+    # ── one painted background per camera zone the engine has captured ──
+    for mp, zone, cap in captures():
+        d = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp / "views" / zone
+        out = str(paint_path(mp, zone).relative_to(ROOT.parent))
+        add(d, {"kind": "view", "map": mp, "zone": zone, "title": f"{mp} / {zone} — painted view",
+                "makes": f"`{out}`, painted over `{cap.relative_to(ROOT.parent)}`", "outputs": [out]},
+            cmd_view, [mp, zone], group="view", map=mp, chapter=chap_of_map(mp), zone=zone)
+
     # ── one shot sheet per panel scene, filed under the map it is played on ──
     for ch, sc in panel_scenes:
         mp = first_map(sc["map"])
@@ -3211,7 +3469,7 @@ def cmd_packages(args):
     print(f"wrote {len(built)} package folder(s) under {PACKAGES.relative_to(ROOT.parent)}/")
     for g, label in (("refsheet", "reference sheets"), ("walker", "walk sheets"), ("tiles", "tile sheets"),
                      ("props", "prop sheets"), ("building", "building face sheets"),
-                     ("scene", "scene shot sheets")):
+                     ("view", "painted views"), ("scene", "scene shot sheets")):
         n = sum(1 for r in index if r["group"] == g and r["ok"])
         blocked = sum(1 for r in index if r["group"] == g and r.get("blocked"))
         if n or blocked:
@@ -3333,7 +3591,8 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     for mp, ch in sorted(all_maps.items(), key=lambda kv: (kv[1], kv[0])):
         mine = [x for x in field if x["map"] == mp]
         borrowed = {k: shared.get((mp, k), []) for k in ("tiles", "props", "building")}
-        if not mine and not any(borrowed.values()):
+        if not mine and not any(borrowed.values()) and not any(x["group"] == "view" and x["map"] == mp
+                                                               for x in index):
             continue                                  # a map with no field art of its own yet
         mapfile = FIELD / "maps" / f"{mp}.map"
         L += [f"### {chapter_label(ch)} — {mp}" + ("" if mapfile.exists() else "  (no map file yet)"), "",
@@ -3344,6 +3603,15 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         if not mine:
             L.append("| — | nothing in tiles.md or props.md calls this map home | | |")
         L.append("")
+        views = [x for x in index if x["group"] == "view" and x["map"] == mp]
+        if views:
+            L += ["**Painted views** — the block-out the engine captured, repainted as a finished "
+                  "background and laid back over it. Nothing in the picture may move.", "",
+                  "| zone | folder | status | after downloading |", "| --- | --- | --- | --- |"]
+            for r in views:
+                L.append(f"| `{r['zone']}` | [`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | "
+                         f"{state(r)} | {cmd(r['dir'])} |")
+            L.append("")
         for kind, ids in borrowed.items():
             if ids:
                 L += [f"Shared {'buildings' if kind == 'building' else kind}, drawn with another map "
@@ -3418,7 +3686,7 @@ def ingest_one(d, meta, returned, extra=()):
     kind = meta.get("kind")
     if kind == "sheet":
         return run_quiet(cmd_slice, [str(d / "sheet.json"), str(returned)])
-    if kind in FIELD_KINDS:
+    if kind in FIELD_KINDS or kind == "view":
         return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]
@@ -3446,6 +3714,8 @@ def cmd_ingest(args):
         elif a == "--fringe":
             extra.append(a)
             skip = True
+        elif a == "--nearest":
+            extra.append(a)
     roots = [Path(a).expanduser().resolve() for a in args
              if not a.startswith("--") and a not in extra] or [PACKAGES]
     metas = []
@@ -3634,6 +3904,8 @@ def main():
         cmd_walker(args[1:])
     elif cmd == "building":
         cmd_building(args[1:])
+    elif cmd == "view":
+        cmd_view(args[1:])
     elif cmd == "cut":
         cmd_cut(args[1:])
     elif cmd == "preview":

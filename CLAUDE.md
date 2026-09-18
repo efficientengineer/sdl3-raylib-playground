@@ -82,6 +82,7 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py props <id>...  # field art: slots sized by each prop's footprint → story/field/props/
 ./story_prompt.py walker <Name>  # field art: the 4x4 walk grid (S W E N) → story/field/walkers/
 ./story_prompt.py building <id>...  # field art: front wall + wall and roof samples → story/field/buildings/
+./story_prompt.py view <map> <zone> # paint over the engine's block-out → story/field/views/<map>_<zone>_paint.png
                                  # (export also writes src/field_text.h from story/field/text.md)
 ./story_prompt.py cut <sheet.json> <img>    # cut a filled-in template: key magenta, resize, write the files
 ```
@@ -482,6 +483,23 @@ leave the background untouched, no text.
 - **`story/field/manifest.md`** is regenerated on every one of those runs: every id ever requested,
   its kind, target size, the package that asked for it, and whether the file exists. Humans and agents
   read it; the engine does not.
+- **Painted views (owner's direction: the Final Fantasy VIII arrangement).** The 3D block-out stays —
+  it is what collision, depth and the camera are computed from — and what the player sees is a
+  painting laid over it. The engine captures a zone from the game's own camera to
+  **`story/field/views/<map>_<zone>.png`** (1280x720 or 640x360, opaque); `./story_prompt.py view <map>
+  <zone>` builds the package around that capture, and `ingest` writes the painting back to
+  **`story/field/views/<map>_<zone>_paint.png` at exactly the capture's size**. Those two file names
+  are the whole contract between the two streams. Without a capture the command exits non-zero and
+  says so — there is nothing to paint over. The capture is attached **first** (it is the layout, not a
+  reference), then the style sheet, then the cut sprites of what the map places, and the prompt's one
+  hard rule is that nothing may move or change size, because a wall that shifted in the painting is a
+  wall the player walks through. No people (the game draws those as sprites), no text, no interface,
+  painted edge to edge. The painting is fitted with a **box filter**, not nearest: it comes back at
+  about 1.5 MP whatever was asked for, so it is a small non-integer reduction, and nearest at 1.27x
+  drops every fourth column and tears the straight edges that have to line up with the block-out.
+  `--nearest` is there for a return that happens to be an exact integer multiple.
+  **The push and bundle lists are the engine agent's to change** — `story/field/views/` is not in
+  `fast_reload.sh` or `deploy.sh` yet, and this side does not touch those scripts.
 - **Examine text is story, so it lives in the story tree**, not in the maps and not in the engine:
   `story/field/text.md`, one `## <map>.<id>` heading (`## halm.well`) per line of text, the text under
   it, tokens expected, and an optional `- name:` — an NPC's display name is story too, so it lives
