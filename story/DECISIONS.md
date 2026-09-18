@@ -158,3 +158,9 @@ Owner: chapter one in game form is "leaps and bounds better". Corrections: still
 re-using legacy beats (the warning guard, the door that opens for Bron) just because art exists; clips
 are too long, cap at about ten lines; make the gameplay between clips explicit (what you do, how long,
 what it unlocks). The old draft (bible, outlines, 326 scenes) is now reference only.
+
+## D13. Names are tokens
+Owner: scenes must be written with token replacement in mind, because names will change often. Rule:
+every proper noun in story text is a token like `{{HERO}}` or `{{HOME_TOWN}}`, including speaker labels;
+`story/v3/NAMES.md` maps tokens to current names; the tool substitutes when exporting to the game and
+when building ChatGPT packages, and can render a readable copy for review.
