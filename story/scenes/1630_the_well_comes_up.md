@@ -39,5 +39,6 @@ it belongs to the town. The two Onn are simply at work, and finished for the day
 - Ket [3]: The third ring is taking load. It starts at the seam. — There.
 - Arro [4]: ...
 - Ket [5] {hope}: Four of nine standing. Three of nine running, as of this morning.
+- Ket [6]: And a flat file. Second cut, eight inches. You will want it at the third ring joint.
 - Arro [6]: I have put the broom away. There is a cupboard. I have never once used the cupboard.
 - Ket [7] {sorrow}: Six hundred and eleven of us. I am at two lights. There will not be another one of us.

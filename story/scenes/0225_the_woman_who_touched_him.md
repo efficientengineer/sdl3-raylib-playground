@@ -10,20 +10,23 @@
 The street's account of the man on the bench, which is three accounts, none of which fits any other.
 He came off a survey crew a year ago; he was always like that; there was a woman on the hill road
 that season in a grey coat who put her hand on somebody near the cut, and *that* man came back
-knowing things he had no business knowing and walked out of the Basin. The laundry holds firmly to
-the second story and has fused two unrelated men to get it, and has the direction of the harm
+knowing things he had no business knowing and walked out of the Basin. The third account is Corm
+Hallet's, a lean stooped tram conductor of fifty who has stopped in the laundry doorway with his
+ticket satchel still on and who contradicts Orla flatly, twice, about her own neighbour; the
+grey-coat story is his, and he tells it the way he calls a stop. Between them the two of them have
+fused two unrelated men to get it, and have the direction of the harm
 exactly backwards, and nobody in Windrow is in a position to correct any of it. Zeph counts the
 contradictions out loud and is asked to leave. Orla finishes by saying, with approval, that the
 company sends a man once a month to see the bench man is fed.
 
 ## Dialogue
 - Orla {dread}: Him? He came off a survey crew on the hill road. Year ago, about.
-- Conductor: He did not. He's always been like that. He was like that when I started.
+- Hallet: He did not. He's always been like that. He was like that when I started.
 - Orla: You started in Green. A year back is before Green.
-- Conductor: There was a woman on that road that season. Grey coat. Walking, on her own.
-- Conductor: Put a hand on a man up by the cut, and he came back knowing things he'd no business knowing.
+- Hallet: There was a woman on that road that season. Grey coat. Walking, on her own.
+- Hallet: Put a hand on a man up by the cut, and he came back knowing things he'd no business knowing.
 - Orla: And walked off his own job and out of the Basin, and his wife with him.
-- Conductor: He hadn't got a wife. That's the whole point of the story.
+- Hallet: He hadn't got a wife. That's the whole point of the story.
 - Zeph: Stop. — You have two men, and one of them is three men.
 - Zeph: He came off a crew and he was always like that. She did for one and made the other one clever.
 - Zeph: I have it as four contradictions in a minute and a half, and I have been generous.

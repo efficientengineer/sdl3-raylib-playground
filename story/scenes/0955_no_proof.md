@@ -14,9 +14,9 @@ for as long as the wall stands. Bron says fine. Pip buys the drinks with money t
 
 ## Dialogue
 - Bron {sorrow}: Couldn't find them.
-- Agent: Couldn't find five men and a fire on a flat white pan.
+- Bost: Couldn't find five men and a fire on a flat white pan.
 - Bron: No.
-- Agent: Right. Men wander off out here. I'll write it off. No proof, no pay — you know the wording.
+- Bost: Right. Men wander off out here. I'll write it off. No proof, no pay — you know the wording.
 - Bron: I know the wording.
 - Hesk: You've just lied to a sealed bill.
 - Bron: Yes.

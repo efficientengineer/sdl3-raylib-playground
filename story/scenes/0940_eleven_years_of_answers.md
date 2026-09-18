@@ -11,8 +11,8 @@ questions, and she asks them constantly, of everyone, about everything, and writ
 before she asks the next one. She interviews the party rather than the other way round and is openly
 delighted with them. The books are indexed. She is not distressed and is not to be pitied: she simply
 notices that other people appear to have a before and she has a shelf, and she would like to know
-what the before is like. She asks Bron for his earliest thing and he gives her the winter in one
-sentence, the way he always does, and she writes it down. Then she asks for the thing he did every
+what the before is like. She asks Bron for his earliest thing and he names the winter and does not
+tell it, the way a man names a thing he has said often, and she writes it down. Then she asks for the thing he did every
 year, and then for the day before it, and he answers fast and well and warmly and gives her exactly
 the answer he gave Lyra in the Registry stacks, word for word, and she writes that down too. Nobody
 in the party reacts, because they have all heard it.
@@ -26,7 +26,7 @@ in the party reacts, because they have all heard it.
 - Ilsa: Here's my trouble. Everyone I meet has a before. A place, a mother, a year. I've a shelf.
 - Ilsa: I'm not sad about it. I'd only like to know what it's like, and nobody can tell me properly.
 - Ilsa: Your earliest thing. Go on. The first one you're sure of.
-- Bron: I got lost above Tellwater at nine. Two nights in the drifts above the fold. First night I was only bored.
+- Bron: Being nine, and lost above Tellwater in the snow. That's the first one I'm sure of.
 - Ilsa: Lovely. Now the other kind. The thing you did every year. Everyone's got one of those.
 - Bron: The autumn fair. Every year of it.
 - Ilsa: And the day before it?

@@ -18,16 +18,16 @@ specific. The fee is out of her own wages. The keeper chalks it and takes no ten
 not say why, and nobody asks.
 
 ## Dialogue
-- Hall-keeper {sorrow}: Fifty-four years the hall's been in this room. Board's come off that wall twice, and once was to paint behind it.
+- Stobb {sorrow}: Fifty-four years the hall's been in this room. Board's come off that wall twice, and once was to paint behind it.
 - Bron: Who signed the notices?
-- Hall-keeper: All of them, in order, and every one of them is correct. That's what's the matter with them.
+- Stobb: All of them, in order, and every one of them is correct. That's what's the matter with them.
 - Bron: Then don't pack.
-- Hall-keeper: I'm not packing because they're right. I'm packing because the crates came and I'd nowhere to put them.
+- Stobb: I'm not packing because they're right. I'm packing because the crates came and I'd nowhere to put them.
 - Pip: Your stove's out.
-- Hall-keeper: It is.
+- Stobb: It is.
 - Idda {tense}: I'm sorry. Is this where one — I've written it out. It's all on the one sheet, you needn't take my word for any of it.
 - Idda: Tier Four. The school. Something wakes the children at night, and I have kept the nights. Six years of them.
 - Idda: The boards up there are company boards. I have used them properly and correctly and nothing has ever come of it.
 - Idda: I am not asking anyone to believe me. I am asking for one person to come up and stand in a corridor and listen.
 - Idda: It's out of my own wages. It isn't much. I've put down exactly what it is.
-- Hall-keeper: No tenth off that one. Chalk it as it stands.
+- Stobb: No tenth off that one. Chalk it as it stands.

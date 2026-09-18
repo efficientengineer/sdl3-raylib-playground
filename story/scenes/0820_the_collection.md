@@ -20,13 +20,13 @@ not in the room; she took the rope-walks and the yards and has not come up.
 ## Dialogue
 - Hall-keeper {hope}: Four bills. Three of them are rats and a wall. The fourth one's the company.
 - Hall-keeper: Sealed properly, accounts office at Vantage, and it pays four times the other three put together.
-- Collector: Escort. One day, my round, up the street and back. I've walked it alone eleven years and I'd like to stop.
-- Collector: It isn't the debtors. It's the stairs and the dogs. Mostly the dogs.
+- Venn: Escort. One day, my round, up the street and back. I've walked it alone eleven years and I'd like to stop.
+- Venn: It isn't the debtors. It's the stairs and the dogs. Mostly the dogs.
 - Hesk: What's the debt.
-- Collector: Nineteen of them on the schedule. Bark accounts, two shop books, and one intake fee that's been running nine years.
-- Collector: Twelve marks and six at the start. Interest at the schedule rate. It stands at fifty-two and four.
+- Venn: Nineteen of them on the schedule. Bark accounts, two shop books, and one intake fee that's been running nine years.
+- Venn: Twelve marks and six at the start. Interest at the schedule rate. It stands at fifty-two and four.
 - Hesk: Intake fee for what.
-- Collector {dread}: The care-house. Bed, board, schooling, a bed kept warm. It's the same paper everybody signs.
+- Venn {dread}: The care-house. Bed, board, schooling, a bed kept warm. It's the same paper everybody signs.
 - Hesk: ...
 - Hall-keeper: I'll not tell you to leave it. I've a stove up here and no wood in it.
 - Bron: Seal's on it. We'll take it.

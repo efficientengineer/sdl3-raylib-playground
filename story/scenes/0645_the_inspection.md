@@ -1,7 +1,7 @@
 # Scene 0645: The Inspection
 
 - type: talk
-- location: a timber derrick over a shaft collar on white salt, a winch house of corrugated iron beside it, a bank of valve gear on a plank stand, coiled cable, hard flat morning light, salt glare
+- location: a plank gate office with a counter across it, a peg board of numbered brass tags, a ledger lying open on the counter, a stove pipe through the back wall, a small-paned window looking out on a timber derrick, hard flat light from the right, morning
 - characters: Bron, Lyra, Ket, Hesk
 - mood: comedy of procedure, played absolutely straight
 

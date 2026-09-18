@@ -1,7 +1,7 @@
 # Scene 0135: The Roof Tank
 
 - type: talk
-- location: a bare sandstone yard under a raised stone cistern on squat pillars, a brass meter box and padlocked tap at waist height, empty buckets stacked against the wall, flat overcast noon light
+- location: a flat sandstone roof with a round stone cistern standing on squat blocks at its centre, an iron inspection hatch propped open on the tank top, a brass meter box and padlocked tap on the parapet, stacked terraces falling away below, hard clear light from the left, morning
 - characters: Bron, Pip, Lyra, Zeph
 - mood: brisk, funny
 

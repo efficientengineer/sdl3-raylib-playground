@@ -34,7 +34,7 @@ cobweb.
 
 ## Dialogue
 - Pip [1] {wonder}: ...There's people.
-- Zeph [2]: Two hundred and six lamp columns down this street, and not one of them out.
+- Zeph [2]: A hundred and ninety-one lamp columns down this street, and not one of them out.
 - Zeph [3]: And no soot on that roof. A thousand years of lamps and not a mark on it.
 - Pip [4] {dread}: Friend? You want a hand with that shutter? — Friend. I'm talking to you.
 - Pip [5]: He's not deaf. He looked at my boots when we came past him.

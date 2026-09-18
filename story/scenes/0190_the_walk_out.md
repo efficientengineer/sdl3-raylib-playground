@@ -1,6 +1,6 @@
 # Scene 0190: The Walk Out
 
-- location: sandstone terraces stacked in four bands up a dry hillside, flat roofs each carrying a round stone cistern, steep stepped streets between them, low morning sun striking from the left, cold clear sky
+- location: a stony path climbing out of a terraced sandstone town, a dry stone wall on the uphill side, wind-bent thorn scrub, the town's flat roofs and cisterns stacked below on the left, hard low sun from the left, early morning
 - characters: Bron, Lyra, Zeph, Pip
 - mood: flat, cold, wrong
 - staging: The party walk downhill away from camera toward the left for the whole scene. The hill and the door-mouth are behind them, up to the right. The town's terraces lie below and ahead at the left

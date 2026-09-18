@@ -14,13 +14,13 @@ beyond the fact, and lets the tone do the rest. Bron reads the poster's name and
 without discussion. Pip does not argue.
 
 ## Dialogue
-- Hall keeper {tense}: That one's been up nine days. Three have read it and put it back on the hook.
+- Stobb {tense}: That one's been up nine days. Three have read it and put it back on the hook.
 - Bron: It's sealed.
-- Hall keeper: It's sealed, it's in a private name, and it pays out of a private purse. Nothing wrong with the paper.
-- Hall keeper: Sit the last hour with a man at the Quiet House at Windrow. That's the work. That's all of the work.
+- Stobb: It's sealed, it's in a private name, and it pays out of a private purse. Nothing wrong with the paper.
+- Stobb: Sit the last hour with a man at the Quiet House at Windrow. That's the work. That's all of the work.
 - Pip: Then why's it hung nine days?
-- Hall keeper: He's retired Pale. He was one of the eleven that went up to Tellwater in ninety-three.
-- Hall keeper: And the Order of the Late Hour have written back declining to send anybody.
+- Stobb: He's retired Pale. He was one of the eleven that went up to Tellwater in ninety-three.
+- Stobb: And the Order of the Late Hour have written back declining to send anybody.
 - Pip: ...
-- Hall keeper: Poster's name is at the foot of it, if you want to know who's paying. Warden Ivo Teach. His own money.
+- Stobb: Poster's name is at the foot of it, if you want to know who's paying. Warden Ivo Teach. His own money.
 - Bron: Book it out.

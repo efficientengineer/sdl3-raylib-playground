@@ -11,8 +11,9 @@ nobody here is frightening: they are sixty decent people who have read a town fi
 the job well, and every single beat of it is a half-degree too accurate and a half-beat too quick.
 Ollo Marrick comes out with flour to the elbow, takes Bron by the shoulder with a good rehearsed
 grip and calls him Hesta's boy in a voice that has said it before. A weaver uses a childhood name
-on him that he has never had in his life and two more people use it after her. A man asks whether
-he ever got another dog. Bron has not been here since he was thirteen and is honestly pleased to
+on him that he has never had in his life, and two more people use it after her: a townsman in a
+carter's apron who also asks whether he ever got another dog, and a townswoman leaning out of an
+upstairs window with washing over her arm who calls it down the square like good news. Bron has not been here since he was thirteen and is honestly pleased to
 be back, and works visibly hard to look as pleased as everyone expects, and cannot quite manage
 it, and feels bad about that. Pip is watching the crowd instead of the reunion and says nothing
 about it.

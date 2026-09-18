@@ -1,7 +1,7 @@
 # Scene 0920: The Roof at Night
 
 - type: talk
-- location: a smaller battered survey crawler on plate tracks with a ladder to a roof rail, survey rods lashed along one side, a stencilled company panel with no words half scraped off, under a black sky thick with stars, night
+- location: the flat roof deck of a small survey crawler, a low iron roof rail on three sides, a lashed spare track plate and a rolled tarpaulin, an open hatch with light coming up out of it, white salt running flat to the horizon below, under a black sky thick with stars, night
 - characters: Bron, Lyra, Zeph, Pip, Ket, Hesk
 - mood: warm, sprawled, no plot at all
 

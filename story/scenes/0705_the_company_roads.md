@@ -18,5 +18,5 @@ afterward by either of them.
 - Narrator: Milestoned to the half mile. Swept. Nothing on it but freight, a mail rider, and a crawler with the paint still wet.
 - Narrator: Six permits, freight class. A docket off a salt barge, a potato cut flat for a seal, and four hours Pip will not talk about.
 - Narrator: It gets warmer as you go. Not at noon — by the mile. You can put a hand out of the cart and find the line.
-- Narrator: Three mornings, the sister asks him one question before they start walking. Three mornings, he answers it well.
+- Narrator: Three mornings, the sister asks him one question before the cart moves. Three mornings, he answers it well.
 - Narrator {wonder}: Then the road turns north, and the rim stands up out of the dark with lights in it, all the way to the top.

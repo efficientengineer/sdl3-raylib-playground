@@ -358,6 +358,15 @@ order: build and height, skin, hair, ears, eyes.
 - status: dying; ch.12's optional side contract is sitting the hour with him
 - notes: Sergeant Bel Rask, 61. The bible's unnamed dying sergeant. He was in the Tellwater street at four in the morning in 1093 with four hundred people standing in it looking at him pleasantly, and the children would not walk when you told them, so you carried them, and he watched his warden carry one the whole four hundred yards. **He must not name the child and must not know who Bron is.** Bron does the Tally from memory, out of order, and it works anyway.
 
+## Hallet
+- role: tram conductor, Windrow
+- ref: story/refs/hallet.png
+- people: human
+- voice: Flat, unhurried, and certain; corrects people about their own neighbours the way he calls a stop, and greets a passenger by the number on his collar without thinking about it.
+- look: Hallet, a lean, stooped man in his fifties with tan skin, thinning sandy hair combed flat and wet, pale tired eyes, a double-breasted slate-blue tram coat buttoned to the throat with tarnished brass buttons, a flat peaked cap, a leather satchel of ticket rolls on a cross-strap, fingerless wool mitts, and a punch on a chain looped twice round one wrist.
+- status: alive, on the Windrow line
+- notes: Corm Hallet. **Portrait only; low art priority** — never named in a panel. He greets the bench man as "four-one-nine", which is the only name that man has in the game, and at `0225` he is the one who tells the grey-coat story and contradicts Orla Winch flatly. He is not sinister and is not hiding anything; he is the town's second wrong account. Ch.2 (`0220`, `0225`).
+
 ## Mira
 - role: Ivo Teach's wife; the Quiet House, Windrow
 - ref: story/refs/mira.png
@@ -419,6 +428,15 @@ order: build and height, skin, hair, ears, eyes.
 - look: Dov, a short, thick-set young man with clay-warm skin, amber eyes with bright rings at the pupils, and pale gold hair cropped into a short upright brush, a broad open face, a charcoal company bore-crew coat with both sleeves cut off at the shoulder and a mustard-yellow band at the left cuff, a harness of brass clips across his chest, heavy gloves tucked into his belt, and a coil of line over one shoulder.
 - status: alive, on a company bore crew against his family's wishes
 - notes: Dov Ninefold, 26, Hesk's nephew. Alive, cheerful, and on the wrong side of every argument at his own dinner table. Ch.5 the argument, ch.6 on the crew at Saltmouth, ch.13 in the evacuation.
+
+## Tarn
+- role: speaker of the doorward council, Ninefold Terrace
+- ref: story/refs/tarn.png
+- people: Kell
+- voice: Seats you, prices the work, and closes the subject; answers a question about a door by naming a fee, and does not raise his voice doing it.
+- look: Tarn, a very short, very broad older man with clay-warm skin, amber eyes with bright rings at the pupils, and iron-grey hair standing up in a flat cropped brush, a sleeveless dust-green council coat with a heavy shoulder strap over a cream underlayer, bare arms, a wide belt of mortar tools with the handles worn pale, a plain iron ring of counters at his hip, and flat boots white with stone dust.
+- status: alive, on the bench ring above the Fifth
+- notes: Tarn Bly, 61. **Portrait only; low art priority** — he is never named in a panel and appears in one scene. Speaks for the nine households at `0530`, posts the two-mark bill to count the door-mouths, and refuses Ket's one question about the Fifth. Orrin Cadder first-names him at `0520` along with Mave and Ordo. Named **Tarn** and not Sesk because no scene may put a name that rhymes with Hesk beside her. Ch.5.
 
 ---
 
@@ -500,6 +518,15 @@ order: build and height, skin, hair, ears, eyes.
 - status: alive, camped against the Sarn cap ring with four crewmates, and not coming back
 - notes: Corrow Sallow. Resettled off the same survey map Bron's surname came from, and **nobody in the party may remark on the name.** Maren gave him his life back three weeks ago: a name that is not the one on the payroll, and a wife eleven days' walk from here who married somebody else in 1099. He has thought about it a great deal and he is not going. Four crewmates stayed through a bad fortnight because somebody had to, and they are the point of the scene. Ch.9, optional.
 
+## Bost
+- role: salt company agent, Ostry Bar
+- ref: story/refs/bost.png
+- people: human
+- voice: Bored, exact and entirely reasonable; quotes the clause, offers the fee, and will not be moved by anything that is not on a form.
+- look: Bost, a heavy-shouldered man of middle height with sun-reddened tan skin, close-cropped grey hair, small pale eyes squinting against the glare, a grey-green oilskin coat worn open over a collarless shirt with the sleeves rolled, a canvas cuff protector on the writing arm, a stub of pencil behind one ear, and a flat tally frame of wooden counters carried under one arm.
+- status: alive, in the shed at the Bar
+- notes: Ivet Bost. **Portrait only; low art priority** — never named in a panel. Runs the salt company's counting shed at Ostry Bar; posts the ch.9 bill about the crawler that came back empty and, at `0955`, declines to take the party's word for what happened to it. He is not a company man of the Works and has no idea what he is standing next to. If the player lies to him at `0955`, the unpaid line goes on the Sallowgate ledger wall for good. Ch.9 (`0945`, `0955`).
+
 ---
 
 ## Emberrow
@@ -522,6 +549,15 @@ order: build and height, skin, hair, ears, eyes.
 - status: alive; married nine years to a man who did not know he had been anyone else
 - notes: Dalla Kettle, 51. She is standing in the doorway when Maren gives her husband his life back. She is the person the party cannot look at. Ch.8, 12.
 
+## Venn
+- role: accounts collector, the Clement Works; the Emberrow round
+- ref: story/refs/venn.png
+- people: human
+- voice: Friendly, unembarrassed and completely without malice; reads the clause out because he is obliged to and lays all three ways out flat without leaning on any of them.
+- look: Venn, a round, comfortable man of middle height with pale freckled skin, thinning ginger hair combed over, mild grey eyes and a permanent good-humoured half-smile, a charcoal company coat with a small brass number plate at the throat and a mustard-yellow band at the left cuff, a wide leather satchel on a cross-strap, ink on the right glove, and a ruled schedule board carried flat against his chest.
+- status: alive, on the round; nineteen doors on the day's list
+- notes: Sennet Venn, 41. **Portrait only; low art priority** — never named in a panel, and both his scenes are optional. He is the face of the bill the party takes at `0820` and the man at the sixth door at `0840`, and he is **not a villain**: he does not pretend the child is a number, he does not enjoy any of it, and he does not argue with anybody. Named **Venn** because the ch.8 outline's "Aldo Venn" would false-match Aldo Fessel's handle in panel text. Ch.8 (`0820`, `0840`), optional.
+
 ---
 
 ## Vantage
@@ -543,6 +579,15 @@ order: build and height, skin, hair, ears, eyes.
 - look: Corrie, a small, quick girl of seventeen with brown skin, black hair tied in two short high tails, big dark eyes and a bright unwavering smile, a charcoal company shop coat with a brass number plate stitched at the throat, a bright pink counter apron with rows of narrow pockets holding paper sleeves, fingerless cotton gloves, and a shallow wooden tray carried level at her waist.
 - status: alive, on the counter
 - notes: Corrie Fallow, 17. Out of a care-house at sixteen, surnamed for the month she arrived, cheerful and incurious and unable to tell you about a single birthday. Pip cannot be in the room with her. Ch.7, 12.
+
+## Stobb
+- role: hall-keeper, the Even Hand's founding hall, Vantage Tier Two
+- ref: story/refs/stobb.png
+- people: human
+- voice: Flat and unsentimental about a fifty-four-year eviction; tells you what is wrong with a bill by telling you what is right with the paper.
+- look: Stobb, a tall, spare old man with sallow pale skin, white hair worn long and pushed back behind the ears, deep-set brown eyes under heavy brows, a rust-brown high-collared jacket gone shiny at the elbows over a grey work shirt, a flat brass open-hand token on a cord at the left wrist, a chalk stub held in one hand, and a stack of flat-packed crates leaning against his leg.
+- status: alive; packing a hall he has kept for fifty-four years
+- notes: Garrick Stobb, 66. **Portrait only; low art priority** — never named in a panel. Keeps the guild's founding hall on Tier Two, which the Works has leased out from under it; he is packing because the crates came, not because anybody convinced him. He is `0725`, `0795` and `1220` and he is the same man in all three: the ch.7 pair are the founding-hall problem, and at `1220` he hands the party the bill posted in Warden Ivo Teach's own name out of his own purse. Distinct from the Even Hand hall-keeper at Emberrow (`0820`), who is a different person and stays an unnamed one-off. Ch.7, 12.
 
 ---
 
@@ -582,4 +627,8 @@ a `characters:` line.
 - **Frame-bearer** — a Pale trooper in the pale ash-grey coat without the rifle, gloves off and tucked in the belt, carrying one end of a long canvas-covered case with brass buckle ends showing, bored, careful, and watching the ground for their footing.
 - **Standing Onn of the muster** (Ostry Bar, ch.9, at distance only) — a narrow upright figure in a long grey keeper's smock and a coloured sash, alone on white salt, motionless, facing out; drawn small, spaced far apart, never grouped and never facing one another.
 - **Person of Thurn** — a very short, very broad figure with clay-warm skin, amber eyes and upright metal-coloured hair, bare arms, and a square-cut sleeveless overdress with a high banded collar in a faded dye, centuries out of fashion, spotless and invisibly mended. Calm, healthy, unhurried, interested in the job in front of them.
+- **Works guard** (the Braid annex, ch.4; reused ch.6 and ch.8) — a charcoal-grey stand-collar coat with a small brass number plate at the throat and a mustard-yellow band at the left cuff, a short baton on the belt and no rifle, a lamp hooked on the chest, and the settled, unhurried slouch of somebody eleven hours into a twelve-hour shift.
+- **Vess townsperson** (ch.4, 13) — a very tall, very thin figure with ash-lilac skin, long backswept fluted ears, solid no-white eyes and wire-hair in cold indigo pinned up with a bone pin, a long straight overcoat in a faded dye over a high-collared underlayer, a shawl folded across one shoulder, and long hands carrying something two-handed.
+- **Even Hand hall-keeper** (any chapter hall that is not Sallowgate, Braid or Vantage) — an ordinary person of the town in working clothes gone shiny at the elbows, a flat brass open-hand token on a cord at the left wrist, a chalk stub in one hand, and a job board or a stove behind them; never a uniform, because the guild has none.
+- **The Cap's house guard** (Vantage Tier Six, ch.12) — a plain dark coat with no company plate and no band, black gloves, polished boots, a truncheon out of sight, older and better paid than the Pale and dressed to be unremarkable beside a garden wall. No rifles.
 - **Sanatorium orderly** (Windrow, ch.10) — a bone-white buttoned sanatorium tunic with a black stand collar, sleeves buttoned at the wrist, a cloth folded over one forearm, a small ring of brass keys on a belt clip, quiet shoes, and a mild professional pleasantness.

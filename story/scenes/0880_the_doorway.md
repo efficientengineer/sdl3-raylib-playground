@@ -26,7 +26,7 @@ Maren is not in this scene. She is still down the steps and the camera does not 
 4. establishing_tall | an open house door seen from the dark street, warm light spilling down the step, a kitchen table and a range visible inside, nobody in the doorway and nobody at the table
 
 ## Dialogue
-- Ross [1] {sorrow}: Wenna. Wenna, there's somebody put in the house. There's a woman in my kitchen —
+- Ross [1] {sorrow}: Enna. Enna, there's somebody put in the house. There's a woman in my kitchen —
 - Dalla [2]: Ross. Your tea's on the side.
 - Ross [3]: Not now, love. I'm looking for my wife.
 - Lyra [3]: Mrs Kettle —

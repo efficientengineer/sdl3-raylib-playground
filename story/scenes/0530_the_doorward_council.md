@@ -6,7 +6,10 @@
 - mood: polite, immovable
 
 ## Beat
-The council will talk to Ket, barely, and only because an Onn asking about a door is an old
+Every line the council speaks is Tarn Bly's: a very short, very broad grey-haired doorward in his
+sixties in a sleeveless council coat, sitting in the middle of the bench ring with a wide belt of
+mortar tools, who seats an Onn by her title, makes four hunters stand, prices the work and closes
+the subject. The council will talk to Ket, barely, and only because an Onn asking about a door is an old
 complaint they know the shape of. They will not open anything, discuss what is behind anything, or
 admit that anyone has ever asked before. What they have is work: a count of the nine door-mouths,
 seals and mortar noted, for a fee so small it is an insult, and it is an insult, because everybody

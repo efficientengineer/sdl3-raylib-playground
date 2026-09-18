@@ -13,7 +13,7 @@ a date, and nothing in the Basin marks the one it sits near.
 
 ## Dialogue
 - Narrator {sorrow}: It took eleven days to walk the first hundred up out of Thurn. One at a time, by the arm.
-- Narrator: The Long Bore head went cold on the seventh. It has been inventoried twice since.
+- Narrator: The Long Bore head went cold on the eighth. It has been inventoried twice since.
 - Narrator: On the seabed below Braid a chant-line says eleven hours of record every day.
 - Narrator: A record that is not rehearsed does not survive. That part of it was always true.
 - Narrator {hope}: Fourteen town councils convened an inquiry at Lomm.

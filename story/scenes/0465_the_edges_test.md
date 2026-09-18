@@ -6,7 +6,7 @@
 - mood: hope -> dread
 
 ## Beat
-A shed hand is sitting on a crate eating, and Zeph bets Pip a coin he can tell her something true
+A Vess ferry-rail hand is sitting on a crate outside the shed eating, and Zeph bets Pip a coin he can tell her something true
 about him in three questions. He asks about the afternoon at the autumn fair the man has been telling
 everybody about, and the man tells it happily, at length, with the dog and the almonds and his
 brother's eleven marks. Then Zeph asks what he did the day before. The man is cheerful, unbothered,

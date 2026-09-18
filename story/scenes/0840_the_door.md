@@ -28,12 +28,12 @@ has not come up. The mother does not beg. Hesk does not move at all.
    - Hesk: eyes cut left at the collector, furious and completely still, brows crushed down, not blinking
 
 ## Dialogue
-- Collector [1] {tense}: Sixth door. This is the one I'd walk past, if walking past was a thing I was able to do.
-- Collector [2]: You'll know why I'm here. The schedule hasn't changed since the letter.
+- Venn [1] {tense}: Sixth door. This is the one I'd walk past, if walking past was a thing I was able to do.
+- Venn [2]: You'll know why I'm here. The schedule hasn't changed since the letter.
 - Mother [3]: I know what it says. I signed it.
-- Collector [4]: Fifty-two marks and four. Or the clause under it.
+- Venn [4]: Fifty-two marks and four. Or the clause under it.
 - Bron [4]: Say the rest of it.
-- Collector [5] {sorrow}: The debt may be discharged by intake. Discharged. That's the word on the paper and that's what it means.
-- Collector [6]: Three ways, and I'll give you all three because I have to. You settle it yourselves, out of your own money.
-- Collector [6]: Or you refuse, and I write that down, and the company has no more work for any of you. Or you do the day you took.
+- Venn [5] {sorrow}: The debt may be discharged by intake. Discharged. That's the word on the paper and that's what it means.
+- Venn [6]: Three ways, and I'll give you all three because I have to. You settle it yourselves, out of your own money.
+- Venn [6]: Or you refuse, and I write that down, and the company has no more work for any of you. Or you do the day you took.
 - Hesk [6]: ...

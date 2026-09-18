@@ -6,7 +6,7 @@
 - staging: The party comes in from the left of frame and faces right into the square. The raised well and the dark ring tower stand centre-right; the bakery front is on the left; the road out runs off to the right. Everyone's attention is on the square
 
 ## Beat
-The town that welcomed Bron wrong five months ago is coming apart politely. Employees are lifting
+The town that welcomed Bron wrong three months ago is coming apart politely. Employees are lifting
 their own posting notices off their own front doors and carrying them to a clerk with a tally
 board, and queueing to do it. Nobody is crying and nobody is angry. Bron came here wanting
 something to hit and there is nothing in the square to hit; Hesk is the only one who asks a useful

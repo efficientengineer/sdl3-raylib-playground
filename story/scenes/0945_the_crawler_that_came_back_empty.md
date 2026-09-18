@@ -13,13 +13,13 @@ decent fee, proof as usual. The agent is mildly embarrassed about the whole thin
 because it is always drink. Nothing in this scene points at anything.
 
 ## Dialogue
-- Agent {hope}: That bill's mine and it's sealed. Crawler came in Tuesday, load still lashed, nobody on it.
+- Bost {hope}: That bill's mine and it's sealed. Crawler came in Tuesday, load still lashed, nobody on it.
 - Bron: Dead?
-- Agent: No. That's the awkward part. They've been seen twice out past the ring, by two different drovers.
+- Bost: No. That's the awkward part. They've been seen twice out past the ring, by two different drovers.
 - Pip: Then walk out and fetch them.
-- Agent: I've a desk and a tally board. You've six people and a crawler and a token on your wrist.
+- Bost: I've a desk and a tally board. You've six people and a crawler and a token on your wrist.
 - Bron: What's the fee?
-- Agent: Nine marks for the five, proof as usual. I'd have offered four, but the season's on.
+- Bost: Nine marks for the five, proof as usual. I'd have offered four, but the season's on.
 - Pip: Why'd they walk off?
-- Agent: Drink. It's always drink. Or a woman. It's drink.
+- Bost: Drink. It's always drink. Or a woman. It's drink.
 - Bron {tense}: We'll take it.

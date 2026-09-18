@@ -30,5 +30,5 @@ word wrong about Bron himself. It ends with the only thing left that anyone can 
 - Lyra: Coppertop. Since you came through the gate this morning. Have you said it to anyone.
 - Bron {sorrow}: ...What is that. What is that a question about.
 - Lyra: I don't know yet. That's why I asked it.
-- Lyra: I'd like to stop arguing and go in. I'd like that to be because we decided.
+- Lyra: That's enough for tonight. None of us is going to be cleverer at one in the morning.
 - Bron: We'll look at the flooded ground in the morning. That's something you can put your hands on.

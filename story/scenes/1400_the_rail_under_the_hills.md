@@ -11,7 +11,7 @@ is getting thinner, and thinning is what causes an inversion. No irony in the vo
 at the end of it.
 
 ## Dialogue
-- Narrator {dread}: Eleven hours since the Long Bore went to full. Thirty-one since Braid walked out onto the seabed.
+- Narrator {dread}: Eleven hours since the Long Bore went to full. Ninety-six since Braid walked out onto the seabed.
 - Narrator: Kerrow is at the bore head with an engineering party. Teach is suspended; his warrant died at noon.
 - Narrator: Cadder was relieved of his post in the street, and his crews still do what he says.
 - Narrator: Tovin-Caleth is at Sallowgate, copying a wall into books.

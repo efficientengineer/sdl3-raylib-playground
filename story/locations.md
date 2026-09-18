@@ -44,6 +44,7 @@ bought. Warm stone, cold air, water on every roof and a meter on every tap.
 - location (sallowgate_wide): sandstone terraces stacked in four bands up a dry hillside, flat roofs each carrying a round stone cistern, steep stepped streets between them, low morning sun striking from the left, cold clear sky
 - location (sallowgate_wide_dusk): the same stacked sandstone terraces at dusk, roof cisterns black against a cold green sky, lamps lit in a few windows, brass meter boxes bolted beside each cistern tap, smoke going straight up
 - location (sallowgate_stepped_street): a narrow stepped street cut between sandstone housefronts, shuttered windows, a handcart chocked on the steps, a company meter box on a wall bracket, hard midday sun down the right-hand wall
+- location (sallowgate_hill_path): a stony path climbing out of a terraced sandstone town, a dry stone wall on the uphill side, wind-bent thorn scrub, the town's flat roofs and cisterns stacked below on the left, hard low sun from the left, early morning
 - location (even_hand_hall_exterior): a squat converted water-house of pale sandstone on the second terrace, a wide arched door propped open, an iron stove pipe through the roof, a chalked board beside the door, late afternoon sun from the right
 - location (even_hand_hall_main): the guild hall ground floor, bare sandstone walls, a black iron stove burning at the left, a pinned job board on the right, behind it a floor-to-ceiling wall of ruled columns of small handwriting, lamplit evening
 - location (even_hand_board): close on the guild job board, a burned-edged timber frame, pinned paper bills curling at the corners, a chalk stub on a string, a broken wax seal, stove light from the left in a dim room
@@ -52,7 +53,9 @@ bought. Warm stone, cold air, water on every roof and a meter on every tap.
 - location (even_hand_bunkroom_night): the same upstairs bunk room at night, twelve iron bunks with eleven stripped bare and one made up, a tallow lamp on a stool at the left, a small square window ajar, cold air
 - location (even_hand_kitchen): a cramped back kitchen with a sandstone hearth, a blackened pot on an iron arm, a scrubbed plank table with mismatched stools, bunches of dried beans on hooks, warm stove light from the left, night
 - location (sallowgate_cistern_yard): a bare sandstone yard under a raised stone cistern on squat pillars, a brass meter box and padlocked tap at waist height, empty buckets stacked against the wall, flat overcast noon light
+- location (sallowgate_roof_tank): a flat sandstone roof with a round stone cistern standing on squat blocks at its centre, an iron inspection hatch propped open on the tank top, a brass meter box and padlocked tap on the parapet, stacked terraces falling away below, hard clear light from the left, morning
 - location (sallowgate_room_above_hall): a small plastered attic room, a cot, a survey satchel hung on a nail, a plank shelf of folded maps, a low square window looking down over flat roofs, early morning sun from the left
+- location (even_hand_hall_morning): the guild hall ground floor, bare sandstone walls, a black iron stove burning at the left, a pinned job board on the right, behind it a floor-to-ceiling wall of ruled columns of small handwriting, cold bright morning light through the open door at the far end
 
 **Palette.** Sandstone buff, dust ochre, cold slate blue, iron black, stove ember orange, bone white.
 **Light.** Outdoors: hard low sun from the left in the morning, from the right after noon; no shadow
@@ -77,6 +80,11 @@ washing lines, and the dark Vintry well standing over the whole place like a chi
 - location (windrow_laundry_doorway): one laundry doorway close, wet brick jamb, steam pouring past a hanging sheet, a copper tub and a scrubbing board inside, a chipped enamel cup on the step, low warm sun from the left, evening
 - location (windrow_bench): a public bench of grey planks against a brick wall, a bent lamp post beside it, pigeons on the cobbles, a folded coat left on the seat, flat grey noon light with no shadows
 - location (windrow_boarding_room): a narrow upstairs lodging room with three plank beds in a row, a washing line of damp shirts strung across it, a sash window propped open on a broken catch, grey morning light from the left
+- location (windrow_pale_post_room): a small Pale post room of grey brick at night, a black iron stove with a kettle, a plank bench under the window, a duty board of iron hooks on the wall, grey coats on pegs, lamplight from a bracket above
+- location (windrow_boarding_kitchen): a narrow boarding-house kitchen let with the rooms, a black range with somebody else's pans on it, a long scrubbed table, a bare bulb window black with night, warm range light
+- location (hill_road_above_windrow): a hill road of loose scree above a tram town, a dry stone wall going up on the right, wind-bent scrub, the town's lamps small below on the left and a dark ring tower black against the sky, cold failing light, night coming
+- location (windrow_drying_yard): a walled drying yard of wet brick with rows of washing lines strung across it, a mangle and stacked baskets against the wall, three hundred feet of dark stacked stone rings standing directly above, overcast morning light from the left
+- location (windrow_survey_office_door): a closed office door of dark varnished timber in a wet brick street front, a brass night bell beside the jamb, a grille at head height with a lamp behind it, washing lines strung overhead, flat grey light from the left, afternoon
 - location (windrow_boarding_parlour): a boarding-house front parlour of grey brick and plaster, four mismatched armchairs round a small black stove, a plank table with a tin tray of cups, a net-curtained window, flat overcast daylight from the right, midday
 - location (windrow_chop_house): a low chop-house room of dark plank walls, one long scrubbed table down the middle crowded with dishes, a coal stove at the back, a steamed window, warm lamplight from a bracket at the left, night
 - location (quiet_house_front): a plain three-storey boarding house of grey brick, a scrubbed step, a black-painted door, window boxes of dead herbs, a boot scraper by the jamb, cold morning light from the left, frost on the step
@@ -106,6 +114,7 @@ the point. Doctor Marsh is proud of it. Maren lived in it for twelve years behin
 - location (sanatorium_file_room): a windowless room of floor-to-ceiling pigeonhole shelving stuffed with paper folders, a rolling ladder on a rail, a bare table with one folder open on it, a hanging lamp overhead, night
 - location (sanatorium_holding_stock): a cold storeroom of shallow wooden drawers pulled half open, each tray holding rows of paper sleeves with glass threads inside, a brass tally frame on the wall, one lamp above the table, night
 - location (sanatorium_marens_room): a small clean room with a cot, a plain chair, a stack of forty identical notebooks on a shelf, a window with no bars looking at a brick wall, grey daylight from the right, morning
+- location (sanatorium_office): a small office off the sanatorium corridor, a desk with a blotter and a tea tray, a wall of cream plaster, a long shelf of ledgers, one tall window with the blind half down, flat daylight from the left
 - location (sanatorium_holding_frame): a tiled treatment room built around a brass yoke the size of a doorway on a floor gantry, padded straps hanging loose, a winding drum and a bank of valve wheels, harsh lamplight from above, night
 
 **Palette.** Cream plaster, scrubbed grey linoleum, hospital white, brass yellow, iron black, one cold
@@ -128,6 +137,7 @@ company and the company is using it anyway. The cut above it is raw and still wo
 - location (relay_station_loft): a cramped roof space over bare joists, shelves of cylinder cases in rows, a collapsed canvas cot, a hatch open to the room below, one shaft of daylight entering from a broken slate at the right, noon
 - location (survey_cut_exterior): a raw stepped cut sliced into a sandstone hillside, spoil heaps and plank walkways, a canvas company tent lashed at the top step, a standing derrick with brass gear, flat dusty afternoon light from above
 - location (survey_cut_rig_floor): a plank working floor at the bottom of a sandstone cut, a cutting rig of iron frame and brass valve gear standing over a shaft collar, coiled hose and a barrow, harsh low sun raking in from the left, evening
+- location (survey_cut_rig_floor_night): a plank working floor at the bottom of a sandstone cut, a cutting rig of iron frame and brass valve gear standing over a shaft collar, coiled hose and a barrow, naphtha lamps on poles throwing hard light downward, night
 - location (survey_cut_camp): a company camp on a hill terrace at night, three canvas tents in a row, a folding table with a lamp and a clipboard, a stack of crated cores, lamplight pooling downward, cold sky behind
 
 **Palette.** Sandstone buff, spoil-heap grey, company canvas olive, brass yellow, iron black, cold
@@ -161,6 +171,7 @@ than a town: too tidy, too even, too new a coat of paint on old stone.
 - location (tellwater_roster_room): a back office of whitewashed stone behind a counter, an iron company strongbox bolted to the floor, shelves of paper folders in ranks, a plain desk with a stamp block, one high window, flat daylight from the right, morning
 - location (tellwater_posting_yard): a walled yard of swept flagstones behind a sandstone office, a two-wheeled handcart standing on its shafts, stacked empty crates under a canvas sheet, a water butt at the wall, low evening sun from the right
 - location (tellwater_south_row): a row of identical sandstone cottages along a swept lane with green shutters, the last house at the end standing apart with its door open, scrubbed steps, a hand pump, flat grey daylight from the left, morning
+- location (tellwater_inn_back_room): the back room of the town inn, a plank table with the plates pushed back, a small coal fire in a plain grate, a row of clean empty hooks by the door, a shuttered window, lamplight from the left, night
 - location (tellwater_empty_house): a bare cottage room with a swept plank floor, one wooden chair against a whitewashed wall, an empty hearth with no ash in it, a cupboard door standing open, cold daylight from a window at the left, morning
 - location (tellwater_low_ground): a shallow flooded hollow east of town, still brown water over drowned fence lines, the broken roof of a shed above the surface, reeds at the edges, cold flat daylight from the right, no wind
 - location (tellwater_decommission_street): a lane of sandstone cottages with doors standing open, handcarts loaded with furniture and crates, canvas sheets over stacked goods, a folding table with a clipboard at the corner, grey noon light
@@ -224,6 +235,7 @@ dying in steps down the slope. Proud, poor, and quietly already beaten. This is 
 place in the Rim Hills and it should be drawn as a single tall face.
 
 - location (ninefold_cliff_wide): a sheer sandstone cliff face with nine squared door-mouths in a row along its foot, a small flat-roofed stone house on the ledge above each one, stepped barley fields below, early sun from the left
+- location (ninefold_steps): eleven hundred feet of cut sandstone steps zigzagging up a cliff face, the rail landing and the laid track shrinking away below, hard clear light, wind
 - location (ninefold_fields): stepped barley terraces walled in dry stone, half of them bare brown earth, hand-dug water channels and stacked hoes, a low stone hut at the field corner, hard clear morning light from the left
 - location (ninefold_door_sealed): a squared door-mouth in sandstone filled with fitted cut-stone blocks, an iron door-key ring set in the centre stone, worn steps in front of it, a stacked cairn to one side, flat noon light
 - location (ninefold_door_mortared): the same squared door-mouth with grey company mortar packed into the joints, fresh drill dust on the steps, a brass survey pin driven at the threshold, hard raking light from the right, afternoon
@@ -274,6 +286,7 @@ with a drill head standing in it. Everything here is newer than everything aroun
 - location (cadder_step_wide): a terrace village of new timber bunkhouses in straight rows on a sandstone shelf, a squared door-mouth standing open at the cliff foot with a derrick over it, abandoned field walls below, clear morning light from the left
 - location (cadder_step_street): a graded gravel street between plank bunkhouses with tin roofs, a standpipe with a brass meter box, a stack of new crates under canvas, laid rail curving away at the end, flat noon light
 - location (cadder_step_school): a single-room schoolhouse of new plank walls with four glazed windows, a stove pipe through the roof, rows of small benches inside, a plain painted board with no words, afternoon sun through the glass from the right
+- location (cadder_step_school_yard): a swept gravel yard between three new plank buildings on a hillside bench, a schoolhouse with glazed windows at the left, a clinic with a painted door at the centre, a row of bunkhouses behind, a standpipe with a brass meter box, hard clear light from the left, morning
 - location (cadder_step_clinic): a clean plank-walled clinic room, two iron cots with white covers, a glazed cabinet of bottles, a scrubbed table with an enamel basin, a stove at the left, flat daylight from a window at the right, morning
 - location (cadder_step_leased_door): a squared sandstone door-mouth propped open with iron shoring, a drill head of brass and iron standing in the gap, spoil heaped to one side, a canvas tent beside it, hard raking sun from the right, evening
 
@@ -314,12 +327,14 @@ shelves of lit windows in a stone face — never as a receding street.
 - location (tier_two_pale_barracks): a plain barrack room of cut stone, two rows of iron cots with grey coats hung above them, a rack of batons by the door, a stove with a kettle, flat daylight from high windows on the right, morning
 - location (tier_two_hired_office): a plain hired office of cut stone over the workshop yards, a desk with a shaded lamp, a small iron stove with a half-full scuttle, two chairs, a shuttered window over the drop, warm lamplight from the left, evening
 - location (tier_two_founding_hall): an old stone hall with a high beamed roof, a burned-edged job board on the back wall, long benches, a cold stove with a pile of unswept ash, a company notice board with no words, grey daylight from the left
+- location (tier_two_notice_wall): a narrow cut-stone street on a quarry shelf, a blank rendered wall down one side pasted over with layer on layer of torn company notices, an iron downpipe, a paste bucket and brush left at the foot of it, grey daylight from the left, dawn
 
 **Tier Three — the Market Shelf (ch. 7, 12)**
 
 - location (tier_three_market_shelf): a wide shop-lined shelf under a stone overhang, awnings in company colours, barrels and crates in ranks, hanging lamps strung along the shopfronts, a low stone parapet over the drop, warm evening lamplight from the right
 - location (tier_three_strand_counter): a bright shop counter of polished wood, shallow trays of paper sleeves in seasonal colours, a brass tally frame and a till, a stool behind, a lamp on a bracket above from the left, evening
 - location (tier_three_fair): the market shelf dressed for the autumn fair, timber stalls with striped awnings, strung lamps overhead, a plank stage with bunting and a pair of company flags with no markings, warm crowded evening light
+- location (tier_three_fair_closed): the market shelf after the fair has closed for the night, timber stalls shuttered under striped awnings, the strung lamps taken in, bunting still up overhead, a plank stage standing empty, cold dark
 - location (tier_three_bar): a low stone-vaulted bar room, a long zinc counter, a wall of small kegs on racks, four round tables with mismatched stools, one hanging lamp over the counter at the left, night
 
 **Tier Four — the Terraces (ch. 7, 10)**
@@ -327,6 +342,7 @@ shelves of lit windows in a stone face — never as a receding street.
 - location (tier_four_terraces): a quiet residential shelf of neat stone houses with railed front gardens, clipped shrubs in stone tubs, a lamp post at each door, a stone parapet along the drop, warm evening light from the right, lit windows
 - location (tier_four_school): a stone schoolhouse with tall glazed windows, rows of desks with slates, a stove at the back, a map frame on a stand with no markings, afternoon sun falling in bars across the floor from the right
 - location (tier_four_dormitory): a children's dormitory of sixteen beds under a sloped stone ceiling, a bare wall on the left with a cable run humming behind it, a nightlight in a wall niche, cold blue darkness, small hours
+- location (tier_four_dormitory_corridor): a children's dormitory corridor of cut stone with a bare wall on the left and a cable run humming behind it, a nightlight in a wall niche, a book-strap and a chair by the door, cold blue darkness, small hours
 - location (tier_four_cable_house): a cramped stone machinery room behind a dormitory wall, a cable running through floor and ceiling on brass sheaves, a bank of valve wheels, a greased drum, a lamp in a wire cage above, night
 - location (tier_four_theatre): a small stone theatre interior, a raked arc of seats, a plain curtain hung on a brass rail, footlights in a row along the stage edge, a chandelier of lamps overhead unlit, warm stage light from below
 
@@ -334,6 +350,7 @@ shelves of lit windows in a stone face — never as a receding street.
 
 - location (tier_five_long_office): a vast low room of desks in ranks under a glazed roof, every desk with a lamp, ledger trays, and a clipboard, brass message tubes running along the ceiling, flat clean daylight from directly above, midmorning
 - location (tier_five_corridor): a wide clerks' corridor of pale cut stone, numbered doors in a row on the left, a trolley of paper folders parked against the wall, hanging lamps in a line, flat even lamplight, late night
+- location (tier_six_corridor): a wide unheated corridor of pale cut stone outside the board floor, a tall shuttered window at the far end with the cold coming off it, a bench against the wall, hanging lamps in a line, night
 
 **Tier Six — the Cap (ch. 12)**
 
@@ -360,6 +377,7 @@ it. It should be the most orderly room in the game and it should make the player
 
 - location (registry_hall): a high stone hall lined with iron shelf stacks of paper folders to the ceiling, a rolling ladder on a floor rail, a long counter across the front, hanging lamps in a row, flat even lamplight, no windows
 - location (registry_stacks): a narrow aisle between iron shelf runs packed with labelled folder spines, a rolling ladder hooked at the end, a wheeled trolley half loaded, a lamp on a bracket at head height lighting from the left, night
+- location (registry_catalogue_room): a square room in a records hall walled floor to ceiling on all four sides with small wooden drawer fronts and their brass pulls, a rolling ladder on a rail, a reading slope on a stand in the middle of the floor, a lamp on a bracket at head height lighting from the left, night
 - location (registry_counter): a polished counter with a brass grille above it, a ledger open on a slope, a stamp block and ink pad, a wire basket of folders, a lamp on a bracket at the right, midmorning
 - location (registry_map_table): a wide table under a hanging lamp with a large plain map unrolled and weighted at the corners, coloured pins in clusters across it, a box of pins and a rule, flat light from directly above, night
 - location (registry_office): a small tidy office of shelved boxes, a desk with a green shade lamp, a chair for a visitor, reading lenses on a chain hung on a hook, a shuttered window behind, warm lamplight from the left, evening
@@ -379,6 +397,7 @@ The Works' largest draw head, capping the hall-mouth under Tier One. Run at full
 and stillest place in the game at once: machinery everywhere, and the air around the head not moving.
 
 - location (long_bore_head_chamber): a great cut-stone chamber with an ancient squared hall-mouth in its back wall, a brass bore head the size of a house bolted across the opening, catwalks and valve banks around it, lamps on stanchions, dust hanging still
+- location (long_bore_shaft_gallery): a lit shaft two hundred feet deep ringed with iron galleries at every level, a bell of riveted plate hanging at the bottom of it, cable runs and ladders down one wall, lamp stanchions at every gallery rail, lamplight from all sides, no daylight
 - location (long_bore_cage): a shaft cage of riveted iron on guide rails inside a square cut-stone shaft, a lattice gate, a lamp in a wire cage on the roof, counterweight cables running past, darkness above and below
 - location (long_bore_draw_gear): a winch floor of massive iron drums and brass gimbal rings under a lamp gantry, cable spooling off a drum, a control pedestal of valve wheels, dust standing motionless in the air, no daylight
 - location (long_bore_stair): a broad stair of square-cut stone between dressed walls, iron handrails bolted on both sides, a landing with a lamp bracket, coils of cable stacked against the left wall, lamplight from above, no daylight
@@ -408,11 +427,13 @@ standing open onto darkness; one guttering wall torch. Door and guard on the rig
 left. Every other Halls location is built outward from that and must not contradict it.
 
 - location (halls_door_mouth_exterior): a squared door-mouth in a sandstone cliff foot with its cut-stone fill stacked aside, a canvas company tent pitched at the threshold, a spoil barrow and a coil of rope, cold grey dawn light from the left
+- location (halls_door_mouth_exterior_early): a squared door-mouth in a sandstone cliff foot with its cut-stone fill stacked aside, a spoil barrow and a coil of rope, cold grey dawn light from the left
 - location (halls_upper_corridor): a cold cut-stone corridor deep underground with square tooling marks on dressed walls, a great stone door standing open onto darkness at the right, one guttering torch in an iron wall bracket, dry dust, no daylight
 - location (halls_great_door): a huge single slab of cut stone swung inward on a stone pivot, its inner face scored by tool marks, a broken iron bar lying on the threshold, dust drifted at its foot, one guttering torch lighting from the left
 - location (halls_guard_alcove): a shallow squared alcove cut into a corridor wall, a stone bench worn hollow, a rusted halberd butt-spike socket in the floor, a shred of red cloth on a hook, one carried lamp from the left, no daylight
 - location (halls_ward_gallery): a long dressed-stone gallery with a row of square floor plates set flush, brass studs at their corners, an iron trip bar sprung out of one wall, dust disturbed in a line, one carried lamp from the right
 - location (halls_broken_corridor): a cut-stone corridor collapsed at one end into a heap of squared blocks, a doorway that now opens on solid rubble, two rusted halberds crossed on the floor, one guttering torch on the right wall, no daylight
+- location (halls_broken_corridor_held): a cut-stone corridor collapsed at one end into a heap of squared blocks, a doorway that now opens on solid rubble, one guttering torch on the right wall, no daylight
 - location (halls_tent_chamber): a squared cut-stone chamber with a canvas company tent pitched inside it, a folding table with a lamp and a clipboard, crates stencilled without words, a stack of survey rods, lamplight from the table, no daylight
 - location (halls_stair_down): a broad stair of square-cut stone dropping between dressed walls into black, an iron handrail bolted along the right, a stone lamp shelf at the head with a guttering torch, dust on the treads, no daylight
 
@@ -483,6 +504,7 @@ It is in better repair than anywhere on the surface and that is the horror.
 - location (thurn_council_quarter): a narrower upper street of fitted stone with square doorways set deeper into the rock, stone benches along both walls, a stepped water channel down the middle, lamp columns at intervals above head height, warm steady light
 - location (thurn_council_door_landing): a broad stone landing before double stone doors at the back right, stone weapon racks along the left wall, a shallow step worn hollow, lamp columns on both sides lighting from above, warm even light, no daylight
 - location (thurn_choir_archway): a squared stone archway at the low end of the street, its stone bar lifted aside, a stair dropping into darkness beyond it, a threshold step worn hollow, a lamp column on the right lighting from above, no daylight
+- location (thurn_choir_archway_barred): a squared stone archway at the low end of the street, its stone bar still across it, a stair dropping into darkness beyond it, a threshold step worn hollow, a lamp column on the right lighting from above, no daylight
 - location (thurn_council_chamber): a round chamber of dressed stone with a ring of stone seats rising in three tiers, a plain stone table at the centre, a closed stone door behind it, lamp panels in the ceiling, cold even light
 - location (thurn_cradle_room): a long vaulted stone room lined with empty glass-fronted tanks on brass frames, their pipework cut through and capped, a floor drain channel, one tank shattered inward, dim lamp panels overhead, no daylight
 - location (thurn_keepers_gallery): a narrow stone gallery above the street with a stone rail, rows of small square wall niches all empty, a single stone bench, a lamp column rising past on the right, warm light from below and right
@@ -524,6 +546,7 @@ seam face — human-made floor, inhuman wall. The last place in the game.
 
 - location (choir_approach): a dressed-stone passage sloping down with a stone handrail on the right, the walls losing their tooling marks and giving way to raw rock, a broken lamp column, dust standing in the air, no daylight
 - location (choir_chamber_floor): a great oval chamber of fitted stone with concentric stepped tiers going down to a central floor disc, stone standing posts at the rim, a seam face filling the back wall, faint even light from that face
+- location (choir_chamber_gallery): the gallery rim of a great oval chamber of fitted stone, stone standing posts along it, stepped tiers dropping away below, a seam face filling the back wall, faint even light from that face
 - location (choir_node_floor): the sunken central disc of a stone chamber, a ring of brass sockets set flush in the floor, a broken gimbal frame canted over one of them, dust motionless in the air, faint light from the wall behind
 - location (choir_stair_flight): a long flight of broad cut-stone steps between dressed walls, iron handrails on both sides, a lamp stanchion at the head, cable coils stacked against the left wall, faint even light rising from below at the right, no daylight
 - location (choir_stair_lower_landing): a wide cut-stone landing at the foot of a stair, a stone bench along the back wall, a dropped lamp on the flags, the chamber doorway open at the right with faint even light coming through it, no daylight
@@ -554,6 +577,8 @@ A labour town at the foot of a dead skywell, working one bore. Everybody here ha
 Salt dust on everything, including the people.
 
 - location (saltmouth_wide): a labour town of plank bunk rows on white salt crust at the foot of a broken stone ring stump, a bore head derrick above the roofs, a crawler depot fence, hard flat noon light, no shadows
+- location (saltmouth_counting_house_alley): a narrow gap between two plank buildings on salt crust, a stack of empty crates against one wall, a standpipe with a brass meter box, wind-driven salt dust along the ground, hard flat afternoon light
+- location (saltmouth_town_edge): a labour town of plank bunk rows on white salt crust at the foot of a broken stone ring stump, a bore head derrick above the roofs, a crawler depot fence, cold pink first light from the right
 - location (saltmouth_counting_house): a plank-walled office with a long counter, pigeonholes of paper folders behind it, a ledger open on a slope with a pen rest, a brass tally frame on the wall, flat daylight from a window at the left, morning
 - location (saltmouth_bunk_rows): a long shed of double plank bunks with hanging blankets between them, salt dust drifted along the duckboard gangway, a row of tin basins, a stove at the far end, low sun entering from the right, evening
 - location (saltmouth_crawler_depot): a fenced salt yard with two salt-crawlers parked on wide plate tracks, a fuel tank on a timber stand, a heap of chain and hooks, a plank watch hut, hard flat afternoon light, salt glare
@@ -579,6 +604,8 @@ Nine hundred feet of company shaft into a thinning branch. The dungeon is a work
 with a shift on, not a ruin.
 
 - location (bore_four_head): a timber derrick over a shaft collar on white salt, a winch house of corrugated iron beside it, a bank of valve gear on a plank stand, coiled cable, hard flat morning light, salt glare
+- location (bore_four_gate_office): a plank gate office with a counter across it, a peg board of numbered brass tags, a ledger lying open on the counter, a stove pipe through the back wall, a small-paned window looking out on a timber derrick, hard flat light from the right, morning
+- location (bore_four_head_night): a timber derrick over a shaft collar on white salt, a winch house of corrugated iron beside it, a bank of valve gear on a plank stand, coiled cable, a row of tallow lamps on poles, cold clear night
 - location (bore_four_cage): a riveted iron shaft cage on guide rails in a square-lined shaft, a lattice gate, a lamp in a wire cage on the roof, the shaft wall sliding past, darkness above and below, no daylight
 - location (bore_four_gallery): a timbered gallery with props and lagging, laid tramway rail down the middle, an ore tub standing on it, a ventilation canvas hung across the roof, one lamp on a hook at the left, no daylight
 - location (bore_four_draw_floor): a shaft-bottom chamber with a brass draw head on a gimbal hanging above a stone floor, a runaway winch drum spooling cable, a valve pedestal, dust standing motionless, one lamp on a stanchion at the left
@@ -672,6 +699,8 @@ skywell running at a fifth on scavenged parts, and an archive that belongs to a 
 - location (braid_chant_hall): a tall narrow stone hall with a stepped floor of shallow tiers, long seating ledges cut into the walls, a shallow central water basin, high slit openings along the right wall, cool daylight falling in bars, midday
 - location (braid_chant_hall_night): the same tall stone hall by night, tiers full of seated figures, small oil lamps set along the ledges, the central basin reflecting them, warm low light from all around at seat height, black above
 - location (braid_chant_hall_back_room): a low back room behind a chant hall, pale violet-grey stone walls, woven mats laid in a ring on the floor, one small iron stove, a stack of clay bowls, warm stove light from the left, evening
+- location (braid_chant_hall_steps): worn stone steps up to a chant-hall side door, an iron handrail bolted into the wall, a stove pipe venting above, the seabed and the rails going out below, cold light from the left, evening
+- location (braid_even_hand_hall): a side room off a Vess chant-hall, a low plank ceiling, a chalked job board on the right-hand wall, a squat iron stove with a kettle on it at the left, a short ledger wall of ruled columns of small handwriting behind the board, lamplight from the left, evening
 - location (braid_rail_head): a rail head on the dry seabed below a terrace town, four loaded sledges strung out on laid rail, a chalked board on a post beside the first, flat overcast daylight from the left, dust raised low
 - location (braid_rail_head_board): close on a dark chalking board on a timber post, ruled columns of chalk strokes across it, a chalk stub hanging on a string, a loaded sledge behind it, flat overcast daylight from the left, morning
 - location (braid_tram_halt): a short stone halt above a terrace town where a single rail line ends at a buffer, an iron bench, a trolley of paper folder boxes, a lamp post, cold grey morning light from the right
@@ -788,6 +817,7 @@ top of the street and second-largest employer. Ottoline Kerrow came out of it. S
 
 - location (emberrow_ravine_wide): a town packed into a narrow ravine of stacked stone housefronts on both walls, rope-walks strung across the gap overhead, smoke lying in a flat layer below the roofline, low evening sun striking only the upper stones from the right
 - location (emberrow_main_street): a steep street of dark stone housefronts with iron-railed steps, rope-walks strung overhead casting bars across the stones, a handcart of bark chocked at the kerb, hazy afternoon light from above, smoke at knee height
+- location (emberrow_main_street_night): a steep street of dark stone housefronts with iron-railed steps, rope-walks strung overhead casting bars across the stones, a handcart chocked at the kerb with a long canvas-covered case on its bed, lamplight from open doors, night
 - location (emberrow_tannery_yard): an open yard of sunken stone soaking pits in rows, hides pegged on drying frames along the wall, a wooden stirring paddle leaning, a pump on a stone base, hard low sun over the ravine lip from the right, morning
 - location (emberrow_rope_walk): a long narrow stone alley with strung rope lines running its length at shoulder height, twisting posts and a hand wheel at one end, coiled hemp stacked against the wall, bars of light from above, midday
 - location (emberrow_even_hand_hall): a single low room over a rope-walk, dark stone walls, a burned-edged timber job board on the end wall, four pinned paper bills, a stove pipe crossing to a window, warm lamplight from a bracket at the left, evening
@@ -796,6 +826,8 @@ top of the street and second-largest employer. Ottoline Kerrow came out of it. S
 - location (emberrow_care_house_dormitory): a warm dormitory of twenty small beds in two rows under a plastered ceiling, a stove at the centre, a shelf of identical enamel cups, a high barred window, even lamplight, evening
 - location (emberrow_care_house_intake): a small clean office with a desk, a brass yoke on a stand in the corner under a cloth, a chair for a child, a pigeonhole rack of forms, flat daylight from a window at the right, morning
 - location (emberrow_kettle_house): a narrow stone housefront on a steep street, a scrubbed doorstep, a chair set out beside the door, a tanner's leather apron on a hook in the jamb, hazy low sun from the right, late afternoon
+- location (emberrow_kettle_kitchen): a small stone kitchen behind a tannery, a black range with a kettle on it, a scrubbed table and four chairs, a cupboard with a man sitting on the floor against it, a lamp on the sill, night
+- location (emberrow_kettle_house_night): a narrow stone housefront on a steep street, a scrubbed doorstep, a chair set out beside the door, a tanner's leather apron on a hook in the jamb, warm lamplight from the open door, night
 
 **Palette.** Wet stone brown, tannery ochre, smoke grey, hide tan, rope hemp, low sun amber.
 **Light.** Sun only reaches the upper walls; the street is in flat shadow with a smoke layer.
@@ -815,6 +847,7 @@ who need not to be seen.
 - location (undercroft_stair): a worn stone stair going down under a tannery yard, a heavy plank door standing open at the bottom, a lamp on a hook at the turn, hides hanging along the wall, lamplight from below, no daylight
 - location (undercroft_vats): a stone cellar of sunken vats in rows with plank lids, drip channels cut in the floor, a stack of bark sacks, a lamp set on a vat lid lighting upward, no daylight
 - location (undercroft_chamber): a low vaulted stone cellar with a bedroll and a crate table, a survey satchel open on it, an oil lamp and a tin cup, a drain grate in the floor, warm lamplight from the left, no daylight
+- location (undercroft_stair_foot): a low vaulted stone cellar at the foot of a worn stone stair, a lamp hung on a hook at the turn, a drain grate in the floor, warm lamplight from the left, no daylight
 - location (undercroft_back_room): a bare stone store room with a brass yoke on a folding stand at the centre, two travelling cases open on the floor, a lamp hung from a roof hook, the door at the left, no daylight
 
 **Palette.** Cellar stone brown, vat liquor ochre, hide tan, brass yellow, lamp amber, black.
@@ -873,6 +906,7 @@ Exterior platform: use `tellwater_dree_platform` under Tellwater.
 **Dead stump — Caleth (Ninefold Terrace), ch. 5**
 
 - location (caleth_stump): the broken lower rings of a stone tower standing eight feet high on a bare ridge, its interior floor filled with stacked stone offerings, dry grass at the base, hard low sun from the left, cold morning
+- location (caleth_stump_dusk): the broken lower rings of a stone tower standing eight feet high on a bare ridge, its interior floor filled with stacked stone offerings, dry grass at the base, hard low sun from the left, cold dusk
 
 **Dead, bored through — Semmet (Saltmouth), ch. 6**
 
@@ -911,6 +945,8 @@ hand-made, patched, and older than they should be.
 - location (ferry_rail_wide): a low timber rail sledge under a single patched triangular sail running on laid rail across white seabed crust, its wake of dust behind, rails to a flat horizon, hard morning light from the left
 - location (ferry_rail_deck): a plank sledge deck with a hand-crank drum at the stern, a bench of lashed crates, the mast foot and sheet cleats, a water barrel roped down, hard flat daylight from above, salt glare
 - location (ferry_rail_siding): a laid-rail siding on white crust at dusk, a sledge with its sail furled on the spar, a small fire in a salt-brick ring, bedrolls laid out on the deck, firelight from the centre, cold sky
+- location (salt_camp_terrace_foot): a camp on white salt crust at the foot of a terrace wall, a small fire of scavenged timber, bedrolls laid on canvas, two lines of laid rail running west into the dark, cold clear night
+- location (salt_open): a floor of white salt crust running flat to the horizon in every direction, two lines of laid rail going west, the terrace wall a low brown band far behind, hard flat morning light, no shade
 
 **Salt-crawler (ch. 6-9)** — company freight crawlers on wide plate tracks.
 
@@ -918,6 +954,7 @@ hand-made, patched, and older than they should be.
 - location (salt_crawler_cab): a cramped iron cab with a steering wheel and two levers, a bank of brass gauges, a folding seat, a cracked windscreen with salt crusting its lower edge, hard glare from the front left, midday
 - location (survey_crawler_wide): a smaller battered survey crawler on plate tracks with a ladder to a roof rail, survey rods lashed along one side, a stencilled company panel with no words half scraped off, low evening sun from the right
 - location (survey_crawler_cabin): a small iron cabin with two bunks folded down, a chart table with weighted maps, a stove the size of a bucket, tin cups in a rack, one lamp swinging from the roof, night
+- location (survey_crawler_roof_deck): the flat roof deck of a small survey crawler, a low iron roof rail on three sides, a lashed spare track plate and a rolled tarpaulin, an open hatch with light coming up out of it, white salt running flat to the horizon below, under a black sky thick with stars, night
 
 **Lifting car (ch. 12)** — cable cars between Vantage's tiers.
 
@@ -932,7 +969,9 @@ Use `rail_platform_underground`, `rail_tunnel`, `rail_junction_hall` under the H
 **Routes on foot**
 
 - location (rim_road): a graded dirt road along a sandstone hillside with a dry stone wall on the uphill side, a leaning stone mile post, wind-bent thorn scrub, hard low sun from the left, early morning
+- location (rim_road_north): a graded dirt road along a sandstone hillside with a dry stone wall on the uphill side, a leaning stone mile post, wind-bent thorn scrub, a quarry city stepped in six tiers up a far hillside at the right, hard low sun from the left, early morning
 - location (terrace_stair): a long stair of cut sandstone steps zigzagging down a terrace face to white flats below, an iron handrail bolted in sections, a landing with a stone bench, cold blue dawn light from the right
+- location (hill_path_above_the_flats): a narrow goat path on a dry hill shoulder, dry stone scree and wind-bent scrub above it, the white salt flats opening far below, one lit headframe small on the crust, cold failing light from the right, dusk
 - location (company_road): a metalled company road with stone kerbs running across dry hill country, a numbered stone mile post, a telegraph line on poles, a roadside water trough, hard flat afternoon light, dust
 
 **A Clement Works road halt** has no key of its own and does not need one: put `pale_post` beside
@@ -1001,41 +1040,7 @@ then the kind of shot. Outline writers: you do not need new art for any of these
 # Index by chapter
 
 Which places each chapter uses, in the order a chapter tends to use them. Find the place here, then
-its section above for the keys; or search `## Key index` at the foot of this file for a key by name.
-
-- **Ch. 1 — Sallowgate.** Sallowgate · the Ancient Halls, upper works · company fixtures.
-- **Ch. 2 — Windrow.** Windrow · the hill relay station and the survey cut · the skywells (Vintry) ·
-  Kettle (the bill is posted here, not visited) · company fixtures.
-- **Ch. 3 — Tellwater.** Tellwater · the drowned bore · the fold (backdrop) · the skywells (Dree) ·
-  routes (`rim_road`, `terrace_stair`).
-- **Ch. 4 — Braid.** Braid · the annex · Wick · Lomm · Brand's Ferry · the skywells (Meddra) ·
-  vehicles (ferry-rail).
-- **Ch. 5 — Ninefold Terrace.** Ninefold Terrace · the Sealed Stair · Cadder Step · the skywells
-  (Caleth stump) · routes.
-- **Ch. 6 — Saltmouth.** Saltmouth · Extraction Bore Four · Kettle · the skywells (Semmet) · the
-  Seam · vehicles (salt-crawler).
-- **Ch. 7 — Vantage.** Vantage, Tiers One to Five · the Registry · the skywells (Ossun) · Dunnow ·
-  routes (`company_road` with `pale_post`).
-- **Ch. 8 — Emberrow.** Emberrow · the tannery undercroft · Dunnow · the skywells (Kestrin quarry) ·
-  company fixtures (care-house, setting frame).
-- **Ch. 9 — the Flats.** the Pale Flats and the Ilder stump · Ostry Bar · Kettle · vehicles (survey
-  crawler) · the Seam.
-- **Ch. 10 — Windrow again.** Windrow · the sanatorium · Vantage Tier Four · the skywells (Vintry).
-- **Ch. 11 — Tellwater again.** Tellwater · Sallowgate · the fold · the skywells (Dree) · routes.
-- **Ch. 12 — Vantage again.** Vantage, Tiers Two to Six · the Registry · Windrow · Emberrow · the
-  skywells (Ossun) · vehicles (lifting car).
-- **Ch. 13 — Braid and the Long Bore.** Braid · the annex · the Long Bore · the Ancient Halls · the
-  hall-mouths and the maintenance rail · the Ninth Door approach.
-- **Ch. 14 — Thurn.** the Ninth Door approach and the Deep Stair · Thurn · the maintenance rail ·
-  Sallowgate (the side contract).
-- **Ch. 15 — the Choir.** the Choir chamber and its stair · the Seam · Thurn · the Long Bore · the
-  Ninth Door from outside · Lomm · Tellwater · Windrow · Sallowgate.
-- **Ch. 16 — epilogue.** Sallowgate · Vantage Tier Two · Windrow · Cadder Step · Ninefold Terrace ·
-  Tellwater.
-
----
-
-## Key index
+its section above for the keys; or search `## Key index
 
 Every key in this file, alphabetically, with the place it lives under. Search the key name.
 
@@ -1049,7 +1054,9 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `bore_four_cage` — Extraction Bore Four
 - `bore_four_draw_floor` — Extraction Bore Four
 - `bore_four_gallery` — Extraction Bore Four
+- `bore_four_gate_office` — extraction bore four
 - `bore_four_head` — Extraction Bore Four
+- `bore_four_head_night` — extraction bore four
 - `bore_four_surface_after` — Extraction Bore Four
 - `bore_head_shed` — company fixtures
 - `bore_head_small` — company fixtures
@@ -1058,8 +1065,10 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `braid_chant_hall` — Braid
 - `braid_chant_hall_back_room` — Braid
 - `braid_chant_hall_night` — Braid
+- `braid_chant_hall_steps` — braid
 - `braid_emptied_house` — Braid
 - `braid_evacuation` — Braid
+- `braid_even_hand_hall` — braid
 - `braid_market_step` — Braid
 - `braid_rail_head` — Braid
 - `braid_rail_head_board` — Braid
@@ -1072,13 +1081,16 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `cadder_step_clinic` — Cadder Step
 - `cadder_step_leased_door` — Cadder Step
 - `cadder_step_school` — Cadder Step
+- `cadder_step_school_yard` — cadder step
 - `cadder_step_street` — Cadder Step
 - `cadder_step_wide` — Cadder Step
 - `caleth_stump` — the skywells
+- `caleth_stump_dusk` — the skywells
 - `care_house_intake_desk` — company fixtures
 - `care_house_schoolroom` — company fixtures
 - `choir_approach` — the Choir chamber
 - `choir_chamber_floor` — the Choir chamber
+- `choir_chamber_gallery` — the choir chamber
 - `choir_node_floor` — the Choir chamber
 - `choir_stair_flight` — the Choir chamber
 - `choir_stair_head` — the Choir chamber
@@ -1102,7 +1114,10 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `emberrow_care_house_intake` — Emberrow
 - `emberrow_even_hand_hall` — Emberrow
 - `emberrow_kettle_house` — Emberrow
+- `emberrow_kettle_house_night` — emberrow
+- `emberrow_kettle_kitchen` — emberrow
 - `emberrow_main_street` — Emberrow
+- `emberrow_main_street_night` — emberrow
 - `emberrow_ravine_wide` — Emberrow
 - `emberrow_rope_walk` — Emberrow
 - `emberrow_tannery_yard` — Emberrow
@@ -1113,6 +1128,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `even_hand_chapter_board` — company fixtures
 - `even_hand_hall_exterior` — Sallowgate
 - `even_hand_hall_main` — Sallowgate
+- `even_hand_hall_morning` — sallowgate
 - `even_hand_kitchen` — Sallowgate
 - `even_hand_ledger_wall` — Sallowgate
 - `ferry_rail_deck` — vehicles and routes
@@ -1121,13 +1137,17 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `fold_camp` — the fold, above Tellwater
 - `hall_mouth_generic` — the hall-mouths and the maintenance rail
 - `halls_broken_corridor` — the Ancient Halls
+- `halls_broken_corridor_held` — the ancient halls, upper works
 - `halls_door_mouth_exterior` — the Ancient Halls
+- `halls_door_mouth_exterior_early` — the ancient halls, upper works
 - `halls_great_door` — the Ancient Halls
 - `halls_guard_alcove` — the Ancient Halls
 - `halls_stair_down` — the Ancient Halls
 - `halls_tent_chamber` — the Ancient Halls
 - `halls_upper_corridor` — the Ancient Halls
 - `halls_ward_gallery` — the Ancient Halls
+- `hill_path_above_the_flats` — vehicles and routes
+- `hill_road_above_windrow` — windrow
 - `ilder_fallen_ring_top` — the Pale Flats and the Ilder stump
 - `ilder_stump_inside` — the Pale Flats and the Ilder stump
 - `ilder_stump_mouth` — the Pale Flats and the Ilder stump
@@ -1149,6 +1169,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `long_bore_cage` — the Long Bore
 - `long_bore_draw_gear` — the Long Bore
 - `long_bore_head_chamber` — the Long Bore
+- `long_bore_shaft_gallery` — the long bore
 - `long_bore_stair` — the Long Bore
 - `meddra_head_exterior` — the skywells
 - `meddra_well_room` — the skywells
@@ -1159,6 +1180,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `ninefold_doorward_house` — Ninefold Terrace
 - `ninefold_fields` — Ninefold Terrace
 - `ninefold_fifth_door` — Ninefold Terrace
+- `ninefold_steps` — ninefold terrace
 - `ninth_approach_gallery` — the Ninth Door and the Deep Stair
 - `ninth_door_outside` — the Ninth Door and the Deep Stair
 - `ninth_inner_doors` — the Ninth Door and the Deep Stair
@@ -1180,6 +1202,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `rail_junction_hall` — the hall-mouths and the maintenance rail
 - `rail_platform_underground` — the hall-mouths and the maintenance rail
 - `rail_tunnel` — the hall-mouths and the maintenance rail
+- `registry_catalogue_room` — the registry
 - `registry_counter` — the Registry
 - `registry_hall` — the Registry
 - `registry_map_table` — the Registry
@@ -1189,20 +1212,27 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `relay_station_interior` — the hill relay station and the survey cut
 - `relay_station_loft` — the hill relay station and the survey cut
 - `rim_road` — vehicles and routes
+- `rim_road_north` — vehicles and routes
 - `sallowgate_cistern_yard` — Sallowgate
+- `sallowgate_hill_path` — sallowgate
+- `sallowgate_roof_tank` — sallowgate
 - `sallowgate_room_above_hall` — Sallowgate
 - `sallowgate_stepped_street` — Sallowgate
 - `sallowgate_wide` — Sallowgate
 - `sallowgate_wide_dusk` — Sallowgate
+- `salt_camp_terrace_foot` — vehicles and routes
 - `salt_crawler_cab` — vehicles and routes
 - `salt_crawler_wide` — vehicles and routes
+- `salt_open` — vehicles and routes
 - `saltmouth_bunk_rows` — Saltmouth
 - `saltmouth_care_house` — Saltmouth
 - `saltmouth_counting_house` — Saltmouth
+- `saltmouth_counting_house_alley` — saltmouth
 - `saltmouth_crawler_depot` — Saltmouth
 - `saltmouth_drain_sump` — Saltmouth
 - `saltmouth_relief_tent` — Saltmouth
 - `saltmouth_street_after` — Saltmouth
+- `saltmouth_town_edge` — saltmouth
 - `saltmouth_wide` — Saltmouth
 - `sanatorium_corridor` — the sanatorium, Windrow
 - `sanatorium_day_room` — the sanatorium, Windrow
@@ -1211,6 +1241,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `sanatorium_holding_frame` — the sanatorium, Windrow
 - `sanatorium_holding_stock` — the sanatorium, Windrow
 - `sanatorium_marens_room` — the sanatorium, Windrow
+- `sanatorium_office` — the clement works sanatorium, windrow
 - `sanatorium_ward` — the sanatorium, Windrow
 - `sealed_stair_fill` — the Sealed Stair
 - `sealed_stair_flight` — the Sealed Stair
@@ -1227,10 +1258,12 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `setting_frame_room` — company fixtures
 - `strand_counter` — company fixtures
 - `survey_crawler_cabin` — vehicles and routes
+- `survey_crawler_roof_deck` — vehicles and routes
 - `survey_crawler_wide` — vehicles and routes
 - `survey_cut_camp` — the hill relay station and the survey cut
 - `survey_cut_exterior` — the hill relay station and the survey cut
 - `survey_cut_rig_floor` — the hill relay station and the survey cut
+- `survey_cut_rig_floor_night` — the hill relay station and the survey cut
 - `survey_depot_yard` — the Pale Flats and the Ilder stump
 - `tellwater_bakery` — Tellwater
 - `tellwater_decommission_street` — Tellwater
@@ -1238,6 +1271,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `tellwater_empty_house` — Tellwater
 - `tellwater_fair_ground` — Tellwater
 - `tellwater_fair_pole_store` — Tellwater
+- `tellwater_inn_back_room` — tellwater
 - `tellwater_lane` — Tellwater
 - `tellwater_lit_window` — Tellwater
 - `tellwater_low_ground` — Tellwater
@@ -1252,6 +1286,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `tellwater_square_dusk` — Tellwater
 - `terrace_stair` — vehicles and routes
 - `thurn_choir_archway` — Thurn
+- `thurn_choir_archway_barred` — thurn, the hall-city
 - `thurn_council_chamber` — Thurn
 - `thurn_council_door_landing` — Thurn
 - `thurn_council_quarter` — Thurn
@@ -1267,6 +1302,7 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `tier_five_long_office` — Vantage
 - `tier_four_cable_house` — Vantage
 - `tier_four_dormitory` — Vantage
+- `tier_four_dormitory_corridor` — region 2 — vantage, the company city
 - `tier_four_school` — Vantage
 - `tier_four_terraces` — Vantage
 - `tier_four_theatre` — Vantage
@@ -1275,20 +1311,24 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `tier_one_mouth` — Vantage
 - `tier_six_board_floor` — Vantage
 - `tier_six_chairmans_house` — Vantage
+- `tier_six_corridor` — region 2 — vantage, the company city
 - `tier_six_gardens` — Vantage
 - `tier_six_ossun_head` — Vantage
 - `tier_three_bar` — Vantage
 - `tier_three_fair` — Vantage
+- `tier_three_fair_closed` — region 2 — vantage, the company city
 - `tier_three_market_shelf` — Vantage
 - `tier_three_strand_counter` — Vantage
 - `tier_two_crawler_depot` — Vantage
 - `tier_two_founding_hall` — Vantage
 - `tier_two_hired_office` — Vantage
+- `tier_two_notice_wall` — region 2 — vantage, the company city
 - `tier_two_pale_barracks` — Vantage
 - `tier_two_yards` — Vantage
 - `undercroft_back_room` — the tannery undercroft
 - `undercroft_chamber` — the tannery undercroft
 - `undercroft_stair` — the tannery undercroft
+- `undercroft_stair_foot` — the tannery undercroft
 - `undercroft_vats` — the tannery undercroft
 - `vantage_face_day` — Vantage
 - `vantage_from_below` — Vantage
@@ -1302,12 +1342,16 @@ Every key in this file, alphabetically, with the place it lives under. Search th
 - `wick_walkway` — Wick
 - `wick_wide` — Wick
 - `windrow_bench` — Windrow
+- `windrow_boarding_kitchen` — windrow
 - `windrow_boarding_parlour` — Windrow
 - `windrow_boarding_room` — Windrow
 - `windrow_chop_house` — Windrow
+- `windrow_drying_yard` — windrow
 - `windrow_laundry_doorway` — Windrow
 - `windrow_laundry_row` — Windrow
+- `windrow_pale_post_room` — windrow
 - `windrow_sanatorium_wall` — Windrow
+- `windrow_survey_office_door` — windrow
 - `windrow_tram_platform` — Windrow
 - `windrow_tram_yard` — Windrow
 - `windrow_wide` — Windrow

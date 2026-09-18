@@ -6,7 +6,10 @@
 - staging: The party stands at the left of frame and faces right. The open door-mouth and the dark beyond it fill the right of every panel. Everyone's attention goes right
 
 ## Beat
-The one hall-mouth in the Basin the Works never got into is standing open, and nothing about it is
+A different door from yesterday's. Yesterday the party ran down the level gallery off this line
+and were stopped dead at the inner doors, which are still shut and still held; this is the other way
+in, the mouth the mile of stair goes down from, and they have come back to it properly. The one
+hall-mouth in the Basin the Works never got into is standing open, and nothing about it is
 broken: the fill is stacked, the mortar is whole, no tool has touched the jamb. It was unbarred from
 within, by somebody who said the right words, a day ago. Hesk Ninefold has spent forty-four years
 being one of nine people whose whole inherited job is keeping doors like this shut, and she looks up
@@ -35,6 +38,7 @@ register in front of her and says the kindest thing she has said since she joine
 - Hesk [1] {dread}: Nine doors in my cliff. I've kept the Fifth forty-four years. That's the Ninth, from behind.
 - Sefa [2]: No forcing. No cutting. That mortar has not been touched since the year it went in.
 - Hesk [2]: Not touched. Asked.
+- Bron [3]: Not the gallery. Her doors are still shut and still held. This one goes down.
 - Ket [3]: There is no dust on that floor. A mile of stair, and somebody has swept it.
 - Hesk [4] {wonder}: ...
 - Sefa [5]: What is that you are doing?

@@ -1,7 +1,7 @@
 # Scene 1620: A Wage Fund
 
 - type: talk
-- location: a graded gravel street between plank bunkhouses with tin roofs, a standpipe with a brass meter box, a stack of new crates under canvas, laid rail curving away at the end, flat noon light
+- location: a swept gravel yard between three new plank buildings on a hillside bench, a schoolhouse with glazed windows at the left, a clinic with a painted door at the centre, a row of bunkhouses behind, a standpipe with a brass meter box, hard clear light from the left, morning
 - characters: Orrin, Hesk, Dov, Bron
 - mood: sorrow, then hope
 

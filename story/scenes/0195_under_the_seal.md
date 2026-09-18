@@ -1,7 +1,7 @@
 # Scene 0195: Under the Seal
 
 - type: talk
-- location: the guild hall ground floor, bare sandstone walls, a black iron stove burning at the left, a pinned job board on the right, behind it a floor-to-ceiling wall of ruled columns of small handwriting, lamplit evening
+- location: the guild hall ground floor, bare sandstone walls, a black iron stove burning at the left, a pinned job board on the right, behind it a floor-to-ceiling wall of ruled columns of small handwriting, cold bright morning light through the open door at the far end
 - characters: Zeph, Bron, Tovin, Lyra, Pip
 - mood: tense, then stubborn
 

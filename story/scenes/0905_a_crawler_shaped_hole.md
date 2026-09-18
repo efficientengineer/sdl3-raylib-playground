@@ -18,7 +18,7 @@ the rest of them go quiet, and nobody asks her where she got it.
 - Ket: Not correct. Three vehicles. One of them is a water bowser and weighs eleven tons empty.
 - Pip: Two crawlers, then.
 - Ket: Correct. That is what I said.
-- Bron: We can't walk it. She's four days out and she doesn't stop properly.
+- Bron: We can't walk it. She's two days out and she doesn't stop properly.
 - Hesk: I'll not be part of a theft. My family keeps a door. You don't take what isn't yours.
 - Zeph: Theft. I have it as a recovery. Their plate is on it and we have a standing grievance.
 - Hesk: That is the worst thing anybody has ever said to me.

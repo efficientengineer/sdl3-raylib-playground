@@ -25,7 +25,7 @@ Nobody in the party says sorry, because there is nothing in what she says that i
 5. high_angle_down | looking down from the platform on the square far below at night, lamps, handcarts, small figures moving between the open doors
 6. profile_flat | Sem in strict side view, mouth open mid-sentence, entirely calm
    - Sem: eyes front along the rail toward the pasture, face level and untroubled, mouth moving
-7. establishing_tall | a shallow flooded hollow east of a town at first light, still brown water over drowned fence lines, reeds at the edges, nothing standing in it, no marker
+7. establishing_tall | a shallow flooded hollow east of a town at first light, still brown water over drowned fence lines, the broken roof of a shed above the surface, reeds at the edges, nothing put up on the bank, no marker
 
 ## Dialogue
 - Ket [1] {dread}: Sem-Dree. What is the state of your well?

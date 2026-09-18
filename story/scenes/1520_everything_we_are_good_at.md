@@ -1,7 +1,7 @@
 # Scene 1520: Everything We Are Good At
 
 - type: talk
-- location: the floor of a great oval chamber of fitted stone, a sunken central disc with a ring of brass sockets in it, a seam face filling the back wall, faint even light from that face
+- location: a great oval chamber of fitted stone with concentric stepped tiers going down to a central floor disc, stone standing posts at the rim, a seam face filling the back wall, faint even light from that face
 - characters: Pip, Zeph, Hesk, Sefa, Ket, Ollo, Bron, Maren
 - mood: confront, then tense
 - backdrop: 1515_four_hundred_voices:7
@@ -21,7 +21,7 @@ it happens.
 ## Dialogue
 - Pip {confront}: Nobody panic. I've already panicked. There's none left for you.
 - Pip: ...Two of them laughed. Two. Why is that worse. That's worse.
-- Zeph: Maren. What happened the day before this one?
+- Zeph: Maren. Yesterday, then. And the day before that one?
 - Zeph: Four days. Four different days, and every one of them a real day.
 - Zeph {tense}: That has never failed me. It has just failed me four times in one breath.
 - Sefa: Registrar Sefa Quill, of the Clement Works. Answer me.

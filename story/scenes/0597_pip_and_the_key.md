@@ -26,4 +26,4 @@ without joking, makes the joke, and Hesk does not laugh and does not fill the si
 - Hesk: ...
 - Hesk: Both hands. It's heavier than it looks.
 - Pip: I've never owned anything older than my boots. Care-house issue, resoled four times.
-- Pip {sorrow}: Sixteen years and one pair of boots. They were very good boots.
+- Pip {sorrow}: Yours has got the whole village cut into it. Mine's got a cobbler's mark inside the heel.

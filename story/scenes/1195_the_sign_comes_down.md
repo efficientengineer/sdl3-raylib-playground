@@ -24,7 +24,7 @@ what they are doing next, and it is not a vow.
 5. establishing_tall | the Rim road running north at night between low walls, and far off on the skyline six stacked tiers of lit windows cut into a quarry face
 
 ## Dialogue
-- Tibb [1] {sorrow}: Cart'll be back at the hall by the eleventh. I'll take it in myself.
+- Tibb [1] {sorrow}: Cart'll be back at the hall by the fifteenth. I'll take it in myself.
 - Tibb [1]: I'm the one stood in front of that wall. What do I have them write?
 - Bron [1]: Her name and the date. Same as anybody else on it.
 - Hesk [2]: Load's on. Two hundred pound, and a bad hill out of here.

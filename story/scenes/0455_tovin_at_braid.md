@@ -1,7 +1,7 @@
 # Scene 0455: Tovin at Braid
 
 - type: talk
-- location: a burned-edged timber job board on a plain wall, pinned paper bills curling at the corners, a chalk stub on a string, a stove pipe crossing the wall behind, lamplight from the left, evening
+- location: a side room off a Vess chant-hall, a low plank ceiling, a chalked job board on the right-hand wall, a squat iron stove with a kettle on it at the left, a short ledger wall of ruled columns of small handwriting behind the board, lamplight from the left, evening
 - characters: Bron, Lyra, Zeph, Pip, Tovin, Mir
 - mood: tense -> hope
 

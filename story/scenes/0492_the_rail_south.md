@@ -32,7 +32,7 @@ image is the cliff with nine squared black notches cut in it, seen from a moving
 7. establishing_tall | the Rim Hills rising ahead out of haze, nine squared dark notches cut in one cliff face, stepped terrace fields above them, no figures
 
 ## Dialogue
-- Cassa [1] {hope}: First light, siding clear, wind off the north-west. We will be under the hills by three.
+- Cassa [1] {hope}: First light, siding clear, wind off the north-west. We will be under the hills by ten.
 - Cassa [2]: One, two, three, four, five — six. Six.
 - Cassa [3]: Six. I am saying it twice because it has changed and I do not intend to mislay one of you.
 - Ket [4] {tense}: Nine door-mouths in one cliff face.

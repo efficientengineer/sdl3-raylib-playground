@@ -6,7 +6,7 @@
 - mood: sorrow, then hope
 
 ## Beat
-An hour later, waiting for the Vantage tram. Pip saw the whole of it from the corner and does not
+An hour later, waiting for the Tellwater tram. Pip saw the whole of it from the corner and does not
 ask him how he is, because she would not want to be asked. She sits down next to him and talks
 rubbish about the crawler and the timetable and Zeph until there is somewhere to put things. Then
 Bron asks her, out of nowhere, the personal question he has never asked her, and for the first time
@@ -17,7 +17,7 @@ is about tomorrow. Neither of them says one word about the laundry.
 
 ## Dialogue
 - Pip {sorrow}: Crawler's throwing a plate again. Hesk says it's the cold. Hesk says everything's the cold.
-- Pip: Eight-ten to Vantage. Calls at Dunnow and nowhere else, about which Zeph has strong feelings.
+- Pip: Eight-ten east. Calls at Tellwater and nowhere else, about which Zeph has strong feelings.
 - Pip: He read me the whole timetable last night. In a voice. There was a voice.
 - Bron: Pip.
 - Bron: What was in the drawer.

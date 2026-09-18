@@ -28,5 +28,5 @@ signed either of them.
 - Ket: Every sealed door in the hills stands on that branch. I would like one of you to tell me I have it wrong.
 - Hesk: ...
 - Hesk: Ninefold's nine sit on it. And Dov's crew will be down the hole when it turns.
-- Ollo: Right. How do we get to Braid ahead of four thousand people leaving it?
+- Ollo: Right. How do we get to Braid ahead of seven thousand people leaving it?
 - Zeph: We don't go to Braid. We go to Saltmouth and take the rail up, and we leave as soon as the crawler's fuelled.

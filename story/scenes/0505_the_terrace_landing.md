@@ -6,7 +6,7 @@
 - staging: The cliff and its nine door-mouths fill the right of the frame and rise above everything. The party stands on the left of the landing facing right and up. The sledge and the rails are behind them at the far left
 
 ## Beat
-The sledge sets six people down at a rail stop at the foot of a cliff with nine squared black
+The sledge sets five people down at a rail stop at the foot of a cliff with nine squared black
 notches cut along its base, a village on the ledges above, and eleven hundred feet of cut steps
 between. The scale takes the top off the conversation. Cassa Tessen will not climb and is not
 embarrassed about it; her line's record does not go up there, so neither does she. Bron pays her

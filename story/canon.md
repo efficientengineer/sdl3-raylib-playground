@@ -498,6 +498,11 @@ Everything in an outline that is not in the bible's glossary or `story/character
 **323 scenes: 111 panel, 189 talk, 23 narration**, across fifteen chapters and an epilogue —
 D8 counted 322 before the editor added `0607_bad_water_at_kettle`.
 
+**Now 326** after the continuity pass: `0845` became `0845a`/`0845b`/`0845c` and `1340` became
+`1340a`/`1340b` (section 10). Chapter 8 holds 21 scenes and chapter 13 holds 21; the panel,
+narration and optional-panel counts in the table below are unchanged, because every split file is
+an optional talk scene.
+
 | Ch | Total | Panel | Talk | Narr | Optional |
 |---|---|---|---|---|---|
 | 1 | 24 | 8 | 14 | 2 | 4 |
@@ -557,3 +562,107 @@ chapter 7. Slugs are unchanged; quote ids from the current `act2.md`. The notes 
 
 Chapter 5's `0505`-`0595` and chapter 6's `0605`-`0685` are unchanged, as are all of Acts I, III, IV
 and V.
+
+---
+
+## 10. Branching scenes
+
+**The scene format has no branch selector.** Two scenes were delivered as several labelled
+outcome blocks inside one file, which the exporter would play in sequence, one after another, as
+though all of them happened. They have been split into one complete scene file per outcome. **The
+game needs a selector before these ship**: it must play exactly one file from each set, chosen by
+how the named side contract resolved. Each file states its condition as the first paragraph of its
+`## Beat`.
+
+| Set | Files | Selected by |
+|---|---|---|
+| Ch.8, after the collector's round | `0845a_after_the_round_settled`, `0845b_after_the_round_refused`, `0845c_after_the_round_collected` | side contract **"Collection at Emberrow"** (`0820`, `0840`): the party settled the sixth door's debt out of their own money / refused the bill / finished the day they took. **Default if the game cannot yet select: `0845c`** — it is the branch the player reaches without spending, and the one the bible's complicity argument is built on. |
+| Ch.13, the line walk | `1340a_four_hours_waited`, `1340b_four_hours_moved` | side contract **"Walk the line"** (`1335`): the party left the chant-line to finish its passage / moved it onto the sledges. **No default**: neither outcome is punished and neither is praised, and nothing later in the game reads either flag. |
+
+All five files are optional and all five are marked in `story/playlist.md` with `(branch: ...)`.
+No mandatory scene anywhere refers to which way either contract went.
+
+---
+
+## 11. Continuity rulings
+
+The continuity pass over all 326 scene files. One line each, newest last. Everything here is
+applied in the files; nothing is left as a note. Items marked **owner may overrule** are money,
+art budget or game systems and are provisional.
+
+**Chapter joins**
+
+1. **The Ninth Door is not the inner doors.** `1405`'s twenty-foot door-mouth is the outer hall-mouth at the maintenance-rail landing, and the mile of Deep Stair drops from it; `1380`/`1385`'s inner doors are at the end of a separate level gallery off the same line. Chapter 13's party ran down the gallery and was stopped at the inner doors, which **stay shut and held**; chapter 14 comes back to the landing and goes down the stair. `1405` is therefore a return, not a discovery, and says so in one line. The party never passes the inner doors, which is what keeps `1440`/`1445` the first use of the relief formula.
+2. `1380`'s "eleven words" was already corrected to **thirty words** by chapter 13's writer, in chapter 14's favour. `story/outline/act4.md` still says eleven and is stale; outlines are history.
+3. `1145` panel 7 drew the flooded hollow with "nothing standing in it", contradicting chapter 3 and the `tellwater_low_ground` key. It now reads "the broken roof of a shed above the surface … nothing put up on the bank, no marker" — the intended meaning was *no memorial*.
+4. The epilogue's **eleven weeks** stands (`1615`). No scene ever said eleven months; only `story/outline/act5.md` does, and it is stale.
+5. `0195` was mid-morning in its Beat and "lamplit evening" in its location line; it now uses the new `even_hand_hall_morning` key.
+6. `0405` ended on a sail "coming on fast" that `0410` then cannot see and `0415` is supposed to introduce. The narration now ends on the rails being in use.
+7. `0492`: Cassa's "under the hills by three" did not fit a four-hour run from first light against `0505`'s early sun. Now **by ten**.
+8. `0505`: the sledge sets **five** people down, not six — Cassa is the sixth and she stays with the sledge.
+9. `0605`: the crossing is **four days** (two off the hill paths, two across the crust), matching `0598`.
+10. `0705`: the party rides a cart for three days and cannot also be walking. The morning question is now asked "before the cart moves".
+11. `0905`: Maren is **two days out**, not four. She is still in the Kettle kitchen at the end of `0895` and the party leaves Emberrow the next morning.
+12. `1090`: chapter 10 put the party on a tram to Vantage and chapter 11 opens in Tellwater. The tram is now the **eight-ten east, calling at Tellwater**; Vantage is still where `1195` points.
+13. `1105`: Tellwater welcomed Bron **three** months ago, not five (2nd of Turn to 6th of Dust on 45-day months).
+14. `1195`: Tibb has the cart back at Sallowgate **by the fifteenth**; the eleventh is impossible on the story's own four-day figure from Tellwater.
+15. `1295`: Braid is **seven thousand** people, matching `1305` and `1310`.
+16. `1300`: the clearance runs **fourteen days from the thirty-fourth of Dust**, which lands day thirteen on the 1st of Fallow, where chapter 13 opens. Kerrow's orders are still dated the 20th.
+17. `1400`: **ninety-six** hours since Braid walked out, not thirty-one; the walk-out ends on the 2nd of Fallow and chapter 14 is the 6th.
+18. `1605`: the Long Bore head went cold on the **eighth** of Fallow. On the seventh it was still running at full (`1500`), and Cadder shuts it off on the way down in `1565`.
+
+**Quoted canon**
+
+19. The fifteen questions, the Four Lines, the oath's terms, Hesk's mangled back half, the relief formula, the payroll line, the intake form, Crewe's list entry, the "Ask me the fifteenth" exchange and the edges test were checked character-for-character in every scene that carries them. All were already identical. No drift found.
+20. `1520` had Zeph put **question 7 of the Tally verbatim** to Maren, which breaks the standing rule in section 1 and borrows chapter 4's tool in chapter 1's words. It now uses `0465`'s own phrasing: *"Maren. Yesterday, then. And the day before that one?"*
+21. Ross Kettle's first wife is **Enna** (`1230`, three uses). `0880`'s single "Wenna" is corrected. Chapter 12 wins on count, not on seniority.
+
+**Repeated lines**
+
+22. **Pip's "Sixteen years and one pair of boots. They were very good boots." belongs to `0694`.** Chapter 6's outline required it and it is the line left when her jokes run out. `0597`'s copy is rewritten to a joke about the two objects; `0850` already avoids it.
+23. **"I'd like to stop arguing and go in. I'd like that to be because we decided." belongs to `0570`.** It is a line about going through a door and chapter 5 is where there is a door. `0340`'s copy is rewritten.
+24. **Bron's winter story is told at `0130` and retold once at `0545`.** `0940`'s third telling is cut to a glance ("Being nine, and lost above Tellwater in the snow"), which keeps `0985` and `1435` intact. `0491` (ch.4) and `0785` (ch.7) already avoid it.
+25. `1415`'s "two hundred and six lamp columns" is now a hundred and ninety-one: two hundred and six is Lyra's count of hours sat (`0870`, `0965`) and the Braid sledge count (`1300`, `1305`), and the third use was noise.
+26. **Cadder's "Who pays the terraces this winter? / Not you. You're leaving on Thursday." stays in both `0285` and `0525`.** It is one man repeating his own unanswerable argument three chapters apart, written that way on purpose by both writers, and nobody ever answers it.
+27. Bron's "We'll take it" (five scenes) and Emmet Sark's entry chit (four) are single-character refrains and stay.
+
+**Speakers and cast**
+
+28. Five one-off labels were one person recurring and now have `characters.md` entries, all portrait-only and low art priority, none named in any panel: **Stobb** (Garrick Stobb, the Even Hand's founding-hall keeper at Vantage — `0725`, `0795`, `1220`, previously two different spellings of "Hall-keeper"), **Venn** (Sennet Venn, the accounts collector — `0820`, `0840`; named Venn and not Aldo Venn because Aldo is a handle), **Bost** (Ivet Bost, the salt company agent — `0945`, `0955`), **Hallet** (Corm Hallet, the Windrow tram conductor — `0220`, `0225`), **Tarn** (Tarn Bly, speaker of the doorward council — `0530`, already named on screen).
+29. `0935`'s **Mother** is relabelled **Camp mother** so she cannot be read as `0840`'s mother. `0820`'s **Hall-keeper** is a different person from Stobb's and stays an unnamed one-off.
+30. **Merrit Tack keeps no reference sheet** (section 2) and therefore stays a one-off speaker label, covered by the "dying hunter's hand" extra. Same for **Voice** (`0265`), which is a wax cylinder, and **Director** (`1275`, `1280`), whose namelessness is the point.
+31. `Clerk`, `Guard`, `Woman` and `Second guard` each cover **different people in different scenes** and stay one-off labels; no alias can serve them.
+32. Every remaining one-off speaker is now described in their scene's `## Beat`. Four Beats were missing their speaker and were extended: `0225` (Hallet), `0530` (Tarn), `0935` (the camp woman), `0310` (the townswoman). `0465`'s Beat called the rail hand a "shed hand" and now matches its own speaker label.
+33. **`Nine` resolves to `Nona`** through the alias in `characters.md`; `stats` reports no warning for it and `check` does not flag it. Chapters 14 and 15 need no change.
+34. Four extras the writers asked for are added to "Uniforms and recurring extras": **Works guard**, **Vess townsperson**, **Even Hand hall-keeper**, **the Cap's house guard**.
+
+**Locations**
+
+35. **Thirty-nine keys added** to `story/locations.md`, and the alphabetical key index rebuilt (311 keys). Where a writer had invented a sentence, that sentence becomes the key, verbatim, so the scene already matches it.
+36. **Changing a key's light or time-of-day clause inline is allowed** and twenty-eight scenes do it; they are not errors and are not being "fixed". Five scenes change a key's *state* rather than its light (a dead rig, cleared dishes, a stopped gantry, a stair seen from below, a bar still across a doorway) and those are allowed too.
+37. Ten scenes that were carrying a fallback or an invented sentence now point at a real key: `0135`, `0190`, `0195`, `0440`, `0455`, `0645`, `0795`, `0920`, `1520`, `1620`, `1655`.
+38. `registry_catalogue_room` and `long_bore_shaft_gallery` are added for the artist, but `0765` and `1365` keep their existing keys, which are correct for the majority of their panels.
+39. **No `ninth_inner_doors_open` key is needed**, because of ruling 1: the inner doors are never open on screen.
+
+**Optional scenes and plants**
+
+40. **`0145_the_stove` is now mandatory.** It is the only place Sela Marrin is liked before chapter 6 takes her, and `0670` and `0689` are both mandatory. **Owner may overrule** (game systems).
+41. **`0760_the_school_wall` is now mandatory.** Its fee is collected on screen in the mandatory `0795`, and the mandatory `1235` gives the party a tier pass and a cable-house key on the strength of it. **Owner may overrule** (game systems).
+42. **Strands stay first buyable at the optional `0489`.** Confirmed provisionally, as before. **Owner may overrule** (game systems).
+
+**Confirmations the writers asked for**
+
+43. Chapter 4's `0440`/`0455` money substitution is **confirmed**: the poster never paid the hall, and Tovin walks three days to hand back the hall's own tenth, because a hall that keeps a cut out of its own box has become that hunter's patron.
+44. Sefa's fee at `0770` is **confirmed** as a weight charge on superseded stock — twelve marks and four, four marks the pound, three pounds and a little. Not a bribe. **Owner may overrule** (economy).
+45. The Emberrow settlement of **fifty-two marks and four** is confirmed against chapter 7's purse. **Owner may overrule** (economy).
+46. `0785` **does not** use the winter story; it applies the edges test to the autumn fair, which is template 4's own content. Confirmed against the chapter 7 outline.
+47. `0607`'s fouling is **confirmed as written**: the blocked inflow is the work, and the man who has slept in the cistern house for nine years is there, does not speak, and nobody looks any further.
+48. A **`Narrator` box inside a panel scene** is confirmed as the way to print a document or an inscription without a character reading it aloud: `0575`, `1065`, `1380`. A speaker box with no portrait (`Voice`, `0265`) is confirmed the same way. **Owner may overrule** (tools) — if the game cannot draw it, `1065` needs a rewrite in which the form is an interactive object, not a reassignment of the lines to a character.
+49. **"Tellwater, house thirty-one"** on the intake form is blessed, and `1080` remains the only scene that uses it.
+50. Chapter 7's mirrored Vantage staging is **correct and chapters 10 and 12 already agree**: up-tier right, the drop left, company staff up-tier of the party, in every Vantage scene in the game.
+51. `0985` stays **at the fold above Tellwater**, per section 6: Bron got lost there at nine and so did Maren, which is the same sentence.
+52. Arro-Vintry's one request in the whole game — a flat file, second cut, eight inches (`0255`, optional) — is **collected at `1630`** in one box that plays whether or not the player took `0255`.
+53. `0255` and `1025` both ask Arro why he keeps a dead machine and the answers differ on purpose; both stay. Neither may be cut down to the other's beat.
+54. Hesk's bible sample line "Write down who went in. That's the job now. That's all the job ever was." stays **unused**. `1405` reached the beat first and `1595` revises `0565` instead, which is the same idea aimed at the right door.
+55. `1585` keeps Ket's responses only and does **not** print the maintenance wording of the fourteen questions; `1490` owns it.
+56. "Coppertop" stays, unexplained forever, and no portrait-only Tellwater townsperson entry is added — the extras list covers them and their Beats now describe them.

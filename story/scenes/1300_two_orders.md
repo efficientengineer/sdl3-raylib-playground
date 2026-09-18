@@ -12,7 +12,7 @@ second is shorter. The last box is the file reference the two of them share.
 
 ## Dialogue
 - Narrator {tense}: Order of the twentieth of Dust. The town of Braid is cleared to the western sidings at the company's charge.
-- Narrator: Fourteen days from posting. Two hundred and six sledges allocated, with water and haulage found.
+- Narrator: Fourteen days from the thirty-fourth of Dust. Two hundred and six sledges, with water and haulage found.
 - Narrator: A hardship payment of three marks the head, paid at the rail head before loading and not against wages.
 - Narrator: Officer responsible, named at the foot: Field Superintendent O. Cadder.
 - Narrator: Order of the twentieth of Dust. Extraction, Vantage. The Long Bore head is raised to full from the first of Fallow.
