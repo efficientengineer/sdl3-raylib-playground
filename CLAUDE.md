@@ -81,6 +81,7 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py tiles <id>...  # field art: template sheet of square slots → story/field/tiles/
 ./story_prompt.py props <id>...  # field art: slots sized by each prop's footprint → story/field/props/
 ./story_prompt.py walker <Name>  # field art: the 4x4 walk grid (S W E N) → story/field/walkers/
+./story_prompt.py building <id>...  # field art: front wall + wall and roof samples → story/field/buildings/
 ./story_prompt.py cut <sheet.json> <img>    # cut a filled-in template: key magenta, resize, write the files
 ```
 
@@ -411,7 +412,7 @@ tool complaints go in `story/notes/<agent>.md` and the orchestrator rules on the
   `story/refs/`, `story/panels/` and `story/packages/` are kept (the last is generated but tracked, so
   the owner can pick up any scene's package without running the tool).
 
-### Field art — the template sheet (`tiles`, `props`, `walker`, `cut`)
+### Field art — the template sheet (`tiles`, `props`, `walker`, `building`, `cut`)
 
 The walking-around art in `FIELD.md` is generated the same way, except that **the tool draws the
 sheet's layout itself** instead of asking ChatGPT to invent one. Each command writes three files to
@@ -428,6 +429,18 @@ leave the background untouched, no text.
   description and `- footprint: WxH`, the sprite's box in map cells at 64 px to the cell, which is
   what sizes its slot; `PROP_FOOTPRINTS` in the tool is the fallback table and an unknown id gets
   1x1 and a warning. A requested id with no entry is an error, as is a canvas too crowded to draw in.
+- **Buildings are not sprites.** A house is map geometry — the `## buildings` section of a `.map` gives
+  its footprint, height and rotation — wearing three textures, and `story/field/buildings.md` says what
+  it is made of (`## <id>`, one-line description, `- map:`, optional `- wall:` and `- roof:` for the
+  material samples). `building <id>...` draws three square slots per building and `cut` writes them to
+  the engine's contract in `src/FIELD_NOTES.md` ("Face-texture contract"), which owns these numbers:
+  `<id>_front.png` **128x128**, stretched *once* across the whole front wall, so a door and windows
+  painted into that one square land where the artist put them whatever the building's width;
+  `<id>_side.png` **128x128** seamless both ways, tiled per cell across and per world unit up on the
+  back, ends and gables; `<id>_roof.png` **64x64** seamless, tiled per cell on each roof slope. All
+  three are opaque. So the front slot is a whole wall seen square on and flat, and the side and roof
+  slots are plain material with no opening and no landmark in them. Ids come from the maps; everything
+  a person could walk around, the grain-yard wall included, stays a prop.
 - **Walkers come from the cast.** `walker <Name>` takes the look from `characters.md` verbatim and
   attaches that character's reference sheet, so the sprite matches the portrait; a name with no
   reference sheet is an error, not a warning. A story name that has moved on (`story/v3/NAMES.md`:
@@ -437,9 +450,17 @@ leave the background untouched, no text.
 - **Cutting needs no border detection**, because the tool made the boxes: `cut <sheet.json> <image>`
   scales them if ChatGPT returned a smaller image (it caps at ~1.5 MP), crops inside each border, keys
   the magenta to alpha with a soft fringe, and writes 64x64 tiles, props trimmed and scaled back to
-  64 px per cell, and one 128x192 walker sheet (rows S, W, E, N; columns stand, step-left, stand,
-  step-right). `slice` redirects to it when the JSON is a template package. Nothing is written if the
-  image is the wrong shape.
+  64 px per cell, one 128x192 walker sheet (rows S, W, E, N; columns stand, step-left, stand,
+  step-right), and building faces resized to the contract sizes with any alpha dropped. `slice`
+  redirects to it when the JSON is a template package. Nothing is written if the image is the wrong
+  shape, or if its margins are not the template's background colour — that is what a file from the
+  wrong package looks like.
+- **Alpha is checked, not assumed.** Props and walkers are written RGBA (colour type 6) by
+  construction, because the keying always produces four channels; what can still go wrong is a slot
+  painted edge to edge, which keys nothing out and renders on the phone as a black rectangle. `cut`
+  counts the transparent pixels in every prop and walker it writes and warns loudly when there are
+  none, naming the file; `ingest` repeats that warning and counts it in its summary, so it cannot be
+  swallowed. A real sprite comes out about a quarter transparent; a walk sheet about half.
 - **`story/field/manifest.md`** is regenerated on every one of those runs: every id ever requested,
   its kind, target size, the package that asked for it, and whether the file exists. Humans and agents
   read it; the engine does not.
@@ -455,5 +476,6 @@ leave the background untouched, no text.
   `v3/NAMES.md` (the `{{TOKEN}}` table), `scenes/`, `panels/`, `refs/`, `portraits/` (generated from
   `refs/`, gitignored), `packages/` (the art tray: generated by `packages`, tracked, holds the owner's
   `returned.png` files); `story_prompt.py` builds the prompts, cuts what comes back, and exports
-- `story/field/` — the walking-around art contract in `FIELD.md`: `tiles.md`, `props.md`, `walkers.md`
-  (what to draw), `tiles/`, `props/`, `walkers/` (the PNGs the game ships), `manifest.md` (generated)
+- `story/field/` — the walking-around art contract in `FIELD.md` and `src/FIELD_NOTES.md`: `tiles.md`,
+  `props.md`, `walkers.md`, `buildings.md` (what to draw), `maps/` (the maps themselves), `tiles/`,
+  `props/`, `walkers/`, `buildings/` (the PNGs the game ships), `manifest.md` (generated)

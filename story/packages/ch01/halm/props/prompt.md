@@ -1,22 +1,18 @@
-# ChatGPT package: halm — 13 props
+# ChatGPT package: halm — 9 props
 
 ## What exists already
 
-0 of 13 files in this package have been cut already.
+0 of 9 files in this package have been cut already.
 
 - slot 1 `story/field/props/barrel.png` — missing
 - slot 2 `story/field/props/cart.png` — missing
 - slot 3 `story/field/props/fence.png` — missing
-- slot 4 `story/field/props/grain_shed.png` — missing
-- slot 5 `story/field/props/guild_hall.png` — missing
-- slot 6 `story/field/props/house_a.png` — missing
-- slot 7 `story/field/props/house_b.png` — missing
-- slot 8 `story/field/props/scale_bench.png` — missing
-- slot 9 `story/field/props/sign.png` — missing
-- slot 10 `story/field/props/tree_a.png` — missing
-- slot 11 `story/field/props/tree_b.png` — missing
-- slot 12 `story/field/props/well.png` — missing
-- slot 13 `story/field/props/yard_wall.png` — missing
+- slot 4 `story/field/props/scale_bench.png` — missing
+- slot 5 `story/field/props/sign.png` — missing
+- slot 6 `story/field/props/tree_a.png` — missing
+- slot 7 `story/field/props/tree_b.png` — missing
+- slot 8 `story/field/props/well.png` — missing
+- slot 9 `story/field/props/yard_wall.png` — missing
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -26,7 +22,7 @@
 ## 2. Paste this prompt exactly
 
 ````
-Create ONE image: the attached template with all 13 numbered slots filled in. Canvas: landscape, 1536x1024, the same size as the template.
+Create ONE image: the attached template with all 9 numbered slots filled in. Canvas: portrait, 1024x1536, the same size as the template.
 16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
@@ -42,19 +38,15 @@ CAMERA, the same for every slot: a front three-quarter view from slightly above,
 SCALE: a slot is a grid of map cells, 64 pixels to the cell in game, and each slot below says how many cells it is. Objects share one scale across the sheet: a four-cell hall is four times the width of a one-cell barrel and is drawn with the same size of pixel.
 
 SLOTS:
-Slot 1 (barrel), 1 x 1 cells, 96x96 px in the template: A squat water barrel of dark staves with two iron hoops, brim full, a tin cup hooked on the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 2 (cart), 2 x 2 cells, 199x199 px in the template: A two-wheeled handcart with its shafts down, loaded above the sides with a rolled mattress and tied bundles. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 3 (fence), 2 x 1 cells, 199x96 px in the template: Three rails pegged between two split posts, one rail newer than the others and set slightly proud. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 4 (grain_shed), 3 x 3 cells, 302x302 px in the template: An open-fronted grain shed of dark boards on a stone base, a sagging roof, sacks stacked inside and a scale bench by the door. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 5 (guild_hall), 4 x 3 cells, 405x302 px in the template: A long low stone hall with a deep porch on squat timber posts, wide double doors standing open, and a bare board on the wall beside them. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 6 (house_a), 3 x 3 cells, 302x302 px in the template: A small valley house of plastered stone under a low timber gable, one shutter open and one gone, the plank door standing ajar on an empty room. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 7 (house_b), 2 x 3 cells, 199x302 px in the template: A narrow two-storey house with a steep tiled roof and an outside stair to the upper door, its lower shutters closed and barred. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 8 (scale_bench), 2 x 1 cells, 199x96 px in the template: A low plank bench with a pair of iron grain scales bolted to one end, a stack of small lead weights beside the pan and one weight lying loose. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 9 (sign), 1 x 2 cells, 96x199 px in the template: A blank plank board nailed across a single post at head height, the wood split at one corner. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 10 (tree_a), 2 x 3 cells, 199x302 px in the template: A broad valley tree with a thick low trunk and a heavy rounded crown, a few dead branches on one side. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 11 (tree_b), 1 x 2 cells, 96x199 px in the template: A thin young tree with a straight pale trunk and a sparse upright crown, staked at the base. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 12 (well), 1 x 2 cells, 96x199 px in the template: A round stone well with a low wall, a plank roof on two posts, a rope on a winding drum and a wooden bucket hooked at the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 13 (yard_wall), 3 x 2 cells, 302x199 px in the template: A shoulder-high grain-yard wall of dry-laid stone with a flat coping course, one stretch bellied out and patched with newer stone. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 1 (barrel), 1 x 1 cells, 158x158 px in the template: A squat water barrel of dark staves with two iron hoops, brim full, a tin cup hooked on the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 2 (cart), 2 x 2 cells, 323x323 px in the template: A two-wheeled handcart with its shafts down, loaded above the sides with a rolled mattress and tied bundles. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 3 (fence), 2 x 1 cells, 323x158 px in the template: Three rails pegged between two split posts, one rail newer than the others and set slightly proud. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 4 (scale_bench), 2 x 1 cells, 323x158 px in the template: A low plank bench with a pair of iron grain scales bolted to one end, a stack of small lead weights beside the pan and one weight lying loose. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 5 (sign), 1 x 2 cells, 158x323 px in the template: A blank plank board nailed across a single post at head height, the wood split at one corner. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 6 (tree_a), 2 x 3 cells, 323x488 px in the template: A broad valley tree with a thick low trunk and a heavy rounded crown, a few dead branches on one side. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 7 (tree_b), 1 x 2 cells, 158x323 px in the template: A thin young tree with a straight pale trunk and a sparse upright crown, staked at the base. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 8 (well), 1 x 2 cells, 158x323 px in the template: A round stone well with a low wall, a plank roof on two posts, a rope on a winding drum and a wooden bucket hooked at the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 9 (yard_wall), 3 x 2 cells, 488x323 px in the template: A shoulder-high grain-yard wall of dry-laid stone with a flat coping course, one stretch bellied out and patched with newer stone. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
 
 RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
 
@@ -63,7 +55,7 @@ AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic
 
 ## 3. Afterwards
 
-- [ ] All 13 slots filled, every border and number still exactly where it was
+- [ ] All 9 slots filled, every border and number still exactly where it was
 - [ ] The magenta is untouched outside the slots, and comes right up to each object
 - [ ] No ground, shadow, base plate or scenery under or behind an object
 - [ ] Every object stands on the bottom edge of its slot and shares one camera angle
@@ -80,7 +72,7 @@ Then cut it up, from the repository root:
 ./story_prompt.py ingest story/packages/ch01/halm/props
 ```
 
-That writes the 13 prop sprite(s) listed above. Running `./story_prompt.py ingest` with no path does every package in
+That writes the 9 prop sprite(s) listed above. Running `./story_prompt.py ingest` with no path does every package in
 `story/packages/` that has a new image waiting. The returned file is never deleted, so a
 bad cut can always be redone after a fix.
 

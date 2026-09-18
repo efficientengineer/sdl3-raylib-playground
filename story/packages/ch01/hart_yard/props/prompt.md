@@ -1,11 +1,10 @@
-# ChatGPT package: hart_yard — 2 props
+# ChatGPT package: hart_yard — 1 props
 
 ## What exists already
 
-0 of 2 files in this package have been cut already.
+0 of 1 files in this package have been cut already.
 
-- slot 1 `story/field/props/ladder_house.png` — missing
-- slot 2 `story/field/props/practice_post.png` — missing
+- slot 1 `story/field/props/practice_post.png` — missing
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -15,7 +14,7 @@
 ## 2. Paste this prompt exactly
 
 ````
-Create ONE image: the attached template with all 2 numbered slots filled in. Canvas: landscape, 1536x1024, the same size as the template.
+Create ONE image: the attached template with all 1 numbered slots filled in. Canvas: portrait, 1024x1536, the same size as the template.
 16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
@@ -31,8 +30,7 @@ CAMERA, the same for every slot: a front three-quarter view from slightly above,
 SCALE: a slot is a grid of map cells, 64 pixels to the cell in game, and each slot below says how many cells it is. Objects share one scale across the sheet: a four-cell hall is four times the width of a one-cell barrel and is drawn with the same size of pixel.
 
 SLOTS:
-Slot 1 (ladder_house), 3 x 3 cells, 913x913 px in the template: A squat hunter's house with half its roof tiles laid and the rest stacked, a long ladder leaning against the eaves, a bad chimney. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
-Slot 2 (practice_post), 1 x 2 cells, 300x607 px in the template: A head-high post of scarred timber set in the ground, a cross-piece near the top, the wood chewed pale where it has been hit. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
+Slot 1 (practice_post), 1 x 2 cells, 709x1425 px in the template: A head-high post of scarred timber set in the ground, a cross-piece near the top, the wood chewed pale where it has been hit. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
 
 RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
 
@@ -41,7 +39,7 @@ AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic
 
 ## 3. Afterwards
 
-- [ ] All 2 slots filled, every border and number still exactly where it was
+- [ ] All 1 slots filled, every border and number still exactly where it was
 - [ ] The magenta is untouched outside the slots, and comes right up to each object
 - [ ] No ground, shadow, base plate or scenery under or behind an object
 - [ ] Every object stands on the bottom edge of its slot and shares one camera angle
@@ -58,7 +56,7 @@ Then cut it up, from the repository root:
 ./story_prompt.py ingest story/packages/ch01/hart_yard/props
 ```
 
-That writes the 2 prop sprite(s) listed above. Running `./story_prompt.py ingest` with no path does every package in
+That writes the 1 prop sprite(s) listed above. Running `./story_prompt.py ingest` with no path does every package in
 `story/packages/` that has a new image waiting. The returned file is never deleted, so a
 bad cut can always be redone after a fix.
 

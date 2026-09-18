@@ -1,11 +1,11 @@
 {
-  "template": "props_barrel-cart-fence-plus10",
+  "template": "props_barrel-cart-fence-plus6",
   "kind": "props",
   "canvas": [
-    1536,
-    1024
+    1024,
+    1536
   ],
-  "canvas_label": "landscape, 1536x1024",
+  "canvas_label": "portrait, 1024x1536",
   "background": [
     255,
     0,
@@ -23,15 +23,15 @@
       ],
       "box": [
         52,
-        258,
-        102,
-        102
+        308,
+        164,
+        164
       ],
       "inner": [
         55,
-        261,
-        96,
-        96
+        311,
+        158,
+        158
       ],
       "target": [
         64,
@@ -47,16 +47,16 @@
         2
       ],
       "box": [
-        202,
-        155,
-        205,
-        205
+        264,
+        144,
+        329,
+        329
       ],
       "inner": [
-        205,
-        158,
-        199,
-        199
+        267,
+        147,
+        323,
+        323
       ],
       "target": [
         128,
@@ -72,16 +72,16 @@
         1
       ],
       "box": [
-        456,
-        258,
-        205,
-        102
+        642,
+        308,
+        329,
+        164
       ],
       "inner": [
-        459,
-        261,
-        199,
-        96
+        645,
+        311,
+        323,
+        158
       ],
       "target": [
         128,
@@ -91,122 +91,22 @@
     },
     {
       "n": 4,
-      "id": "grain_shed",
-      "cells": [
-        3,
-        3
-      ],
-      "box": [
-        710,
-        53,
-        308,
-        308
-      ],
-      "inner": [
-        713,
-        56,
-        302,
-        302
-      ],
-      "target": [
-        192,
-        192
-      ],
-      "out": "story/field/props/grain_shed.png"
-    },
-    {
-      "n": 5,
-      "id": "guild_hall",
-      "cells": [
-        4,
-        3
-      ],
-      "box": [
-        1067,
-        53,
-        411,
-        308
-      ],
-      "inner": [
-        1070,
-        56,
-        405,
-        302
-      ],
-      "target": [
-        256,
-        192
-      ],
-      "out": "story/field/props/guild_hall.png"
-    },
-    {
-      "n": 6,
-      "id": "house_a",
-      "cells": [
-        3,
-        3
-      ],
-      "box": [
-        52,
-        409,
-        308,
-        308
-      ],
-      "inner": [
-        55,
-        412,
-        302,
-        302
-      ],
-      "target": [
-        192,
-        192
-      ],
-      "out": "story/field/props/house_a.png"
-    },
-    {
-      "n": 7,
-      "id": "house_b",
-      "cells": [
-        2,
-        3
-      ],
-      "box": [
-        408,
-        409,
-        205,
-        308
-      ],
-      "inner": [
-        411,
-        412,
-        199,
-        302
-      ],
-      "target": [
-        128,
-        192
-      ],
-      "out": "story/field/props/house_b.png"
-    },
-    {
-      "n": 8,
       "id": "scale_bench",
       "cells": [
         2,
         1
       ],
       "box": [
-        662,
-        615,
-        205,
-        102
+        52,
+        851,
+        329,
+        164
       ],
       "inner": [
-        665,
-        618,
-        199,
-        96
+        55,
+        854,
+        323,
+        158
       ],
       "target": [
         128,
@@ -215,23 +115,23 @@
       "out": "story/field/props/scale_bench.png"
     },
     {
-      "n": 9,
+      "n": 5,
       "id": "sign",
       "cells": [
         1,
         2
       ],
       "box": [
-        916,
-        512,
-        102,
-        205
+        429,
+        686,
+        164,
+        329
       ],
       "inner": [
-        919,
-        515,
-        96,
-        199
+        432,
+        689,
+        158,
+        323
       ],
       "target": [
         64,
@@ -240,23 +140,23 @@
       "out": "story/field/props/sign.png"
     },
     {
-      "n": 10,
+      "n": 6,
       "id": "tree_a",
       "cells": [
         2,
         3
       ],
       "box": [
-        1067,
-        409,
-        205,
-        308
+        642,
+        521,
+        329,
+        494
       ],
       "inner": [
-        1070,
-        412,
-        199,
-        302
+        645,
+        524,
+        323,
+        488
       ],
       "target": [
         128,
@@ -265,23 +165,23 @@
       "out": "story/field/props/tree_a.png"
     },
     {
-      "n": 11,
+      "n": 7,
       "id": "tree_b",
       "cells": [
         1,
         2
       ],
       "box": [
-        1321,
-        512,
-        102,
-        205
+        52,
+        1063,
+        164,
+        329
       ],
       "inner": [
-        1324,
-        515,
-        96,
-        199
+        55,
+        1066,
+        158,
+        323
       ],
       "target": [
         64,
@@ -290,23 +190,23 @@
       "out": "story/field/props/tree_b.png"
     },
     {
-      "n": 12,
+      "n": 8,
       "id": "well",
       "cells": [
         1,
         2
       ],
       "box": [
-        52,
-        766,
-        102,
-        205
+        264,
+        1063,
+        164,
+        329
       ],
       "inner": [
-        55,
-        769,
-        96,
-        199
+        267,
+        1066,
+        158,
+        323
       ],
       "target": [
         64,
@@ -315,23 +215,23 @@
       "out": "story/field/props/well.png"
     },
     {
-      "n": 13,
+      "n": 9,
       "id": "yard_wall",
       "cells": [
         3,
         2
       ],
       "box": [
-        202,
-        766,
-        308,
-        205
+        477,
+        1063,
+        494,
+        329
       ],
       "inner": [
-        205,
-        769,
-        302,
-        199
+        480,
+        1066,
+        488,
+        323
       ],
       "target": [
         192,
@@ -340,5 +240,5 @@
       "out": "story/field/props/yard_wall.png"
     }
   ],
-  "prompt": "Create ONE image: the attached template with all 13 numbered slots filled in. Canvas: landscape, 1536x1024, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THESE ARE: single objects for a 2.5D field map, one object per slot, each cut out against the flat magenta. The magenta is not a backdrop, it is empty space: it runs right up to the edge of the object on every side. No ground, no grass, no paving, no base plate, no cast shadow, no glow, no scenery and no second object in a slot.\n\nCAMERA, the same for every slot: a front three-quarter view from slightly above, looking about fifty degrees down, as if all of these objects stood in one town seen from one fixed camera. The object sits upright, centred left to right, and touches the bottom edge of its slot, because that line is where it meets the ground in game.\n\nSCALE: a slot is a grid of map cells, 64 pixels to the cell in game, and each slot below says how many cells it is. Objects share one scale across the sheet: a four-cell hall is four times the width of a one-cell barrel and is drawn with the same size of pixel.\n\nSLOTS:\nSlot 1 (barrel), 1 x 1 cells, 96x96 px in the template: A squat water barrel of dark staves with two iron hoops, brim full, a tin cup hooked on the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 2 (cart), 2 x 2 cells, 199x199 px in the template: A two-wheeled handcart with its shafts down, loaded above the sides with a rolled mattress and tied bundles. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 3 (fence), 2 x 1 cells, 199x96 px in the template: Three rails pegged between two split posts, one rail newer than the others and set slightly proud. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 4 (grain_shed), 3 x 3 cells, 302x302 px in the template: An open-fronted grain shed of dark boards on a stone base, a sagging roof, sacks stacked inside and a scale bench by the door. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 5 (guild_hall), 4 x 3 cells, 405x302 px in the template: A long low stone hall with a deep porch on squat timber posts, wide double doors standing open, and a bare board on the wall beside them. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 6 (house_a), 3 x 3 cells, 302x302 px in the template: A small valley house of plastered stone under a low timber gable, one shutter open and one gone, the plank door standing ajar on an empty room. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 7 (house_b), 2 x 3 cells, 199x302 px in the template: A narrow two-storey house with a steep tiled roof and an outside stair to the upper door, its lower shutters closed and barred. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 8 (scale_bench), 2 x 1 cells, 199x96 px in the template: A low plank bench with a pair of iron grain scales bolted to one end, a stack of small lead weights beside the pan and one weight lying loose. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 9 (sign), 1 x 2 cells, 96x199 px in the template: A blank plank board nailed across a single post at head height, the wood split at one corner. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 10 (tree_a), 2 x 3 cells, 199x302 px in the template: A broad valley tree with a thick low trunk and a heavy rounded crown, a few dead branches on one side. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 11 (tree_b), 1 x 2 cells, 96x199 px in the template: A thin young tree with a straight pale trunk and a sparse upright crown, staked at the base. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 12 (well), 1 x 2 cells, 96x199 px in the template: A round stone well with a low wall, a plank roof on two posts, a rope on a winding drum and a wooden bucket hooked at the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 13 (yard_wall), 3 x 2 cells, 302x199 px in the template: A shoulder-high grain-yard wall of dry-laid stone with a flat coping course, one stretch bellied out and patched with newer stone. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\n\nRENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.\n\nAVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a scene or background inside a slot, two objects in one slot, changing the size of the image"
+  "prompt": "Create ONE image: the attached template with all 9 numbered slots filled in. Canvas: portrait, 1024x1536, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THESE ARE: single objects for a 2.5D field map, one object per slot, each cut out against the flat magenta. The magenta is not a backdrop, it is empty space: it runs right up to the edge of the object on every side. No ground, no grass, no paving, no base plate, no cast shadow, no glow, no scenery and no second object in a slot.\n\nCAMERA, the same for every slot: a front three-quarter view from slightly above, looking about fifty degrees down, as if all of these objects stood in one town seen from one fixed camera. The object sits upright, centred left to right, and touches the bottom edge of its slot, because that line is where it meets the ground in game.\n\nSCALE: a slot is a grid of map cells, 64 pixels to the cell in game, and each slot below says how many cells it is. Objects share one scale across the sheet: a four-cell hall is four times the width of a one-cell barrel and is drawn with the same size of pixel.\n\nSLOTS:\nSlot 1 (barrel), 1 x 1 cells, 158x158 px in the template: A squat water barrel of dark staves with two iron hoops, brim full, a tin cup hooked on the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 2 (cart), 2 x 2 cells, 323x323 px in the template: A two-wheeled handcart with its shafts down, loaded above the sides with a rolled mattress and tied bundles. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 3 (fence), 2 x 1 cells, 323x158 px in the template: Three rails pegged between two split posts, one rail newer than the others and set slightly proud. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 4 (scale_bench), 2 x 1 cells, 323x158 px in the template: A low plank bench with a pair of iron grain scales bolted to one end, a stack of small lead weights beside the pan and one weight lying loose. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 5 (sign), 1 x 2 cells, 158x323 px in the template: A blank plank board nailed across a single post at head height, the wood split at one corner. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 6 (tree_a), 2 x 3 cells, 323x488 px in the template: A broad valley tree with a thick low trunk and a heavy rounded crown, a few dead branches on one side. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 7 (tree_b), 1 x 2 cells, 158x323 px in the template: A thin young tree with a straight pale trunk and a sparse upright crown, staked at the base. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 8 (well), 1 x 2 cells, 158x323 px in the template: A round stone well with a low wall, a plank roof on two posts, a rope on a winding drum and a wooden bucket hooked at the rim. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\nSlot 9 (yard_wall), 3 x 2 cells, 488x323 px in the template: A shoulder-high grain-yard wall of dry-laid stone with a flat coping course, one stretch bellied out and patched with newer stone. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\n\nRENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.\n\nAVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a scene or background inside a slot, two objects in one slot, changing the size of the image"
 }

@@ -22,37 +22,17 @@ with beds, the grain yard still working, {{MENTOR}}'s yard up the hill), then tw
 crowded road and its broken culvert, the river bridge, the empty grass north of it, a camp on the
 ridge, and the shrine on the grass under {{STAIR}}.
 
+**Buildings are not props.** A house, the guild hall, the grain shed and the ladder house are map
+geometry with three face textures on them, not sprites: they live in `buildings.md` and come off a
+`./story_prompt.py building` sheet. What stays here is everything a person could walk around — the
+well, the carts, the fences, the trees, the grain-yard wall.
+
 **{{STAIR}} itself is not a prop.** The bottom step is a staircase wider than a town ending thirty
 feet above an empty field: at 64 pixels to the cell it is hundreds of cells across and taller than
 the camera. It has to be built as map geometry — a run of the `stair_stone` wall tile for the face of
 the step, with the mass above it carried by the map's backdrop — and the only sprites under it are
 the ones listed here (`stone_shelf`, `water_jar`, `step_rope`, `sitter`). Do not put it on a prop
 sheet; a 64-pixel staircase is the one thing that will make the scale of the field read wrong.
-
-## house_a
-A small valley house of plastered stone under a low timber gable, one shutter open and one gone, the plank door standing ajar on an empty room.
-- footprint: 3x3
-- map: halm
-
-## house_b
-A narrow two-storey house with a steep tiled roof and an outside stair to the upper door, its lower shutters closed and barred.
-- footprint: 2x3
-- map: halm
-
-## guild_hall
-A long low stone hall with a deep porch on squat timber posts, wide double doors standing open, and a bare board on the wall beside them.
-- footprint: 4x3
-- map: halm
-
-## grain_shed
-An open-fronted grain shed of dark boards on a stone base, a sagging roof, sacks stacked inside and a scale bench by the door.
-- footprint: 3x3
-- map: halm
-
-## ladder_house
-A squat hunter's house with half its roof tiles laid and the rest stacked, a long ladder leaning against the eaves, a bad chimney.
-- footprint: 3x3
-- map: hart_yard
 
 ## well
 A round stone well with a low wall, a plank roof on two posts, a rope on a winding drum and a wooden bucket hooked at the rim.

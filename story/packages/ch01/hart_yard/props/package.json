@@ -2,13 +2,11 @@
   "kind": "props",
   "map": "hart_yard",
   "ids": [
-    "ladder_house",
     "practice_post"
   ],
-  "title": "hart_yard \u2014 2 props",
-  "makes": "`story/field/props/ladder_house.png`, `story/field/props/practice_post.png`",
+  "title": "hart_yard \u2014 1 props",
+  "makes": "`story/field/props/practice_post.png`",
   "outputs": [
-    "story/field/props/ladder_house.png",
     "story/field/props/practice_post.png"
   ],
   "dir": "story/packages/ch01/hart_yard/props"

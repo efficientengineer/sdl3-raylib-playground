@@ -1,4 +1,4 @@
-# halm — 13 props — save the image here
+# halm — 9 props — save the image here
 
 1. Open `prompt.md` in this folder. Attach the files it lists, in that order, then paste its prompt.
 2. Save what ChatGPT gives back **into this folder**, named `returned.png`.
@@ -14,10 +14,6 @@ That cuts the image into:
 - `story/field/props/barrel.png`
 - `story/field/props/cart.png`
 - `story/field/props/fence.png`
-- `story/field/props/grain_shed.png`
-- `story/field/props/guild_hall.png`
-- `story/field/props/house_a.png`
-- `story/field/props/house_b.png`
 - `story/field/props/scale_bench.png`
 - `story/field/props/sign.png`
 - `story/field/props/tree_a.png`

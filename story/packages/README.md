@@ -43,7 +43,9 @@ unblock each other. A checked box is already cut; everything below this section 
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · to generate · `ingest ch01/halm/tiles`
 - [ ] **10.** everything standing in `halm`  
       [`ch01/halm/props`](ch01/halm/props/prompt.md) · to generate · `ingest ch01/halm/props`
-- [ ] **11.** the shot sheet for `0110_the_board` — the first scene the game plays  
+- [ ] **11.** the front, wall and roof of every building in `halm`  
+      [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · to generate · `ingest ch01/halm/buildings`
+- [ ] **12.** the shot sheet for `0110_the_board` — the first scene the game plays  
       [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) · to generate · `ingest ch01/halm/scenes/0110_the_board`
 
 Then `./story_prompt.py ingest` and `./fast_reload.sh`.
@@ -80,8 +82,9 @@ until their reference sheet exists, because the walker must match it.
 
 ## 4. Field art, by chapter and map
 
-Tiles are the big surfaces (ground, floors, walls); everything else in the world is a prop
-sprite. A map named `common` means the entry carries no `- map:` line yet.
+Tiles are the big surfaces the ground is made of; a building is map geometry wearing three
+textures (the front wall, a wall sample, a roof sample); everything else is a prop sprite.
+A map named `common` means the entry carries no `- map:` line yet.
 
 ### ch01 — bridge  (no map file yet)
 
@@ -98,17 +101,20 @@ Shared props, drawn with another map so one id is never drawn twice: `cart` (wit
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
 | [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) | `story/field/tiles/cliff.png`, `story/field/tiles/dirt.png`, `story/field/tiles/grass.png`, `story/field/tiles/plank.png`, `story/field/tiles/stone.png`, `story/field/tiles/wall_plaster.png`, `story/field/tiles/wall_timber.png` | to generate | `ingest ch01/halm/tiles` |
-| [`ch01/halm/props`](ch01/halm/props/prompt.md) | `story/field/props/barrel.png`, `story/field/props/cart.png`, `story/field/props/fence.png`, `story/field/props/grain_shed.png`, `story/field/props/guild_hall.png`, `story/field/props/house_a.png`, `story/field/props/house_b.png`, `story/field/props/scale_bench.png`, `story/field/props/sign.png`, `story/field/props/tree_a.png`, `story/field/props/tree_b.png`, `story/field/props/well.png`, `story/field/props/yard_wall.png` | to generate | `ingest ch01/halm/props` |
+| [`ch01/halm/props`](ch01/halm/props/prompt.md) | `story/field/props/barrel.png`, `story/field/props/cart.png`, `story/field/props/fence.png`, `story/field/props/scale_bench.png`, `story/field/props/sign.png`, `story/field/props/tree_a.png`, `story/field/props/tree_b.png`, `story/field/props/well.png`, `story/field/props/yard_wall.png` | to generate | `ingest ch01/halm/props` |
+| [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) | `grain_shed`, `guild_hall`, `house_a`, `house_b`, `ladder_house` — front, side and roof each | to generate | `ingest ch01/halm/buildings` |
 
 ### ch01 — hart_yard
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/hart_yard/props`](ch01/hart_yard/props/prompt.md) | `story/field/props/ladder_house.png`, `story/field/props/practice_post.png` | to generate | `ingest ch01/hart_yard/props` |
+| [`ch01/hart_yard/props`](ch01/hart_yard/props/prompt.md) | `story/field/props/practice_post.png` | to generate | `ingest ch01/hart_yard/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (with `halm`), `dirt` (with `halm`), `grass` (with `halm`), `plank` (with `halm`), `wall_plaster` (with `halm`), `wall_timber` (with `halm`)
 
 Shared props, drawn with another map so one id is never drawn twice: `barrel` (with `halm`), `fence` (with `halm`), `tree_a` (with `halm`)
+
+Shared buildings, drawn with another map so one id is never drawn twice: `ladder_house` (with `halm`)
 
 ### ch01 — north_grass  (no map file yet)
 

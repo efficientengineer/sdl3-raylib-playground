@@ -1,4 +1,4 @@
-# hart_yard — 2 props — save the image here
+# hart_yard — 1 props — save the image here
 
 1. Open `prompt.md` in this folder. Attach the files it lists, in that order, then paste its prompt.
 2. Save what ChatGPT gives back **into this folder**, named `returned.png`.
@@ -11,7 +11,6 @@
 
 That cuts the image into:
 
-- `story/field/props/ladder_house.png`
 - `story/field/props/practice_post.png`
 
 `returned.png` is never deleted, so a bad cut can be redone after a fix, and a regeneration is just

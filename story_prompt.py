@@ -20,6 +20,8 @@
   ./story_prompt.py tiles  grass dirt water    story/out/tiles_....template.png + .chatgpt.md + .sheet.json
   ./story_prompt.py props  well cart sign      slots sized by each prop's footprint in map cells
   ./story_prompt.py walker Bron                the 4x4 walk grid (rows S W E N), the ref sheet attached
+  ./story_prompt.py building house_a           three slots a building: the front wall, a wall sample, a
+                                               roof sample -> story/field/buildings/<id>_{front,side,roof}.png
   ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png
                                                key the magenta, cut the slots, write story/field/tiles|props|walkers/
                                                and regenerate story/field/manifest.md ('slice' redirects here)
@@ -1740,13 +1742,21 @@ def run_quiet(fn, args):
 # takes the pixels inside the border, and a digit drawn inside would end up baked into the tile.
 
 FIELD = ROOT / "field"
-FIELD_DIRS = {"tile": FIELD / "tiles", "prop": FIELD / "props", "walker": FIELD / "walkers"}
-FIELD_DOCS = {"tile": FIELD / "tiles.md", "prop": FIELD / "props.md", "walker": FIELD / "walkers.md"}
+FIELD_DIRS = {"tile": FIELD / "tiles", "prop": FIELD / "props", "walker": FIELD / "walkers",
+              "building": FIELD / "buildings"}
+FIELD_DOCS = {"tile": FIELD / "tiles.md", "prop": FIELD / "props.md", "walker": FIELD / "walkers.md",
+              "building": FIELD / "buildings.md"}
 FIELD_MANIFEST = FIELD / "manifest.md"
-FIELD_KINDS = ("tiles", "props", "walker")          # the three commands; singular forms key the dicts above
+FIELD_KINDS = ("tiles", "props", "walker", "building")   # the four commands
+KIND_DIR = {"tiles": "tile", "props": "prop", "walker": "walker", "building": "building"}
 
 CELL_PX = 64                          # a map cell is 64 internal pixels (FIELD.md, "Art contract")
 TILE_PX = 64                          # every tile is 64x64 and seamless
+
+# Buildings are map geometry with three textures on them, not sprites. The sizes and the mapping are
+# the engine's contract (src/FIELD_NOTES.md, "Face-texture contract"); change them there first.
+BUILDING_FACES = ("front", "side", "roof")
+FACE_PX = {"front": (128, 128), "side": (128, 128), "roof": (64, 64)}
 WALK_W, WALK_H = 32, 48               # one walker frame
 WALK_FACINGS = ("S", "W", "E", "N")   # row order
 WALK_STEPS = ("stand", "step-left", "stand", "step-right")   # column order
@@ -1766,11 +1776,9 @@ TEMPLATE_CANVASES = ((1536, 1024, "landscape, 1536x1024"), (1024, 1536, "portrai
 
 # Expected props and their box in map cells (W across, H tall). props.md's own '- footprint:' line wins;
 # this table is the fallback, and an id in neither gets 1x1 and a warning.
-PROP_FOOTPRINTS = {
-    "house_a": (3, 3), "house_b": (2, 3), "guild_hall": (4, 3), "grain_shed": (3, 3),
-    "ladder_house": (3, 3), "well": (1, 2), "cart": (2, 2), "barrel": (1, 1),
-    "practice_post": (1, 2), "fence": (2, 1), "tree_a": (2, 3), "tree_b": (1, 2),
-    "sign": (1, 2), "milestone": (1, 1),
+PROP_FOOTPRINTS = {                   # houses and halls are not here: a building is geometry, see buildings.md
+    "well": (1, 2), "cart": (2, 2), "barrel": (1, 1), "practice_post": (1, 2), "fence": (2, 1),
+    "tree_a": (2, 3), "tree_b": (1, 2), "sign": (1, 2), "milestone": (1, 1),
 }
 DEFAULT_FOOTPRINT = (1, 1)
 
@@ -2254,6 +2262,102 @@ def cmd_walker(args):
                  warn, md, template, f"16 frames at {s}x, {label}")
 
 
+def cmd_building(args):
+    """Three slots per building: the whole front wall, a wall sample, a roof sample.
+
+    A building is not a sprite. The engine raises the box from the map and stretches the front across
+    the front wall, so the door and the windows are painted into that one square and land wherever the
+    artist put them; the side and the roof are seamless material, no openings and no landmark."""
+    ids = [a.lower() for a in args if not a.startswith("--")]
+    if not ids:
+        die("usage: building <id> [<id>...]   (ids come from story/field/buildings.md)")
+    entries, style, warn = field_entries(FIELD_DOCS["building"], "building"), load_style(), []
+    ids = dedupe_ids(ids, warn)
+    missing = [i for i in ids if i not in entries]
+    if missing:
+        die(f"no entry in story/field/buildings.md for: {', '.join(missing)}. Add a '## <id>' with a "
+            f"one-line description and a '- map:' line.")
+    for i in ids:
+        if not entries[i]["desc"]:
+            die(f"story/field/buildings.md: '## {i}' has no description line")
+        for key in ("desc", "wall", "roof"):
+            if entries[i].get(key):
+                check_description(entries[i][key], f"{i} ({key})", "story/field/buildings.md")
+
+    W, H, label, u, boxes = layout_cells([(1, 1)] * (len(ids) * 3), ids)
+    slots, n = [], 0
+    for i in ids:
+        for face in BUILDING_FACES:
+            n += 1
+            slots.append({"n": n, "id": i, "face": face, "box": list(boxes[n - 1]),
+                          "inner": list(inner_box(boxes[n - 1])), "target": list(FACE_PX[face]),
+                          "out": str((FIELD_DIRS["building"] / f"{i}_{face}.png").relative_to(ROOT.parent))})
+    name = package_name("buildings", ids)
+    b = style["blocks"]
+    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
+         f"Canvas: {label}, the same size as the template.", b["header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "",
+          "WHAT THESE ARE: wall and roof textures for the buildings of a 2.5D field map. The buildings "
+          "themselves are built by the game out of flat walls and roof slopes; these slots are what "
+          "gets painted onto them. Each building has three slots in a row: its front wall, its wall "
+          "material, its roof material. Every slot is filled edge to edge, right up to the white "
+          "border, with no sky, no ground, no scenery, no frame and no empty corner.", "",
+          "THE FRONT SLOT is the whole front wall of that one building, seen square on and flat, as if "
+          "you stood in front of it and looked straight at the wall: no perspective, no corner of the "
+          "building turning away, nothing in front of it. The door and the windows are painted into it "
+          "where they belong on that wall, at the size they would really be, with the door standing on "
+          "the very bottom edge of the slot. The game stretches this square across the real width of "
+          "the wall, so draw the whole wall and nothing else: no roof above it, no ground below it, no "
+          "sky, and no margin around it.", "",
+          "THE SIDE AND ROOF SLOTS are material samples, not walls: a patch of the same stuff, filled "
+          "edge to edge, with NO door, NO window, NO opening and no single large feature the eye can "
+          "count across a building. Both are SEAMLESS: the right edge continues into the left and the "
+          "bottom into the top, because the game repeats them. The side sample is seen square on and "
+          "flat like the front; the roof sample is seen straight down from above.", "",
+          f"In game the front and side are {FACE_PX['front'][0]}x{FACE_PX['front'][1]} pixels and the "
+          f"roof is {FACE_PX['roof'][0]}x{FACE_PX['roof'][1]}, so keep the pixels large and the shapes "
+          f"simple. All of these buildings stand in one valley town and share one palette.", "",
+          "SLOTS:"]
+    for s in slots:
+        e = entries[s["id"]]
+        px = f"{s['inner'][2]}x{s['inner'][3]} px in the template"
+        if s["face"] == "front":
+            L.append(f"Slot {s['n']} ({s['id']} front), {px}: the whole front wall of this building, "
+                     f"square on and flat, door and windows included, filling the slot edge to edge. "
+                     f"The building is: {e['desc'].rstrip('.')}.")
+        elif s["face"] == "side":
+            what = e.get("wall") or e["desc"]
+            L.append(f"Slot {s['n']} ({s['id']} side), {px}: a seamless sample of this building's wall "
+                     f"material, square on and flat, with no door and no window: {what.rstrip('.')}.")
+        else:
+            what = e.get("roof") or e["desc"]
+            L.append(f"Slot {s['n']} ({s['id']} roof), {px}: a seamless sample of this building's roof "
+                     f"seen straight down from above: {what.rstrip('.')}.")
+    L += ["", f"RENDERING: {b['rendering']}", "",
+          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, sky or "
+          f"ground or scenery in a slot, a three-quarter or perspective view of a building, a roof "
+          f"drawn over a front wall, a door or window in a side or roof slot, a visible seam in a side "
+          f"or roof sample, a frame or margin inside a slot, changing the size of the image"]
+    prompt = "\n".join(L)
+    template, manifest, md = write_field_package(
+        "building", name, label, W, H, BLACK, slots, prompt, attach, field_after(manifest_path(name), [
+            f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
+            "- [ ] Each front is one flat wall seen square on: no corner turning away, no roof, no ground",
+            "- [ ] The door stands on the bottom edge of its front slot and is the right size for the wall",
+            "- [ ] No door, window or opening anywhere in a side or roof slot",
+            "- [ ] Side and roof samples tile: left edge would meet right, top would meet bottom",
+            "- [ ] Every slot is filled to its border, with no frame, no margin and no empty corner", "",
+            "If one slot fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot "
+            "and the whole template exactly as it is. <what was wrong>\"."],
+            makes=f"the {len(slots)} face texture(s) listed above"),
+        status=field_status("building", slots))
+    report_field(kind_rows("building", slots, package_label(name)), warn, md, template,
+                 f"{len(ids)} buildings, {len(slots)} faces, {label}")
+
+
 def dedupe_ids(ids, warn):
     out = []
     for i in ids:
@@ -2296,8 +2400,9 @@ def kind_rows(kind, slots, package):
         if s["id"] in seen:
             continue
         seen.add(s["id"])
-        rows.append({"id": s["id"], "kind": kind, "target": f"{s['target'][0]}x{s['target'][1]}",
-                     "package": package})
+        target = (" / ".join(f"{f} {FACE_PX[f][0]}" for f in BUILDING_FACES) if kind == "building"
+                  else f"{s['target'][0]}x{s['target'][1]}")
+        rows.append({"id": s["id"], "kind": kind, "target": target, "package": package})
     return rows
 
 
@@ -2327,6 +2432,16 @@ def read_manifest_rows():
     return rows
 
 
+def field_art_exists(kind, ident):
+    """Is there a file on disk for this id? Buildings have three, and any one of them counts."""
+    d = FIELD_DIRS.get(kind)
+    if d is None:
+        return False
+    if kind == "building":
+        return any((d / f"{ident}_{f}.png").exists() for f in BUILDING_FACES)
+    return (d / f"{ident}.png").exists()
+
+
 def write_field_manifest(new_rows=()):
     """Regenerate story/field/manifest.md: every id ever requested, plus every id the docs declare."""
     rows = read_manifest_rows()
@@ -2334,6 +2449,7 @@ def write_field_manifest(new_rows=()):
     tiles = field_entries(FIELD_DOCS["tile"], "tile") if FIELD_DOCS["tile"].exists() else {}
     props = field_entries(FIELD_DOCS["prop"], "prop") if FIELD_DOCS["prop"].exists() else {}
     walkers = field_entries(FIELD_DOCS["walker"], "walker") if FIELD_DOCS["walker"].exists() else {}
+    builds = field_entries(FIELD_DOCS["building"], "building") if FIELD_DOCS["building"].exists() else {}
     for i in tiles:
         declared.append({"id": i, "kind": "tile", "target": f"{TILE_PX}x{TILE_PX}", "package": "-"})
     for i, e in props.items():
@@ -2341,29 +2457,42 @@ def write_field_manifest(new_rows=()):
         declared.append({"id": i, "kind": "prop", "target": f"{cw * CELL_PX}x{chh * CELL_PX}", "package": "-"})
     for i in walkers:
         declared.append({"id": i, "kind": "walker", "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": "-"})
+    for i in builds:
+        declared.append({"id": i, "kind": "building", "package": "-",
+                         "target": " / ".join(f"{f} {FACE_PX[f][0]}" for f in BUILDING_FACES)})
     for r in declared:                                   # a declared id keeps whatever package asked for it
         key = (r["kind"], r["id"])
         r["package"] = rows.get(key, {}).get("package", "-")
         rows[key] = r
     for r in new_rows:
         rows[(r["kind"], r["id"])] = dict(r)
+    live = {(r["kind"], r["id"]) for r in declared} | {(r["kind"], r["id"]) for r in new_rows}
+    for key in [k for k in rows if k not in live and not field_art_exists(*k)]:
+        del rows[key]                                    # an id its doc has dropped, with nothing on disk
+                                                         # (house_a was a prop before it became a building)
 
     L = ["# story/field/manifest.md — every field art id",
          "",
-         "Generated by `./story_prompt.py tiles|props|walker|cut`. The engine does not read it; people and",
-         "agents do. `package` is the last template sheet that asked for the id, `-` if none has yet.",
-         "Sizes are the target the pipeline writes; the last column is what is actually on disk.",
+         "Generated by `./story_prompt.py tiles|props|walker|building|cut`. The engine does not read it;",
+         "people and agents do. `package` is the last template sheet that asked for the id, `-` if none has",
+         "yet. Sizes are the target the pipeline writes; the last column is what is actually on disk.",
          ""]
     for kind, title, note in (("tile", "Tiles", f"{TILE_PX}x{TILE_PX}, opaque, seamless on all four edges"),
                               ("prop", "Props", f"alpha, {CELL_PX} px to a map cell, standing on the bottom row"),
                               ("walker", "Walkers", f"alpha, 4 rows (S, W, E, N) x 4 columns of "
-                                                    f"{WALK_W}x{WALK_H} frames")):
+                                                    f"{WALK_W}x{WALK_H} frames"),
+                              ("building", "Buildings", "opaque faces on map geometry: front stretched once "
+                                                        "across the front wall, side and roof seamless")):
         group = sorted((r for (k, _), r in rows.items() if k == kind), key=lambda r: r["id"])
         L += [f"## {title} — {note}", "", "| id | kind | target | package | file |", "| --- | --- | --- | --- | --- |"]
         for r in group:
-            f = FIELD_DIRS[kind] / f"{r['id']}.png"
-            size = png_size(f) if f.exists() else None
-            state = f"yes, {size[0]}x{size[1]}" if size else ("yes" if f.exists() else "missing")
+            if kind == "building":                       # three files to an id, so say which of them exist
+                have = [x for x in BUILDING_FACES if (FIELD_DIRS[kind] / f"{r['id']}_{x}.png").exists()]
+                state = ", ".join(have) if have else "missing"
+            else:
+                f = FIELD_DIRS[kind] / f"{r['id']}.png"
+                size = png_size(f) if f.exists() else None
+                state = f"yes, {size[0]}x{size[1]}" if size else ("yes" if f.exists() else "missing")
             L.append(f"| `{r['id']}` | {r['kind']} | {r['target']} | `{r['package']}` | {state} |")
         if not group:
             L.append("| — | | | | |")
@@ -2401,6 +2530,29 @@ def key_magenta(rows, w, h, ch):
             dst[x * 4:x * 4 + 4] = bytes((r, g, b, a))
         out.append(dst)
     return out
+
+
+LOUD = []           # warnings that have to survive run_quiet's swallowed output; `ingest` prints them
+
+
+def check_alpha(rows, w, h, out):
+    """A prop or a walker must come out with real transparency, or the game draws a black rectangle.
+
+    `write_png` writes colour type 6 whenever it is handed 4 channels, and `key_magenta` always hands
+    it 4, so every prop and walker file is RGBA by construction — that part cannot go wrong. What a
+    real cut can still get wrong is the *content*: a generator that painted over every last pixel of
+    magenta leaves a sprite with nothing keyed out, and the engine draws it as a solid rectangle. Say
+    so here, loudly, instead of leaving it to be found on the phone. A sprite that is honestly a
+    rectangle trips this too, and should: it will look like one in game."""
+    clear = sum(1 for r in rows for i in range(3, len(r), 4) if r[i] < 128)
+    if clear == 0:
+        LOUD.append(f"{out.name} came out with no transparent pixel anywhere, so the game will draw it "
+                    f"as a solid rectangle. Either the magenta was painted over, or the object really "
+                    f"does fill its slot. Ask for that slot again with the background left untouched "
+                    f"right up to the edge of the object.")
+        print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+        return "   <-- NO TRANSPARENCY, see the warning"
+    return f"  ({100 * clear // (w * h)}% transparent)"
 
 
 def crop(rows, ch, x, y, w, h):
@@ -2475,16 +2627,18 @@ def cmd_cut(args):
             f"this package, or the generator repainted the background. Nothing written.")
     print(f"{image.name}: {w}x{h}, template {tw}x{th} ({sx:.2f}x), {len(slots)} slot(s), kind {kind}")
 
-    if kind == "tiles":
-        FIELD_DIRS["tile"].mkdir(parents=True, exist_ok=True)
+    if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
+        FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
         for s in slots:
             x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
-            px = resize_nn(crop(rows, ch, x, y, bw, bh), bw, bh, ch, TILE_PX, TILE_PX)
-            if ch == 4:                                   # a tile is opaque: drop the alpha channel
+            tw_, th_ = s["target"]
+            px = resize_nn(crop(rows, ch, x, y, bw, bh), bw, bh, ch, tw_, th_)
+            if ch == 4:
                 px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
             out = ROOT.parent / s["out"]
-            write_png(out, TILE_PX, TILE_PX, 3, px)
-            print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  {TILE_PX}x{TILE_PX}")
+            write_png(out, tw_, th_, 3, px)
+            what = f"{s['id']} {s['face']}" if s.get("face") else s["id"]
+            print(f"  slot {s['n']} {what}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  {tw_}x{th_}")
     elif kind == "props":
         FIELD_DIRS["prop"].mkdir(parents=True, exist_ok=True)
         for s in slots:
@@ -2502,7 +2656,7 @@ def cmd_cut(args):
             out = ROOT.parent / s["out"]
             write_png(out, nw, nh, 4, px)
             print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> trimmed {cw}x{chh} -> "
-                  f"{out.relative_to(ROOT.parent)}  {nw}x{nh}")
+                  f"{out.relative_to(ROOT.parent)}  {nw}x{nh}{check_alpha(px, nw, nh, out)}")
     else:
         FIELD_DIRS["walker"].mkdir(parents=True, exist_ok=True)
         sheet = [bytearray(WALK_W * 4 * 4) for _ in range(WALK_H * 4)]
@@ -2516,12 +2670,11 @@ def cmd_cut(args):
         out = ROOT.parent / data["out"]
         write_png(out, WALK_W * 4, WALK_H * 4, 4, sheet)
         print(f"  16 frames -> {out.relative_to(ROOT.parent)}  {WALK_W * 4}x{WALK_H * 4} "
-              f"(rows {', '.join(WALK_FACINGS)})")
+              f"(rows {', '.join(WALK_FACINGS)}){check_alpha(sheet, WALK_W * 4, WALK_H * 4, out)}")
 
-    kinds = {"tiles": "tile", "props": "prop", "walker": "walker"}
     rows_out = ([{"id": data["template"].split("_", 1)[1], "kind": "walker",
                   "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": data["template"]}]
-                if kind == "walker" else kind_rows(kinds[kind], slots, data["template"]))
+                if kind == "walker" else kind_rows(KIND_DIR[kind], slots, data["template"]))
     write_field_manifest(rows_out)
     print(f"{FIELD_MANIFEST.relative_to(ROOT.parent)} updated")
 
@@ -2574,18 +2727,22 @@ def cast_in_play(scenes, cast):
 
 
 def split_field_ids(ids, sizes):
-    """Group ids into sheets that lay out with usable slots. ([[id...]], [(id, why it never fits)])."""
-    groups, bad, cur, cur_sizes = [], [], [], []
-    for i, s in zip(ids, sizes):
-        best, why = try_layout_cells([s])
+    """Group ids into sheets that lay out with usable slots. ([[id...]], [(id, why it never fits)]).
+
+    An id may want several slots — a building wants three — so an entry in `sizes` is either one
+    (w, h) box or a list of them, and a group is never split through the middle of an id."""
+    boxes = [s if isinstance(s, list) else [s] for s in sizes]
+    groups, bad, cur, cur_boxes = [], [], [], []
+    for i, bs in zip(ids, boxes):
+        best, why = try_layout_cells(bs)
         if best is None:
             bad.append((i, why))
             continue
-        if cur and try_layout_cells(cur_sizes + [s])[0] is None:
+        if cur and try_layout_cells(cur_boxes + bs)[0] is None:
             groups.append(cur)
-            cur, cur_sizes = [], []
+            cur, cur_boxes = [], []
         cur.append(i)
-        cur_sizes.append(s)
+        cur_boxes += bs
     if cur:
         groups.append(cur)
     return groups, bad
@@ -2704,6 +2861,7 @@ def cmd_packages(args):
     # ── the field art, by the map it belongs to ──
     tiles = field_entries(FIELD_DOCS["tile"], "tile") if FIELD_DOCS["tile"].exists() else {}
     props = field_entries(FIELD_DOCS["prop"], "prop") if FIELD_DOCS["prop"].exists() else {}
+    houses = field_entries(FIELD_DOCS["building"], "building") if FIELD_DOCS["building"].exists() else {}
     panel_scenes = [(ch, sc) for ch, sc in scenes if sc["kind"] == "panels" and sc["panels"]]
     map_chapter, default_ch = {}, min([ch for ch, _ in scenes], default=1)
     for ch, sc in scenes:
@@ -2711,7 +2869,9 @@ def cmd_packages(args):
     chap_of_map = lambda m: map_chapter.get(m, default_ch)
 
     shared = {}                    # (map, kind) -> [(id, the map whose package draws it)]
-    for kind, entries, dirname in (("tiles", tiles, "tiles"), ("props", props, "props")):
+    builder = {"tiles": cmd_tiles, "props": cmd_props, "building": cmd_building}
+    for kind, entries, dirname in (("tiles", tiles, "tiles"), ("props", props, "props"),
+                                   ("building", houses, "buildings")):
         by_map = {}
         for i, e in entries.items():
             maps = [slug(m) for m in (e.get("map") or "").split(",") if slug(m)] or [COMMON_MAP]
@@ -2720,19 +2880,25 @@ def cmd_packages(args):
                 shared.setdefault((other, kind), []).append((i, maps[0]))
         for mp in sorted(by_map):
             ids = sorted(by_map[mp])
-            sizes = [(1, 1)] * len(ids) if kind == "tiles" else [footprint_of(i, entries[i], []) for i in ids]
+            sizes = ([(1, 1)] * len(ids) if kind == "tiles" else
+                     [[(1, 1)] * len(BUILDING_FACES) for _ in ids] if kind == "building" else
+                     [footprint_of(i, entries[i], []) for i in ids])
             groups, bad = split_field_ids(ids, sizes)
             for i, why in bad:
                 failures.append((f"{kind} {i}", why))
             for n, group in enumerate(groups, 1):
                 folder = dirname if len(groups) == 1 else f"{dirname}_{n}"
                 d = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp / folder
-                outs = [str((FIELD_DIRS[kind[:-1]] / f"{i}.png").relative_to(ROOT.parent)) for i in group]
+                outs = ([str((FIELD_DIRS["building"] / f"{i}_{f}.png").relative_to(ROOT.parent))
+                         for i in group for f in BUILDING_FACES] if kind == "building" else
+                        [str((FIELD_DIRS[KIND_DIR[kind]] / f"{i}.png").relative_to(ROOT.parent)) for i in group])
+                what = "buildings" if kind == "building" else kind
                 add(d, {"kind": kind, "map": mp, "ids": group,
-                        "title": f"{mp} — {len(group)} {kind}" + (f" ({n} of {len(groups)})" if len(groups) > 1 else ""),
-                        "makes": ", ".join(f"`{o}`" for o in outs), "outputs": outs},
-                    cmd_tiles if kind == "tiles" else cmd_props, list(group),
-                    group=kind, map=mp, chapter=chap_of_map(mp))
+                        "title": f"{mp} — {len(group)} {what}" + (f" ({n} of {len(groups)})" if len(groups) > 1 else ""),
+                        "makes": (", ".join(f"`{i}`" for i in group) + " — front, side and roof each"
+                                  if kind == "building" else ", ".join(f"`{o}`" for o in outs)),
+                        "outputs": outs},
+                    builder[kind], list(group), group=kind, map=mp, chapter=chap_of_map(mp))
 
     # ── one shot sheet per panel scene, filed under the map it is played on ──
     for ch, sc in panel_scenes:
@@ -2757,7 +2923,8 @@ def cmd_packages(args):
     write_packages_readme(index, orphans, failures, notes, every, scenes, shared, all_maps, lead_map, cast)
     print(f"wrote {len(built)} package folder(s) under {PACKAGES.relative_to(ROOT.parent)}/")
     for g, label in (("refsheet", "reference sheets"), ("walker", "walk sheets"), ("tiles", "tile sheets"),
-                     ("props", "prop sheets"), ("scene", "scene shot sheets")):
+                     ("props", "prop sheets"), ("building", "building face sheets"),
+                     ("scene", "scene shot sheets")):
         n = sum(1 for r in index if r["group"] == g and r["ok"])
         blocked = sum(1 for r in index if r["group"] == g and r.get("blocked"))
         if n or blocked:
@@ -2831,7 +2998,8 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         step(r, f"{r['who']}'s reference sheet — the portrait, the walker and every panel come from it")
     for r in todo_first([x for x in rows("walker") if not x.get("blocked") and x["meta"].get("handle") in cast]):
         step(r, f"{r['who']}'s walk sprite — the figure walking the map")
-    for g, what in (("tiles", "the ground and walls of {m}"), ("props", "everything standing in {m}")):
+    for g, what in (("tiles", "the ground and walls of {m}"), ("props", "everything standing in {m}"),
+                    ("building", "the front, wall and roof of every building in {m}")):
         for r in [x for x in index if x["group"] == g and x["map"] == lead_map]:
             step(r, what.format(m=f"`{lead_map}`"))
     for r in [x for x in rows("scene") if x["map"] == lead_map]:
@@ -2868,13 +3036,14 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     if not rows("walker"):
         L.append("| — | | | |")
 
-    field = [r for r in index if r["group"] in ("tiles", "props")]
+    field = [r for r in index if r["group"] in ("tiles", "props", "building")]
     L += ["", "## 4. Field art, by chapter and map", "",
-          "Tiles are the big surfaces (ground, floors, walls); everything else in the world is a prop",
-          f"sprite. A map named `{COMMON_MAP}` means the entry carries no `- map:` line yet.", ""]
+          "Tiles are the big surfaces the ground is made of; a building is map geometry wearing three",
+          "textures (the front wall, a wall sample, a roof sample); everything else is a prop sprite.",
+          f"A map named `{COMMON_MAP}` means the entry carries no `- map:` line yet.", ""]
     for mp, ch in sorted(all_maps.items(), key=lambda kv: (kv[1], kv[0])):
         mine = [x for x in field if x["map"] == mp]
-        borrowed = {k: shared.get((mp, k), []) for k in ("tiles", "props")}
+        borrowed = {k: shared.get((mp, k), []) for k in ("tiles", "props", "building")}
         if not mine and not any(borrowed.values()):
             continue                                  # a map with no field art of its own yet
         mapfile = FIELD / "maps" / f"{mp}.map"
@@ -2888,7 +3057,8 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         L.append("")
         for kind, ids in borrowed.items():
             if ids:
-                L += [f"Shared {kind}, drawn with another map so one id is never drawn twice: "
+                L += [f"Shared {'buildings' if kind == 'building' else kind}, drawn with another map "
+                      f"so one id is never drawn twice: "
                       + ", ".join(f"`{i}` (with `{home}`)" for i, home in sorted(ids)), ""]
     if not field:
         L += ["(nothing in `story/field/tiles.md` or `story/field/props.md` yet)", ""]
@@ -2990,7 +3160,7 @@ def cmd_ingest(args):
     if not metas:
         die(f"no package folders under {', '.join(str(r) for r in roots)}. Run: ./story_prompt.py packages")
 
-    done, failed, waiting, fresh = 0, 0, 0, 0
+    done, failed, waiting, fresh, loud = 0, 0, 0, 0, 0
     for mf in metas:
         d, meta = mf.parent, json.loads(mf.read_text())
         rel = d.relative_to(ROOT.parent) if d.is_relative_to(ROOT.parent) else d
@@ -3003,6 +3173,7 @@ def cmd_ingest(args):
             fresh += 1
             continue
         kept = archive_returned(d, returned)
+        LOUD.clear()
         ok, msg = ingest_one(d, meta, returned)
         line = squash(msg) if msg else ""
         if ok:
@@ -3013,8 +3184,11 @@ def cmd_ingest(args):
         else:
             failed += 1
             print(f"FAIL  {rel}  {line}", file=sys.stderr)
+        for w in LOUD:                                   # never let a cutter's warning vanish into the capture
+            print(f"      ! {w}", file=sys.stderr)
+        loud += len(LOUD)
     print(f"\n{done} cut, {failed} failed, {fresh} already up to date, {waiting} still waiting for an image "
-          f"({len(metas)} package(s))")
+          f"({len(metas)} package(s))" + (f", {loud} warning(s) above" if loud else ""))
     if done:
         print("The game picks the new art up on the next ./fast_reload.sh (it runs portraits and export first).")
     if failed:
@@ -3134,6 +3308,8 @@ def main():
         cmd_props(args[1:])
     elif cmd == "walker":
         cmd_walker(args[1:])
+    elif cmd == "building":
+        cmd_building(args[1:])
     elif cmd == "cut":
         cmd_cut(args[1:])
     elif cmd == "preview":
