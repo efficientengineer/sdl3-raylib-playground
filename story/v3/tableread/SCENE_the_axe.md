@@ -1,12 +1,16 @@
 # Table read: "The Axe" (test)
 
 ## Situation (all actors know this)
-Halm, evening, Hart's one-room kitchen. Hart has the guild ledger open. Falke leaves at dawn on his
-first real job: the bread run to the Stair, two days west, which Hart has finally vouched for after
-refusing all afternoon. Ottilie is going with him. Falke's father's axe has hung on Hart's wall for
-eleven years; everyone in town has seen it and no one has taken it down.
+Halm, evening, Hart's one-room kitchen. Hart has the guild ledger open. The bread goes out to the
+Stair on the same day every year and that day is tomorrow, so Falke leaves at dawn. Hart posted the
+job himself this morning, because for eleven years he has quietly paid a carter to run it and this
+year no carter came — every carter and hunter in the valley has walked west for eighty coin a week,
+and his knee will not carry him there. It needed no guarantor: no hunter in the valley will vouch for
+a man on the run that killed the last one, who was Falke's father. Hart spent the afternoon trying to
+pull the job back down and has just signed it over instead. Ottilie is going with him. Falke's
+father's axe has hung on Hart's wall for eleven years and no one has taken it down.
 
-## Facts that must be said out loud by someone before the scene ends
+## Facts someone must state plainly before the scene ends
 1. Hart is charging Falke six coin for his own father's axe.
 2. Hart kept the axe eleven years and wants paying for the keeping.
 3. There is a notch in the blade.

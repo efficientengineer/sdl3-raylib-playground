@@ -4,53 +4,58 @@ All names are tokens. See `NAMES.md`. Party this chapter: {{HERO}} and {{HEALER}
 {{SCHOLAR}} and {{THIEF}} arrive in chapter two.
 
 ## Goal
-Get a job at the guild hall.
+Find work before the board is empty.
 
 ## Play: Explore + first fight — the town (5 min)
-{{HOME_TOWN}} is nine streets, a grain yard and a well. Everyone talks about your father first.
+{{HOME_TOWN}} is nine streets, a grain yard and a well, and a third of it has walked west this year:
+the carters' yard is empty, two shops are shuttered, and the people left talk about your father
+first and about eighty coin a week second.
 **Fight:** three rats the size of dogs behind the grain shed. They charge in a line. Teaches attack timing.
-**Find:** a grain sack the baker buys, which is your money. **Unlocks:** the guild hall.
+**Find:** a grain sack the baker buys, which is your money. **Unlocks:** the guild hall, where one
+sheet went up this morning.
 
 ## Clip: The Board
 
 [The guild hall. One sheet is left on the board.]
 
-CLERK: The coast escort is gone. {{RIVAL}} signed for it an hour ago.
+CLERK: The coast escort is gone. {{RIVAL}} signed for it an hour ago and left at noon.
 
-{{HERO}}: An hour? I was standing here at the bell! Put me down for the next one.
+{{HERO}}: An hour? I was standing here at the bell! What else is there?
 
-CLERK: The rule is that every job needs a hunter who will vouch for you. {{MENTOR}} has vouched for
-{{RIVAL}} four times this year. He has never once vouched for—
+CLERK: One sheet, and {{MENTOR}} posted it this morning. The bread goes out to the {{STAIR}} on the
+same day every year, and that day is tomorrow, so it leaves at dawn. Two days there, two days back,
+thirty coin.
 
-{{HERO}}: Never once? Not one job, ever?
+{{HERO}}: Thirty? For carrying a loaf? Who has to vouch for me on it?
 
-CLERK: Never once. Now — there is one job left. Carry this year's bread out to the {{STAIR}} and come
-back. Two days there, two days back, thirty coin. It has sat on that board four months because it is
-dull work.
+CLERK: The rule is waived on this one. No hunter in this valley will vouch for a man on that run,
+because the last hunter who walked it died on that road eleven years ago — and every carter who
+would have taken it instead is walking west for eighty a week.
 
-{{HERO}}: I'll take it! Hold it for me, I'm going up that hill right now.
+{{HERO}}: The last hunter who walked it was my father. I'll take it!
 
 ## Goal
-Get {{MENTOR}} to vouch for you.
+Stop {{MENTOR}} pulling the job back off the board.
 
 ## Play: Talk + climb — {{MENTOR}}'s yard (3 min)
-{{MENTOR}} trained your father, then {{HEALER}}, then you. He is on his roof fixing tiles, his knee
-is bad, and he will not come down.
+{{MENTOR}} trained your father, then {{HEALER}}, then you. He posted the run this morning because no
+carter came for it, and whoever posts a job can withdraw it until dawn. He is on his roof fixing
+tiles, his knee is bad, and he will not come down.
 **Find:** your father's hunter badge in the water barrel. **Unlocks:** the argument.
 
 ## Clip: You're Not Ready
 
 [{{MENTOR}} is on his roof nailing down tiles. {{HEALER}} is holding the ladder.]
 
-{{HERO}}: Vouch for me at the guild! It's the bread run to the {{STAIR}} — two days west, two days back.
+{{HERO}}: You put the bread run on the board this morning and you never said a word to me!
 
-{{MENTOR}}: No.
+{{MENTOR}}: Taking it back down before dark. Forget you saw it.
 
-{{HERO}}: It's thirty coin for walking to a step and walking home! What is going to happen to me out
-there?
+{{HERO}}: It goes out tomorrow or it doesn't go at all! Who else is left to carry it — you, on that
+knee?
 
 {{MENTOR}}: Your father walked that bread out thirty years. Died on that road eleven years back. I'm
-not signing you onto it.
+not putting you on it.
 
 {{HERO}}: You haven't even told me I'm not ready yet. You're saving it.
 
@@ -69,7 +74,7 @@ back. You can hear all of it.
 {{HEALER}}: I will go with him. I am a healer, I have walked that road twice — and do you know he has
 never once asked me to come anywhere?
 
-{{MENTOR}}: [writing his name in the book] Two days west. Bread on the stone shelf under the step.
+{{MENTOR}}: [signing the job over to him] Two days west. Bread on the stone shelf under the step.
 Straight back.
 
 {{HERO}}: What's at the step? I've never been out that far.
@@ -143,7 +148,8 @@ Six families live off the pilgrims here, and they all say the same thing: a woma
 bottom step, she is one of the people the ancients made, and once a year she takes the bread.
 **Do:** put your loaf on the stone shelf. The job is done and the screen says so.
 **Find:** last year's loaf still wrapped, a rope hanging from the bottom step, cart tracks in the
-grass, and a cloth folded under the shelf.
+grass, a cloth folded under the shelf, and eleven carters' receipts nailed inside the shrine door,
+every one of them paid by {{MENTOR}}.
 
 ## Clip: The Bread
 

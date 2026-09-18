@@ -4,7 +4,7 @@ Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
 ## The checklist
 
-Run every scene against all fourteen before it is written, and again before it is done.
+Run every scene against all fifteen before it is written, and again before it is done.
 Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game Storytelling*.
 
 0. **Plain.** After every clip a twelve-year-old could say what just happened, why, and what happens
@@ -44,7 +44,11 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
 9. **Tension and release alternate.** Every chapter has a rest and a laugh in it.
 10. **Story serves the map and the mechanics.** The writer's output, in order of importance:
     Goals, Areas, Encounters, Clips.
-11. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
+11. **Why now, why these people, why not before, who else.** Before writing any job, goal or reveal,
+    answer all four in your notes, and the answers must live in the world rather than in the plot's
+    convenience. A job no one has taken for months needs a reason it went untaken. A road only
+    these four can walk needs everyone else to be somewhere, for a reason, today.
+12. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
     or in the next clip.
 
 ## Names are tokens

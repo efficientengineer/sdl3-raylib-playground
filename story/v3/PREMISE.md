@@ -58,8 +58,10 @@ on that shore, and a caretaker comes twice a year to keep it going.
 ## {{MENTOR}} — the old hunter
 
 Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. Bad knee, worse temper, a guild ledger of
-what everyone in town owes him, and a roof he keeps climbing. Says "you're not ready" so often it has
-stopped being an insult.
+what everyone in town owes him, and a roof he keeps climbing. Since {{HERO}}'s father died he has
+quietly paid a carter out of his own money every year to take the bread out, so the run never went
+back through the guild. This year no carter came. Says "you're not ready" so often it has stopped
+being an insult.
 **Wants:** the house to have {{HERO}} in it; calls that his safety for as long as it works.
 
 ## {{RIVAL}} — the rival
@@ -75,7 +77,9 @@ Sells his coast escort on and takes {{VILLAIN}}'s coin in chapter one.
 Every region is a station on the same road: {{VILLAIN}} is walking to the door, and so are you.
 Beats marked **[non-default]** say how the writing avoids the version the genre reaches for first.
 
-1. **Carry the bread to the {{STAIR}}.** You see the first work of the ancients and cannot get within
+1. **Carry the bread to the {{STAIR}}.** The bread goes out on the same day every year, the job is
+   posted that morning because every carter in the valley has walked west for {{VILLAIN}}'s wages,
+   and it leaves at dawn. You see the first work of the ancients and cannot get within
    thirty feet of the bottom step. The woman who has taken that bread every year is gone, there is a
    rope on the step that should have slid off, and the {{SECOND_MOON}} moves again while you watch.
    (Chapter one.)
