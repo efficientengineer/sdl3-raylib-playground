@@ -142,3 +142,13 @@ today, the known risks, and the suggested next steps. Everything else hangs off 
 
 **To reverse anything:** every ruling in this log and in `story/canon.md` says how. Nothing is
 expensive to change: no art exists except scene 003's seven approved panels.
+
+## D11. Owner's verdict on the first draft: rejected on feel
+The owner read REVIEW.md and could not tell what the story was: "an AdLib with a ton of proper nouns",
+nothing like Phantasy Star IV or FF7 in feel. Diagnosis: the orchestrator's brief over-rewarded invented
+vocabulary and literary restraint (subtext, reasonable villains, no theme lines), which produced quiet
+paperwork drama. The source games are earnest, direct, loud, with a handful of words, monsters, vehicles,
+villains with presence, and a set piece in the first ten minutes.
+**Decided:** before any rewrite, produce a plain-language feel-first treatment (no invented names) and a
+rewritten opening hour in that voice, for the owner to judge. The existing draft stays in the repo as raw
+material (cast designs, art pipeline, structure) but is not the plan.
