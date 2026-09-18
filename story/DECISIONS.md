@@ -113,3 +113,32 @@ then 13, 14, 15; then the epilogue.
 **Known risks I am accepting** (see `story/notes/editor.md`): a healer's death two-thirds through is the
 most recognisable beat in both source games, saved only by its paperwork cause; chapter 13 is the
 thinnest chapter; 111 panel sheets is at the top of the art budget.
+
+## D10. Run complete
+**Decided:** The story is finished. **326 scenes — 111 panel, 192 talk, 23 narration — 689 panels and
+3,628 dialogue lines across fifteen chapters and an epilogue**, with 54 cast entries, 311 location
+keys, and a current ChatGPT package (165 files) for every panel scene and every reference sheet in
+`story/packages/`. `check` passes on all 326 scene files (only `000_TEMPLATE.md` fails, by design);
+`export` and `stats` succeed; the exported intro is unchanged and `003_the_warning`'s art is untouched.
+
+**The phases.**
+1. **Pitches and tools** — three independent story pitches; `type: talk` scenes and dialogue portraits added to the tool.
+2. **Bible** — `story/bible.md` (~22,600 words) from pitch C, accepted in D6.
+3. **Design and outlines** — five act outlines, the full cast, and the location book, written in parallel.
+4. **Editorial merge** — one story editor reconciled the five outlines and wrote `story/canon.md`, which outranks the bible and the outlines from here on.
+5. **Scene writing** — sixteen chapters written in five waves ordered by quotation, not chronology; chapter 1 first and frozen on delivery, the epilogue last.
+6. **Passes** — a continuity editor over all 326 files, the playlist, the branch splits and the speaker list; then a script doctor on the ten weakest scenes and chapter 1.
+7. **Close-out** — packages regenerated, `story/REVIEW.md` written, this entry, `CLAUDE.md` and `plot.md` updated.
+
+**Agents: thirty-four Opus subagents**, one brief each, exclusive file ownership, no agent ever
+committing. Three pitch writers · one bible writer · five act outliners · two cast designers · two
+location designers · one story editor · sixteen chapter writers · two tools agents · one continuity
+editor · one script doctor. The orchestrator assigned, merged, ruled on conflicts, and made every
+commit.
+
+**What the owner reads:** **`story/REVIEW.md`** — what was made, the story in one page, the cast, the
+numbered list of decisions that need a yes, what to generate first in ChatGPT, what plays on the phone
+today, the known risks, and the suggested next steps. Everything else hangs off it.
+
+**To reverse anything:** every ruling in this log and in `story/canon.md` says how. Nothing is
+expensive to change: no art exists except scene 003's seven approved panels.

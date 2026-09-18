@@ -255,3 +255,8 @@ not list the character; generate those last.
 | 47 | Mira | Tier 4 — Acts IV-V | [ref_mira.chatgpt.md](ref_mira.chatgpt.md) |
 | 48 | Bron | unranked | [ref_bron.chatgpt.md](ref_bron.chatgpt.md) |
 | 49 | Lyra | unranked | [ref_lyra.chatgpt.md](ref_lyra.chatgpt.md) |
+| 50 | Hallet | unranked | [ref_hallet.chatgpt.md](ref_hallet.chatgpt.md) |
+| 51 | Tarn | unranked | [ref_tarn.chatgpt.md](ref_tarn.chatgpt.md) |
+| 52 | Bost | unranked | [ref_bost.chatgpt.md](ref_bost.chatgpt.md) |
+| 53 | Venn | unranked | [ref_venn.chatgpt.md](ref_venn.chatgpt.md) |
+| 54 | Stobb | unranked | [ref_stobb.chatgpt.md](ref_stobb.chatgpt.md) |

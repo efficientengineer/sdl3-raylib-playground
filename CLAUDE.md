@@ -198,6 +198,46 @@ Debug panel (top 1/3 of screen) with two tabs:
 Scene art is 16-bit Genesis manga cutscenes (Phantasy Star IV look). The style is **locked** in
 `story/STYLE.md`; read its "Rules" section before writing anything image-related.
 
+### The story files
+
+*The Fair Copy* is written: 326 scenes (111 panel, 192 talk, 23 narration) in fifteen chapters and an
+epilogue. Start at **`story/REVIEW.md`** — the owner's entry point, and the fastest way to load the
+project. Then:
+
+- `story/DECISIONS.md` — the orchestrator's log, D1-D10: every story and scope call, and how to reverse it.
+- `story/canon.md` — settled facts and rulings. **Canon beats the bible and the outlines**, in that
+  order, and `003_the_warning` beats canon. Sections: the fifteen questions (1), rulings (2), Ket's
+  light ledger (3), calendar/ages/party (4), the cross-act plant table (5), the name register (6),
+  five prohibitions (7), branching scenes (10), continuity rulings (11).
+- `story/bible.md` — the world. Sections 1 (titles), 2 (premise), 9 (the party), 12 (the chapter plan)
+  are the ones worth reading; the rest is reference.
+- `story/outline/act1-5.md` — **history.** Superseded wherever they disagree with canon; two are
+  knowingly stale.
+- `story/playlist.md` — play order. `## intro` is what the game actually plays; `## chapter01`-`16`
+  are the full lists, with `(optional)` and `(branch: ...)` markers.
+- `story/characters.md` (54 entries), `story/locations.md` (311 keys), `story/plot.md` (short state file).
+- `story/packages/` — generated but tracked: a paste-ready ChatGPT package per panel scene and per
+  reference sheet, plus `README.md` as the index and art-priority order.
+- `story/notes/` — each agent's report. `continuity.md` has the ten weakest scenes; `editor.md` the
+  five biggest risks; `cast-designer-2.md` §5 the reference-sheet priority order.
+
+**Frozen wording.** Some text is quoted across many chapters and must be reproduced character for
+character, never paraphrased: the Tally's fifteen questions, the guild's Four Lines, the hall-guards'
+oath and the relief formula, the payroll line, the intake form, Crewe's list entry. Canon section 1
+names every scene allowed to quote the Tally; no other scene may. `003_the_warning`'s panels, staging
+and acting lines are frozen outright because its art is approved.
+
+**Branch scenes.** The format has no selector, so a branching moment is **one complete scene file per
+outcome**, suffixed `a`/`b`/`c` (`0845a/b/c`, `1340a/b`), each stating its condition in the first
+paragraph of its `## Beat` and marked `(branch: ...)` in the playlist. The game must play exactly one
+of a set; until a selector exists, only `0845c` is safe to ship.
+
+**How big story work is done here.** Orchestrator-only: the main session writes a brief per agent,
+spawns Opus subagents that each own an exclusive set of files, merges their output, rules on the
+conflicts they report, and makes every commit. **Agents never commit, never touch `src/`,
+`story_prompt.py`, `STYLE.md` or another agent's files, and never deploy to the phone.** Conflicts and
+tool complaints go in `story/notes/<agent>.md` and the orchestrator rules on them in `DECISIONS.md`.
+
 - **Never hand-write a final image prompt**, and never paste style text into one. Write a scene
   file in `story/scenes/NNN_slug.md` (copy `000_TEMPLATE.md`), then run the tool. It inserts the locked
   style blocks and each character's `look` verbatim, and exits non-zero if the scene breaks a

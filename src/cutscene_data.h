@@ -14,7 +14,7 @@ struct CsScene { const char *id; const char *title; bool narration;   // narrati
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
 
 static const CsLine CS_p01_prologue_LINES[] = {
-    { "Narrator", "Long ago, the people of the hills built their halls downward, toward something that sang to them in the dark.", 0, CS_WONDER, nullptr, CS_LEFT },
+    { "Narrator", "Long ago, the people of the hills built their halls downward, toward something that sang in the dark.", 0, CS_WONDER, nullptr, CS_LEFT },
     { "Narrator", "They grew wise there. They grew rich. And then, in a single season, they sealed every door from the inside.", 0, CS_WONDER, nullptr, CS_LEFT },
     { "Narrator", "No one came out. The guards who held those doors swore an oath that outlasted their lives.", 0, CS_DREAD, nullptr, CS_LEFT },
     { "Narrator", "A thousand years later, a bill went up on the board in the water-house at Sallowgate.", 0, CS_DREAD, nullptr, CS_LEFT },
@@ -45,9 +45,9 @@ static const CsLine CS_003b_after_the_warning_LINES[] = {
     { "Bron", "It's still standing there. It hasn't even shifted its grip.", 0, CS_DREAD, "portrait_bron.png", CS_LEFT },
     { "Lyra", "It won't. It's been holding that gap for a thousand years.", 0, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
     { "Bron", "Then whatever it's holding it against is still down there.", 0, CS_DREAD, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "That's what frightens me. It sealed itself in with the thing it was afraid of.", 0, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
+    { "Lyra", "Every door in this hill was barred from the inside. That isn't keeping people out.", 0, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
     { "Bron", "The contract says clear the entrance. Nobody said anything about what's behind it.", 0, CS_TENSE, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "Then we go in with our eyes open. And we tell the others before we take another step.", 0, CS_HOPE, "portrait_lyra.png", CS_RIGHT },
+    { "Lyra", "Then we go in. And we go back up and tell the other two before anybody takes another step.", 0, CS_HOPE, "portrait_lyra.png", CS_RIGHT },
 };
 
 static const CsScene CS_INTRO[] = {
