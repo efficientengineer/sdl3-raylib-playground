@@ -18,19 +18,20 @@ sheet went up this morning.
 
 [The guild hall. One sheet is left on the board.]
 
-CLERK: The coast escort is gone. {{RIVAL}} signed for it an hour ago and left at noon.
+CLERK: The rule is that you sign before the bell. {{RIVAL}} signed for the coast escort an hour ago
+and left at noon.
 
-{{HERO}}: An hour? I was standing here at the bell! What else is there?
+{{HERO}}: An hour? I stood right here at the bell! What's that last sheet on the board?
 
-CLERK: One sheet, and {{MENTOR}} posted it this morning. The bread goes out to the {{STAIR}} on the
-same day every year, and that day is tomorrow, so it leaves at dawn. Two days there, two days back,
-thirty coin.
+CLERK: The bread run out to the {{STAIR}}. {{MENTOR}} carried it in himself this morning — thirty
+coin, two days out, two days back, and it leaves at dawn.
 
-{{HERO}}: Thirty? For carrying a loaf? Who has to vouch for me on it?
+{{HERO}}: {{MENTOR}} posted it himself? So where's the carter who takes the bread every year?
 
-CLERK: The rule is waived on this one. No hunter in this valley will vouch for a man on that run,
-because the last hunter who walked it died on that road eleven years ago — and every carter who
-would have taken it instead is walking west for eighty a week.
+CLERK: There is no carter. Every carter who would take the bread has walked west to the lord's city
+for eighty coin a week — and the rule that a hunter must vouch for you is waived on this one, because
+no hunter will vouch for a man on that run. The last hunter who walked it died on that road eleven
+years ago.
 
 {{HERO}}: The last hunter who walked it was my father. I'll take it!
 
@@ -54,8 +55,8 @@ tiles, his knee is bad, and he will not come down.
 {{HERO}}: It goes out tomorrow or it doesn't go at all! Who else is left to carry it — you, on that
 knee?
 
-{{MENTOR}}: Your father walked that bread out thirty years. Died on that road eleven years back. I'm
-not putting you on it.
+{{MENTOR}}: Your father and I walked that bread out together for twenty years. Broke my knee on that
+road. Next year he walked it alone and didn't come back. Eleven years ago. Not putting you on it.
 
 {{HERO}}: You haven't even told me I'm not ready yet. You're saving it.
 
@@ -71,33 +72,33 @@ back. You can hear all of it.
 
 [{{HEALER}} is holding the guild book open. {{MENTOR}} is sitting on the bottom rung of the ladder.]
 
-{{HEALER}}: I will go with him. I am a healer, I have walked that road twice — and do you know he has
-never once asked me to come anywhere?
+{{HEALER}}: Sign it, {{MENTOR}}. Four days, not two — two west and two back — and I am the one who
+patches whoever goes.
 
-{{MENTOR}}: [signing the job over to him] Two days west. Bread on the stone shelf under the step.
-Straight back.
+{{MENTOR}}: [signing the job over to him] Bread on the stone shelf under the bottom step. Straight back.
 
 {{HERO}}: What's at the step? I've never been out that far.
 
 {{MENTOR}}: A staircase the ancients built. A woman lives under it and takes the bread once a year.
 Don't touch the stone. Don't go past her shelf.
 
-{{HERO}}: A woman lives under it? {{HEALER}} — will you come with me?
+{{HERO}}: A woman lives under it? {{HEALER}} — you've walked that road twice. Come with me?
 
-{{HEALER}}: Yes!
+{{HEALER}}: Yes! And he has never once asked me to come anywhere until today.
 
 ## Play: Explore + shop — {{MENTOR}}'s kitchen (3 min)
 Supper. He stays at the table and tells you what everything in the room is if you touch it.
 **Shop:** rope, a waterskin, food. Spend carefully; you need coin in the next scene.
-**Unlocks:** your father's axe — slow, heavy, and the only weapon in the game that can break.
+**Unlocks:** your father's sword — long reach and fast, and the only weapon in the game that can
+break. The notch in the blade is where it breaks.
 
-## Clip: The Axe
+## Clip: The Sword
 
 [{{MENTOR}}'s kitchen. He has the guild ledger open in front of him.]
 
-{{MENTOR}}: Take your father's axe. Six coin.
+{{MENTOR}}: Take your father's sword. Six coin.
 
-{{HERO}}: Six coin? You're selling me my own father's axe!
+{{HERO}}: Six coin? You're selling me my own father's sword!
 
 {{MENTOR}}: Kept it eleven years. I want paying for the keeping.
 
@@ -155,18 +156,18 @@ every one of them paid by {{MENTOR}}.
 
 [The stone shelf under the bottom step. The new loaf is on it next to last year's.]
 
-{{HERO}}: [pulling a folded cloth out from under the shelf] This is my father's cloth — that's his
-mark stitched in the corner!
+{{HERO}}: [unfolding a cloth from under the shelf] That's my father's mark in the corner — he stitched
+it into everything he owned!
 
-{{HEALER}}: He left it the year he died, then. Eleven years under a rock.
+{{HEALER}}: Last year's loaf is still wrapped, with a full year of rain on it. She has been gone a
+year, {{HERO}}.
 
-{{HERO}}: He walked out here every year for thirty years and sat under this step. She knew him thirty
-years. Did he ever tell you that?
+{{HERO}}: A year? Then he left this the year he died — it has been under this step eleven years.
 
-{{HEALER}}: He never told anyone. And she has not taken the bread for a year, {{HERO}}. Whatever
-happened to her, she has been gone that long.
+{{HEALER}}: Thirty years he sat under this step, and he told no one. She knew him longer than you did.
 
-{{HERO}}: He talked to her more than he talked to me.
+{{HERO}}: Thirty years and he never once said her name to me? He talked to her every year and gave me
+the weather!
 
 ## Play: Travel — night under the {{STAIR}} (2 min)
 A fire and two bedrolls. The stone goes up past where the firelight reaches.

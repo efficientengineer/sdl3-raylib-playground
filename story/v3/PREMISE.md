@@ -29,7 +29,7 @@ those are the same thing.
 
 ## {{HERO}} — hunter's apprentice, seventeen
 
-Short, broad, red-haired, carrying an axe he paid for. His father was the best hunter in town, died
+Short, broad, red-haired, carrying an sword he paid for. His father was the best hunter in town, died
 on a job no one will describe to him, and for thirty years carried the year's bread out to the
 {{STAIR}} and sat under it talking to the woman who lives there.
 {{HERO}} has no gift and no destiny. What he has, and does not know he has, is an introduction.
@@ -57,11 +57,13 @@ on that shore, and a caretaker comes twice a year to keep it going.
 
 ## {{MENTOR}} — the old hunter
 
-Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. Bad knee, worse temper, a guild ledger of
-what everyone in town owes him, and a roof he keeps climbing. Since {{HERO}}'s father died he has
-quietly paid a carter out of his own money every year to take the bread out, so the run never went
-back through the guild. This year no carter came. Says "you're not ready" so often it has stopped
-being an insult.
+Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. He and the father were hunting partners for
+twenty years and the bread run was theirs together: two men and one loaf, every year, on the same day.
+The year before the father died, {{MENTOR}}'s knee was broken on that road. The next year the father
+walked it alone and did not come back. Since then {{MENTOR}} has paid a carter out of his own pocket
+every year to take the bread out, because it is still his run in his head and money is the only way he
+knows to say so — and it is why he sells {{HERO}} the sword instead of giving it. {{HERO}} knows they
+were partners. He does not know about the money, and will not hear it from {{MENTOR}}.
 **Wants:** the house to have {{HERO}} in it; calls that his safety for as long as it works.
 
 ## {{RIVAL}} — the rival
@@ -72,7 +74,7 @@ Sells his coast escort on and takes {{VILLAIN}}'s coin in chapter one.
 
 ---
 
-## The game in ten beats
+## The game in fourteen beats
 
 Every region is a station on the same road: {{VILLAIN}} is walking to the door, and so are you.
 Beats marked **[non-default]** say how the writing avoids the version the genre reaches for first.
@@ -83,31 +85,36 @@ Beats marked **[non-default]** say how the writing avoids the version the genre 
    thirty feet of the bottom step. The woman who has taken that bread every year is gone, there is a
    rope on the step that should have slid off, and the {{SECOND_MOON}} moves again while you watch.
    (Chapter one.)
-2. **Walk west on the pilgrim road.** Reach the green city and be fed by people who will not hear a
-   word against him.
-   **[non-default]** {{VILLAIN}} never argues his case and never asks anyone to join him. He offers
-   {{HERO}} a contract on better terms than the guild's, with his own name on the guarantor line — the
-   line the guild left blank in chapter one — and {{HERO}} nearly signs it before right and wrong come up.
-3. **The town that sold her.** You arrive at the bell house a season late. The money is spent, the
-   school is built, the children are in it, and there is no one here to fight.
-4. **Learn ten words.** A dying caretaker in a road-house will teach {{SCHOLAR}} ten words of their
-   language in exchange for being carried outside to see the weather. Those ten words are the party's
-   only way into anything for the next four regions.
-5. **The edge of the sea.** {{MENTOR}} dies at the wall where the water stops.
+2. **Walk west in the crowd.** Join the pilgrim road: thousands of ordinary people walking toward the
+   rain with handcarts, and the party is four more of them.
+3. **Pick up two.** {{SCHOLAR}} attaches himself because the road is full of people who have seen the
+   ancients' language; {{THIEF}} joins because a crowd this size is a living.
+4. **See the green city, and love it.** Fountains, wet streets, a street named after him, children who
+   have never seen rain — and the lord himself, charming, generous, and half right, who feeds you.
+5. **Take jobs in three directions and find the bill.** A river town whose river stopped, a coast whose
+   tides no longer match the moon, a mill that will not turn, and refugees walking west because the
+   lord's city is the only water left.
+6. **Find her in his keep.** The woman from under the {{STAIR}} is here — old, unguarded, free to leave
+   — helping him because he asked her something no one had asked in a thousand years.
+7. **The road to act three.** He is walking to {{THE_DOOR}} with her to ask for more, the {{STAIR}} is
+   where the answer comes down, and the {{SECOND_MOON}} is being moved to line up with it.
+8. **Learn ten words.** A dying caretaker in a road-house teaches {{SCHOLAR}} ten words of their
+   language in exchange for being carried outside to see the weather.
+9. **The edge of the sea.** {{MENTOR}} dies at the wall where the water stops.
    **[non-default]** It proves nothing about {{HERO}}. He is there because he took a wrong turning,
    he knows it, and he spends his last minute furious about the cart fare. The party is a mile off
    and only hears it. What {{HERO}} inherits is the ledger with his own name in it.
-6. **Take a vehicle.** One of theirs, found upright and patient, that goes where it used to go and
+10. **Take a vehicle.** One of theirs, found upright and patient, that goes where it used to go and
    nowhere else. It joins the party as a set piece, it opens four regions, and it will never once go
    where you want.
-7. **The season that did not come.** The cold arrives on the same day every year because something
+11. **The season that did not come.** The cold arrives on the same day every year because something
    decides it. This year it doesn't, a region starves, and it is downstream of the help.
-8. **{{RIVAL}} walks out of the coat.** He has seen the pilgrimage from inside and brings the one
+12. **{{RIVAL}} walks out of the coat.** He has seen the pilgrimage from inside and brings the one
    thing the party needs: the marching order, and the date {{VILLAIN}} reaches the door.
-9. **The mountain that is a door.** Both parties arrive. The caretaker is asked to choose, and before
+13. **The mountain that is a door.** Both parties arrive. The caretaker is asked to choose, and before
    she answers she tells {{HERO}} what his father said to her across thirty years — and it is all
    weather, and bread, and a boy who was doing well at his letters.
-10. **Overrule it.** The door can be held shut by a caretaker standing in it, and she is the last one
+14. **Overrule it.** The door can be held shut by a caretaker standing in it, and she is the last one
     and she is tired, and {{HERO}} asks her anyway and she says yes because he asked.
     **[non-default]** No closing callback and no weather. The last scene is the four of them arguing
     about who owes whom money on a road going nowhere in particular, and the game ends inside the

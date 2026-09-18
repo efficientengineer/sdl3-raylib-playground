@@ -10,7 +10,7 @@ Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 
 | Token | Current name | What it is |
 |---|---|---|
-| `{{HERO}}` | Falke | Hunter's apprentice, seventeen. Bought his father's axe. Has an introduction he doesn't know about. |
+| `{{HERO}}` | Falke | Hunter's apprentice, seventeen. Bought his father's sword. Has an introduction he doesn't know about. |
 | `{{HEALER}}` | Ottilie | Healer, twenty-three. The mentor's other student. Wants to be asked along. |
 | `{{SCHOLAR}}` | Frage | One of eight people alive who read any of the ancients' language, and the worst of them. Joins chapter two. |
 | `{{THIEF}}` | Elster | Thief, small, loud. Sends money home to a sister a caretaker keeps alive. Joins chapter two. |
