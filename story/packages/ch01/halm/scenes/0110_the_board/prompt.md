@@ -2,14 +2,14 @@
 
 ## What exists already
 
-0 of 6 panels have been cut into `story/panels/` already.
+6 of 6 panels have been cut into `story/panels/` already.
 
-- `story/panels/0110_the_board_p1_establishing_tall.png` — missing
-- `story/panels/0110_the_board_p2_two_shot.png` — missing
-- `story/panels/0110_the_board_p3_object_insert.png` — missing
-- `story/panels/0110_the_board_p4_portrait_inset.png` — missing
-- `story/panels/0110_the_board_p5_over_shoulder.png` — missing
-- `story/panels/0110_the_board_p6_eyes_slit.png` — missing
+- `story/panels/0110_the_board_p1_establishing_tall.png` — **cut already**
+- `story/panels/0110_the_board_p2_two_shot.png` — **cut already**
+- `story/panels/0110_the_board_p3_object_insert.png` — **cut already**
+- `story/panels/0110_the_board_p4_portrait_inset.png` — **cut already**
+- `story/panels/0110_the_board_p5_over_shoulder.png` — **cut already**
+- `story/panels/0110_the_board_p6_eyes_slit.png` — **cut already**
 
 ## 1. Start a new chat and attach these files, in this order
 

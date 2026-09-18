@@ -22,15 +22,17 @@
   ./story_prompt.py walker Bron                the 4x4 walk grid (rows S W E N), the ref sheet attached
   ./story_prompt.py building house_a           three slots a building: the front wall, a wall sample, a
                                                roof sample -> story/field/buildings/<id>_{front,side,roof}.png
-  ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png
-                                               key the magenta, cut the slots, write story/field/tiles|props|walkers/
+  ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png [--fringe N]
+                                               key the magenta (--fringe N shaves N more pixels off the
+                                               edge), cut the slots, write story/field/tiles|props|walkers/
                                                and regenerate story/field/manifest.md ('slice' redirects here)
 
   ./story_prompt.py preview story/scenes/003_x.md
                                                write story/out/<scene>.preview.html: panels layered manga-style and
                                                revealed line by line with a dialogue box (placeholders if not sliced yet)
 
-  ./story_prompt.py export                     write src/cutscene_data.h from story/playlist.md for the game
+  ./story_prompt.py export                     write src/cutscene_data.h from story/playlist.md, and
+                                               src/field_text.h from story/field/text.md, for the game
                                                (scenes whose panels are not all generated yet are skipped)
 
   ./story_prompt.py names                      the {{TOKEN}} table from story/v3/NAMES.md, and every token
@@ -42,7 +44,8 @@
                                                cast/<name>/refsheet|walker, chNN/<map>/tiles|props|scenes/<scene>,
                                                each with prompt.md, sheet.json, template.png, RETURN_HERE.md
                                                and a README index (one failing scene does not stop the run)
-  ./story_prompt.py ingest [folder] [--force]  cut every image saved as returned.png in story/packages/:
+  ./story_prompt.py ingest [folder] [--force] [--fringe N]
+                                               cut every image saved as returned.png in story/packages/:
                                                shot sheets into panels, templates into tiles/props/walkers,
                                                a reference sheet into story/refs/ plus its portrait
 
@@ -797,6 +800,17 @@ def cmd_check_build(args, build):
             "dialogue": [{"speaker": w, "line": l} for w, l in scene["dialogue"]],
         }, indent=2) + "\n")
         print(f"{path.name}: wrote {txt.relative_to(ROOT.parent)}")
+    if not build and "--all" in args:                    # the field's examine text answers to the same rules
+        err, warn = check_field_text()
+        for w in warn:
+            print(f"warning: {w}", file=sys.stderr)
+        for e in err:
+            print(f"ERROR: {e}", file=sys.stderr)
+        n = len(load_field_text())
+        todo = sum(1 for e in load_field_text().values() if TODO_RE.match(e["raw"]))
+        print(f"{FIELD_TEXT.relative_to(ROOT.parent)}: " +
+              (f"{len(err)} error(s)" if err else f"ok ({n} line(s), {todo} still a placeholder)"))
+        failed += 1 if err else 0
     if failed:
         sys.exit(f"story_prompt: {failed} scene(s) rejected. Fix the scene file; do not bypass the rules.")
 
@@ -1309,7 +1323,7 @@ def cmd_slice(args):
         die('usage: slice story/out/<name>.sheet.json <image> [--trim N] [--boxes "x,y,w,h;..."]')
     manifest, image = json.loads(Path(pos[0]).read_text()), Path(pos[1]).expanduser()
     if manifest.get("kind") in FIELD_KINDS:              # a field template package: the boxes are known
-        return cmd_cut(pos)                              # --trim and --boxes mean nothing here
+        return cmd_cut(args)                             # --trim and --boxes mean nothing there, --fringe does
     if not image.exists():
         die(f"{image} not found")
     w, h, ch, rows = read_png(image)
@@ -1747,6 +1761,10 @@ FIELD_DIRS = {"tile": FIELD / "tiles", "prop": FIELD / "props", "walker": FIELD 
 FIELD_DOCS = {"tile": FIELD / "tiles.md", "prop": FIELD / "props.md", "walker": FIELD / "walkers.md",
               "building": FIELD / "buildings.md"}
 FIELD_MANIFEST = FIELD / "manifest.md"
+FIELD_TEXT = FIELD / "text.md"        # examine text: '## <map>.<id>' -> one or two sentences
+V3_STYLE, SMELLS = ROOT / "v3" / "STYLE.md", ROOT / "v3" / "SMELLS.md"   # the BAN: lists
+TEXT_MAX_SENTENCES = 2                # it is a box on a phone that a thumb dismisses
+TODO_RE = re.compile(r"^\[[\w.]+:\s*TODO\]$")   # a placeholder the writer has not filled yet
 FIELD_KINDS = ("tiles", "props", "walker", "building")   # the four commands
 KIND_DIR = {"tiles": "tile", "props": "prop", "walker": "walker", "building": "building"}
 
@@ -1764,9 +1782,20 @@ WALK_MIN_SCALE = 4                    # frames drawn at least 4x up so ChatGPT h
 TILE_KINDS = ("ground", "wall")
 
 MAGENTA, BLACK, WHITE = (255, 0, 255), (0, 0, 0), (255, 255, 255)
-KEY_HARD, KEY_SOFT = 56, 180          # RGB distance to magenta: <= hard is background, <= soft fades out
-#   A half-and-half blend of a mid tone with magenta lands around 130, so the soft band has to reach
-#   past that or every sprite keeps a pink outline. The band only applies to magenta-hued pixels.
+KEY_HARD = 56                         # RGB distance to magenta: at or under this the pixel is background
+#   Distance to magenta is a bad measure of how much magenta is *in* a pixel. A black outline blended
+#   half and half with the background lands at rgb(126,0,128) — 181 away from pure magenta, further
+#   than a mid grey is — so any distance threshold either keeps it (a purple outline on the phone,
+#   which is what the first real cut showed) or eats real colour. What does measure it is the magenta
+#   cast, min(r, b) - g: magenta is the one colour with red and blue at the top and green at the
+#   bottom, so for a blend with a roughly neutral foreground the cast is about 255 * the magenta
+#   fraction, and 255 - cast is the alpha. That estimate only gets applied near the background, so an
+#   object may be any colour it likes in its own interior.
+KEY_EDGE_REACH = 3                    # how many pixels in from the background the anti-aliasing reaches
+KEY_CAST_MIN = 16                     # a smaller cast than this is the artist's colour, not the background
+KEY_CAST_CLEAN = 24                   # cast still left after un-matting: the pixel needs a neighbour's colour
+KEY_MIN_ALPHA = 64                    # under this the engine's 0.5 alpha test drops the pixel anyway
+KEY_CLEAN_RADIUS = 4                  # how far to look for a clean opaque neighbour to borrow a colour from
 SLOT_BORDER = 3                       # white border drawn inside each slot rectangle
 SLOT_MARGIN, SLOT_GUTTER = 52, 48     # canvas margin, gap between slots (the numbers live in the gap)
 SLOT_MIN = 96                         # an inner slot smaller than this is not worth asking for
@@ -2152,12 +2181,14 @@ def cmd_props(args):
     L += ["", f"RENDERING: {b['rendering']}", "",
           f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
           f"grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a "
-          f"scene or background inside a slot, two objects in one slot, changing the size of the image"]
+          f"scene or background inside a slot, two objects in one slot, a soft blurred or glowing edge "
+          f"where an object meets the magenta, changing the size of the image"]
     prompt = "\n".join(L)
     template, manifest, md = write_field_package(
         "props", name, label, W, H, MAGENTA, slots, prompt, attach, field_after(manifest_path(name), [
             f"- [ ] All {len(ids)} slots filled, every border and number still exactly where it was",
             "- [ ] The magenta is untouched outside the slots, and comes right up to each object",
+            "- [ ] The edge of every object is hard against the magenta, not soft, blurred or glowing",
             "- [ ] No ground, shadow, base plate or scenery under or behind an object",
             "- [ ] Every object stands on the bottom edge of its slot and shares one camera angle",
             "- [ ] One scale across the sheet: the big buildings really are bigger than the barrel", "",
@@ -2244,7 +2275,8 @@ def cmd_walker(args):
     L += [f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {b['rendering']}", "",
           f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
           f"shadow under the feet, a different size or costume between frames, the head bobbing between "
-          f"frames, a background inside a frame, changing the size of the image"]
+          f"frames, a background inside a frame, a soft blurred or glowing edge where the figure meets "
+          f"the magenta, changing the size of the image"]
     prompt = "\n".join(L)
     out_file = str((FIELD_DIRS["walker"] / f"{ident}.png").relative_to(ROOT.parent))
     template, manifest, md = write_field_package(
@@ -2501,35 +2533,224 @@ def write_field_manifest(new_rows=()):
     FIELD_MANIFEST.write_text("\n".join(L))
 
 
+# ── field text: what the world says when you look at it ──
+
+def load_bans():
+    """[(phrase, whole word?, file)] for every quoted phrase on a 'BAN:' line in the v3 lists.
+
+    Those lists are written to be grepped — each rule is one `BAN:` line and the greppable part of it
+    is in quotes — so this reads them rather than copying them. A rule with nothing quoted is a
+    structural one ("ALL-CAPS dialogue") and is left to a human."""
+    out, seen = [], set()
+    for path in (V3_STYLE, SMELLS):
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
+            m = re.match(r"^BAN:\s*(.+)$", line.strip())
+            if not m:
+                continue
+            rest = re.split(r"\s+[\u2014-]\s+", m.group(1))[0]     # the advice after the dash is not the rule
+            words = re.match(r"^the words?\s+(.*)$", rest, flags=re.I)
+            quotes = re.findall(r'"([^"]{2,})"', words.group(1) if words else rest)
+            bare = re.fullmatch(r'\s*(?:"[^"]+"[\s,/]*(?:and\s*)?)+\s*(?:\([^)]*\))?\s*', rest)
+            for phrase in quotes:
+                one = re.fullmatch(r"[\w']+", phrase) is not None
+                if one and not (words or bare):
+                    continue                             # a common word quoted inside a prose rule
+                if phrase.lower() not in seen:
+                    seen.add(phrase.lower())
+                    out.append((phrase, one, path.relative_to(ROOT.parent)))
+    return out
+
+
+def banned_hits(text):
+    """[(phrase, which list)] for every banned phrase in a piece of text."""
+    hits = []
+    for phrase, word, where in load_bans():
+        pat = rf"\b{re.escape(phrase)}\b" if word else re.escape(phrase)
+        if re.search(pat, text, flags=re.I):
+            hits.append((phrase, where))
+    return hits
+
+
+def sentence_count(text):
+    return len([s for s in re.split(r"[.!?]+(?:\s|$)", text.strip()) if s.strip()])
+
+
+def load_field_text():
+    """{id: {'text': substituted, 'raw': as written, 'note': the '- what:' line, 'unknown': [tokens]}}."""
+    out = {}
+    if not FIELD_TEXT.exists():
+        return out
+    for name, body in h2_sections(FIELD_TEXT.read_text()).items():
+        if "." not in name:
+            continue                                     # the file's own prose headings
+        raw = next((squash(l) for l in body.splitlines()
+                    if l.strip() and not re.match(r"^\s*- [\w ]+?:", l)), "")
+        unknown, unnamed = [], []
+        out[name] = {"raw": raw, "text": detok(raw, unknown, unnamed), "unknown": unknown,
+                     "unnamed": unnamed, **kv_lines(body)}
+    return out
+
+
+def check_field_text():
+    """(errors, warnings) for story/field/text.md: ids, length, tokens, and the banned lists."""
+    err, warn = [], []
+    if not FIELD_TEXT.exists():
+        return err, [f"{FIELD_TEXT.relative_to(ROOT.parent)} not found; the field has no examine text"]
+    maps = {p.stem for p in (FIELD / "maps").glob("*.map")}
+    entries = load_field_text()
+    if not entries:
+        warn.append(f"{FIELD_TEXT.name}: no '## <map>.<id>' entries")
+    for ident, e in sorted(entries.items()):
+        where = f"{FIELD_TEXT.name}: {ident}"
+        if not re.fullmatch(r"[a-z0-9_]+\.[a-z0-9_]+", ident):
+            err.append(f"{where}: an id is '<map>.<thing>', lower case, digits and underscores only")
+            continue
+        mp = ident.split(".")[0]
+        if maps and mp not in maps:
+            warn.append(f"{where}: no story/field/maps/{mp}.map, so nothing can trigger this line")
+        if not e["raw"]:
+            err.append(f"{where}: no text under the heading")
+            continue
+        for tok in e["unknown"]:
+            err.append(f"{where}: unknown name token {{{{{tok}}}}}: it has no row in "
+                       f"{NAMES_FILE.relative_to(ROOT.parent)}")
+        if TODO_RE.match(e["raw"]):
+            warn.append(f"{where}: still a placeholder; the game will show it in brackets")
+            continue                                     # the rest is for text somebody has written
+        n = sentence_count(e["text"])
+        if n > TEXT_MAX_SENTENCES:
+            err.append(f"{where}: {n} sentences, max {TEXT_MAX_SENTENCES}")
+        for phrase, src in banned_hits(e["text"]):
+            err.append(f"{where}: '{phrase}' is on the banned list in {src}")
+        m = DOUBLE_ARTICLE.search(e["text"])
+        if m:
+            err.append(f"{where}: '{m.group(0)}' after name substitution: a token's value never carries "
+                       f"its own article")
+    return err, warn
+
+
 # ── cutting a returned template ──
 
-def key_magenta(rows, w, h, ch):
-    """RGBA rows with the magenta keyed out: flat magenta goes transparent, the fringe fades.
+def magenta_cast(r, g, b):
+    """How much magenta is mixed into a pixel, 0-255. See the note on KEY_HARD."""
+    return min(r, b) - g
 
-    A pixel is background when it is nearer to magenta than to any colour the art would use, which in
-    practice means near-magenta AND magenta-hued (red and blue both above green). The fringe ChatGPT
-    leaves around an object is a blend of the object with the magenta, so it gets a part alpha and the
-    magenta is taken back out of the colour; otherwise every sprite would have a pink outline."""
-    out = []
+
+def key_magenta(rows, w, h, ch, fringe=0):
+    """RGBA rows with the magenta keyed out: flat magenta transparent, the anti-aliased edge cleaned.
+
+    Three passes, because the engine alpha-tests at 0.5 and draws whatever survives at full strength,
+    so a surviving pixel has to carry a clean colour — a half-magenta pixel kept at alpha 1 is the
+    purple outline the phone showed.
+
+    1. Flat magenta goes transparent, and every pixel within KEY_EDGE_REACH of it is marked as edge.
+       Only edge pixels are ever touched again: an object's interior may be any colour it likes.
+    2. Each edge pixel's alpha comes from its magenta cast (255 - cast), and the magenta is taken back
+       out of its colour at that alpha. Under KEY_MIN_ALPHA it is background.
+    3. Any edge pixel still carrying a cast after that — the un-matte only corrects what the estimate
+       got right — takes the colour of the nearest clean opaque pixel and keeps its own alpha. With no
+       clean pixel within reach (a one-pixel-wide rope) the cast is subtracted off instead.
+
+    `fringe` then erodes the alpha by that many pixels, for a sheet that stays dirty anyway."""
+    px = [bytearray(w * 4) for _ in range(h)]
     for y in range(h):
-        src, dst = rows[y], bytearray(w * 4)
+        src, dst = rows[y], px[y]
         for x in range(w):
             r, g, b = src[x * ch], src[x * ch + 1], src[x * ch + 2]
-            d = ((r - 255) ** 2 + g * g + (b - 255) ** 2) ** 0.5
-            if d <= KEY_HARD:
-                continue                                        # leave the pixel at 0,0,0,0
-            a = 255
-            if d < KEY_SOFT and r > g and b > g:
-                a = int(255 * (d - KEY_HARD) / (KEY_SOFT - KEY_HARD))
-                if a < 64:                                      # mostly magenta: call it background
+            if ((r - 255) ** 2 + g * g + (b - 255) ** 2) ** 0.5 <= KEY_HARD:
+                continue                                        # flat background: leave it at 0,0,0,0
+            dst[x * 4:x * 4 + 4] = bytes((r, g, b, 255))
+
+    # The edge is grown from the background rather than measured off it: flood outward through every
+    # pixel that still carries a magenta cast, however deep the ramp goes, then take KEY_EDGE_REACH
+    # more rings for the colour clamp. A fixed band missed the middle of a soft edge and left the
+    # worst pixels — the ones nearest pure magenta — sitting at full alpha. An object that is itself
+    # magenta and touches the background would be eaten by this, which is the bargain the contract
+    # already makes: on these sheets the magenta is empty space, never paint.
+    edge = [[False] * w for _ in range(h)]
+    front = [(x, y) for y in range(h) for x in range(w) if not px[y][x * 4 + 3]]
+    while front:
+        nxt = []
+        for x, y in front:
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < w and 0 <= ny < h and px[ny][nx * 4 + 3] and not edge[ny][nx] \
+                        and magenta_cast(px[ny][nx * 4], px[ny][nx * 4 + 1], px[ny][nx * 4 + 2]) >= KEY_CAST_MIN:
+                    edge[ny][nx] = True
+                    nxt.append((nx, ny))
+        front = nxt
+    front = [(x, y) for y in range(h) for x in range(w) if edge[y][x] or not px[y][x * 4 + 3]]
+    for _ in range(KEY_EDGE_REACH):
+        nxt = []
+        for x, y in front:
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < w and 0 <= ny < h and px[ny][nx * 4 + 3] and not edge[ny][nx]:
+                    edge[ny][nx] = True
+                    nxt.append((nx, ny))
+        front = nxt
+
+    for y in range(h):                                          # 2. alpha from the cast, then un-matte
+        row = px[y]
+        for x in range(w):
+            if not edge[y][x]:
+                continue
+            r, g, b = row[x * 4], row[x * 4 + 1], row[x * 4 + 2]
+            cast = magenta_cast(r, g, b)
+            if cast < KEY_CAST_MIN:
+                continue
+            a = max(0, 255 - cast)
+            if a < KEY_MIN_ALPHA:
+                row[x * 4:x * 4 + 4] = b"\0\0\0\0"
+                continue
+            f = a / 255.0                                       # observed = f*colour + (1-f)*magenta
+            row[x * 4:x * 4 + 4] = bytes((min(255, max(0, int((r - 255 * (1 - f)) / f))),
+                                          min(255, max(0, int(g / f))),
+                                          min(255, max(0, int((b - 255 * (1 - f)) / f))), a))
+
+    clean = [[px[y][x * 4 + 3] == 255 and not edge[y][x] for x in range(w)] for y in range(h)]
+    for y in range(h):                                          # 3. whatever is still purple
+        row = px[y]
+        for x in range(w):
+            if not edge[y][x] or not row[x * 4 + 3]:
+                continue
+            r, g, b, a = row[x * 4:x * 4 + 4]
+            if magenta_cast(r, g, b) <= KEY_CAST_CLEAN:
+                continue
+            got = nearest_clean(px, clean, w, h, x, y)
+            row[x * 4:x * 4 + 4] = bytes((*got, a)) if got else \
+                bytes((max(0, r - magenta_cast(r, g, b)), g, max(0, b - magenta_cast(r, g, b)), a))
+
+    return erode_alpha(px, w, h, fringe) if fringe else px
+
+
+def nearest_clean(px, clean, w, h, x, y):
+    """The colour of the nearest fully opaque pixel that the background never touched, or None."""
+    for rad in range(1, KEY_CLEAN_RADIUS + 1):
+        best, bd = None, None
+        for dy in range(-rad, rad + 1):
+            for dx in range(-rad, rad + 1):
+                if max(abs(dx), abs(dy)) != rad:
                     continue
-                f = a / 255.0                                   # un-matte: observed = f*colour + (1-f)*magenta
-                r = min(255, max(0, int((r - 255 * (1 - f)) / f)))
-                g = min(255, max(0, int(g / f)))
-                b = min(255, max(0, int((b - 255 * (1 - f)) / f)))
-            dst[x * 4:x * 4 + 4] = bytes((r, g, b, a))
-        out.append(dst)
-    return out
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h and clean[ny][nx]:
+                    d = dx * dx + dy * dy
+                    if bd is None or d < bd:
+                        best, bd = px[ny][nx * 4:nx * 4 + 3], d
+        if best:
+            return tuple(best)
+    return None
+
+
+def erode_alpha(px, w, h, n):
+    """Shave n pixels off the alpha, for a sheet whose edge stays dirty however it is keyed."""
+    for _ in range(n):
+        gone = [(x, y) for y in range(h) for x in range(w) if px[y][x * 4 + 3]
+                and any(not (0 <= x + dx < w and 0 <= y + dy < h) or not px[y + dy][(x + dx) * 4 + 3]
+                        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+        for x, y in gone:
+            px[y][x * 4:x * 4 + 4] = b"\0\0\0\0"
+    return px
 
 
 LOUD = []           # warnings that have to survive run_quiet's swallowed output; `ingest` prints them
@@ -2595,9 +2816,14 @@ def scaled_inner(slot, sx, sy, w, h):
 
 
 def cmd_cut(args):
-    pos = [a for a in args if not a.startswith("--")]
+    pos, fringe, it = [], 0, iter(args)
+    for a in it:
+        if a == "--fringe":
+            fringe = int(next(it, "0"))
+        elif not a.startswith("--"):
+            pos.append(a)
     if len(pos) != 2:
-        die("usage: cut story/out/<name>.sheet.json <image>")
+        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N]")
     data = json.loads(Path(pos[0]).read_text())
     image = Path(pos[1]).expanduser()
     kind = data.get("kind")
@@ -2643,7 +2869,7 @@ def cmd_cut(args):
         FIELD_DIRS["prop"].mkdir(parents=True, exist_ok=True)
         for s in slots:
             x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
-            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch)
+            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
             bounds = opaque_bounds(px, bw, bh)
             if not bounds:
                 print(f"  slot {s['n']} {s['id']}: nothing but background in the slot; not written", file=sys.stderr)
@@ -2662,7 +2888,7 @@ def cmd_cut(args):
         sheet = [bytearray(WALK_W * 4 * 4) for _ in range(WALK_H * 4)]
         for s in slots:
             x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
-            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch)
+            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
             px = resize_nn(px, bw, bh, 4, WALK_W, WALK_H)
             ox, oy = s["col"] * WALK_W, s["row"] * WALK_H
             for r in range(WALK_H):
@@ -3124,13 +3350,13 @@ def archive_returned(d, returned):
     return out
 
 
-def ingest_one(d, meta, returned):
+def ingest_one(d, meta, returned, extra=()):
     """Run the right cutter for one package. (ok, message)."""
     kind = meta.get("kind")
     if kind == "sheet":
         return run_quiet(cmd_slice, [str(d / "sheet.json"), str(returned)])
     if kind in FIELD_KINDS:
-        return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned)])
+        return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]
         try:
@@ -3149,8 +3375,16 @@ def ingest_one(d, meta, returned):
 
 def cmd_ingest(args):
     """Cut every image the owner has saved into story/packages/ since the last run."""
-    force = "--force" in args
-    roots = [Path(a).expanduser().resolve() for a in args if not a.startswith("--")] or [PACKAGES]
+    force, extra, skip = "--force" in args, [], False
+    for a in args:                                       # --fringe N is handed to the cutter as it stands
+        if skip:
+            extra.append(a)
+            skip = False
+        elif a == "--fringe":
+            extra.append(a)
+            skip = True
+    roots = [Path(a).expanduser().resolve() for a in args
+             if not a.startswith("--") and a not in extra] or [PACKAGES]
     metas = []
     for r in roots:
         if not r.exists():
@@ -3174,7 +3408,7 @@ def cmd_ingest(args):
             continue
         kept = archive_returned(d, returned)
         LOUD.clear()
-        ok, msg = ingest_one(d, meta, returned)
+        ok, msg = ingest_one(d, meta, returned, extra)
         line = squash(msg) if msg else ""
         if ok:
             done += 1
@@ -3198,6 +3432,7 @@ def cmd_ingest(args):
 # ───────────────────────── Export to the game ─────────────────────────
 
 GAME_HEADER = ROOT.parent / "src" / "cutscene_data.h"
+GAME_FIELD_TEXT = ROOT.parent / "src" / "field_text.h"
 
 
 def c_str(text):
@@ -3283,6 +3518,30 @@ def cmd_export(args):
             "static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);", ""]
     GAME_HEADER.write_text("\n".join(out))
     print(f"wrote {GAME_HEADER.relative_to(ROOT.parent)}  ({len(table)} of {len(stems)} scenes)")
+    export_field_text()
+
+
+def export_field_text():
+    """story/field/text.md -> src/field_text.h: the examine lines, names substituted, sorted by id."""
+    err, _ = check_field_text()
+    if err:
+        for e in err:
+            print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit("story_prompt: field text rejected. Fix story/field/text.md; do not bypass the rules.")
+    entries = load_field_text()
+    out = ["// GENERATED by ./story_prompt.py export. Do not edit: change story/field/text.md.",
+           "#pragma once", "",
+           "// What the world says when you look at it. A map's `message` trigger names an id; the",
+           "// engine looks it up here. Sorted by id, so a binary search is safe.",
+           "struct FieldText { const char *id; const char *text; };",
+           "static const FieldText FIELD_TEXT[] = {"]
+    for ident in sorted(entries):
+        out.append(f"    {{ {c_str(ident)}, {c_str(entries[ident]['text'])} }},")
+    out += ["};", f"#define FIELD_TEXT_COUNT {len(entries)}", ""]
+    GAME_FIELD_TEXT.write_text("\n".join(out))
+    todo = sum(1 for e in entries.values() if TODO_RE.match(e["raw"]))
+    print(f"wrote {GAME_FIELD_TEXT.relative_to(ROOT.parent)}  ({len(entries)} line(s)"
+          + (f", {todo} still a placeholder)" if todo else ")"))
 
 
 def main():

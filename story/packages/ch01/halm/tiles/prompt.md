@@ -2,15 +2,15 @@
 
 ## What exists already
 
-0 of 7 files in this package have been cut already.
+7 of 7 files in this package have been cut already.
 
-- slot 1 `story/field/tiles/cliff.png` — missing
-- slot 2 `story/field/tiles/dirt.png` — missing
-- slot 3 `story/field/tiles/grass.png` — missing
-- slot 4 `story/field/tiles/plank.png` — missing
-- slot 5 `story/field/tiles/stone.png` — missing
-- slot 6 `story/field/tiles/wall_plaster.png` — missing
-- slot 7 `story/field/tiles/wall_timber.png` — missing
+- slot 1 `story/field/tiles/cliff.png` — **exists**
+- slot 2 `story/field/tiles/dirt.png` — **exists**
+- slot 3 `story/field/tiles/grass.png` — **exists**
+- slot 4 `story/field/tiles/plank.png` — **exists**
+- slot 5 `story/field/tiles/stone.png` — **exists**
+- slot 6 `story/field/tiles/wall_plaster.png` — **exists**
+- slot 7 `story/field/tiles/wall_timber.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 

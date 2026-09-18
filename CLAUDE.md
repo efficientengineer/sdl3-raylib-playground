@@ -82,6 +82,7 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py props <id>...  # field art: slots sized by each prop's footprint → story/field/props/
 ./story_prompt.py walker <Name>  # field art: the 4x4 walk grid (S W E N) → story/field/walkers/
 ./story_prompt.py building <id>...  # field art: front wall + wall and roof samples → story/field/buildings/
+                                 # (export also writes src/field_text.h from story/field/text.md)
 ./story_prompt.py cut <sheet.json> <img>    # cut a filled-in template: key magenta, resize, write the files
 ```
 
@@ -461,9 +462,31 @@ leave the background untouched, no text.
   counts the transparent pixels in every prop and walker it writes and warns loudly when there are
   none, naming the file; `ingest` repeats that warning and counts it in its summary, so it cannot be
   swallowed. A real sprite comes out about a quarter transparent; a walk sheet about half.
+- **Keying the magenta is by cast, not by distance** (the first real cut put a purple outline on the
+  well and the cart). ChatGPT anti-aliases an object's edge into the key colour, and a black outline
+  blended half and half with magenta is `rgb(126,0,128)` — *further* from pure magenta than a mid grey
+  is, so no distance threshold can catch it without eating real colour. What measures it is the
+  magenta cast, `min(r, b) - g`: for a blend with a roughly neutral foreground the cast is about 255
+  times the magenta fraction, so `255 - cast` is the alpha. `cut` floods in from the background
+  through every pixel that still carries a cast, sets each one's alpha from its cast, un-mattes the
+  colour at that alpha, and then — because the engine alpha-tests at 0.5 and draws whatever survives
+  at full strength — gives any pixel still looking purple the colour of its nearest clean opaque
+  neighbour, keeping its own alpha. An object's interior is never touched, so paint may be any colour;
+  only what the background reaches is cleaned. `--fringe N` erodes the alpha by N more pixels for a
+  sheet that stays dirty anyway. On the thirteen Halm props this went from 3273 fringe pixels to 4
+  (one with `--fringe 1`), with no holes punched in the sprites.
 - **`story/field/manifest.md`** is regenerated on every one of those runs: every id ever requested,
   its kind, target size, the package that asked for it, and whether the file exists. Humans and agents
   read it; the engine does not.
+- **Examine text is story, so it lives in the story tree**, not in the maps and not in the engine:
+  `story/field/text.md`, one `## <map>.<id>` heading (`## halm.well`) per line of text, the text under
+  it, tokens expected. A map's `message` trigger names the id; `export` writes `src/field_text.h`
+  (`struct FieldText { const char *id; const char *text; }`, `FIELD_TEXT[]` sorted by id,
+  `FIELD_TEXT_COUNT`) with the names substituted, and `check --all` validates it: two sentences at
+  most, no unknown token, and nothing on the `BAN:` lists in `story/v3/STYLE.md` and
+  `story/v3/SMELLS.md` — which the tool reads rather than copies, so "nobody" fails wherever it is
+  written. A line left as `[halm.well: TODO]` is exported as it stands, so an unwritten line shows on
+  the phone as a bracket rather than as silence.
 
 ## Index
 

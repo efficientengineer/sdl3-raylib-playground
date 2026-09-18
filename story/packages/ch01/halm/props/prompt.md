@@ -2,17 +2,17 @@
 
 ## What exists already
 
-0 of 9 files in this package have been cut already.
+9 of 9 files in this package have been cut already.
 
-- slot 1 `story/field/props/barrel.png` — missing
-- slot 2 `story/field/props/cart.png` — missing
-- slot 3 `story/field/props/fence.png` — missing
-- slot 4 `story/field/props/scale_bench.png` — missing
-- slot 5 `story/field/props/sign.png` — missing
-- slot 6 `story/field/props/tree_a.png` — missing
-- slot 7 `story/field/props/tree_b.png` — missing
-- slot 8 `story/field/props/well.png` — missing
-- slot 9 `story/field/props/yard_wall.png` — missing
+- slot 1 `story/field/props/barrel.png` — **exists**
+- slot 2 `story/field/props/cart.png` — **exists**
+- slot 3 `story/field/props/fence.png` — **exists**
+- slot 4 `story/field/props/scale_bench.png` — **exists**
+- slot 5 `story/field/props/sign.png` — **exists**
+- slot 6 `story/field/props/tree_a.png` — **exists**
+- slot 7 `story/field/props/tree_b.png` — **exists**
+- slot 8 `story/field/props/well.png` — **exists**
+- slot 9 `story/field/props/yard_wall.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -50,13 +50,14 @@ Slot 9 (yard_wall), 3 x 2 cells, 488x323 px in the template: A shoulder-high gra
 
 RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
 
-AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a scene or background inside a slot, two objects in one slot, changing the size of the image
+AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a scene or background inside a slot, two objects in one slot, a soft blurred or glowing edge where an object meets the magenta, changing the size of the image
 ````
 
 ## 3. Afterwards
 
 - [ ] All 9 slots filled, every border and number still exactly where it was
 - [ ] The magenta is untouched outside the slots, and comes right up to each object
+- [ ] The edge of every object is hard against the magenta, not soft, blurred or glowing
 - [ ] No ground, shadow, base plate or scenery under or behind an object
 - [ ] Every object stands on the bottom edge of its slot and shares one camera angle
 - [ ] One scale across the sheet: the big buildings really are bigger than the barrel
