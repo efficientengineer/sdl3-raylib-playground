@@ -2,6 +2,32 @@
 
 Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
+## The checklist
+
+Run every scene against all eleven before it is written, and again before it is done.
+(1-10 after Evan Skolnick, *Video Game Storytelling*; 11 is the owner's.)
+
+1. **The player holds the controller.** A clip exists only when play cannot carry the beat, and it
+   never repeats what play just showed.
+2. **One sentence, always.** At any moment the player can say what they are doing and why they care,
+   in one sentence — and the `## Goal` line is that sentence.
+3. **Two wants meeting.** Everyone wants something sayable in one line; every scene is two of those
+   wants colliding; and the villain wants something the player could imagine wanting.
+4. **The middle turns.** Three acts, and the long middle must turn rather than fill: every region
+   changes what the party knows or what the party can do.
+5. **Find, then see, then hear.** Let the player find it. Failing that, let them see it. Telling them
+   is the last resort and the weakest.
+6. **Shorter.** Every line does work. Cut greetings, cut recaps, cut any line that explains the line
+   before it.
+7. **Backstory is not story.** Deliver it in bites, on demand, where the player asked. Never a lecture.
+8. **Emotion is earned in play hours,** not in text. If the scene wants feeling the game has not paid
+   for, the scene is too early.
+9. **Tension and release alternate.** Every chapter has a rest and a laugh in it.
+10. **Story serves the map and the mechanics.** The writer's output, in order of importance:
+    Goals, Areas, Encounters, Clips.
+11. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
+    or in the next clip.
+
 ## Names are tokens
 
 Every character, place and thing name is a token in double braces, including speaker labels:
@@ -14,19 +40,21 @@ Role-only speakers stay plain English and get no token: `CLERK`, `SOLDIER`, `BAK
 **`## Goal`** — the words on the player's screen. A verb and a place. "Clear the entrance. That's the
 whole job." A new `## Goal` goes in whenever the player's job changes.
 
-**`## Play: <kind> — <place> (<minutes>)`** — 3-6 short lines, the design, in front of the player's
+**`## Play: <kind> — <place> (<minutes>)`** — three lines, the design, in front of the player's
 hands. Kinds: explore / fight / boss / puzzle / travel / shop / talk-to-townsfolk / chase.
 Say what the player is doing, be concrete about mechanics ("the howler calls another dog every two
 turns until it dies"), then: **Find:** what's in there. **Unlocks:** a door, a road, a party member,
 a weapon, a clue. Every clip has a Play block in front of it. No two clips touch.
 
 **`## Clip: <title>`** — a cutscene, which means **dialogue**.
-**Ten lines of dialogue, maximum.** Longer, split it and put gameplay between the halves.
-At most one stage direction per beat, in brackets, and it must be an action someone performs.
-A clip with more bracket lines than speaker lines is a scene written as a book.
 
 ## Rules for clips
 
+- **Three to six lines. Most of them tell the player what is happening or where to go next, and
+  exactly one is a quip, a tease, or a feeling stated plainly.** A clip that will not fit in six lines
+  is two clips with play between them. This is the first rule and it outranks the rest.
+- At most one stage direction per beat, in brackets, and it must be an action someone performs.
+  A clip with more bracket lines than speaker lines is a scene written as a book.
 - **Someone wants something from someone else and says so, in words, before the clip ends.**
 - People interrupt, talk over the answer, and get told they are wrong.
 - Big feelings get said, loudly, by the person having them. Declare. Sulk. Apologise badly.
@@ -51,10 +79,26 @@ guilt and fear all flatter the confessor. Vanity, loneliness, laziness and "I li
 do not. If the dead man gets eulogised as the finest of his generation, give him instead a flaw that
 killed him and a habit that annoyed someone.
 
+## Chapter density
+
+Match Phantasy Star IV's first hour: a town, a guild, one job, one companion. Per chapter, at most:
+six clips, 1,200 words, one new party member, one kind of ordinary fight plus one boss, one new
+mechanic, one sighting of the ancients' work, one appearance by the rival. No puzzles unless the
+chapter spends its mechanic on one. If an element is there because it was fun to write, cut it.
+
+## The ancients are unobtainable
+
+Their works are the size of geography and people have prayed to them for a thousand years. No one
+operates them. There are three ways in and no fourth: a caretaker, their language, or one of their
+own vehicles. Nothing in their work has controls of any kind, and no door opens for the hero. The
+villain cannot turn anything on; he is walking to the one place where they can be woken or overruled, and
+every region is a station on that road for him and for the party. Ancient things join the party one
+at a time, as set pieces, never as equipment.
+
 ## Plain words
 
 Nine named things exist in the whole game and they all live in `NAMES.md`. Everything else gets
-described: *the ancients. The old halls. The guild. The dry city in the west. The hum.*
+described: *the ancients. Their work. The guild. The shrine. The road west.*
 A new capital letter is a cost. Spend none.
 
 ## Banned — grep before any file is called done
@@ -80,7 +124,7 @@ BAN: rule-of-three list sentences — "charming, funny, and kind"
 BAN: "[beat]" as a stage direction — cut it or give somebody a line
 BAN: mood adverbs in stage directions — "radiant", "delighted", "ruefully", "coldly", "quietly"
 BAN: "for the first time"
-BAN: age measured in dust — "a thousand years of dust"
+BAN: age measured in dust — "a thousand years of dust", "dust had made a shoulder of it"
 BAN: narrator asides that explain the joke or the reward — "which is your first money"
 BAN: similes about ruins
 BAN: ALL-CAPS dialogue
@@ -103,6 +147,20 @@ first guess and the reveal as two sentences. If the second is the first with the
 arrow reversed, throw the reveal out and find a third answer — a date, a procedure, a debt, a name,
 an unfinished piece of admin. The building in chapter one is not hostile and not protective; it is
 doing a headcount from a day in the distant past and cannot close it.
+
+### The model-default story (forbidden by name, from `story/v4/DIFF.md` §4)
+```
+BAN: the words "engine", "tower", "switch", "hum", "hatch", "crawler", "terrace", "console"
+BAN: the terraced valley home; the floor hatch; the blue stair; the crawler tutorial
+BAN: a ruin under the home town with something inside it to turn on
+BAN: the drought-motivated polite official as antagonist; a dated promise of rain
+BAN: a crew of four one step ahead of the party
+BAN: salt flats; the stilt town; the seafloor station; the drowned forest
+BAN: the boat / diving bell / flying machine ladder of vehicles
+BAN: the sky ring finale; throwing the last switch by hand
+BAN: the elders who do not believe the hero
+BAN: "they were dead for centuries"
+```
 
 ### Retrieved lines and shapes (four writers found these independently)
 ```
@@ -147,7 +205,7 @@ BAN: "he swung this all day"
 1. The mentor's confession that inverts his catchphrase (he told the father he was ready; the father
    died). Have the catchphrase already explained, badly, years ago, and make the scene about
    something else.
-2. The rival's price being public self-humiliation. If he wants something handed over in ten seconds,
+2. The rival's price being a public climbdown. If he wants something handed over in ten seconds,
    it is a transaction, not a rivalry. Make him right instead of make him cruel.
 3. The renege — the rival taking payment and not delivering. Cheaper than making him correct.
 4. Mumble → "Louder." → shout. Any escalation built from repeating a line at higher volume.
@@ -168,13 +226,13 @@ BAN: "he swung this all day"
 
 ## Ten lines in the voice
 
-1. **{{THIEF}}:** I didn't steal it. It was on the ground. After I put it there, granted, but still.
-2. **{{SCHOLAR}}:** Your survey crew. I am the survey crew. I paid the guild to be the survey crew.
-3. **{{MENTOR}}:** I charged his father. He paid part of it and owed me the rest, so that's inherited as well.
-4. **{{RIVAL}}:** Leave his line open. He's good for it.
-5. **{{HERO}}:** Don't be kind to me in front of the book. Be kind to me outside where I can hit you.
-6. **{{HEALER}}:** He's been talking about this job since the spring and he has never once asked me.
-7. **{{VILLAIN}}:** I have a wet city and you have a dry one. Which of us would you like to be angry with?
-8. **{{THIEF}}:** I want to go home and I want you all to know I said so.
-9. **{{SCHOLAR}}:** I can't hear anything. Should I be able to hear something?
-10. **{{HERO}}:** Write it small.
+1. **CLERK:** {{MENTOR}} against {{RIVAL}}, four times this year. Against you, nothing. Not one line, ever.
+2. **{{HERO}}:** I'll take it. Write it down before I think about it.
+3. **{{MENTOR}}:** It was your father's run. He did it thirty years and never once came straight home.
+4. **{{MENTOR}}:** I'm saving it.
+5. **{{HEALER}}:** Ask me, then.
+6. **{{MENTOR}}:** Badly. He swung at a thing he should have run from and liked that it worked.
+7. **{{HEALER}}:** You are charging him for his father's axe.
+8. **{{RIVAL}}:** You'll be up all night with a loaf and I'll be in a cart.
+9. **{{HEALER}}:** Wrapped, untouched, a year in the weather.
+10. **{{HERO}}:** Pack the fire. We're going west before it stops.
