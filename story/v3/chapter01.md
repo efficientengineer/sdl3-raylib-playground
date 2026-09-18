@@ -1,468 +1,412 @@
-# CHAPTER ONE — The Door That Knows You
+# CHAPTER ONE — Four
 
 ## Goal
-Get down to the guild hall before the board's picked clean.
+Get to the guild hall before the board's picked clean.
 
-## Area: Fallow
-
-A town of nine streets, a grain yard, and a well everyone argues about. Chickens on the road. You
-can talk to eleven people and six of them mention your father before they mention you.
-The bell over the guild hall rings twice a morning: once for work, once for an hour later, when
-the work is gone. It has rung once.
-Things to find: a whetstone in the grain yard, four coins under the well bucket, and the baker's
-boy, who will sell you three buns and a rumour about the lights in the west for the price of four.
-Behind the grain shed, something is knocking.
-
-## Encounter
-
-Shed-rats — fat, brown, the size of dogs, and completely unafraid of you; they charge in a line and
-squeal when hit. Three of them. Beat them and the shed door swings open on a sack of grain, which
-the baker buys, which is your first money.
+## Play: Explore + first fight — the town (6 min)
+Nine streets, a grain yard, a well. Talk to anyone; six of eleven townsfolk say your father's name
+before yours. The bell has already rung once, so the crowd is at the board.
+Something is knocking behind the grain shed. **Fight:** three shed-rats, dog-sized, charge in a line
+and squeal when hit. Teaches attack timing.
+**Find:** a whetstone in the yard, four coins under the well bucket, a grain sack behind the rats.
+**Unlocks:** the baker buys the sack; that's your starting purse and your first shop.
 
 ## Clip: The Board
 
-[A crowd around a cork board. Cray is already at the front, unpinning a paper.]
+[Cray has the paper off the board before Bron reaches the crowd.]
 
 BRON: That's mine.
 
-CRAY: It's got a pin in it and my hand on it, so it's the guild's and it's mine.
+CRAY: It's got my hand on it.
 
-BRON: I was here first.
+BRON: I was there first.
 
 CRAY: You were in a shed. With rats. I could hear you talking to them.
 
 BRON: That was encouragement.
 
-CRAY: Encouraging the rats. [He holds the paper up over Bron's head.] Escort to the coast road,
-four days, eighty coin. Who signs for you, Bron? Say it in front of everyone.
+CRAY: [holding the paper up over Bron's head] Escort to the coast. Four days, eighty coin. Who signs
+for you?
 
 BRON: Dorn signs for me.
 
-CRAY: Dorn hasn't signed for you in two years. He signs for me. Ask him what he called you last
-month.
-
-BRON: I know what he called me.
-
-CRAY: [delighted] Say it.
+CRAY: Dorn signs for me. Ask him what he said about you last month.
 
 BRON: He said I wasn't ready.
 
-[Pip slips out of the crowd behind Cray, already three steps away with something in her fist.]
+CRAY: Say it louder, the clerk missed it.
 
-PIP: He's right, you know! Sorry! I only heard the end!
+## Play: Chase — the rooftops (3 min)
+A small girl lifts Cray's purse in the crowd and runs. Cray screams. The player can chase or walk
+away; the guild clerk will pin the last paper on the board either way.
+**Chase:** two minutes of rooftops and washing lines, no combat, one alley you can cut off if you
+looked at the town map.
+**Find:** the last job on the board — the old halls on the east ridge, clear the entrance for a
+survey crew, two days, thirty coin. It has been up there four months.
+**Unlocks:** the clip below, and Pip's face, which you will see again.
 
-CRAY: Who is that.
+## Clip: The Purse
 
-PIP: Passing through. Lovely town. Terrible security. [She's gone.]
+[Pip is on a roof ridge, holding the purse out over the drop.]
 
-CRAY: [patting his belt, going pale] My purse.
+PIP: You're the one who lost the argument.
 
-BRON: You want me to get it? I'm very fast for a man who talks to rats.
+BRON: Come down and give that back.
 
-CRAY: Get out of my way.
+PIP: Is he nice? The man I took it off. Is he a nice man?
 
-BRON: Say please and I'll chase her.
+BRON: ...No.
 
-CRAY: [shoving past] Get a job, Bron. Get any job.
+PIP: Then I'm keeping it.
+
+BRON: That's still stealing.
+
+PIP: Yes. [She drops the purse into his hands.] And now it's yours. Bye.
+
+BRON: Wait — that's worse!
+
+PIP: [already going] Much worse!
 
 ## Goal
 Get Dorn to sign for you.
 
-## Area: Dorn's yard
-
-Up the hill, past the fence he made you rebuild twice. A stump with an axe in it. Six practice
-posts, all of them split at the same height, which is your height.
-Dorn is sharpening something and will keep sharpening it while you talk.
-Lyra is here, sorting a bag of bandages on the step, and she'll look up before he does.
-Look in the water barrel: your father's hunting badge is at the bottom, where Dorn put it so he'd
-stop seeing it.
+## Play: Talk + climb — Dorn's yard (4 min)
+Up the hill past the fence he made you rebuild twice. Six practice posts, all split at your height.
+Lyra is on the step sorting bandages and will talk to you before he does; three optional lines here
+are the only place in the chapter she tells you about his knee.
+**Find:** your father's hunting badge at the bottom of the water barrel. Taking it is optional and
+Dorn sees you do it.
+**Unlocks:** the argument.
 
 ## Clip: You're Not Ready
 
-[Dorn keeps the stone moving on the blade for the whole clip.]
+[Dorn keeps the stone moving on the blade.]
 
-BRON: There's a job on the board. The old halls, east side. Clear the entrance so the surveyors can
-get in. Two days.
+BRON: There's one paper left. The old halls, east ridge. Clear the entrance for a survey crew.
+Two days.
 
 DORN: No.
 
 BRON: You didn't hear the rest.
 
-DORN: There isn't a rest. The old halls are two days there and never back. No.
-
-LYRA: He's been asking for six months.
-
-DORN: And I've been saying it for six months, which makes me consistent and him deaf.
+DORN: There's no rest. No.
 
 BRON: I killed a hall-crawler in the spring.
 
-DORN: You killed a hall-crawler with me standing behind you holding a spear.
+DORN: I was four feet behind you with a spear and you've not shut up about it since.
 
-BRON: You were very far behind me.
+BRON: You were further back than four feet.
 
-DORN: I was four feet behind you, boy, and you've built a religion out of it.
+DORN: I have measured it.
 
-LYRA: Sign it. I'll go with him.
+LYRA: Sign it.
 
-DORN: [the stone stops] You'll do what?
+DORN: [the stone stops] Don't you start.
 
-LYRA: I'll go with him. You trained me too, and you've never once said I wasn't ready, which means
-either I am or you were scared to tell me.
+## Play: Tutorial fight — the posts (4 min)
+Dorn makes you work while he and Lyra argue behind you, audible, in barks. Timed swings on the six
+posts; the last one he moves.
+**Mechanics:** teaches the guard-break window. You lose if you swing early three times, and losing
+only costs you the argument's good ending — he signs regardless.
+**Find:** hit all six clean and he gives you a hunter's whistle, which calls the party back to you
+from anywhere on screen and keeps working all game.
+**Unlocks:** his signature.
 
-DORN: Don't be clever at me on a work day.
+## Clip: He Signs
 
-LYRA: Then sign it.
+[Lyra has the paper held out and has been holding it out for a while.]
 
-BRON: [to Lyra, quietly, thrilled] You'd come?
+LYRA: I'll go with him.
 
-LYRA: Don't make a face about it.
+DORN: You'll do what?
 
-BRON: I'm not making a face.
+LYRA: You trained me too. You have never once told me I wasn't ready.
 
-LYRA: You're making the face right now, in front of him.
+DORN: That's different.
 
-DORN: [standing, bad knee, loud] Everyone stop talking.
+LYRA: Then say why out loud, with him standing there.
 
-[He throws the whetstone into the barrel. It sinks next to the badge.]
-
-DORN: Two days. Clear the entrance. You do the doorway and you come home. You go one room past the
-doorway and I will come out there and carry you back by the hair.
+DORN: [taking the paper] Two days. The doorway and home. One room past the doorway and I'll come out
+there myself.
 
 BRON: You can't walk that far.
 
-DORN: I will crawl it. Go and pack. Not you, Lyra — you stay a minute.
+DORN: I'll crawl it. Go and pack.
 
-## Area: Dorn's house, that night
+BRON: [to Lyra, low] You'd really come?
 
-One room, one chair, one lamp, forty years of hooks on the wall with nothing left on them.
-The fire's going. Dorn is in the chair and will stay in it.
-Above the fire, on two pegs, is an axe with a worn grip and a bad notch in the blade, and everyone
-in town has seen it and no one has ever taken it down.
-Search the shelf for a folded map of the east valley, drawn in a hand that isn't Dorn's.
+LYRA: Don't do the face. Go and pack.
+
+## Play: Explore — Dorn's house, that night (3 min)
+One room, one chair, one lamp, forty empty hooks. The fire's going and he stays in the chair.
+You can search everything and he will comment on all of it.
+**Find:** a folded map of the east valley in a hand that isn't his; a tin of his wife's buttons he
+will not discuss; above the fire, on two pegs, an axe with a worn grip and a bad notch in the blade.
+**Unlocks:** the axe becomes Bron's weapon. Slower and much harder hitting. It is also the only
+weapon in the game that can be broken.
 
 ## Clip: The Axe on the Wall
 
-[Dorn lifts the axe off the pegs and holds it out, handle first, the whole time he's talking.]
+[Dorn lifts the axe off the pegs and holds it out, handle first.]
 
 DORN: Take it.
 
 BRON: That's his.
 
-DORN: It's been mine for eleven years and I've hated every day of it. Take it.
+DORN: It's been on my wall eleven years and I've hated it every day of them. Take it.
 
-BRON: [taking it, both hands, too carefully] It's heavier than it looks.
+BRON: [both hands] It's heavier than it looks.
 
 DORN: It's exactly as heavy as it looks. You're just impressed.
 
-BRON: How did he do it? The notch.
+BRON: How did he get the notch?
 
 DORN: Badly.
 
 BRON: Dorn.
 
-DORN: He put it into something he should have walked away from, and it worked, and he got very fond
-of that story. Then he did it again.
+DORN: He swung at a thing he should have run from and it worked and he liked that too much. So he
+did it again.
 
-BRON: That's the most you've ever said about it.
-
-DORN: And it's the last, so hold it in your head. [He sits back down.] Listen. I say you're not ready
-because every boy I ever said "you're ready" to went out that gate with his chin up and his guard
-down, and I have carried three of them home. It's a sentence I say so I don't have to do that again.
-It's about me. It was always about me.
-
-BRON: ...You could have told me that six months ago.
-
-DORN: I could have. I'm old and I'm proud and I liked you needing it. Go to bed.
-
-BRON: Dorn—
-
-DORN: Dawn, boy. And keep the notch out of the wood.
+DORN: Go to bed. Keep the notch out of the wood.
 
 ## Goal
-Meet Lyra at the gate at dawn.
+Be at the gate before light.
 
-## Area: The town gate, before light
-
-Blue dark, one lamp, frost on the rail. The town is asleep except for the baker, who is awake and
-watching and will wave.
-Walk to the gate and the chapter lets you turn around twice; on the second turn, the light is on in
-Dorn's window up the hill, and he is standing in it, and he stays there until you go.
-Last chance to spend your rat money: the baker sells bread, the well gives you a full skin, and the
-stable boy buys shed-rat hides at a price Pip will later call criminal.
+## Play: Shop + explore — the gate, blue dark (3 min)
+Frost on the rail, one lamp, the baker awake and waving. Last shop: bread, a full waterskin, rope,
+and the stable boy buys shed-rat hides at a price Pip will later call criminal.
+Walk to the gate and the game lets you turn around twice. On the second turn, the lamp is lit in
+Dorn's window up the hill and he's standing in it.
+**Unlocks:** leaving. You cannot come back to town this chapter.
 
 ## Clip: Dawn at the Gate
 
-[Lyra is already there with two packs. Zeph is sitting on the gatepost with a book open on his knees.]
+[Zeph is sitting on the gatepost with a book open on his knees.]
 
-BRON: Who's that.
+BRON: Who's that?
 
-LYRA: He was here when I got here.
+LYRA: He was here before me.
 
-ZEPH: [eyes on the page] You're going to the old halls on the east ridge. Second-age, probably a
-service hall, possibly a pump house, definitely older than everything you have ever thought about.
-I'm coming.
+ZEPH: You're going to the east ridge halls. I'm coming.
 
-BRON: No you're not.
+BRON: No.
 
-ZEPH: [closing the book, standing, radiant] I've read nine books about that building. Nine. There
-are nine. I have met a man who was inside it for a full minute and I bought him dinner four times
-to hear it. I can read their marks — badly, admittedly, I can read about a third of their marks —
-and you cannot read any of them, and you are about to walk into a corridor full of their marks.
-I'm coming.
+ZEPH: I have read nine books about that building. There are nine books. I've read them.
 
-LYRA: He's got a point.
+LYRA: He can read their marks.
 
-BRON: He's got a book.
+ZEPH: A third of their marks, which is more than either of you can do.
 
-ZEPH: I've got four books.
+BRON: Lyra.
 
-PIP: [from the top of the wall, mouth full] Five! There's one in your bag you forgot about!
+LYRA: He's useful and he's already packed. [walking] We're going.
 
-BRON: You.
-
-PIP: Me!
-
-CRAY'S VOICE: [distant, furious, from the town] PIP!
-
-PIP: [dropping down beside them] So I'm leaving. Which way are you going? Never mind, that way.
-
-LYRA: Give it back.
-
-PIP: Give what back?
-
-LYRA: [holding out her hand and waiting] Give it back.
-
-PIP: [handing over a purse] It's heavier than it looks.
-
-BRON: It's exactly as heavy as it looks.
-
-PIP: Oh, I like him. Is he always like this?
-
-LYRA: Yes.
-
-PIP: And you like that?
-
-LYRA: [walking off] We're going.
-
-BRON: [hurrying after her] What did she mean by that?
+ZEPH: [hurrying after] I've also brought rope!
 
 ## Goal
 Reach the old halls on the east ridge.
 
-## Area: The ridge road
+## Play: Travel + fight — the ridge road (10 min)
+Two days of uphill. First proper road: three fight encounters, a dead cart, a farm with the shutters
+nailed shut from outside.
+**Fight:** ridge dogs, packs of four, one hangs back and howls; the howler calls another dog every
+two turns until it dies. Teaches target priority.
+**Find:** a lantern and a half-written letter in the cart; a shortcut over the scree that skips one
+fight and costs you a party conversation.
+**See:** from the high point, your town behind you, a river that is far too low, and a tower in the
+western haze with one light near the top. The camera holds on the tower for three seconds.
+**Unlocks:** the ridge camp, where somebody has eaten your bread.
 
-Two days of uphill in one screen scroll. Grass, wind, a dead cart, a farm with the shutters nailed.
-From the high point you can see three things: your town behind you, a river that shouldn't be that
-low, and far to the west a tower standing up out of the haze with a light near the top of it.
-Talk to the party here and each of them tells you one true thing: Zeph about the tower, Pip about
-the coast, Lyra about Dorn's knee.
-Off the path, in the dead cart, a lantern and a letter someone stopped writing.
+## Clip: The Fifth One
 
-## Encounter
+[Pip has their loaf in both hands and her boots up on their packs.]
 
-Ridge dogs — lean, grey, hunting in fours, one hangs back and howls to call more. Kill the howler
-first or the fight never ends. They drop hide, which the party can sell, and Pip will point that
-out for a cut.
+PIP: Don't stop on my account.
 
-## Area: The old halls, entrance
+BRON: You followed us.
 
-A hillside with a building coming out of it, half-buried, the angle wrong, like the hill grew up
-around something that refused to move. The stone is smooth and warm. Rubble across the mouth, which
-is the job.
-Clear it and the air comes out cold and dry and smelling of iron. Inside: a corridor with a floor
-too flat, and lights in the ceiling that come on in a line ahead of you as you walk, one, then the
-next, then the next.
-Zeph will say a full paragraph about the lights. You can walk away while he does.
-Under the rubble: a bone-handled knife, ancient, still sharp.
+PIP: You walk very slowly. I had time to eat.
 
-## Encounter
+LYRA: Give it back.
 
-Hall-crawlers — flat, pale, six-legged, they come off the ceiling and land on the person at the back.
-Four of them, and they keep arriving until someone smashes the cracked pipe they're nesting in.
-They drop nothing. This is the fight where the player learns to turn around.
+PIP: [handing over half a loaf] There's a man in town telling everyone a red-haired boy robbed him.
 
-## Clip: The Doorkeeper
+BRON: I didn't — you put it in my hands!
 
-[The corridor opens out. A tall shape stands in the doorway on the far side, and it has been standing
-there long enough that dust has made a shoulder of it.]
+PIP: And you kept it for two days.
 
-PIP: Nope.
+ZEPH: I like her.
 
-ZEPH: Oh. Oh, that's a — that's a doorkeeper, that's an actual —
+LYRA: Of course you do.
 
-PIP: Zeph, it's moving.
-
-ZEPH: It's WONDERFUL.
-
-[The shape lifts its head. Light comes on behind its face.]
-
-THE DOORKEEPER: You may come in.
-
-BRON: [axe up] We're here to clear the entrance.
-
-THE DOORKEEPER: The entrance is clear. Thank you. You may come in.
-
-LYRA: What's in here?
-
-THE DOORKEEPER: Water and weather. It is switched off. It was switched off by the people who
-made it, on purpose, on a morning I remember very well.
-
-ZEPH: You remember it.
-
-THE DOORKEEPER: I stood here while they walked out. They said it would be hard for a while and
-then it would be better, and it was hard for a while, and then it was better.
-
-BRON: So why are you still standing in the door?
-
-THE DOORKEEPER: To say this to whoever came. [It steps aside, and its foot leaves a clean shape in a
-thousand years of dust.] Others came, nineteen days ago. They turned it on. Please turn it off
-when you leave.
-
-[It settles back against the frame.]
-
-PIP: ...I hate that. I hate that a lot. Say something, somebody.
-
-ZEPH: Nineteen days.
-
-LYRA: Bron.
-
-BRON: I heard him. [He goes in.]
+BRON: Fine. Carry something.
 
 ## Goal
-Find the room that's humming.
+Clear the entrance. That's the whole job.
 
-## Area: The long stair
+## Play: Fight + clear — the entrance (6 min)
+A building coming out of a hillside at the wrong angle, half-buried, warm to the touch. The rubble
+across the mouth is the job: four minutes of clearing, and the game says JOB COMPLETE in the corner.
+Inside, a corridor with a floor too flat. Lights come on in the ceiling ahead of you, one, then the
+next, then the next.
+**Fight:** hall-crawlers drop off the ceiling onto whoever is at the back and keep arriving until
+someone smashes the cracked pipe. Teaches checking behind you.
+**Find:** a bone-handled knife under the rubble, still sharp; a survey crew's stake, snapped.
+**Unlocks:** the corridor. The hum enters the sound mix here, under everything, and stays.
 
-Down. The corridor drops in wide shallow steps for longer than the hill is tall. Water on the
-floor now, and it's moving, which means something is pushing it.
-The lights ahead run on faster than you can walk, like something further down is expecting you.
-Doors along the sides, all sealed, all warm.
-On the fourth landing: a pack, a bedroll, and a soldier's coat from the west, folded, with a ration
-tin still in the pocket and a coin with a face on it none of you recognise.
+## Clip: The Hum
 
-## Encounter
+[Bron stops with his hand flat on the wall.]
 
-The stone hound — a guard animal the ancients built, awake for nineteen days and angry about it.
-Big, slow, armoured; hits the whole party; opens its chest to vent heat every third turn and that's
-when you go in. Drops a hot green shard that sells high and which Zeph screams about selling.
+ZEPH: Why has he stopped?
 
-## Area: The round room
+BRON: It got louder.
 
-The bottom. A circular room with a ceiling you can't see and a shaft going up through it, and every
-surface covered in the ancients' marks. Zeph translates four words and gets three wrong.
-Three doors. Two are jammed and will never open.
-The third has no handle, no seam, and a palm-shaped mark at Bron's exact height.
-Everyone tries it. Take as long as you like.
+LYRA: What did?
 
-## Clip: The Door That Knows You
+BRON: The noise. It's been getting louder since the rubble. [pointing down the corridor] It's
+coming from there.
 
-[Pip has both hands flat on the door and is leaning her whole weight in.]
+ZEPH: I can't hear anything.
 
-PIP: Open. Open. I'm asking nicely. I have never asked anything nicely.
+PIP: I can't hear anything either and I have excellent ears, ask anyone.
 
-ZEPH: It reads the hand. It has to be reading the hand. Lyra, yours, go.
+BRON: ...You're joking.
 
-LYRA: [pressing her palm to the mark] Nothing.
+LYRA: We're not joking.
 
-ZEPH: Mine, mine, get out of the way— [He presses both palms flat and holds his breath.] ...I've
-waited eleven years for this.
+BRON: The well at home does it. The hill behind Dorn's yard does it. Everyone gets that, I thought
+everyone —
 
-PIP: It doesn't like you.
+LYRA: Bron. Sit down a minute.
 
-ZEPH: It's a door, it has no opinions, MOVE, Bron, you do it.
+## Goal
+Find out what's still running down there.
 
-BRON: Why me?
+## Play: Puzzle — the building wants you out (10 min)
+New mechanic: **LISTEN.** Hold the button and the screen desaturates, sound drops out, and the hum
+shows as a direction and a pitch. Only Bron has it. Louder and lower means closer to whatever is
+running. This is your compass for the rest of the game.
+The building fights you politely. Doors unseal toward the surface. Lights switch on behind you and
+go dark ahead. Warm air pushes up the stair. Every route it offers goes out.
+**Do:** three rooms of working against it — jam a door open with the survey stake, walk a dark stretch
+on LISTEN alone, get Zeph to a wall panel he can read.
+**Find:** a soldier's coat from the west on the fourth landing, folded, with a ration tin and a coin
+none of you know.
+**Unlocks:** the panel above the inner door.
 
-PIP: Because you're last and I want to go home.
+## Clip: Four
 
-[Bron puts his hand on the mark. The door opens.]
+[The marks on the panel change while Zeph is reading them.]
 
-PIP: ...Oh, come on.
+ZEPH: It's a count. Four.
 
-ZEPH: Do it again.
+PIP: Four what?
 
-BRON: I only did it the once.
+ZEPH: People still inside the building.
 
-ZEPH: Close it and do it again.
+LYRA: There are five of us.
 
-LYRA: Bron. Take your hand off the wall and look at me. Are you frightened?
+ZEPH: I've read it four times.
 
-BRON: Yes.
+[The lights ahead go out. A line of lights comes on behind them, pointing up the stair.]
 
-LYRA: Good. Say that again later when he asks you.
+LYRA: It wants us out.
 
-BRON: Why did it open for me?
+ZEPH: It was told to empty the building and it never finished. It's still doing it.
 
-ZEPH: [already writing] I don't know. I don't know! Do you know how rarely I get to say that? I'm
-having the best day of my life.
+PIP: So who is it happy to leave?
 
-PIP: We're going to die down here and his last words are going to be that.
+[Bron walks on past the panel toward the dark. The count stays at four.]
 
-## Area: Beyond the door
+PIP: Bron. Bron, stop — it didn't change.
 
-A hall the size of the town. Down the middle, a machine — pipes as thick as houses, wound in
-something that glows a low steady blue, all of it turning, all of it loud.
-Wet air. It is raining inside the building, a fine warm rain, falling from a ceiling you still
-can't see, and running away down channels in the floor and out and up.
-On a walkway at the far end, a control stand, switched on, with a fresh chalk mark beside the lever
-and a crate of tools left open next to it.
-Nineteen days of boot prints in the dust, and all of them go out.
+LYRA: Come back here. Now.
 
-## Encounter
+## Play: Puzzle — counting to zero (6 min)
+Pip's plan, and the game lets her say it in a menu: the building will only stand down when the
+building is empty. So you leave. All five walk back up the stair, the count runs 4, 3, 2, 1, 0, the
+lights go out behind you, and the whole place goes quiet and cold.
+Then you go back in through the vent Pip found on the way up, and this time the doors stay where
+they are.
+**Do:** a short stealth-free crawl, one lever, one drop.
+**Find:** the vent route is a permanent shortcut into the lower halls.
+**Unlocks:** the lower halls, and the hum loud enough that the controller buzzes with it.
 
-Two soldiers in western coats left on watch, plus the thing they've been feeding — a crawler grown
-enormous on the heat. The soldiers surrender the moment their pet drops. They carry orders on paper,
-sealed, and one of them will tell you the name on the seal if Pip asks and Lyra heals his arm.
+## Play: Boss — the stone hound (5 min)
+A guard animal the ancients built, awake nineteen days and furious about it. Armoured, slow, hits
+the whole party.
+**Mechanics:** it opens its chest to vent heat every third turn. Hit it then or hit it never. Bron
+on LISTEN can hear the vent coming one turn early, which is the tutorial for using LISTEN in fights.
+**Drops:** a hot green shard worth more coin than the entire job, and Zeph screams about selling it.
+
+## Play: Explore — the big hall (5 min)
+A room the size of the town. Pipes as thick as houses, wound in something glowing a low steady blue,
+all of it turning, all of it loud, and warm rain falling from a ceiling you cannot see and running
+away down channels in the floor.
+**Do:** cross the walkway. Two soldiers in western coats are on watch with a crawler they've been
+feeding fat on the heat; they surrender the moment it drops.
+**Find:** sealed orders on the soldiers. Lyra heals one of their arms and he tells you the name on
+the seal. A control stand, switched on, chalk mark fresh beside the lever, tool crate open.
+**Unlocks:** the way out, and a save point, because of what's outside.
 
 ## Clip: Rain
 
 [They come out of the hillside into the open. It is raining hard on a valley that has never had it.]
 
-PIP: [flat palm out] That's rain.
+PIP: That's rain.
 
-ZEPH: It doesn't rain here. It has never rained here. There are no words in the local dialect for—
+ZEPH: It doesn't rain here. There's no word for it in the local —
 
-PIP: Zeph. Wet. There's a word. It's wet.
+PIP: Wet. There's a word.
 
-LYRA: [looking west] Look at the tower.
+LYRA: Look at the tower.
 
-[On the horizon, the tower has three lights burning on it now, not one.]
+[On the horizon the tower has three lights burning on it. Two days ago it had one.]
 
-ZEPH: That was dark on the ridge two days ago. That was dark my whole life.
-
-CRAY: [from the tree line, in a coat none of them could afford] You're all standing in the rain
-with your mouths open.
+CRAY: [out of the trees, in a coat none of them could afford] You're all standing in the rain with
+your mouths open.
 
 BRON: Cray.
 
-CRAY: A man came to the hall the day you left. Hiring. Real money, real contracts, a lord in the
-west with a dead city and a very large machine, and he is buying every hunter who can find a door.
-[He turns his collar up.] I signed. Eleven of us signed. You'd have been first pick.
+CRAY: A man came hiring the day you left. Some lord out west with money and a machine. Eleven of us
+signed.
 
-BRON: A lord.
+CRAY: He pays scholars double. Tell your friend.
 
-CRAY: You'll like him. Everyone likes him. He made it rain on eleven thousand people and they've
-named a street after him already. [beat] Come west, Bron. Bring the girl and the mouth and whatever
-that one is. He pays.
+ZEPH: [quietly] ...That's very unfair.
 
-ZEPH: I'm a scholar.
+CRAY: [walking backwards into the trees] Two days on that road and you cleared a doorway. I'm on
+a horse.
 
-CRAY: He pays scholars double.
+## Goal
+Choose a road.
 
-ZEPH: [quietly] ...Oh, that's very unfair.
+## Play: Travel — the fork (2 min)
+Half a mile down, in the rain, the road splits. East is two days home and a hot meal and the old man
+in the window. West is the tower, and you can see it from here now, three lights, through weather
+that has no business existing.
+**Do:** the game will let you walk east for about forty steps before Lyra says his name.
+**Unlocks:** the rest of it.
 
-LYRA: Bron. There's a thing standing in a doorway back there that asked us to turn it off.
+## Clip: West
 
-CRAY: [laughing, walking backwards into the trees] It asked you. Did it ask nicely? Did it say
-please? [He's gone.]
+[Bron stands in the rain with the axe on his shoulder.]
 
-[Bron stands in the rain with his father's axe over his shoulder and water running off the notch.]
+PIP: So. Home, old man, hot food?
 
-PIP: So we go home and tell the old man, yes? That's the plan? Home, old man, hot food?
+LYRA: Bron.
 
-BRON: Dorn told me I wasn't ready.
+BRON: It's all still running. Somebody switched it on nineteen days ago and went west.
 
-LYRA: He tells everyone that.
+PIP: Nineteen days ago I was in a barn.
+
+LYRA: Dorn said two days.
+
+BRON: Dorn said I wasn't ready.
+
+LYRA: He says that to everyone.
 
 BRON: He was right.
 
