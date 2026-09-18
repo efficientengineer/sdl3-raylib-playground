@@ -4,3 +4,4 @@ FALKE: [lifts the axe] Six coin? For my own father's axe?! Wait — there's a no
 HART: [taps the notch] Your father swung at a thing he should have run from. Worked, so he did it again — second time killed him. Notch stays.
 FALKE: [grips the handle] Killed him the second time? You hung it on your wall eleven years and never said a word — here's your six coin.
 OTTILIE: [counts the coin] Four, and two from the baker. That is all of it — and I am the one who patches you.
+HART: [pockets the coin] Paid in full. Sharpen it tonight. Run from the big ones. Out — dawn comes early.
