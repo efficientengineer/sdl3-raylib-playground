@@ -10,8 +10,12 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | --- | --- | --- | --- | --- |
 | `cliff` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `dirt` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
+| `fence_top` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | missing |
+| `fence_wood` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | missing |
 | `grass` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `grass_tall` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | missing |
+| `hedge` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | missing |
+| `hedge_top` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | missing |
 | `old_road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
 | `plank` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `river_bank` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
@@ -20,6 +24,8 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | `stair_stone` | tile | 64x64 | `story/packages/ch01/stair_shrine/tiles` | missing |
 | `stone` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `wall_plaster` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
+| `wall_stone` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | missing |
+| `wall_stone_top` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | missing |
 | `wall_timber` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `water` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
 

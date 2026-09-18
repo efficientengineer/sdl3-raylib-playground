@@ -2974,6 +2974,41 @@ def split_field_ids(ids, sizes):
     return groups, bad
 
 
+def frozen_packages(here, dirname, kind, ids):
+    """[(folder, ids)] for packages of this kind that have already been drawn, so their slots are fixed.
+
+    Once the owner has generated a sheet, its template and its slot boxes are the only thing that can
+    cut the image they got back. Adding an id to `tiles.md` must therefore never re-shuffle that
+    package: the drawn ones keep exactly the ids they were built with, and everything new goes into a
+    fresh `tiles_2`. A package counts as drawn when a returned image is sitting in it, or when every
+    file it makes is already on disk."""
+    out = []
+    for d in sorted(here.glob(f"{dirname}*")) if here.is_dir() else []:
+        mf = d / PKG_META
+        if not mf.exists():
+            continue
+        try:
+            meta = json.loads(mf.read_text())
+        except ValueError:
+            continue
+        was = meta.get("ids") or []
+        if meta.get("kind") != kind or not was or any(i not in ids for i in was):
+            continue                                     # not ours, or an id it drew has since gone
+        if pkg_returned(d) or (meta.get("outputs") and
+                               all((ROOT.parent / o).exists() for o in meta["outputs"])):
+            out.append((d.name, was))
+    return out
+
+
+def next_package_name(dirname, used):
+    if dirname not in used:
+        return dirname
+    n = 2
+    while f"{dirname}_{n}" in used:
+        n += 1
+    return f"{dirname}_{n}"
+
+
 def pkg_returned(d):
     """The image the owner saved in a package folder, newest first, or None."""
     files = [p for p in d.iterdir() if p.stem == RETURNED and p.suffix.lower() in RETURN_SUFFIXES] \
@@ -3104,23 +3139,34 @@ def cmd_packages(args):
             by_map.setdefault(maps[0], []).append(i)
             for other in maps[1:]:            # drawn once, used on several maps: say so, never redraw it
                 shared.setdefault((other, kind), []).append((i, maps[0]))
+        box_of = lambda i: ([(1, 1)] if kind == "tiles" else
+                            [(1, 1)] * len(BUILDING_FACES) if kind == "building" else
+                            [footprint_of(i, entries[i], [])])
         for mp in sorted(by_map):
             ids = sorted(by_map[mp])
-            sizes = ([(1, 1)] * len(ids) if kind == "tiles" else
-                     [[(1, 1)] * len(BUILDING_FACES) for _ in ids] if kind == "building" else
-                     [footprint_of(i, entries[i], []) for i in ids])
-            groups, bad = split_field_ids(ids, sizes)
+            here = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp
+            done, taken = frozen_packages(here, dirname, kind, ids), set()
+            for _, keep in done:
+                taken |= set(keep)
+            rest = [i for i in ids if i not in taken]
+            groups, bad = split_field_ids(rest, [box_of(i)[0] if kind != "building" else box_of(i)
+                                                 for i in rest])
             for i, why in bad:
                 failures.append((f"{kind} {i}", why))
-            for n, group in enumerate(groups, 1):
-                folder = dirname if len(groups) == 1 else f"{dirname}_{n}"
-                d = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp / folder
+            plan = list(done)
+            if not done and len(groups) == 1:
+                plan.append((dirname, groups[0]))
+            else:
+                for g in groups:                         # a new id never disturbs a sheet already drawn
+                    plan.append((next_package_name(dirname, {n for n, _ in plan}), g))
+            for n, (folder, group) in enumerate(plan, 1):
+                d = here / folder
                 outs = ([str((FIELD_DIRS["building"] / f"{i}_{f}.png").relative_to(ROOT.parent))
                          for i in group for f in BUILDING_FACES] if kind == "building" else
                         [str((FIELD_DIRS[KIND_DIR[kind]] / f"{i}.png").relative_to(ROOT.parent)) for i in group])
                 what = "buildings" if kind == "building" else kind
                 add(d, {"kind": kind, "map": mp, "ids": group,
-                        "title": f"{mp} — {len(group)} {what}" + (f" ({n} of {len(groups)})" if len(groups) > 1 else ""),
+                        "title": f"{mp} — {len(group)} {what}" + (f" ({n} of {len(plan)})" if len(plan) > 1 else ""),
                         "makes": (", ".join(f"`{i}`" for i in group) + " — front, side and roof each"
                                   if kind == "building" else ", ".join(f"`{o}`" for o in outs)),
                         "outputs": outs},
@@ -3227,7 +3273,9 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     for g, what in (("tiles", "the ground and walls of {m}"), ("props", "everything standing in {m}"),
                     ("building", "the front, wall and roof of every building in {m}")):
         for r in [x for x in index if x["group"] == g and x["map"] == lead_map]:
-            step(r, what.format(m=f"`{lead_map}`"))
+            part = re.search(r"\((\d+) of (\d+)\)", r["meta"].get("title", ""))
+            step(r, what.format(m=f"`{lead_map}`") + (f", sheet {part.group(1)} of {part.group(2)}"
+                                                      if part else ""))
     for r in [x for x in rows("scene") if x["map"] == lead_map]:
         step(r, f"the shot sheet for `{r['scene']['stem']}` — the first scene the game plays")
     L += [f"## 1. The short path to something on the phone", "",

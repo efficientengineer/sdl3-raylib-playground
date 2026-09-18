@@ -10,7 +10,7 @@
     "wall_plaster",
     "wall_timber"
   ],
-  "title": "halm \u2014 7 tiles",
+  "title": "halm \u2014 7 tiles (1 of 2)",
   "makes": "`story/field/tiles/cliff.png`, `story/field/tiles/dirt.png`, `story/field/tiles/grass.png`, `story/field/tiles/plank.png`, `story/field/tiles/stone.png`, `story/field/tiles/wall_plaster.png`, `story/field/tiles/wall_timber.png`",
   "outputs": [
     "story/field/tiles/cliff.png",

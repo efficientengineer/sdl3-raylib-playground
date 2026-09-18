@@ -18,11 +18,18 @@ Format, one `## <id>` per tile:
 Every tile is 64x64 and seamless on all four edges: the right edge continues into the left, the
 bottom into the top, so a field of them shows no seam and no repeated landmark.
 
-Per map, the set is: **halm** grass, dirt, stone, plank, cliff, wall_plaster, wall_timber ·
-**hart_yard** grass, dirt, plank, cliff, wall_plaster, wall_timber · **west_road** road, grass,
-old_road, river_bank, water · **bridge** stone, road, river_bank, water, grass · **north_grass**
-grass_tall, grass, old_road, scree, cliff · **ridge_camp** scree, grass, cliff · **stair_shrine**
-grass, dirt, stone, wall_plaster, stair_stone.
+Per map, the set is: **halm** grass, dirt, stone, plank, cliff, wall_plaster, wall_timber,
+wall_stone, wall_stone_top, fence_wood, fence_top, hedge, hedge_top · **hart_yard** grass, dirt,
+plank, cliff, wall_plaster, wall_timber, wall_stone, wall_stone_top, fence_wood, fence_top, hedge,
+hedge_top · **west_road** road, grass, old_road, river_bank, water · **bridge** stone, road,
+river_bank, water, grass · **north_grass** grass_tall, grass, old_road, scree, cliff ·
+**ridge_camp** scree, grass, cliff · **stair_shrine** grass, dirt, stone, wall_plaster, stair_stone.
+
+**Walls, fences and hedges are extruded boxes**, not sprites: the engine raises a box along the line
+and textures its face with the `- kind: wall` tile and its top with the matching `- kind: ground`
+one, so those two have to look like the same object seen from the front and from above. A tile is
+opaque, so a gap a person could see through — between two fence rails — is painted as one flat dark
+colour rather than left clear.
 
 ## grass
 Short valley grass in uneven clumps with bare earth showing through and a few small stones.
@@ -93,3 +100,33 @@ Dark timber framing over pale plaster panels, the beams pegged at the joins.
 Enormous pale grey cut blocks in even courses with hairline joints, unweathered, no moss and no crack anywhere in them.
 - kind: wall
 - map: stair_shrine
+
+## wall_stone
+A dry stone wall face of stacked grey field stones in uneven courses, no mortar, small chips packed into the gaps and lichen on the weathered faces.
+- kind: wall
+- map: halm, hart_yard
+
+## wall_stone_top
+The top of a dry stone wall seen straight down from above: a run of flat grey capstones laid across the width, chipped at the edges, moss in the joints between them.
+- kind: ground
+- map: halm, hart_yard
+
+## fence_wood
+A post-and-rail timber fence seen level from the front, two split rails pegged between square posts, the wood grey and shaken; the gaps between the rails are one flat dark colour, the same on every tile.
+- kind: wall
+- map: halm, hart_yard
+
+## fence_top
+The top of a timber fence seen straight down from above: the upper rail running the length of the tile with its grain along it, a square post head cut level at intervals, the strip either side of the rail the same flat dark colour as the fence face.
+- kind: ground
+- map: halm, hart_yard
+
+## hedge
+A clipped hedge face of dense small leaves cut level, dark green with olive lights, a few bare twigs showing through near the bottom.
+- kind: wall
+- map: halm, hart_yard
+
+## hedge_top
+The top of a clipped hedge seen straight down from above, dense leaf cover cut level with a slightly uneven ridge along the middle and shadow between the clumps.
+- kind: ground
+- map: halm, hart_yard

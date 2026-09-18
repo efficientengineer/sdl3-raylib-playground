@@ -39,13 +39,15 @@ unblock each other. A checked box is already cut; everything below this section 
       [`cast/falke/walker`](cast/falke/walker/prompt.md) · to generate · `ingest cast/falke/walker`
 - [ ] **8.** Ottilie's walk sprite — the figure walking the map  
       [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · to generate · `ingest cast/ottilie/walker`
-- [x] **9.** the ground and walls of `halm`  
+- [x] **9.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
-- [x] **10.** everything standing in `halm`  
+- [ ] **10.** the ground and walls of `halm`, sheet 2 of 2  
+      [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) · to generate · `ingest ch01/halm/tiles_2`
+- [x] **11.** everything standing in `halm`  
       [`ch01/halm/props`](ch01/halm/props/prompt.md) · done · `ingest ch01/halm/props`
-- [ ] **11.** the front, wall and roof of every building in `halm`  
+- [ ] **12.** the front, wall and roof of every building in `halm`  
       [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · to generate · `ingest ch01/halm/buildings`
-- [x] **12.** the shot sheet for `0110_the_board` — the first scene the game plays  
+- [x] **13.** the shot sheet for `0110_the_board` — the first scene the game plays  
       [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) · done · `ingest ch01/halm/scenes/0110_the_board`
 
 Then `./story_prompt.py ingest` and `./fast_reload.sh`.
@@ -101,6 +103,7 @@ Shared props, drawn with another map so one id is never drawn twice: `cart` (wit
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
 | [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) | `story/field/tiles/cliff.png`, `story/field/tiles/dirt.png`, `story/field/tiles/grass.png`, `story/field/tiles/plank.png`, `story/field/tiles/stone.png`, `story/field/tiles/wall_plaster.png`, `story/field/tiles/wall_timber.png` | done | `ingest ch01/halm/tiles` |
+| [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) | `story/field/tiles/fence_top.png`, `story/field/tiles/fence_wood.png`, `story/field/tiles/hedge.png`, `story/field/tiles/hedge_top.png`, `story/field/tiles/wall_stone.png`, `story/field/tiles/wall_stone_top.png` | to generate | `ingest ch01/halm/tiles_2` |
 | [`ch01/halm/props`](ch01/halm/props/prompt.md) | `story/field/props/barrel.png`, `story/field/props/cart.png`, `story/field/props/fence.png`, `story/field/props/scale_bench.png`, `story/field/props/sign.png`, `story/field/props/tree_a.png`, `story/field/props/tree_b.png`, `story/field/props/well.png`, `story/field/props/yard_wall.png` | done | `ingest ch01/halm/props` |
 | [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) | `grain_shed`, `guild_hall`, `house_a`, `house_b`, `ladder_house` — front, side and roof each | to generate | `ingest ch01/halm/buildings` |
 
@@ -110,7 +113,7 @@ Shared props, drawn with another map so one id is never drawn twice: `cart` (wit
 | --- | --- | --- | --- |
 | [`ch01/hart_yard/props`](ch01/hart_yard/props/prompt.md) | `story/field/props/practice_post.png` | to generate | `ingest ch01/hart_yard/props` |
 
-Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (with `halm`), `dirt` (with `halm`), `grass` (with `halm`), `plank` (with `halm`), `wall_plaster` (with `halm`), `wall_timber` (with `halm`)
+Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (with `halm`), `dirt` (with `halm`), `fence_top` (with `halm`), `fence_wood` (with `halm`), `grass` (with `halm`), `hedge` (with `halm`), `hedge_top` (with `halm`), `plank` (with `halm`), `wall_plaster` (with `halm`), `wall_stone` (with `halm`), `wall_stone_top` (with `halm`), `wall_timber` (with `halm`)
 
 Shared props, drawn with another map so one id is never drawn twice: `barrel` (with `halm`), `fence` (with `halm`), `tree_a` (with `halm`)
 

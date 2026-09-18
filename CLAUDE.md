@@ -327,7 +327,7 @@ tool complaints go in `story/notes/<agent>.md` and the orchestrator rules on the
   story/packages/cast/<name>/refsheet/          the character reference sheet  (folder named for the
   story/packages/cast/<name>/walker/            the 4x4 walk sheet              current name, as maps are)
   story/packages/ch01/<map>/tiles/              that map's ground and wall tiles
-  story/packages/ch01/<map>/props_1/            its props, split when the slots would be too small to draw in
+  story/packages/ch01/<map>/props, props_2/     split when one sheet's slots would be too small to draw in
   story/packages/ch01/<map>/scenes/<scene>/     a shot sheet per panel scene played on that map
   ```
 
@@ -336,7 +336,11 @@ tool complaints go in `story/notes/<agent>.md` and the orchestrator rules on the
   template, `package.json` for the tool, and `RETURN_HERE.md` — the one instruction: save ChatGPT's
   image **in that folder** as `returned.png`. Maps come from the `- map:` lines on scenes and on
   `story/field/tiles.md` / `props.md` entries; an id used on several maps is drawn once with the first
-  and listed as shared under the others, so no id is ever drawn twice. The README opens with **the
+  and listed as shared under the others, so no id is ever drawn twice. **A package that has been
+  drawn is frozen**: once a returned image sits in it, or every file it makes exists, its id list,
+  slot boxes and template stay exactly as they were, and ids added to `tiles.md` or `props.md`
+  afterwards go into a fresh `tiles_2` beside it — otherwise adding one tile would re-shuffle a sheet
+  the owner had already generated and the archived image could never be cut again. The README opens with **the
   short path to something on the phone**: a numbered to-do with status boxes — the missing reference
   sheets, then the walk sprites they unblock, then the first map's tiles and props, then the first
   scene's shot sheet — and the rest follows by map in chapter order.
