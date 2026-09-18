@@ -1,0 +1,23 @@
+{
+  "kind": "props",
+  "map": "stair_shrine",
+  "ids": [
+    "rubbing_stall",
+    "shrine_house",
+    "sitter",
+    "step_rope",
+    "stone_shelf",
+    "water_jar"
+  ],
+  "title": "stair_shrine \u2014 6 props",
+  "makes": "`story/field/props/rubbing_stall.png`, `story/field/props/shrine_house.png`, `story/field/props/sitter.png`, `story/field/props/step_rope.png`, `story/field/props/stone_shelf.png`, `story/field/props/water_jar.png`",
+  "outputs": [
+    "story/field/props/rubbing_stall.png",
+    "story/field/props/shrine_house.png",
+    "story/field/props/sitter.png",
+    "story/field/props/step_rope.png",
+    "story/field/props/stone_shelf.png",
+    "story/field/props/water_jar.png"
+  ],
+  "dir": "story/packages/ch01/stair_shrine/props"
+}

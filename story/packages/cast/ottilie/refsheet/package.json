@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "lyra",
+  "title": "Ottilie \u2014 reference sheet",
+  "ref": "story/refs/lyra.png",
+  "makes": "`story/refs/lyra.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/lyra.png",
+    "story/portraits/lyra.png"
+  ],
+  "dir": "story/packages/cast/ottilie/refsheet"
+}

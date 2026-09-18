@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "stolz",
+  "title": "Stolz \u2014 reference sheet",
+  "ref": "story/refs/stolz.png",
+  "makes": "`story/refs/stolz.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/stolz.png",
+    "story/portraits/stolz.png"
+  ],
+  "dir": "story/packages/cast/stolz/refsheet"
+}

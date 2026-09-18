@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "bron",
+  "title": "Falke \u2014 reference sheet",
+  "ref": "story/refs/bron.png",
+  "makes": "`story/refs/bron.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/bron.png",
+    "story/portraits/bron.png"
+  ],
+  "dir": "story/packages/cast/falke/refsheet"
+}

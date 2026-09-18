@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "hart",
+  "title": "Hart \u2014 reference sheet",
+  "ref": "story/refs/hart.png",
+  "makes": "`story/refs/hart.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/hart.png",
+    "story/portraits/hart.png"
+  ],
+  "dir": "story/packages/cast/hart/refsheet"
+}

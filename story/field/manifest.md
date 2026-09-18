@@ -8,33 +8,54 @@ Sizes are the target the pipeline writes; the last column is what is actually on
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `cliff` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `dirt` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `grass` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `plank` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `stone` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `wall_plaster` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `wall_timber` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
-| `water` | tile | 64x64 | `tiles_grass-dirt-stone-plus5` | missing |
+| `cliff` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `dirt` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `grass` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `grass_tall` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | missing |
+| `old_road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
+| `plank` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `river_bank` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
+| `road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
+| `scree` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | missing |
+| `stair_stone` | tile | 64x64 | `story/packages/ch01/stair_shrine/tiles` | missing |
+| `stone` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `wall_plaster` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `wall_timber` | tile | 64x64 | `story/packages/ch01/halm/tiles` | missing |
+| `water` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | missing |
 
 ## Props — alpha, 64 px to a map cell, standing on the bottom row
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `barrel` | prop | 64x64 | `props_well-cart-barrel-plus6` | missing |
-| `cart` | prop | 128x128 | `props_well-cart-sign` | missing |
-| `fence` | prop | 128x64 | `props_well-cart-barrel-plus6` | missing |
-| `grain_shed` | prop | 192x192 | `props_house_a-house_b-guild_hall-plus2` | missing |
-| `guild_hall` | prop | 256x192 | `props_house_a-house_b-guild_hall-plus2` | missing |
-| `house_a` | prop | 192x192 | `props_house_a-house_b-guild_hall-plus2` | missing |
-| `house_b` | prop | 128x192 | `props_house_a-house_b-guild_hall-plus2` | missing |
-| `ladder_house` | prop | 192x192 | `props_house_a-house_b-guild_hall-plus2` | missing |
-| `milestone` | prop | 64x64 | `props_well-cart-barrel-plus6` | missing |
-| `practice_post` | prop | 64x128 | `props_well-cart-barrel-plus6` | missing |
-| `sign` | prop | 64x128 | `props_well-cart-sign` | missing |
-| `tree_a` | prop | 128x192 | `props_well-cart-barrel-plus6` | missing |
-| `tree_b` | prop | 64x128 | `props_well-cart-barrel-plus6` | missing |
-| `well` | prop | 64x128 | `props_well-cart-sign` | missing |
+| `barrel` | prop | 64x64 | `story/packages/ch01/halm/props` | missing |
+| `bedroll` | prop | 128x64 | `story/packages/ch01/ridge_camp/props` | missing |
+| `bridge_rail` | prop | 128x64 | `story/packages/ch01/bridge/props` | missing |
+| `campfire` | prop | 64x64 | `story/packages/ch01/ridge_camp/props` | missing |
+| `cart` | prop | 128x128 | `story/packages/ch01/halm/props` | missing |
+| `cave_mouth` | prop | 192x128 | `story/packages/ch01/north_grass/props` | missing |
+| `culvert` | prop | 192x128 | `story/packages/ch01/west_road/props` | missing |
+| `fence` | prop | 128x64 | `story/packages/ch01/halm/props` | missing |
+| `grain_shed` | prop | 192x192 | `story/packages/ch01/halm/props` | missing |
+| `guild_hall` | prop | 256x192 | `story/packages/ch01/halm/props` | missing |
+| `house_a` | prop | 192x192 | `story/packages/ch01/halm/props` | missing |
+| `house_b` | prop | 128x192 | `story/packages/ch01/halm/props` | missing |
+| `ladder_house` | prop | 192x192 | `story/packages/ch01/hart_yard/props` | missing |
+| `milestone` | prop | 64x64 | `story/packages/ch01/west_road/props` | missing |
+| `practice_post` | prop | 64x128 | `story/packages/ch01/hart_yard/props` | missing |
+| `ridge_rock` | prop | 192x128 | `story/packages/ch01/ridge_camp/props` | missing |
+| `rubbing_stall` | prop | 128x128 | `story/packages/ch01/stair_shrine/props` | missing |
+| `scale_bench` | prop | 128x64 | `story/packages/ch01/halm/props` | missing |
+| `shrine_house` | prop | 192x128 | `story/packages/ch01/stair_shrine/props` | missing |
+| `sign` | prop | 64x128 | `story/packages/ch01/halm/props` | missing |
+| `sitter` | prop | 64x64 | `story/packages/ch01/stair_shrine/props` | missing |
+| `slide_rubble` | prop | 192x128 | `story/packages/ch01/north_grass/props` | missing |
+| `step_rope` | prop | 64x192 | `story/packages/ch01/stair_shrine/props` | missing |
+| `stone_shelf` | prop | 256x64 | `story/packages/ch01/stair_shrine/props` | missing |
+| `tree_a` | prop | 128x192 | `story/packages/ch01/halm/props` | missing |
+| `tree_b` | prop | 64x128 | `story/packages/ch01/halm/props` | missing |
+| `water_jar` | prop | 64x64 | `story/packages/ch01/stair_shrine/props` | missing |
+| `well` | prop | 64x128 | `story/packages/ch01/halm/props` | missing |
+| `yard_wall` | prop | 192x128 | `story/packages/ch01/halm/props` | missing |
 
 ## Walkers — alpha, 4 rows (S, W, E, N) x 4 columns of 32x48 frames
 
@@ -42,5 +63,7 @@ Sizes are the target the pipeline writes; the last column is what is actually on
 | --- | --- | --- | --- | --- |
 | `bron` | walker | 128x192 | `walker_bron` | missing |
 | `clerk` | walker | 128x192 | `walker_clerk` | missing |
-| `villager_a` | walker | 128x192 | `-` | missing |
-| `villager_b` | walker | 128x192 | `-` | missing |
+| `falke` | walker | 128x192 | `story/packages/cast/falke/walker` | missing |
+| `ottilie` | walker | 128x192 | `story/packages/cast/ottilie/walker` | missing |
+| `villager_a` | walker | 128x192 | `story/packages/cast/villager_a/walker` | missing |
+| `villager_b` | walker | 128x192 | `story/packages/cast/villager_b/walker` | missing |

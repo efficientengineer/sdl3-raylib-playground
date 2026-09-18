@@ -16,3 +16,4 @@ story/portraits/
 __pycache__/
 story/refs/style.*
 android/app/src/main/assets/cutscenes/
+story/packages/**/returned.*

@@ -1,0 +1,15 @@
+{
+  "kind": "sheet",
+  "scene": "0170_the_jar",
+  "map": "stair_shrine",
+  "title": "0170_the_jar \u2014 shot sheet",
+  "makes": "5 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0170_the_jar_p1_establishing_wide.png",
+    "story/panels/0170_the_jar_p2_full_body_reveal.png",
+    "story/panels/0170_the_jar_p3_object_insert.png",
+    "story/panels/0170_the_jar_p4_eyes_slit.png",
+    "story/panels/0170_the_jar_p5_two_shot.png"
+  ],
+  "dir": "story/packages/ch01/stair_shrine/scenes/0170_the_jar"
+}

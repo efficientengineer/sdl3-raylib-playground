@@ -13,46 +13,36 @@ struct CsScene { const char *id; const char *title; bool narration;   // narrati
                  CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
 
-static const CsLine CS_p01_prologue_LINES[] = {
-    { "Narrator", "Long ago, the people of the hills built their halls downward, toward something that sang in the dark.", 0, CS_WONDER, nullptr, CS_LEFT },
-    { "Narrator", "They grew wise there. They grew rich. And then, in a single season, they sealed every door from the inside.", 0, CS_WONDER, nullptr, CS_LEFT },
-    { "Narrator", "No one came out. The guards who held those doors swore an oath that outlasted their lives.", 0, CS_DREAD, nullptr, CS_LEFT },
-    { "Narrator", "A thousand years later, a bill went up on the board in the water-house at Sallowgate.", 0, CS_DREAD, nullptr, CS_LEFT },
-    { "Narrator", "Clear the entrance. Ask no questions.", 0, CS_DREAD, nullptr, CS_LEFT },
-    { "Narrator", "Triple rate. Four hunters signed for it, and nobody in the hall asked why.", 0, CS_TENSE, nullptr, CS_LEFT },
+static const CsLine CS_0130_he_signs_LINES[] = {
+    { "Ottilie", "Sign it, Hart. Four days, not two  -  two west and two back  -  and I am the one who patches whoever goes.", 0, CS_TENSE, "portrait_lyra.png", CS_LEFT },
+    { "Hart", "Jar on the stone shelf under the bottom step. Straight back.", 0, CS_TENSE, nullptr, CS_RIGHT },
+    { "Falke", "What's at the step? I've never been out that far.", 0, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Hart", "A staircase the ancients built. A woman lives under it and takes the jar once a year. Don't touch the stone. Don't go past her shelf.", 0, CS_WONDER, nullptr, CS_RIGHT },
+    { "Falke", "A woman lives under it? Ottilie  -  you've walked that road twice. Come with me?", 0, CS_WONDER, "portrait_bron.png", CS_LEFT },
+    { "Ottilie", "Yes! And he has never once asked me to come anywhere until today.", 0, CS_HOPE, "portrait_lyra.png", CS_LEFT },
 };
 
-static const CsPanel CS_003_the_warning_PANELS[] = {
-    { "003_the_warning_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 56.8f}, {3.0f, 2.0f, 80.0f, 43.7f} },
-    { "003_the_warning_p2_low_angle_menace.png", 0, {73.0f, 3.0f, 22.0f, 56.6f}, {61.0f, 10.0f, 36.0f, 46.3f} },
-    { "003_the_warning_p3_eyes_slit.png", 0, {20.0f, 52.0f, 60.0f, 20.2f}, {4.0f, 40.0f, 92.0f, 15.5f} },
-    { "003_the_warning_p4_two_shot.png", 1, {4.0f, 5.0f, 52.0f, 48.6f}, {3.0f, 2.0f, 80.0f, 37.4f} },
-    { "003_the_warning_p5_object_insert.png", 1, {49.0f, 44.6f, 17.0f, 28.8f}, {69.0f, 29.4f, 30.0f, 25.4f} },
-    { "003_the_warning_p6_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 44.0f}, {61.0f, 10.0f, 36.0f, 36.0f} },
-    { "003_the_warning_p7_portrait_inset.png", 1, {82.0f, 38.0f, 17.0f, 29.6f}, {69.0f, 36.0f, 30.0f, 26.1f} },
-};
-static const CsLine CS_003_the_warning_LINES[] = {
-    { "Bron", "It's blocking the way.", 1, CS_TENSE, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "No. Look at it. It's pointing us back the way we came.", 2, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
-    { "Bron", "A dead man doesn't give me orders.", 3, CS_TENSE, "portrait_bron.png", CS_LEFT },
-    { "Bron", "Then it can point while I walk through it!", 4, CS_CONFRONT, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "Bron, wait!", 5, CS_CONFRONT, "portrait_lyra.png", CS_RIGHT },
-    { "Lyra", "It hasn't moved. It could have cut us down the moment that door opened.", 6, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
-    { "Lyra", "It isn't guarding the door from us. It's still guarding us from the door.", 7, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
+static const CsLine CS_0140_the_sword_LINES[] = {
+    { "Hart", "Take your father's sword. Six coin.", 0, CS_HOPE, nullptr, CS_LEFT },
+    { "Falke", "Six coin? You're selling me my own father's sword!", 0, CS_HOPE, "portrait_bron.png", CS_RIGHT },
+    { "Hart", "Kept it eleven years. I want paying for the keeping.", 0, CS_HOPE, nullptr, CS_LEFT },
+    { "Falke", "There's a notch in the blade. How did he put a notch in it?", 0, CS_TENSE, "portrait_bron.png", CS_RIGHT },
+    { "Hart", "Sheets, north of the river. One drops on you and you're held until somebody cuts you out. He'd wade into them instead of walking round. Twenty years I was there to cut him out. Year he walked alone there was no one. Notch stays.", 0, CS_SORROW, nullptr, CS_LEFT },
+    { "Ottilie", "Pay him, Falke. He will stand there all night at six coin an hour.", 0, CS_HOPE, "portrait_lyra.png", CS_LEFT },
 };
 
-static const CsLine CS_003b_after_the_warning_LINES[] = {
-    { "Bron", "It's still standing there. It hasn't even shifted its grip.", 0, CS_DREAD, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "It won't. It's been holding that gap for a thousand years.", 0, CS_DREAD, "portrait_lyra.png", CS_RIGHT },
-    { "Bron", "Then whatever it's holding it against is still down there.", 0, CS_DREAD, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "Every door in this hill was barred from the inside. That isn't keeping people out.", 0, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
-    { "Bron", "The contract says clear the entrance. Nobody said anything about what's behind it.", 0, CS_TENSE, "portrait_bron.png", CS_LEFT },
-    { "Lyra", "Then we go in. And we go back up and tell the other two before anybody takes another step.", 0, CS_HOPE, "portrait_lyra.png", CS_RIGHT },
+static const CsLine CS_0160_the_fire_LINES[] = {
+    { "Falke", "My arms have gone. How many was that today?", 0, CS_HOPE, "portrait_bron.png", CS_LEFT },
+    { "Ottilie", "Nineteen, and I patched you four times, twice for the same arm. Sleep  -  I wake you at the turn.", 0, CS_HOPE, "portrait_lyra.png", CS_RIGHT },
+    { "Falke", "Did you know my father? Properly, I mean. You were in Hart's yard.", 0, CS_WONDER, "portrait_bron.png", CS_LEFT },
+    { "Ottilie", "I was twelve and he was the big one who came and went. I remember one thing about this run: he came home a day late off it. Every year.", 0, CS_WONDER, "portrait_lyra.png", CS_RIGHT },
+    { "Falke", "A day late, every year? I was six when he died and no one has ever told me that!", 0, CS_SORROW, "portrait_bron.png", CS_LEFT },
+    { "Ottilie", "Hart used to stand at the gate and count. Sleep.", 0, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
 };
 
 static const CsScene CS_INTRO[] = {
-    { "p01_prologue", "Beneath the Hills", true, CS_NARRATION, nullptr, nullptr, 0, CS_p01_prologue_LINES, 6 },
-    { "003_the_warning", "The Warning", false, CS_PANELS, nullptr, CS_003_the_warning_PANELS, 7, CS_003_the_warning_LINES, 7 },
-    { "003b_after_the_warning", "After the Warning", false, CS_TALK, "003_the_warning_p6_full_body_reveal.png", nullptr, 0, CS_003b_after_the_warning_LINES, 6 },
+    { "0130_he_signs", "He Signs", false, CS_TALK, nullptr, nullptr, 0, CS_0130_he_signs_LINES, 6 },
+    { "0140_the_sword", "The Sword", false, CS_TALK, nullptr, nullptr, 0, CS_0140_the_sword_LINES, 6 },
+    { "0160_the_fire", "The Fire", false, CS_TALK, nullptr, nullptr, 0, CS_0160_the_fire_LINES, 6 },
 };
 static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);

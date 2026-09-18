@@ -1,0 +1,44 @@
+{
+  "template": "props_bridge_rail",
+  "kind": "props",
+  "canvas": [
+    1536,
+    1024
+  ],
+  "canvas_label": "landscape, 1536x1024",
+  "background": [
+    255,
+    0,
+    255
+  ],
+  "border": 3,
+  "out": null,
+  "slots": [
+    {
+      "n": 1,
+      "id": "bridge_rail",
+      "cells": [
+        2,
+        1
+      ],
+      "box": [
+        52,
+        154,
+        1431,
+        715
+      ],
+      "inner": [
+        55,
+        157,
+        1425,
+        709
+      ],
+      "target": [
+        128,
+        64
+      ],
+      "out": "story/field/props/bridge_rail.png"
+    }
+  ],
+  "prompt": "Create ONE image: the attached template with all 1 numbered slots filled in. Canvas: landscape, 1536x1024, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THESE ARE: single objects for a 2.5D field map, one object per slot, each cut out against the flat magenta. The magenta is not a backdrop, it is empty space: it runs right up to the edge of the object on every side. No ground, no grass, no paving, no base plate, no cast shadow, no glow, no scenery and no second object in a slot.\n\nCAMERA, the same for every slot: a front three-quarter view from slightly above, looking about fifty degrees down, as if all of these objects stood in one town seen from one fixed camera. The object sits upright, centred left to right, and touches the bottom edge of its slot, because that line is where it meets the ground in game.\n\nSCALE: a slot is a grid of map cells, 64 pixels to the cell in game, and each slot below says how many cells it is. Objects share one scale across the sheet: a four-cell hall is four times the width of a one-cell barrel and is drawn with the same size of pixel.\n\nSLOTS:\nSlot 1 (bridge_rail), 2 x 1 cells, 1425x709 px in the template: A run of low bridge parapet in cut stone with a flat coping, one section rebuilt in newer blocks and a rubbed hollow where hands go. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.\n\nRENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.\n\nAVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a scene or background inside a slot, two objects in one slot, changing the size of the image"
+}

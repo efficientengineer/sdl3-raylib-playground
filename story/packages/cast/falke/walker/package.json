@@ -1,0 +1,10 @@
+{
+  "kind": "walker",
+  "handle": "bron",
+  "title": "Falke \u2014 walk sheet",
+  "makes": "`story/field/walkers/falke.png`, the 4x4 walk sprite sheet",
+  "outputs": [
+    "story/field/walkers/falke.png"
+  ],
+  "dir": "story/packages/cast/falke/walker"
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "tiles",
+  "map": "halm",
+  "ids": [
+    "cliff",
+    "dirt",
+    "grass",
+    "plank",
+    "stone",
+    "wall_plaster",
+    "wall_timber"
+  ],
+  "title": "halm \u2014 7 tiles",
+  "makes": "`story/field/tiles/cliff.png`, `story/field/tiles/dirt.png`, `story/field/tiles/grass.png`, `story/field/tiles/plank.png`, `story/field/tiles/stone.png`, `story/field/tiles/wall_plaster.png`, `story/field/tiles/wall_timber.png`",
+  "outputs": [
+    "story/field/tiles/cliff.png",
+    "story/field/tiles/dirt.png",
+    "story/field/tiles/grass.png",
+    "story/field/tiles/plank.png",
+    "story/field/tiles/stone.png",
+    "story/field/tiles/wall_plaster.png",
+    "story/field/tiles/wall_timber.png"
+  ],
+  "dir": "story/packages/ch01/halm/tiles"
+}

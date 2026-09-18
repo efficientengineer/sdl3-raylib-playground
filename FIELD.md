@@ -42,6 +42,20 @@ changes it without the orchestrator.
   around Y only, depth-tested with `discard` on alpha < 0.5 (no blend sorting). Walkers (player, NPCs)
   are billboards with animation frames. Props may be `wide` (a house spans 3x2 cells: the sprite's
   base sits on the front row and the cells behind are blocked).
+- **Buildings are 3D** (owner, after the first build): `## buildings` lines `x z w d h id` make a
+  textured box with a roof, faces from `story/field/buildings/<id>_front.png`, `_side.png`,
+  `_roof.png` (sizes in `src/FIELD_NOTES.md`). Houses, halls and sheds are buildings; small things
+  (well, cart, barrel, posts, trees) stay billboards.
+- **Impassable must look impassable** (owner): every open unshared navmesh edge gets a fence, hedge,
+  wall, rock line, water edge or cliff step drawn on it (`| fence` / `| hedge` flags on nav lines
+  instance a strip along the edge; the Dev "Show blockers" toggle draws every bare edge in red).
+  Where grass is meant to be open, extend the mesh instead. Exits are never fenced: an exit
+  rectangle subtracts from blocker edges and gets a road running off the map edge or an open gate.
+- **Towns are organic, not grids** (owner): a rough radial plan around an irregular square, streets
+  that bend, fork, pinch and dead-end, buildings at varied angles (`rot` on building lines),
+  non-uniform spacing, a stream cutting an odd line. Nothing laid out like city blocks.
+- **The player never leaves the frame** (owner): follow mode keeps the player inside the middle
+  50% of the image; fixed and rail modes pan automatically when the player nears the edge.
 - Post-process slot: the FBO is drawn through one fullscreen pass so a tilt-shift blur (top and
   bottom bands) can be added later without restructuring. Not required in the first build.
 - Shaders are inline GLSL ES 3.00 strings in `field.cpp` (Android is the only target).
@@ -141,6 +155,55 @@ now — battle is the next stream, not this one.
 Left half of the screen: a floating virtual joystick (appears where the thumb lands, 8-direction
 snap, dead zone). Right half: tap = action/confirm, long-press = run. Draw both with ImGui, half
 transparent, no textures.
+
+## Map design rules
+
+Shape tells the player who made a place. These rules are binding for every map; a map agent
+checks its work against the list at the end before handing off.
+
+1. **Shape follows the maker.** People *grow* places; the ancients *built* them. A human settlement
+   is organic: it started from one reason (a well, a ford, a crossroads, shelter under a hill) and
+   spread along the easiest walking lines, so nothing in it is straight for longer than two or three
+   houses. An ancients' place is geometric: gridded, symmetric, repeated, straight, at a scale no
+   person needs. The contrast is a feeling the game relies on. Grids are for the ancients only —
+   never for a valley town, a shrine, a camp or a road.
+2. **Start from the reason.** Mark the origin point first (Halm: the well). The oldest, densest,
+   most crooked buildings cluster round it; newer and sparser toward the edges; the guild hall and
+   the market face the square it made.
+3. **Paths before buildings.** Draw where people walk — from the origin to each exit, to the water,
+   to the fields — as bending desire lines. Then put buildings along the paths, fronts to the path.
+   Streets fork at odd angles, pinch to one cell where they're old, widen into an irregular open
+   space where people meet, and some dead-end in a yard.
+4. **Terrain decides.** Water and height come before the plan. Streams are never straight and never
+   parallel to a street. On a slope, paths curve or switchback along the contour; straight ramps and
+   steps exist only where something was built to make them.
+5. **Nothing uniform.** Building sizes, rotations (no two neighbours parallel unless they share a
+   wall), gaps between them, plot shapes, fence heights, the distance between trees. If two things
+   are the same distance apart as two other things, move one.
+6. **Ragged edges.** A town dissolves into orchards, walls, hedges, sheds and fields; it never stops
+   at a clean line. The map border is hidden behind terrain, trees or a bend, not a fence across
+   the world.
+7. **One landmark always in view.** The player orients by the well, the hall, the hill, the Stair.
+   Camera zones are chosen so a landmark stays in frame; a depth shot is aimed at one.
+8. **Small and dense.** Six to twelve buildings on a town map, every one of them with a reason to
+   walk to it (a door, an NPC, a find). A big empty map is a mistake, not scope.
+9. **One memorable thing per map.** The lopsided square, the stream through the middle, the road
+   that climbs round the hill. Name it in the map's `## meta` as `landmark:`.
+10. **Ancient places are the inverse of all of the above.** Perfect grids, mirror symmetry, identical
+    spacing, right angles, dead-flat floors, straight lines that run out of view, seams too tight to
+    see, materials that don't weather, doors sized for something taller. Use every one of those
+    tells there and nowhere else. Where people live on top of ancient work (the old road under the
+    grass, a hall on an ancient foundation), the organic grows over the grid and the grid shows
+    through in patches.
+11. **Roads between places** bend with the land, have a reason for every bend (a rock, a wet patch,
+    an old wall), and offer side turnings that go somewhere small.
+12. **The graph-paper test.** Look at the map from above with the Dev camera. If it reads as graph
+    paper and the place isn't ancient, it's wrong. Redo it before anything else.
+
+Checklist before hand-off: origin point named · desire lines drawn before buildings · no straight
+street longer than three houses · no two neighbouring buildings parallel · stream and slope paths
+curved · edges ragged and the border hidden · landmark in every camera zone · every building has a
+reason · `landmark:` set · graph-paper test passed.
 
 ## First maps
 

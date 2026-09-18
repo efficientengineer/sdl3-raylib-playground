@@ -1,0 +1,16 @@
+{
+  "kind": "sheet",
+  "scene": "0150_the_road_west",
+  "map": "bridge",
+  "title": "0150_the_road_west \u2014 shot sheet",
+  "makes": "6 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0150_the_road_west_p1_establishing_wide.png",
+    "story/panels/0150_the_road_west_p2_full_body_reveal.png",
+    "story/panels/0150_the_road_west_p3_portrait_inset.png",
+    "story/panels/0150_the_road_west_p4_over_shoulder.png",
+    "story/panels/0150_the_road_west_p5_eyes_slit.png",
+    "story/panels/0150_the_road_west_p6_low_angle_menace.png"
+  ],
+  "dir": "story/packages/ch01/bridge/scenes/0150_the_road_west"
+}

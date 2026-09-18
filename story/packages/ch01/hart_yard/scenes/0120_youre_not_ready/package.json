@@ -1,0 +1,16 @@
+{
+  "kind": "sheet",
+  "scene": "0120_youre_not_ready",
+  "map": "hart_yard",
+  "title": "0120_youre_not_ready \u2014 shot sheet",
+  "makes": "6 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0120_youre_not_ready_p1_establishing_wide.png",
+    "story/panels/0120_youre_not_ready_p2_low_angle_menace.png",
+    "story/panels/0120_youre_not_ready_p3_object_insert.png",
+    "story/panels/0120_youre_not_ready_p4_profile_flat.png",
+    "story/panels/0120_youre_not_ready_p5_full_body_reveal.png",
+    "story/panels/0120_youre_not_ready_p6_high_angle_down.png"
+  ],
+  "dir": "story/packages/ch01/hart_yard/scenes/0120_youre_not_ready"
+}

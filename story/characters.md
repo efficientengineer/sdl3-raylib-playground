@@ -70,6 +70,7 @@ order: build and height, skin, hair, ears, eyes.
 
 ## Bron
 - role: hunter of the Even Hand, axe, party leader
+- alias: Falke
 - ref: story/refs/bron.png
 - people: Kell
 - voice: Short sentences, concrete nouns, the thing first and the reason after; no irony and no idea how funny he is.
@@ -79,6 +80,7 @@ order: build and height, skin, hair, ears, eyes.
 
 ## Lyra
 - role: Attendance sister of the Order of the Late Hour, mace
+- alias: Ottilie
 - ref: story/refs/lyra.png
 - people: human
 - voice: Complete unhurried sentences; says the frightening thing plainly and quietly, asks one question too many, and never signals a joke.
@@ -602,6 +604,54 @@ order: build and height, skin, hair, ears, eyes.
 - look: Nona, a very short and very broad woman, wide through the shoulders, with clay-warm skin, amber eyes with bright rings at the pupils, pale gold hair standing straight up in a cropped brush, bare arms floured white to the elbow, a sleeveless square-cut overdress of faded woad-blue with a high banded collar and a row of bone toggles, a plain belted apron, and thin leather shoes — all of it very old, spotless, and invisibly mended.
 - status: alive and entirely well; ch.14, and the first person out of the Ninth Door in ch.15
 - notes: **Nine** — her working name this week; somebody called her that and next week it will be something else and she does not mind and cannot see why you would. Handle is **Nona** because "nine" false-matches "Nine Doors", "nine hundred tallies" and Ilven's nine chant-pins in panel text; write her dialogue speaker label as **Nine**, and any replacement working name must still be a number. **She must never be given a backstory**: she does not have one, cannot be given one, and nobody in Thurn knows their own age. Ch.14 Ollo asks her about the bread instead of the past and she is funny about the fat. Ch.15 `portrait_inset`, looking up into daylight she has never seen, delighted, recognising nobody. **She is not pitiable and is never drawn as a blank.** Her clothes are the whole design: old clothes in perfect repair.
+
+---
+
+## The valley (v3, chapter one)
+
+The four new faces of the jar run. Handles are the names in `story/v3/NAMES.md`, so a scene written
+in tokens resolves straight onto them: `{{MENTOR}}` reads Hart, `{{RIVAL}}` reads Stolz. The Clerk and
+the Shrinewoman have no token — `STYLE.md` keeps role-only speakers in plain English — so scenes name
+them outright. None of the four has a reference sheet yet; `./story_prompt.py refsheet <Handle>` makes
+the package that produces one, and the middle panel of it becomes their dialogue portrait.
+
+## Hart
+- role: the old hunter who posted the water run; guild ledger, bad knee
+- ref: story/refs/hart.png
+- people: human
+- voice: Orders and grumbles, never a question. Fragments with the subject dropped. Four words where most people use twelve, and a price on every favour.
+- look: Hart, a stocky broad-shouldered man of sixty with a straight back and a stiff left leg, iron-grey hair cropped short and brushed flat, deep-set brown eyes and a clean-shaven square jaw, a faded slate-blue work coat with the sleeves rolled to the elbow over a grey high-necked shirt, a wide brown tool belt with a claw hammer through it, grey cloth wrapped round the left knee over patched canvas trousers, heavy laced boots.
+- status: alive, ch.1; stays in {{HOME_TOWN}} when the party walks west
+- notes: {{MENTOR}} in `story/v3/NAMES.md`. Walked the water out with {{HERO}}'s father for twenty years until the road broke his knee; paid the eleven carters' receipts nailed inside the shrine door out of his own money and told no one. Posted the run with his own thirty coin this morning because no convoy came. Roofer's build and a roofer's habits: he is on the roof in half the scenes he is in, and will not come down to argue. Age is in the flat parting, the straight back and the kept-for-work coat, never in the face.
+
+## Stolz
+- role: hunter, nineteen, signed with the lord of the western city
+- ref: story/refs/stolz.png
+- people: human
+- voice: Gloats and asks mocking questions. Easy long sentences, a number in every speech, and he compliments you while he beats you.
+- look: Stolz, a tall lean young man of nineteen with a loose easy stance, tan skin, big swept-back honey-blond hair with a hard shine band and one strand hanging over the brow, pale green eyes and a half-smile, a new ankle-length coat of deep wine red with a high black collar and a gold cord looping the right shoulder, a black high-necked bodysuit, black gloves, a fat purse on a wide belt, tall polished boots, a straight sword slung across his back, a punched gold coin hung at his throat on a black cord.
+- status: alive, ch.1; rides west in the lord's cart
+- notes: {{RIVAL}} in `story/v3/NAMES.md`. Better than {{HERO}} and right about it. Signed the coast escort an hour before the bell, sold it on to another hunter and took the western city's eighty coin a week the same morning. The coat, the purse and the coin at his throat are all new and all paid for by the lord: the design says *this man got paid this week* before he opens his mouth. Never cruel to your face.
+
+## Guildclerk
+- role: the guild hall clerk of {{HOME_TOWN}}; keeps the board and the ledger
+- alias: Clerk
+- ref: story/refs/guildclerk.png
+- people: human
+- voice: Recites the rule, then the fact, then what follows. No contractions and no opinions; starts the sentence again from the beginning when he is cut off.
+- look: Guildclerk, a slight upright young man with mousy brown hair combed flat in a hard side parting, small round grey eyes, a narrow clean-shaven face, a high-collared charcoal tunic buttoned to the throat over a white shirt with cuffed sleeves, a plain grey sash, ink on the first two fingers of the right hand, a pen behind one ear, flat black shoes.
+- status: alive, ch.1
+- notes: A role-only speaker with no token: written `CLERK` in `story/v3/chapter01.md`, and the speaker label in a scene file is the alias **Clerk**, which is what the game prints. The handle is `Guildclerk` because a handle of `Clerk` is matched as a whole word inside panel text and four older scenes describe "a clerk" in a panel — see `story/notes/scene-agent.md`. He is not an obstacle and not a joke; he is the only person in the hall who knows what the rules are, and he says them in order.
+
+## Shrinewoman
+- role: the oldest woman of the six shrine families under {{STAIR}}
+- alias: Shrine Woman
+- ref: story/refs/shrinewoman.png
+- people: human
+- voice: Talks to anyone who will stand still; tells you the interesting part first and does not check whether you needed it.
+- look: Shrinewoman, a small stooped old woman with a straight neck and a slow step, sun-darkened hands, white hair pinned up in a flat coil, dark bright eyes, a long undyed wool robe over a faded green underdress, a grey shawl pinned at one shoulder, a rope belt with a tin water dipper hung from it, wooden sandals.
+- status: alive, ch.1
+- notes: Speaker label is **Shrine Woman** (the alias), matching `story/v3/chapter01.md`; the handle is one word so it does not false-match "the shrine" in panel text. She remembers {{HERO}}'s father as the hunter who stayed a whole day with the woman under the step, every year for twenty years, and she says so to a stranger within a minute of meeting him because it is the most interesting thing she knows. Not mystical, not a seer: a villager beside a gift stall.
 
 ---
 

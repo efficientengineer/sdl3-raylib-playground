@@ -1,0 +1,16 @@
+{
+  "kind": "sheet",
+  "scene": "0110_the_board",
+  "map": "halm",
+  "title": "0110_the_board \u2014 shot sheet",
+  "makes": "6 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0110_the_board_p1_establishing_tall.png",
+    "story/panels/0110_the_board_p2_two_shot.png",
+    "story/panels/0110_the_board_p3_object_insert.png",
+    "story/panels/0110_the_board_p4_portrait_inset.png",
+    "story/panels/0110_the_board_p5_over_shoulder.png",
+    "story/panels/0110_the_board_p6_eyes_slit.png"
+  ],
+  "dir": "story/packages/ch01/halm/scenes/0110_the_board"
+}

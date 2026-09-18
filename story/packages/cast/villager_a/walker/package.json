@@ -1,0 +1,10 @@
+{
+  "kind": "walker",
+  "handle": "villager_a",
+  "title": "villager_a \u2014 walk sheet (no cast entry)",
+  "makes": "`story/field/walkers/villager_a.png`, the 4x4 walk sprite sheet",
+  "outputs": [
+    "story/field/walkers/villager_a.png"
+  ],
+  "dir": "story/packages/cast/villager_a/walker"
+}

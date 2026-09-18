@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "guildclerk",
+  "title": "Guildclerk \u2014 reference sheet",
+  "ref": "story/refs/guildclerk.png",
+  "makes": "`story/refs/guildclerk.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/guildclerk.png",
+    "story/portraits/guildclerk.png"
+  ],
+  "dir": "story/packages/cast/guildclerk/refsheet"
+}

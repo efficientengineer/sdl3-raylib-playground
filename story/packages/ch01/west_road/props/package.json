@@ -1,0 +1,15 @@
+{
+  "kind": "props",
+  "map": "west_road",
+  "ids": [
+    "culvert",
+    "milestone"
+  ],
+  "title": "west_road \u2014 2 props",
+  "makes": "`story/field/props/culvert.png`, `story/field/props/milestone.png`",
+  "outputs": [
+    "story/field/props/culvert.png",
+    "story/field/props/milestone.png"
+  ],
+  "dir": "story/packages/ch01/west_road/props"
+}
