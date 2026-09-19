@@ -20,12 +20,21 @@
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"
 
+// A WALK CELL is one world unit and never changes: the maps, triggers, characters, camera and the
+// 16-texel pattern grid are all in walk cells. A VOXEL is HALF a walk cell on every axis (the owner,
+// 2026-09-19: "4 blocks should be able to fit into the smallest block size now… more detail, feel
+// different than Minecraft"), so the block grid is 2x2x2 voxels to the cell and everything structural
+// is authored in voxels. VX_V* are voxel counts, VX_MAX* are cell counts.
 #define VX_MAXW  96              // map cells east
 #define VX_MAXD  96              // map cells south
-#define VX_MAXY  24              // blocks up
-#define VX_CH    16              // chunk footprint, in cells
-#define VX_CHX   (VX_MAXW / VX_CH)
-#define VX_CHZ   (VX_MAXD / VX_CH)
+#define VX_VPC   2               // voxels per walk cell, per axis
+#define VOX_S    0.5f            // one voxel, in world units
+#define VX_VW    (VX_MAXW * VX_VPC)   // 192 voxels east
+#define VX_VD    (VX_MAXD * VX_VPC)   // 192 voxels south
+#define VX_VY    48                   // voxels up (24 walk cells)
+#define VX_CHV   32              // chunk footprint, in voxels (= 16 walk cells, as before)
+#define VX_CHX   (VX_VW / VX_CHV)
+#define VX_CHZ   (VX_VD / VX_CHV)
 #define VX_CHUNKS (VX_CHX * VX_CHZ)
 #define VX_TRIGS 128
 #define VX_NPCS  48
@@ -111,7 +120,7 @@ static void rgb_to_oklab(float r, float g, float b, float *L, float *A, float *B
 enum {
     B_AIR = 0, B_GRASS, B_GRASS_DRY, B_DIRT, B_MUD, B_GRAVEL, B_PAVING, B_STONE,
     B_PLASTER, B_TIMBER, B_PLANK, B_ROOF, B_THATCH, B_WATER, B_WATERBED, B_CROP,
-    B_LEAVES, B_TRUNK, B_DOOR, B_WINDOW, B_HEDGE, B_COUNT
+    B_LEAVES, B_TRUNK, B_DOOR, B_WINDOW, B_HEDGE, B_WETSTONE, B_SLATE, B_COUNT
 };
 // patterns
 enum { P_MOTTLE = 0, P_GRASS, P_COBBLE, P_PLANK, P_ROOFTILE, P_WATER, P_THATCH, P_CROP,
@@ -149,10 +158,80 @@ static const VxBlockDef BLOCKS[B_COUNT] = {
     { "door",      "wood",                       0.14f,0.38f, "wood",                      0.12f,0.34f, P_PLANK,     true,  false },
     { "window",    "water blue / metal",         0.08f,0.55f, "water blue / metal",        0.08f,0.55f, P_FLAT,      true,  false },
     { "hedge",     "foliage green (cool)",       0.20f,0.62f, "foliage green (cool)",      0.16f,0.56f, P_LEAVES,    true,  false },
+    { "wetstone",  "neutral cool (stone, steel)",0.12f,0.42f, "neutral cool (stone, steel)",0.08f,0.38f, P_STONEWALL, true,  false },
+    { "slate",     "neutral cool (stone, steel)",0.20f,0.56f, "neutral cool (stone, steel)",0.16f,0.50f, P_ROOFTILE,  true,  false },
 };
 
 static bool blk_solid(unsigned char b) { return b != B_AIR && BLOCKS[b].solid; }
 static bool blk_opaque(unsigned char b) { return b != B_AIR && b != B_WATER; }   // water's neighbours still draw
+
+// ───────────────────────── shapes ─────────────────────────
+// A parallel uint8 grid gives every voxel a SHAPE and an ORIENTATION: shp = shape * 8 + orient, so
+// SH_CUBE with orient 0 is 0 and an untouched grid is all cubes. Orientations that name a compass
+// direction use D_* below, which index DIRV[] (the horizontal unit vector) — never a literal.
+//
+// At half-voxel scale slab/post/pane are smaller than they were, and the call (owner asked) is that
+// they all still earn their place: a slab is a quarter of a walk cell and makes eaves, sills and
+// ridges; a post is a fence upright with rails; a pane is glass, a shutter and a railing infill.
+enum { SH_CUBE = 0, SH_SLOPE, SH_SLOPE_OUT, SH_SLOPE_IN, SH_SLAB, SH_STAIRS, SH_POST, SH_PANE, SH_COUNT };
+enum { D_S = 0, D_N, D_E, D_W };                    // +z, -z, +x, -x
+static const int DIRV[4][2] = { {0,1}, {0,-1}, {1,0}, {-1,0} };   // x, z
+static int dir_cw(int d)  { return d == D_S ? D_W : d == D_W ? D_N : d == D_N ? D_E : D_S; }
+static int dir_opp(int d) { return d == D_S ? D_N : d == D_N ? D_S : d == D_E ? D_W : D_E; }
+
+#define SHP(shape, orient) ((unsigned char)((shape) * 8 + (orient)))
+#define SH_OF(s)  ((s) >> 3)
+#define OR_OF(s)  ((s) & 7)
+enum { SL_BOT = 0, SL_TOP = 1 };                                  // SH_SLAB orientations
+enum { PN_S = 0, PN_N, PN_E, PN_W, PN_MIDX, PN_MIDZ };            // SH_PANE orientations
+
+// Does this shape fill the whole of that face of its cell? A face may only be culled against a
+// neighbour that covers the shared boundary — when in doubt this says false and the face is drawn.
+static bool shape_covers(unsigned char s, int face) {              // face: F_TOP..F_WEST ordering
+    int sh = SH_OF(s), o = OR_OF(s);
+    if (sh == SH_CUBE) return true;
+    if (face == 1 /*F_BOT*/) return sh == SH_SLOPE || sh == SH_SLOPE_OUT || sh == SH_SLOPE_IN
+                                 || sh == SH_STAIRS || (sh == SH_SLAB && o == SL_BOT);
+    if (face == 0 /*F_TOP*/) return sh == SH_SLAB && o == SL_TOP;
+    int d = face - 2;                                              // F_SOUTH..F_WEST -> D_S..D_W
+    if (d < 0 || d > 3) return false;
+    if (sh == SH_SLOPE || sh == SH_STAIRS) return o == d;          // the high end is a full square
+    if (sh == SH_SLOPE_IN) return o == d || dir_cw(o) == d;
+    return false;                                                  // slab sides, out-corner, post, pane
+}
+
+// The top surface height (0..1 within the voxel) at each of the four plan corners, in the order
+// (x0,z0), (x1,z0), (x1,z1), (x0,z1). Only the ramp shapes use it.
+static void shape_corner_h(unsigned char s, float h[4]) {
+    int sh = SH_OF(s), o = OR_OF(s);
+    static const int CX[4] = { 0, 1, 1, 0 }, CZ[4] = { 0, 0, 1, 1 };
+    for (int i = 0; i < 4; i++) h[i] = 1.0f;
+    if (sh == SH_SLOPE || sh == SH_STAIRS) {
+        for (int i = 0; i < 4; i++) {
+            int on = (DIRV[o][0] ? (CX[i] == (DIRV[o][0] > 0 ? 1 : 0)) : (CZ[i] == (DIRV[o][1] > 0 ? 1 : 0)));
+            h[i] = on ? 1.0f : 0.0f;
+        }
+    } else if (sh == SH_SLOPE_OUT || sh == SH_SLOPE_IN) {
+        int a = o, b = dir_cw(o);
+        for (int i = 0; i < 4; i++) {
+            bool ona = DIRV[a][0] ? (CX[i] == (DIRV[a][0] > 0 ? 1 : 0)) : (CZ[i] == (DIRV[a][1] > 0 ? 1 : 0));
+            bool onb = DIRV[b][0] ? (CX[i] == (DIRV[b][0] > 0 ? 1 : 0)) : (CZ[i] == (DIRV[b][1] > 0 ? 1 : 0));
+            h[i] = (sh == SH_SLOPE_OUT) ? ((ona && onb) ? 1.0f : 0.0f) : ((ona || onb) ? 1.0f : 0.0f);
+        }
+    }
+}
+
+static bool shape_is_ramp(unsigned char s) {
+    int sh = SH_OF(s);
+    return sh == SH_SLOPE || sh == SH_STAIRS || sh == SH_SLOPE_OUT || sh == SH_SLOPE_IN;
+}
+// The walkable surface height of a ramp voxel at a fractional plan position, 0..1 inside the voxel.
+static float shape_height_at(unsigned char s, float fu, float fw) {
+    if (!shape_is_ramp(s)) return 1.0f;
+    float h[4]; shape_corner_h(s, h);
+    float a = h[0] + (h[1] - h[0]) * fu, b = h[3] + (h[2] - h[3]) * fu;
+    return a + (b - a) * fw;
+}
 
 // ───────────────────────── data ─────────────────────────
 
@@ -189,21 +268,26 @@ struct VxSpr {
     int kind;                          // 0 sprite, 1 blob shadow, 2 additive glow
 };
 
-struct VxVert {                        // 20 bytes: pos, (type,face), (lit,warm,ao,spare)
-    float x, y, z;
-    unsigned char type, face, ao, spare;   // attr 1: integer, 4-byte aligned
-    unsigned char lit, warm, pad[2];       // attr 2: normalised, 4-byte aligned
+struct VxVert {                        // 32 bytes
+    float x, y, z;                         // world position
+    float u, w;                            // the pattern's own 2D basis, in world units (16 texels each)
+    unsigned char type, face, ao, spare;   // attr 2: integer. spare = per-vertex extra (water shallows)
+    unsigned char lit, warm, pad[2];       // attr 3: normalised. lit = the face term, warm = lamp
+    signed char nx, ny, nz, npad;          // attr 4: the real normal, for the shadow map's offset
 };
 
-struct VxChunk { GLuint vbo; int verts, cap; };
+struct VxChunk { GLuint vbo; int verts, cap; float lo[3], hi[3]; };
 
 struct VoxField {
     // map
     char map_name[32], set[24], music[24];
     int mw, md;                                  // cells
-    unsigned char blk[VX_MAXY][VX_MAXD][VX_MAXW];
-    unsigned char hgt[VX_MAXD][VX_MAXW];         // walkable top: the y you stand ON (feet at hgt+1)
+    int vw, vd;                                  // voxels  (= mw * VX_VPC, md * VX_VPC)
+    unsigned char blk[VX_VY][VX_VD][VX_VW];
+    unsigned char shp[VX_VY][VX_VD][VX_VW];      // shape * 8 + orientation; 0 = a plain cube
+    unsigned char hgt[VX_MAXD][VX_MAXW];         // walkable top, IN VOXELS: the voxel you stand ON
     unsigned char walk[VX_MAXD][VX_MAXW];        // 1 = a body may stand here
+    unsigned char ramp[VX_MAXD][VX_MAXW];        // 1 = this cell's surface is a ramp, crossed smoothly
     unsigned char tsolid[VX_MAXD][VX_MAXW];      // the tile map's own solidity, for the check
     short ground[VX_MAXD][VX_MAXW];              // tiles.md def of the ground terrain
     VxDef defs[VX_DEFS]; int def_count;
@@ -249,7 +333,7 @@ struct VoxField {
     GLuint atlas; int atlas_w, atlas_h, atlas_cell;
     GLuint decal_tex[24]; int decal_w[24], decal_h[24]; char decal_id[24][24]; int decal_count;
     // scattered detail billboards, built once per map
-    struct { float x, z; short y; unsigned char d, size; } det[3072];
+    struct { float x, z, y; unsigned char d, size; } det[3072];
     int det_count;
 
     // gl
@@ -261,6 +345,14 @@ struct VoxField {
     GLuint cap_fbo, cap_tex, cap_depth; int cap_w, cap_h;
     VxSpr *spr; int spr_count;
 
+    // shadow map of the static world
+    GLuint sky_prog, shadow_prog, shadow_fbo, shadow_tex;
+    int shadow_dim;
+    float lmvp[16], sundir[3];
+    float sun_az, sun_el, sh_str, sh_soft;
+    int sh_snap;
+    bool shadow_dirty;
+    double shadow_ms;
     // camera / look
     int ortho, hd2d, cutaway;
     float pitch, fov, view_h, tilt, ao_str, detail;
@@ -268,6 +360,7 @@ struct VoxField {
     int motes, res_pct;
     float cam_eye[3], cam_tgt[3], mvp[16], view[16];
     float player_screen[3];
+    int chunks_drawn;
 
     // ui / flow
     char msg[512], msg_who[64];
@@ -283,7 +376,7 @@ struct VoxField {
     char cap_out[320]; int cap_req, cap_wi, cap_hi; bool cap_ok;
     bool selfchecked;
     double frame_ms_sum; int frame_n;
-    int reach_missing;
+    int reach_missing, shaped, houses, ramps;
 };
 
 static int vx_max_tex = 0;
@@ -812,13 +905,30 @@ static float vx_vnoise(float x, float z, uint32_t seed) {
     return vx_lerp(vx_lerp(a, b, fx), vx_lerp(c, d, fx), fz);
 }
 
+// Everything below here is in VOXELS: x,z run 0..vw/vd, y runs 0..VX_VY, and one voxel is VOX_S of a
+// world unit. A walk cell (cx,cz) owns the 2x2 voxel columns at (cx*2, cz*2).
 static void set_blk(VoxField *v, int x, int y, int z, unsigned char b) {
-    if (x < 0 || z < 0 || y < 0 || x >= v->mw || z >= v->md || y >= VX_MAXY) return;
+    if (x < 0 || z < 0 || y < 0 || x >= v->vw || z >= v->vd || y >= VX_VY) return;
     v->blk[y][z][x] = b;
+    v->shp[y][z][x] = 0;
+}
+static void set_shaped(VoxField *v, int x, int y, int z, unsigned char b, unsigned char shape) {
+    if (x < 0 || z < 0 || y < 0 || x >= v->vw || z >= v->vd || y >= VX_VY) return;
+    v->blk[y][z][x] = b;
+    v->shp[y][z][x] = shape;
 }
 static unsigned char get_blk(VoxField *v, int x, int y, int z) {
-    if (x < 0 || z < 0 || y < 0 || x >= v->mw || z >= v->md || y >= VX_MAXY) return B_AIR;
+    if (x < 0 || z < 0 || y < 0 || x >= v->vw || z >= v->vd || y >= VX_VY) return B_AIR;
     return v->blk[y][z][x];
+}
+static unsigned char get_shp(VoxField *v, int x, int y, int z) {
+    if (x < 0 || z < 0 || y < 0 || x >= v->vw || z >= v->vd || y >= VX_VY) return 0;
+    return v->shp[y][z][x];
+}
+// Fill a whole walk cell's 2x2 column of voxels at voxel level y.
+static void set_cell(VoxField *v, int cx, int y, int cz, unsigned char b) {
+    for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++)
+        set_blk(v, cx * VX_VPC + dx, y, cz * VX_VPC + dz, b);
 }
 
 static bool trig_covers(VoxField *v, int x, int z) {
@@ -841,9 +951,304 @@ static int door_x_for(VoxField *v, int x0, int z0, int w, int d) {
     return -1;
 }
 
+// ───────────────────────── the rule-based house generator ─────────────────────────
+// No wave function collapse: a short list of rules, applied in a fixed order, seeded per building.
+// Everything is in VOXELS (half a walk cell), which is what buys the framing, sills, recesses and
+// eaves — at the old scale every one of those would have been a whole cell.
+//
+//   foundation course -> walls (+ timber framing for plaster) -> roof chosen by footprint
+//   -> gable ends -> door recess under a lintel -> windows on a rhythm -> chimney -> extras
+//
+// The footprint is still filled solid as far as walking is concerned: walk[] is cleared by the
+// caller for every cell of the stamp, exactly as before.
+
+enum { HS_PLASTER = 0, HS_STONE, HS_TIMBER };
+
+struct HouseIn {
+    int cx0, cz0, cw, cd;        // footprint, in walk cells
+    int base;                    // top solid ground voxel under it
+    int style;
+    unsigned char wall, roof;
+    int door_side, door_cell;    // D_*, and the cell index along that side (-1 = centre)
+    uint32_t seed;
+    bool grand;
+    int depth;                   // recursion guard for the L-wing
+};
+
+static int vx_houses_built = 0;
+
+// Everything in the shell of a mass of `b` that has air above and air on exactly one horizontal side
+// becomes a slope leaning that way. It is what turns a stepped blob into something rounded, and it is
+// used for tree crowns and for thatch.
+static void vx_round_shell(VoxField *v, int x0, int y0, int z0, int x1, int y1, int z1, unsigned char b) {
+    for (int y = y0; y <= y1; y++) for (int z = z0; z <= z1; z++) for (int x = x0; x <= x1; x++) {
+        if (get_blk(v, x, y, z) != b || get_shp(v, x, y, z) != 0) continue;
+        if (get_blk(v, x, y + 1, z) != B_AIR) continue;
+        int open = 0, d_open = -1;
+        for (int d = 0; d < 4; d++)
+            if (get_blk(v, x + DIRV[d][0], y, z + DIRV[d][1]) == B_AIR) { open++; d_open = d; }
+        if (open == 1) set_shaped(v, x, y, z, b, SHP(SH_SLOPE, dir_opp(d_open)));
+        else if (open == 2) {
+            int a = -1, c = -1;
+            for (int d = 0; d < 4; d++) if (get_blk(v, x + DIRV[d][0], y, z + DIRV[d][1]) == B_AIR) { if (a < 0) a = d; else c = d; }
+            if (a >= 0 && c >= 0 && dir_opp(a) != c) {
+                int hi = (dir_cw(dir_opp(a)) == dir_opp(c)) ? dir_opp(a) : dir_opp(c);
+                set_shaped(v, x, y, z, b, SHP(SH_SLOPE_OUT, hi));
+            }
+        }
+    }
+}
+
+static void vx_build_house(VoxField *v, const HouseIn *in);
+
+// A pitched roof over a voxel rectangle, laid course by course from the eaves up. Slope voxels at
+// voxel pitch (45 degrees), a slab ridge, and a half-voxel eave that oversails the wall by one voxel
+// — always at least four voxels above the ground, so it can never block a walking cell.
+// A roof is a HEIGHT MAP, not a shell. For every column of the plan the surface level is decided
+// first — distance to the nearer eave for a gable, the lesser of the two distances for a hip — then
+// the column is filled solid up to it and the top voxel is given the slope (or, where the two
+// directions tie, the outer corner) that makes the pitch. A shell of 45-degree slopes with nothing
+// under it reads as a hole at this camera; this cannot.
+static void vx_roof(VoxField *v, int x0, int z0, int W, int D, int yr, unsigned char roof, bool hip) {
+    bool ridge_x = (W >= D);
+    int span = ridge_x ? D : W, len = ridge_x ? W : D;
+    int half = span / 2;
+    // the eave: one voxel of oversail all the way round, its top flush with the roof's outer edge
+    for (int z = z0 - 1; z < z0 + D + 1; z++) for (int x = x0 - 1; x < x0 + W + 1; x++) {
+        bool out = (x < x0 || x >= x0 + W || z < z0 || z >= z0 + D);
+        if (out && get_blk(v, x, yr - 1, z) == B_AIR) set_shaped(v, x, yr - 1, z, roof, SHP(SH_SLAB, SL_TOP));
+    }
+    for (int o = 0; o < span; o++) for (int a = 0; a < len; a++) {
+        int x = ridge_x ? x0 + a : x0 + o, z = ridge_x ? z0 + o : z0 + a;
+        int d_off = o < span - 1 - o ? o : span - 1 - o;
+        int d_alg = a < len - 1 - a ? a : len - 1 - a;
+        int dir_off = ridge_x ? (o < span - 1 - o ? D_S : D_N) : (o < span - 1 - o ? D_E : D_W);
+        int dir_alg = ridge_x ? (a < len - 1 - a ? D_E : D_W) : (a < len - 1 - a ? D_S : D_N);
+        int rise = hip ? (d_off < d_alg ? d_off : d_alg) : d_off;
+        unsigned char shape;
+        if (hip && d_off == d_alg) {
+            int o1 = (dir_cw(dir_off) == dir_alg) ? dir_off : dir_alg;
+            shape = SHP(SH_SLOPE_OUT, o1);
+        } else {
+            shape = SHP(SH_SLOPE, (hip && d_alg < d_off) ? dir_alg : dir_off);
+        }
+        for (int y = yr; y < yr + rise; y++) set_blk(v, x, y, z, roof);
+        set_shaped(v, x, yr + rise, z, roof, shape);
+    }
+    // the ridge: a slab cap over the two rows that meet at the top, so the pitches meet in a line
+    int y = yr + half;
+    for (int a = 0; a < len; a++) {
+        if (hip) {
+            int d_alg = a < len - 1 - a ? a : len - 1 - a;
+            if (d_alg < half - 1) continue;
+        }
+        for (int t = 0; t < 2; t++) {
+            int o = half - 1 + t;
+            if (o >= span) continue;
+            int x = ridge_x ? x0 + a : x0 + o, z = ridge_x ? z0 + o : z0 + a;
+            set_shaped(v, x, y, z, roof, SHP(SH_SLAB, SL_BOT));
+        }
+    }
+}
+
+static void vx_build_house(VoxField *v, const HouseIn *in) {
+    if (in->cw < 1 || in->cd < 1 || in->depth > 1) return;
+    vx_houses_built++;
+    uint32_t sd = in->seed;
+    int x0 = in->cx0 * VX_VPC, z0 = in->cz0 * VX_VPC;
+    int W = in->cw * VX_VPC, D = in->cd * VX_VPC;
+    int y0 = in->base + 1;                                  // the first voxel above the ground
+    unsigned char wall = in->wall, roof = in->roof;
+    unsigned char frame = (in->style == HS_STONE) ? B_STONE : B_TIMBER;
+    int wh = in->grand ? 8 : (in->cw >= 3 && in->cd >= 3 ? 7 : 6);   // wall height in voxels
+    int yb = y0 + 1, yr = yb + wh;
+
+    // 1. the foundation course: a plinth of stone one voxel proud of the ground under the whole thing
+    for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
+        set_blk(v, x, y0, z, in->style == HS_TIMBER ? B_STONE : B_STONE);
+    // 2. the walls
+    for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++) {
+        bool edge = (x == x0 || x == x0 + W - 1 || z == z0 || z == z0 + D - 1);
+        if (!edge) continue;
+        for (int y = yb; y < yr; y++) set_blk(v, x, y, z, wall);
+    }
+    // 3. timber framing: corner posts, a post every three voxels, a mid rail and a top plate
+    if (in->style != HS_STONE) {
+        for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++) {
+            bool edge = (x == x0 || x == x0 + W - 1 || z == z0 || z == z0 + D - 1);
+            if (!edge) continue;
+            bool corner = (x == x0 || x == x0 + W - 1) && (z == z0 || z == z0 + D - 1);
+            int along = (z == z0 || z == z0 + D - 1) ? x - x0 : z - z0;
+            bool post = corner || (along % 3 == 0);
+            for (int y = yb; y < yr; y++) {
+                if (post || y == yr - 1 || y == yb + wh / 2) set_blk(v, x, y, z, frame);
+            }
+        }
+    }
+    // 4. a jettied upper storey on a wide plan: the storey above the mid rail oversails by one voxel
+    //    all the way round. It is built BEFORE the roof, because the roof has to cover it — a roof
+    //    laid on the original footprint over jettied walls leaves an open tray, which is what the
+    //    first build of this did.
+    bool jetty = (in->cw >= 4 && in->cd >= 3 && in->style != HS_STONE && vx_rnd((int)sd, 5, 1) > 0.45f);
+    if (jetty) {
+        for (int z = z0 - 1; z < z0 + D + 1; z++) for (int x = x0 - 1; x < x0 + W + 1; x++) {
+            if (x >= x0 && x < x0 + W && z >= z0 && z < z0 + D) continue;
+            bool corner_out = (x < x0 || x >= x0 + W) && (z < z0 || z >= z0 + D);
+            if (corner_out) continue;
+            for (int y = yb + wh / 2 + 1; y < yr; y++) set_blk(v, x, y, z, wall);
+            set_shaped(v, x, yb + wh / 2, z, frame, SHP(SH_SLOPE, D_S));
+        }
+    }
+    int rx0 = jetty ? x0 - 1 : x0, rz0 = jetty ? z0 - 1 : z0;
+    int RW = jetty ? W + 2 : W, RD = jetty ? D + 2 : D;
+    // 5. the roof: gable along the long axis, hipped when the plan is nearly square
+    bool hip = (in->cw * 4 >= in->cd * 3) && (in->cd * 4 >= in->cw * 3) && in->cw >= 2 && in->cd >= 2;
+    vx_roof(v, rx0, rz0, RW, RD, yr, roof, hip);
+    // 6. the gable end walls, filled up to the roofline
+    if (!hip) {
+        bool ridge_x = (RW >= RD);
+        int span = ridge_x ? RD : RW;
+        for (int s = 0; s < 2; s++) {
+            int fixed = s ? (ridge_x ? RW - 1 : RD - 1) : 0;
+            for (int o = 0; o < span; o++) {
+                int rise = o < span - 1 - o ? o : span - 1 - o;
+                int x = ridge_x ? rx0 + fixed : rx0 + o, z = ridge_x ? rz0 + o : rz0 + fixed;
+                for (int y = yr; y <= yr + rise; y++) if (get_blk(v, x, y, z) == B_AIR) set_blk(v, x, y, z, wall);
+            }
+        }
+    }
+    // 7. the door: a one-voxel recess with the leaf set back, a lintel over it and a step outside
+    int ds = in->door_side;
+    int len = (ds == D_S || ds == D_N) ? W : D;
+    int dc = in->door_cell < 0 ? len / 2 - 1 : in->door_cell * VX_VPC;
+    if (dc < 1) dc = 1;
+    if (dc > len - 3) dc = len - 3;
+    if (dc < 0) dc = 0;
+    {
+        int inx = -DIRV[ds][0], inz = -DIRV[ds][1];
+        for (int t = 0; t < 2 && dc + t < len; t++) {
+            int x, z;
+            if (ds == D_S)      { x = x0 + dc + t; z = z0 + D - 1; }
+            else if (ds == D_N) { x = x0 + dc + t; z = z0; }
+            else if (ds == D_E) { x = x0 + W - 1;  z = z0 + dc + t; }
+            else                { x = x0;          z = z0 + dc + t; }
+            for (int y = yb; y < yb + 4; y++) set_blk(v, x, y, z, B_AIR);          // the recess
+            for (int y = yb; y < yb + 4; y++) set_blk(v, x + inx, y, z + inz, B_DOOR);
+            set_blk(v, x, yb + 4, z, frame);                                        // the lintel
+            set_shaped(v, x + inx, yb - 1, z + inz, B_STONE, SHP(SH_SLAB, SL_TOP)); // the threshold
+        }
+    }
+    // 8. windows on a rhythm: a recessed pane, a timber surround and a slate sill that oversails
+    for (int side = 0; side < 4; side++) {
+        int slen = (side == D_S || side == D_N) ? W : D;
+        int inx = -DIRV[side][0], inz = -DIRV[side][1];
+        int rows = in->grand ? 2 : 1;
+        for (int i = 1; i < slen - 1; i++) {
+            if (i % 3 != 2) continue;
+            for (int r = 0; r < rows; r++) {
+                int wy = yb + 3 + r * 3;
+                if (wy + 1 >= yr) continue;
+                int x, z;
+                if (side == D_S)      { x = x0 + i; z = z0 + D - 1; }
+                else if (side == D_N) { x = x0 + i; z = z0; }
+                else if (side == D_E) { x = x0 + W - 1;  z = z0 + i; }
+                else                  { x = x0;          z = z0 + i; }
+                if (side == ds && i >= dc - 1 && i <= dc + 2 && r == 0) continue;
+                if (get_blk(v, x, wy, z) != wall && get_blk(v, x, wy, z) != frame) continue;
+                for (int y = wy; y < wy + 2; y++) {
+                    set_shaped(v, x, y, z, B_WINDOW, SHP(SH_PANE, side == D_S ? PN_N : side == D_N ? PN_S : side == D_E ? PN_W : PN_E));
+                }
+                set_blk(v, x, wy - 1, z, frame);
+                set_blk(v, x, wy + 2, z, frame);
+                set_shaped(v, x - inx, wy - 1, z - inz, B_SLATE, SHP(SH_SLAB, SL_TOP));   // the sill
+                (void)inx; (void)inz;
+            }
+        }
+    }
+    // 9. a chimney on a seeded spot: one cell square, three voxels clear of the ridge
+    {
+        bool ridge_x = (W >= D);
+        int a = 1 + (int)(vx_rnd((int)sd, 11, 3) * (float)((ridge_x ? W : D) - 3));
+        int ridge_y = yr + (ridge_x ? D : W) / 2;
+        int top = ridge_y + 2;
+        int cxv = ridge_x ? x0 + a : x0 + W / 2 - 1, czv = ridge_x ? z0 + D / 2 - 1 : z0 + a;
+        for (int t = 0; t < 2; t++) for (int u = 0; u < 2; u++)
+            for (int y = yr - 1; y <= top; y++) set_blk(v, cxv + t, y, czv + u, B_STONE);
+        for (int t = 0; t < 2; t++) for (int u = 0; u < 2; u++)
+            set_shaped(v, cxv + t, top + 1, czv + u, B_SLATE, SHP(SH_SLAB, SL_BOT));
+    }
+    // 10. a porch on a grand building, hung on brackets.
+    if (in->grand) {
+        int px, pz, pw, pd;
+        if (ds == D_S)      { px = x0 + dc - 1; pz = z0 + D;     pw = 4; pd = 2; }
+        else if (ds == D_N) { px = x0 + dc - 1; pz = z0 - 2;     pw = 4; pd = 2; }
+        else if (ds == D_E) { px = x0 + W;      pz = z0 + dc - 1; pw = 2; pd = 4; }
+        else                { px = x0 - 2;      pz = z0 + dc - 1; pw = 2; pd = 4; }
+        // brackets, not posts: a porch that reached the ground would close the lane to its own door
+        for (int t = 0; t < 4; t++) {
+            int x = px + (t & 1 ? pw - 1 : 0), z = pz + (t & 2 ? pd - 1 : 0);
+            for (int y = yb + 5; y < yb + 7; y++) if (get_blk(v, x, y, z) == B_AIR) set_blk(v, x, y, z, frame);
+        }
+        vx_roof(v, px, pz, pw, pd, yb + 7, roof, false);
+    }
+}
+
+// ───────────────────────── trees ─────────────────────────
+// Three silhouettes, seeded. A crown may hang over a walking cell, but only above head height, and the
+// cutaway takes it away when the party walks under it.
+static void vx_build_tree(VoxField *v, int cx, int cz, int base, uint32_t sd, const char *name) {
+    int x0 = cx * VX_VPC, z0 = cz * VX_VPC;
+    int y0 = base + 1;
+    int species = (int)(vx_rnd((int)sd, 3, 5) * 3.0f);
+    if (species > 2) species = 2;
+    if (!strcmp(name, "orchard_tree")) species = 2;
+    if (!strcmp(name, "tree_2")) species = 1;
+    // The crown may oversail a walking cell, but never below this: three voxels of clear headroom
+    // plus the slab course, which is the same rule vx_can_stand enforces.
+    const int CROWN_FLOOR = 4;
+    int th = species == 1 ? 7 : species == 2 ? 5 : 5 + (int)(vx_rnd((int)sd, 7, 2) * 2.0f);
+    for (int y = y0; y < y0 + th; y++) for (int t = 0; t < 2; t++) for (int u = 0; u < 2; u++)
+        set_blk(v, x0 + t, y, z0 + u, B_TRUNK);
+    int tx = x0 + 1, tz = z0 + 1;                              // the trunk's plan centre
+    int ly = y0 + th;
+    if (species == 1) {                                        // a tall stepped cone
+        for (int L = 0; L < 6; L++) {
+            float rad = 4.2f - L * 0.64f;
+            int y = ly - 3 + L;
+            if (y < y0 + CROWN_FLOOR) continue;
+            for (int dz = -5; dz <= 5; dz++) for (int dx = -5; dx <= 5; dx++) {
+                float d = sqrtf((dx + 0.5f) * (dx + 0.5f) + (dz + 0.5f) * (dz + 0.5f));
+                if (d > rad) continue;
+                if (d > rad - 0.9f && vx_rnd(x0 + dx, z0 + dz, y) > 0.58f) continue;
+                if (get_blk(v, tx + dx, y, tz + dz) == B_AIR) set_blk(v, tx + dx, y, tz + dz, B_LEAVES);
+            }
+        }
+    } else {                                                   // a rounded broadleaf crown
+        float rx = species == 2 ? 3.0f : 4.6f, ry = species == 2 ? 2.4f : 3.6f;
+        for (int dy = -3; dy <= 6; dy++) for (int dz = -6; dz <= 6; dz++) for (int dx = -6; dx <= 6; dx++) {
+            int yy = ly + dy;
+            if (yy < y0 + CROWN_FLOOR) continue;
+            float u = (dx + 0.5f) / rx, w = (dz + 0.5f) / rx, q = (dy - ry * 0.35f) / ry;
+            float r2 = u * u + w * w + q * q;
+            if (r2 > 1.0f) continue;
+            if (r2 > 0.74f && vx_rnd(x0 + dx, z0 + dz + 31, yy) > 0.66f) continue;
+            if (get_blk(v, tx + dx, yy, tz + dz) == B_AIR) set_blk(v, tx + dx, yy, tz + dz, B_LEAVES);
+        }
+    }
+    vx_round_shell(v, x0 - 7, y0 + CROWN_FLOOR, z0 - 7, x0 + 8, ly + 8, z0 + 8, B_LEAVES);
+}
+
+// ───────────────────────── the world ─────────────────────────
+
 static void vx_build_world(VoxField *v) {
     memset(v->blk, 0, sizeof(v->blk));
-    // 1. the height field — low frequency, 0..2 extra blocks, flattened everywhere it matters
+    memset(v->shp, 0, sizeof(v->shp));
+    memset(v->ramp, 0, sizeof(v->ramp));
+    v->vw = v->mw * VX_VPC; v->vd = v->md * VX_VPC;
+    vx_houses_built = 0;
+
+    // 1. the height field, in VOXELS — half steps now, so the roll is gentler and reads as ground
+    //    rather than as terracing. Forced flat everywhere the tile map needs a guaranteed lane.
     unsigned char flat[VX_MAXD][VX_MAXW];
     memset(flat, 0, sizeof(flat));
     for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
@@ -860,48 +1265,95 @@ static void vx_build_world(VoxField *v) {
             if (nx >= 0 && nz >= 0 && nx < v->mw && nz < v->md && !flat[nz][nx]) flat[nz][nx] = 2;
         }
     }
+    const int H_FLAT = 4;                       // solid voxels under a flat cell
+    static unsigned char hh[VX_MAXD][VX_MAXW];
     for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
-        if (flat[z][x]) { v->hgt[z][x] = 1; continue; }
-        float n = vx_vnoise(x / 9.0f, z / 9.0f, 7717u) * 0.75f + vx_vnoise(x / 4.0f, z / 4.0f, 313u) * 0.25f;
-        int h = 1 + (int)(n * 3.4f);
-        v->hgt[z][x] = (unsigned char)(h < 1 ? 1 : h > 3 ? 3 : h);
+        if (flat[z][x]) { hh[z][x] = H_FLAT; continue; }
+        float n = vx_vnoise(x / 9.0f, z / 9.0f, 7717u) * 0.72f + vx_vnoise(x / 4.0f, z / 4.0f, 313u) * 0.28f;
+        int h = H_FLAT + (int)(n * 5.2f);
+        hh[z][x] = (unsigned char)(h < H_FLAT ? H_FLAT : h > H_FLAT + 4 ? H_FLAT + 4 : h);
     }
-    // Terraces: no neighbour may differ by more than one block, so every walk edge is a single step.
-    for (int pass = 0; pass < 8; pass++) {
+    // No neighbour may differ by more than two voxels — one voxel is a free smooth step, two is a hop.
+    for (int pass = 0; pass < 10; pass++) {
         bool changed = false;
         for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
-            int h = v->hgt[z][x];
+            int h = hh[z][x];
             for (int d = 0; d < 4; d++) {
                 int nx = x + DX[d], nz = z + DZ[d];
                 if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
-                if (h > v->hgt[nz][nx] + 1) { h = v->hgt[nz][nx] + 1; changed = true; }
+                if (h > hh[nz][nx] + 2) { h = hh[nz][nx] + 2; changed = true; }
             }
-            v->hgt[z][x] = (unsigned char)h;
+            hh[z][x] = (unsigned char)h;
         }
         if (!changed) break;
     }
 
-    // 2. the ground columns, and the water channel one block below the land
+    // 2. the ground columns. The TOP voxel's material is chosen per voxel, not per cell, and may be
+    //    borrowed from a neighbouring cell on a hash — which is what makes grass, dirt and paving meet
+    //    on a ragged line instead of on the cell edge. Height stays per cell, so walking is unaffected.
+    static unsigned char topb[VX_MAXD][VX_MAXW];
+    static unsigned char iswater[VX_MAXD][VX_MAXW];
     for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
         int def = v->ground[z][x];
         const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
-        unsigned char top = terr_block(nm);
-        int h = v->hgt[z][x];
-        if (top == B_WATER) {
-            // The bed sits one block down, so the bank shows real depth; the surface is drawn at
-            // 0.8 of a block by the mesher, not by another block.
-            for (int y = 0; y < h - 1; y++) set_blk(v, x, y, z, B_WATERBED);
-            if (h >= 1) set_blk(v, x, h - 1, z, B_WATER);
-            v->walk[z][x] = 0;
-            v->hgt[z][x] = (unsigned char)(h - 1 < 0 ? 0 : h - 1);
-        } else {
-            for (int y = 0; y < h; y++) set_blk(v, x, y, z, y == h - 1 ? top : (y >= h - 3 ? B_DIRT : B_STONE));
-            v->walk[z][x] = v->tsolid[z][x] ? 0 : 1;
+        topb[z][x] = terr_block(nm);
+        iswater[z][x] = topb[z][x] == B_WATER;
+    }
+    for (int cz = 0; cz < v->md; cz++) for (int cx = 0; cx < v->mw; cx++) {
+        int H = hh[cz][cx];
+        if (iswater[cz][cx]) {
+            // A channel with a real bed: the bed is three voxels down, the surface 1.2 voxels below
+            // the land, and the banks are wet stone.
+            for (int y = 0; y <= H - 4; y++) set_cell(v, cx, y, cz, y == H - 4 ? B_WATERBED : B_STONE);
+            set_cell(v, cx, H - 3, cz, B_WATER);
+            set_cell(v, cx, H - 2, cz, B_WATER);
+            v->walk[cz][cx] = 0;
+            v->hgt[cz][cx] = (unsigned char)(H - 4 < 0 ? 0 : H - 4);
+            continue;
+        }
+        bool near_water = false;
+        for (int dz = -1; dz <= 1 && !near_water; dz++) for (int dx = -1; dx <= 1; dx++) {
+            int nx = cx + dx, nz = cz + dz;
+            if (nx >= 0 && nz >= 0 && nx < v->mw && nz < v->md && iswater[nz][nx]) { near_water = true; break; }
+        }
+        for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++) {
+            int vx = cx * VX_VPC + dx, vz = cz * VX_VPC + dz;
+            unsigned char top = topb[cz][cx];
+            // ragged boundary: this voxel may take the neighbouring cell's ground instead
+            int nxc = dx ? cx + 1 : cx - 1, nzc = dz ? cz + 1 : cz - 1;
+            float r = vx_rnd(vx, vz, 4177);
+            if (r < 0.24f && nxc >= 0 && nxc < v->mw && !iswater[cz][nxc] && hh[cz][nxc] == H) top = topb[cz][nxc];
+            else if (r < 0.46f && nzc >= 0 && nzc < v->md && !iswater[nzc][cx] && hh[nzc][cx] == H) top = topb[nzc][cx];
+            for (int y = 0; y < H; y++) {
+                unsigned char b = (y == H - 1) ? top
+                                : (near_water && y >= H - 3) ? B_WETSTONE
+                                : (y >= H - 3) ? B_DIRT : B_STONE;
+                set_blk(v, vx, y, vz, b);
+            }
+        }
+        v->walk[cz][cx] = v->tsolid[cz][cx] ? 0 : 1;
+        v->hgt[cz][cx] = (unsigned char)(H - 1);
+    }
+    // an irregular shoreline: wet stone shoulders pushed out into the water from the bank
+    for (int cz = 0; cz < v->md; cz++) for (int cx = 0; cx < v->mw; cx++) {
+        if (!iswater[cz][cx]) continue;
+        int H = hh[cz][cx];
+        for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++) {
+            int vx = cx * VX_VPC + dx, vz = cz * VX_VPC + dz;
+            bool touches = false;
+            for (int d = 0; d < 4; d++) {
+                int nx = (vx + DIRV[d][0]) / VX_VPC, nz = (vz + DIRV[d][1]) / VX_VPC;
+                if (nx >= 0 && nz >= 0 && nx < v->mw && nz < v->md && !iswater[nz][nx]) touches = true;
+            }
+            if (!touches) continue;
+            if (vx_rnd(vx, vz, 913) < 0.45f) {
+                set_blk(v, vx, H - 3, vz, B_WETSTONE);
+                if (vx_rnd(vx, vz, 914) < 0.4f) set_shaped(v, vx, H - 2, vz, B_WETSTONE, SHP(SH_SLAB, SL_BOT));
+            }
         }
     }
 
-    // 3. the objects: houses, trees, low walls and posts are built in blocks; everything else is left
-    //    to a billboard from the atlas, which is the safe default for a thing nobody has modelled.
+    // 3. the objects
     for (int i = 0; i < v->place_count; i++) {
         VxPlace *p = &v->places[i];
         VxDef *d = &v->defs[p->def];
@@ -910,54 +1362,52 @@ static void vx_build_world(VoxField *v) {
         int x0 = p->x, z0 = p->z, W = d->w, D = d->h;
         int base = 0;
         for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
-            if (x < v->mw && z < v->md && v->hgt[z][x] > base) base = v->hgt[z][x];
+            if (x < v->mw && z < v->md && (int)v->hgt[z][x] > base) base = v->hgt[z][x];
         if (k->kind == OB_HOUSE) {
-            int dx_door = door_x_for(v, x0, z0, W, D);
-            if (dx_door < 0) dx_door = x0 + W / 2;
-            for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++) {
-                bool edge = (x == x0 || x == x0 + W - 1 || z == z0 || z == z0 + D - 1);
-                for (int y = base; y < base + 3; y++) set_blk(v, x, y, z, edge ? k->wall : k->wall);
-                if (z == z0 + D - 1) {                      // the south face: the door and two windows
-                    if (x == dx_door) { set_blk(v, x, base, z, B_DOOR); set_blk(v, x, base + 1, z, B_DOOR); }
-                    else if ((x == x0 + 1 || x == x0 + W - 2) && x != dx_door) set_blk(v, x, base + 1, z, B_WINDOW);
-                }
-            }
-            // A stepped gable: the ridge runs along the longer side, each course inset one block.
-            bool ridge_x = W >= D;
-            int span = ridge_x ? D : W;
-            int levels = (span + 1) / 2;
-            for (int r = 0; r < levels; r++) {
-                int y = base + 3 + r;
-                int ax0 = ridge_x ? x0 : x0 + r, ax1 = ridge_x ? x0 + W - 1 : x0 + W - 1 - r;
-                int az0 = ridge_x ? z0 + r : z0, az1 = ridge_x ? z0 + D - 1 - r : z0 + D - 1;
-                if (ax0 > ax1 || az0 > az1) break;
-                for (int z = az0; z <= az1; z++) for (int x = ax0; x <= ax1; x++) set_blk(v, x, y, z, k->roof);
+            HouseIn in;
+            memset(&in, 0, sizeof(in));
+            in.cx0 = x0; in.cz0 = z0; in.cw = W; in.cd = D; in.base = base;
+            in.wall = k->wall; in.roof = k->roof;
+            in.style = k->wall == B_STONE ? HS_STONE : k->wall == B_PLASTER ? HS_PLASTER : HS_TIMBER;
+            in.seed = vx_h32(x0, z0, 77);
+            in.grand = (!strcmp(d->name, "guild_hall") || !strcmp(d->name, "barn") || (W >= 4 && D >= 4));
+            int dxd = door_x_for(v, x0, z0, W, D);
+            in.door_side = D_S;
+            in.door_cell = dxd < 0 ? -1 : dxd - x0;
+            vx_build_house(v, &in);
+            // an L-wing on a big plan: a lower mass along one side, gabled the other way
+            if (W >= 5 && D >= 4 && vx_rnd((int)in.seed, 2, 9) > 0.5f) {
+                HouseIn wing = in;
+                wing.cw = W / 2; wing.cd = 2; wing.cz0 = z0 + D;
+                wing.grand = false; wing.depth = 1; wing.door_cell = -1;
+                bool room = wing.cz0 + wing.cd <= v->md;
+                for (int z = wing.cz0; z < wing.cz0 + wing.cd && room; z++)
+                    for (int x = wing.cx0; x < wing.cx0 + wing.cw; x++)
+                        if (x >= v->mw || !v->tsolid[z][x]) room = false;
+                if (room) vx_build_house(v, &wing);
             }
             for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
                 if (x < v->mw && z < v->md) v->walk[z][x] = 0;
         } else if (k->kind == OB_TREE) {
-            int cx = x0 + W / 2, cz = z0 + D - 1;                  // the trunk stands on the solid row
-            // Short and wide, not a Minecraft mast: a trunk of two or three, then a squat crown that
-            // stays inside the frame at the camera's own height.
-            int th = 2 + (int)(vx_rnd(cx, cz, 9) * 2.0f);
-            for (int y = base; y < base + th; y++) set_blk(v, cx, y, cz, B_TRUNK);
-            int ly = base + th;
-            for (int dy = 0; dy <= 2; dy++) for (int dz = -2; dz <= 2; dz++) for (int dx2 = -2; dx2 <= 2; dx2++) {
-                float fx = dx2 / 1.85f, fz = dz / 1.85f, fy = (dy - 0.8f) / 1.45f;
-                float r2 = fx * fx + fz * fz + fy * fy;
-                if (r2 > 1.0f) continue;
-                if (r2 > 0.62f && vx_rnd(cx + dx2, cz + dz, ly + dy) > 0.55f) continue;   // a ragged edge
-                int yy = ly + dy;
-                if (get_blk(v, cx + dx2, yy, cz + dz) == B_AIR) set_blk(v, cx + dx2, yy, cz + dz, B_LEAVES);
-            }
+            int cx = x0 + W / 2, cz = z0 + D - 1;
+            vx_build_tree(v, cx, cz, base, vx_h32(cx, cz, 5), d->name);
             for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
                 if (x < v->mw && z < v->md && (d->solid[z - z0] & (1 << (x - x0)))) v->walk[z][x] = 0;
-        } else {                                                   // low wall or post
-            int hh = k->kind == OB_POST ? 2 : 1;
+        } else {
+            // fences, walls, hedges and posts, now with real uprights and rails at voxel thickness
+            bool fence = (k->wall == B_TIMBER && k->kind == OB_LOWWALL);
             for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++) {
                 if (x >= v->mw || z >= v->md) continue;
-                int b2 = v->hgt[z][x];
-                for (int y = b2; y < b2 + hh; y++) set_blk(v, x, y, z, k->wall);
+                int b2 = v->hgt[z][x] + 1;
+                if (k->kind == OB_POST) {
+                    for (int y = b2; y < b2 + 5; y++) set_shaped(v, x * VX_VPC, y, z * VX_VPC, k->wall, SHP(SH_POST, 0));
+                } else if (fence) {
+                    for (int y = b2; y < b2 + 3; y++)
+                        set_shaped(v, x * VX_VPC, y, z * VX_VPC, k->wall, SHP(SH_POST, 0));
+                } else {
+                    for (int y = b2; y < b2 + 3; y++) set_cell(v, x, y, z, k->wall);
+                    if (k->wall == B_HEDGE) vx_round_shell(v, x * VX_VPC, b2, z * VX_VPC, x * VX_VPC + 1, b2 + 2, z * VX_VPC + 1, B_HEDGE);
+                }
                 v->walk[z][x] = 0;
             }
         }
@@ -968,7 +1418,43 @@ static void vx_build_world(VoxField *v) {
         VxNpc *np = &v->npcs[i];
         if (np->tx >= 0 && np->tz >= 0 && np->tx < v->mw && np->tz < v->md) v->walk[np->tz][np->tx] = 0;
     }
+
+    // 4. ramps: where a walkable cell steps two voxels up to exactly one neighbour and is level with
+    //    the one opposite, its surface becomes a 45-degree slope instead of a lip to hop over.
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        if (!v->walk[z][x] || v->place_at[z][x]) continue;
+        int h = v->hgt[z][x], up = -1, ups = 0;
+        for (int d = 0; d < 4; d++) {
+            int nx = x + DX[d], nz = z + DZ[d];
+            if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md || !v->walk[nz][nx]) continue;
+            if ((int)v->hgt[nz][nx] == h + 2) { up = d; ups++; }
+        }
+        if (ups != 1) continue;
+        int bx = -DX[up], bz = -DZ[up];
+        int lx = x + bx, lz = z + bz;
+        if (lx < 0 || lz < 0 || lx >= v->mw || lz >= v->md || !v->walk[lz][lx] || (int)v->hgt[lz][lx] != h) continue;
+        unsigned char mat = get_blk(v, x * VX_VPC, h, z * VX_VPC);
+        if (mat == B_AIR) continue;
+        // the ramp climbs across the cell: the near voxel row one voxel up, the far row two
+        int d_up = (DX[up] > 0) ? D_E : (DX[up] < 0) ? D_W : (DZ[up] > 0) ? D_S : D_N;
+        for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++) {
+            int vx = x * VX_VPC + dx, vz = z * VX_VPC + dz;
+            int along = (DX[up] ? dx : dz);
+            if (DX[up] < 0 || DZ[up] < 0) along = 1 - along;
+            set_blk(v, vx, h + 1, vz, along ? mat : B_AIR);
+            set_shaped(v, vx, h + 1 + along, vz, mat, SHP(SH_SLOPE, d_up));
+        }
+        v->ramp[z][x] = (unsigned char)(1 + d_up);
+    }
+    v->shaped = 0;
+    for (int y = 0; y < VX_VY; y++) for (int z = 0; z < v->vd; z++) for (int x = 0; x < v->vw; x++)
+        if (v->shp[y][z][x]) v->shaped++;
+    v->houses = vx_houses_built;
+    v->ramps = 0;
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) if (v->ramp[z][x]) v->ramps++;
 }
+
+static void vx_sun_defaults(VoxField *v);
 
 // ───────────────────────── walkability, and the check that it survived the height field ─────────
 // A step is legal when the target cell is walkable, its top is within one block, and there are two
@@ -977,13 +1463,45 @@ static void vx_build_world(VoxField *v) {
 static bool vx_can_stand(VoxField *v, int x, int z) {
     if (x < 0 || z < 0 || x >= v->mw || z >= v->md) return false;
     if (!v->walk[z][x]) return false;
-    int y = v->hgt[z][x];
-    return get_blk(v, x, y, z) == B_AIR && get_blk(v, x, y + 1, z) == B_AIR;
+    int y = v->hgt[z][x];                             // the voxel the feet stand on
+    // Headroom. The party is 1.6 walk cells, so three voxels (1.5 cells) must be wholly clear and
+    // the fourth may hold only a top slab — which is what lets a sill, an eave or a rail oversail a
+    // lane without closing it. A ramp's own slope voxels are what you walk on and never count.
+    for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++)
+        for (int k = 1; k <= 4; k++) {
+            int vx = x * VX_VPC + dx, vy = y + k, vz = z * VX_VPC + dz;
+            if (get_blk(v, vx, vy, vz) == B_AIR) continue;
+            unsigned char sp = get_shp(v, vx, vy, vz);
+            if (v->ramp[z][x] && k <= 2 && shape_is_ramp(sp)) continue;
+            if (k == 4 && SH_OF(sp) == SH_SLAB && OR_OF(sp) == SL_TOP) continue;
+            return false;
+        }
+    return true;
 }
+// One voxel of rise is a free, smooth step; two is a hop, and only a ramp cell makes a two-voxel
+// climb smooth. Anything more is a wall.
 static bool vx_can_step(VoxField *v, int fx, int fz, int tx, int tz) {
     if (!vx_can_stand(v, tx, tz)) return false;
     int a = v->hgt[fz][fx], b = v->hgt[tz][tx];
-    return (a > b ? a - b : b - a) <= 1;
+    int dd = a > b ? a - b : b - a;
+    if (dd <= 1) return true;
+    if (dd == 2) return true;                          // a hop, as one old block used to be
+    // a ramp cell reaches two voxels above its own foot, so it can meet the shelf it climbs to
+    if (v->ramp[fz][fx] && b == a + 2) return true;
+    if (v->ramp[tz][tx] && a == b + 2) return true;
+    return false;
+}
+
+// The walking surface at a fractional position inside a cell, in VOXELS. A ramp is crossed smoothly:
+// the height is the slope's own plane at that fraction, so there is no hop at either end.
+static float vx_surface_v(VoxField *v, int cx, int cz, float fx, float fz) {
+    if (cx < 0 || cz < 0 || cx >= v->mw || cz >= v->md) return 0;
+    float y = (float)v->hgt[cz][cx] + 1.0f;
+    int r = v->ramp[cz][cx];
+    if (!r) return y;
+    int d = r - 1;
+    float t = DIRV[d][0] ? (DIRV[d][0] > 0 ? fx : 1.0f - fx) : (DIRV[d][1] > 0 ? fz : 1.0f - fz);
+    return y + t * 2.0f;
 }
 
 static int npc_home_at(VoxField *v, int x, int z) {
@@ -1030,29 +1548,36 @@ static int vx_verify_reach(VoxField *v) {
         for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++)
             if (tile_r[z * VX_MAXW + x] && !vox_r[z * VX_MAXW + x]) missing++;
         if (!missing) return 0;
-        // Flatten every unreachable cell and its neighbours to 1 and rebuild the columns there.
+        // Flatten every unreachable cell and its neighbours back to the flat level and rebuild them.
         for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
             if (!tile_r[z * VX_MAXW + x] || vox_r[z * VX_MAXW + x]) continue;
             for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
                 int nx = x + dx, nz = z + dz;
                 if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
-                int h = v->hgt[nz][nx];
-                if (h <= 1) continue;
-                for (int y = 1; y < h; y++) {
-                    unsigned char b = v->blk[y][nz][nx];
-                    if (b == B_AIR) break;
-                    v->blk[y][nz][nx] = B_AIR;
-                }
-                v->blk[0][nz][nx] = v->blk[0][nz][nx] ? v->blk[0][nz][nx] : B_DIRT;
+                if (v->place_at[nz][nx]) continue;
                 int def = v->ground[nz][nx];
                 const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
-                v->blk[0][nz][nx] = terr_block(nm) == B_WATER ? B_WATER : terr_block(nm);
-                v->hgt[nz][nx] = (unsigned char)(terr_block(nm) == B_WATER ? 0 : 1);
+                unsigned char top = terr_block(nm);
+                if (top == B_WATER) continue;
+                v->ramp[nz][nx] = 0;
+                const int H = 4;
+                for (int dzv = 0; dzv < VX_VPC; dzv++) for (int dxv = 0; dxv < VX_VPC; dxv++) {
+                    int vx = nx * VX_VPC + dxv, vz = nz * VX_VPC + dzv;
+                    for (int y = 0; y < VX_VY; y++)
+                        set_blk(v, vx, y, vz, y < H - 1 ? (y >= H - 3 ? B_DIRT : B_STONE) : y == H - 1 ? top : B_AIR);
+                }
+                v->hgt[nz][nx] = (unsigned char)(H - 1);
             }
         }
         SDL_Log("voxfield: %d cells unreachable after the height field — flattened, retrying", missing);
     }
     return missing;
+}
+
+// The world y a body's feet rest at, on a cell's flat surface.
+static float vx_gy(VoxField *v, int x, int z) {
+    if (x < 0 || z < 0 || x >= v->mw || z >= v->md) return 0;
+    return ((float)v->hgt[z][x] + 1.0f) * VOX_S;
 }
 
 // ───────────────────────── meshing ─────────────────────────
@@ -1063,14 +1588,24 @@ static int vx_verify_reach(VoxField *v) {
 // to numbers that were baked.
 
 enum { F_TOP = 0, F_BOT, F_SOUTH, F_NORTH, F_EAST, F_WEST };
-static const float FACE_L[6] = { 1.00f, 0.42f, 0.90f, 0.56f, 0.78f, 0.66f };  // top, bottom, S(to camera), N, E, W
 static const int FN[6][3] = { {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}, {1,0,0}, {-1,0,0} };
+static const int F_OPP[6] = { F_BOT, F_TOP, F_NORTH, F_SOUTH, F_WEST, F_EAST };
+
+// The face term, from the REAL normal, so a slope is lit between the two faces it lies between
+// rather than snapping to one of them. The six axis normals reproduce the old FACE_L table exactly:
+// top 1.00, bottom 0.42, south 0.90, north 0.56, east 0.78, west 0.66.
+static float vx_face_light(float nx, float ny, float nz) {
+    float horiz = 0.725f + 0.17f * nz + 0.06f * nx;
+    float vert = ny > 0 ? 1.00f : 0.42f;
+    float k = ny < 0 ? -ny : ny;
+    return horiz + (vert - horiz) * k;
+}
 
 static VxVert *vx_tmp = nullptr;
 static int vx_tmp_cap = 0, vx_tmp_n = 0;
 static void tmp_push(const VxVert *v6) {
     if (vx_tmp_n + 6 > vx_tmp_cap) {
-        vx_tmp_cap = vx_tmp_cap ? vx_tmp_cap * 2 : 65536;
+        vx_tmp_cap = vx_tmp_cap ? vx_tmp_cap * 2 : 262144;
         vx_tmp = (VxVert *)realloc(vx_tmp, sizeof(VxVert) * (size_t)vx_tmp_cap);
     }
     if (!vx_tmp) return;
@@ -1079,18 +1614,18 @@ static void tmp_push(const VxVert *v6) {
 }
 
 static bool vx_opaque_at(VoxField *v, int x, int y, int z) { return blk_opaque(get_blk(v, x, y, z)); }
-
-// The sun: a fixed direction, marched at mesh time. A wall between a face and the sun is the whole
-// of the shadowing — it is what makes the houses sit in the square rather than float on it.
-static float vx_sun_shadow(VoxField *v, float px, float py, float pz) {
-    float sx = 0.55f, sy = 1.0f, sz = -0.42f;
-    float x = px + sx * 0.6f, y = py + sy * 0.6f, z = pz + sz * 0.6f;
-    for (int i = 0; i < 12; i++) {
-        if (y >= VX_MAXY) break;
-        if (vx_opaque_at(v, (int)floorf(x), (int)floorf(y), (int)floorf(z))) return 0.72f;
-        x += sx; y += sy; z += sz;
-    }
-    return 1.0f;
+// For ambient occlusion only a full opaque cube occludes; a slope, slab, post or pane does not, which
+// keeps the corners under a roof from going black.
+static bool vx_ao_solid(VoxField *v, int x, int y, int z) {
+    return blk_opaque(get_blk(v, x, y, z)) && SH_OF(get_shp(v, x, y, z)) == SH_CUBE;
+}
+// A face may be culled only against a neighbour that FILLS the shared boundary. When in doubt this
+// says no and the face is drawn — the rule that stops shaped neighbours punching holes in the world.
+static bool vx_covered(VoxField *v, int x, int y, int z, int face) {
+    int nx = x + FN[face][0], ny = y + FN[face][1], nz = z + FN[face][2];
+    unsigned char nb = get_blk(v, nx, ny, nz);
+    if (!blk_opaque(nb)) return false;
+    return shape_covers(get_shp(v, nx, ny, nz), F_OPP[face]);
 }
 
 static void vx_lamp_at(VoxField *v, float x, float y, float z, float *lamp) {
@@ -1105,96 +1640,250 @@ static void vx_lamp_at(VoxField *v, float x, float y, float z, float *lamp) {
     *lamp = s > 1 ? 1 : s;
 }
 
-static void vx_mesh_chunk(VoxField *v, int cx, int cz) {
-    vx_tmp_n = 0;
-    int x0 = cx * VX_CH, z0 = cz * VX_CH;
-    int x1 = x0 + VX_CH > v->mw ? v->mw : x0 + VX_CH;
-    int z1 = z0 + VX_CH > v->md ? v->md : z0 + VX_CH;
-    for (int z = z0; z < z1; z++) for (int x = x0; x < x1; x++) for (int y = 0; y < VX_MAXY; y++) {
-        unsigned char b = v->blk[y][z][x];
-        if (b == B_AIR) continue;
-        bool is_water = BLOCKS[b].water;
-        for (int f = 0; f < 6; f++) {
-            if (is_water && f != F_TOP) continue;
-            int nx = x + FN[f][0], ny = y + FN[f][1], nz = z + FN[f][2];
-            unsigned char nb = get_blk(v, nx, ny, nz);
-            if (blk_opaque(nb)) continue;
-            if (!is_water && nb == b) continue;
-            if (f == F_BOT && y == 0) continue;
-            // Corner positions: u and w are the face's two tangent axes.
-            float ox = (float)x, oy = (float)y, oz = (float)z;
-            float top_drop = is_water ? 0.2f : 0.0f;
-            float c[4][3]; int au[3], aw[3];
-            switch (f) {
-                case F_TOP:   au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=0;aw[2]=1;
-                    c[0][0]=ox;   c[0][1]=oy+1-top_drop; c[0][2]=oz;
-                    c[1][0]=ox+1; c[1][1]=oy+1-top_drop; c[1][2]=oz;
-                    c[2][0]=ox+1; c[2][1]=oy+1-top_drop; c[2][2]=oz+1;
-                    c[3][0]=ox;   c[3][1]=oy+1-top_drop; c[3][2]=oz+1; break;
-                case F_BOT:   au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=0;aw[2]=1;
-                    c[0][0]=ox;   c[0][1]=oy; c[0][2]=oz+1;
-                    c[1][0]=ox+1; c[1][1]=oy; c[1][2]=oz+1;
-                    c[2][0]=ox+1; c[2][1]=oy; c[2][2]=oz;
-                    c[3][0]=ox;   c[3][1]=oy; c[3][2]=oz;   break;
-                case F_SOUTH: au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=1;aw[2]=0;
-                    c[0][0]=ox;   c[0][1]=oy;   c[0][2]=oz+1;
-                    c[1][0]=ox+1; c[1][1]=oy;   c[1][2]=oz+1;
-                    c[2][0]=ox+1; c[2][1]=oy+1; c[2][2]=oz+1;
-                    c[3][0]=ox;   c[3][1]=oy+1; c[3][2]=oz+1; break;
-                case F_NORTH: au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=1;aw[2]=0;
-                    c[0][0]=ox+1; c[0][1]=oy;   c[0][2]=oz;
-                    c[1][0]=ox;   c[1][1]=oy;   c[1][2]=oz;
-                    c[2][0]=ox;   c[2][1]=oy+1; c[2][2]=oz;
-                    c[3][0]=ox+1; c[3][1]=oy+1; c[3][2]=oz;  break;
-                case F_EAST:  au[0]=0;au[1]=0;au[2]=1; aw[0]=0;aw[1]=1;aw[2]=0;
-                    c[0][0]=ox+1; c[0][1]=oy;   c[0][2]=oz+1;
-                    c[1][0]=ox+1; c[1][1]=oy;   c[1][2]=oz;
-                    c[2][0]=ox+1; c[2][1]=oy+1; c[2][2]=oz;
-                    c[3][0]=ox+1; c[3][1]=oy+1; c[3][2]=oz+1; break;
-                default:      au[0]=0;au[1]=0;au[2]=1; aw[0]=0;aw[1]=1;aw[2]=0;
-                    c[0][0]=ox; c[0][1]=oy;   c[0][2]=oz;
-                    c[1][0]=ox; c[1][1]=oy;   c[1][2]=oz+1;
-                    c[2][0]=ox; c[2][1]=oy+1; c[2][2]=oz+1;
-                    c[3][0]=ox; c[3][1]=oy+1; c[3][2]=oz;   break;
+// How near a water voxel is to its bank, 0 (mid-channel) .. 1 (touching), and whether the bank it is
+// nearest is the NORTH one — the camera-facing bank, which wants a dark band under it.
+static void vx_water_edge(VoxField *v, int x, int z, float *shallow, float *north) {
+    int best = 99, bn = 0;
+    for (int r = 1; r <= 6; r++) {
+        for (int d = 0; d < 4; d++) {
+            int cx = (x + DIRV[d][0] * r) / VX_VPC, cz = (z + DIRV[d][1] * r) / VX_VPC;
+            if (cx < 0 || cz < 0 || cx >= v->mw || cz >= v->md) continue;
+            if (get_blk(v, x + DIRV[d][0] * r, 0, z + DIRV[d][1] * r) == B_AIR) continue;
+            bool water = false;
+            for (int y = 0; y < VX_VY; y++) if (get_blk(v, x + DIRV[d][0] * r, y, z + DIRV[d][1] * r) == B_WATER) water = true;
+            if (water) continue;
+            if (r < best) { best = r; bn = (d == D_N); }
+        }
+        if (best <= r) break;
+    }
+    *shallow = best > 6 ? 0.0f : 1.0f - (float)(best - 1) / 6.0f;
+    *north = (best <= 2 && bn) ? 1.0f : 0.0f;
+}
+
+// One quad (or, with c[3] == c[2], one triangle) of one voxel. Corners are in VOXEL-LOCAL 0..1
+// coordinates; `cullface` is the cell boundary the quad lies in, or -1 for an interior surface.
+struct VxQuadCtx { VoxField *v; int x, y, z; unsigned char b; };
+static void vx_emit_quad(VxQuadCtx *q, const float lc[4][3], const float n[3], int cullface) {
+    VoxField *v = q->v;
+    if (cullface >= 0 && vx_covered(v, q->x, q->y, q->z, cullface)) return;
+    float c[4][3];
+    for (int i = 0; i < 4; i++) {
+        c[i][0] = ((float)q->x + lc[i][0]) * VOX_S;
+        c[i][1] = ((float)q->y + lc[i][1]) * VOX_S;
+        c[i][2] = ((float)q->z + lc[i][2]) * VOX_S;
+    }
+    // Winding is DERIVED, never typed: the cross product of the first two edges must agree with the
+    // quad's own normal, else it is flipped. This is why no face can vanish under back-face culling.
+    {
+        float e1[3] = { c[1][0]-c[0][0], c[1][1]-c[0][1], c[1][2]-c[0][2] };
+        float e2[3] = { c[2][0]-c[0][0], c[2][1]-c[0][1], c[2][2]-c[0][2] };
+        float ax = e1[1]*e2[2]-e1[2]*e2[1], ay = e1[2]*e2[0]-e1[0]*e2[2], az = e1[0]*e2[1]-e1[1]*e2[0];
+        if (ax*n[0] + ay*n[1] + az*n[2] < 0) {
+            for (int k = 0; k < 3; k++) { float t = c[1][k]; c[1][k] = c[3][k]; c[3][k] = t; }
+        }
+    }
+    // the face id: the dominant axis of the normal. It picks the top or side palette ramp and, for a
+    // wall, the fraction up the block that the grass lip uses.
+    int face;
+    {
+        float ax = n[0] < 0 ? -n[0] : n[0], ay = n[1] < 0 ? -n[1] : n[1], az = n[2] < 0 ? -n[2] : n[2];
+        if (ay >= ax && ay >= az) face = n[1] > 0 ? F_TOP : F_BOT;
+        else if (az >= ax)        face = n[2] > 0 ? F_SOUTH : F_NORTH;
+        else                      face = n[0] > 0 ? F_EAST : F_WEST;
+    }
+    bool axis = (n[0]*n[0] + n[1]*n[1] + n[2]*n[2]) > 0.999f &&
+                ((n[0] == 0 && n[1] == 0) || (n[0] == 0 && n[2] == 0) || (n[1] == 0 && n[2] == 0));
+    // the tangent basis for AO
+    float tu[3], tw[3];
+    if (n[1] > 0.9f || n[1] < -0.9f) { tu[0]=1;tu[1]=0;tu[2]=0; }
+    else { float l = sqrtf(n[2]*n[2] + n[0]*n[0]); tu[0]= n[2]/l; tu[1]=0; tu[2]= -n[0]/l; }
+    tw[0] = n[1]*tu[2] - n[2]*tu[1]; tw[1] = n[2]*tu[0] - n[0]*tu[2]; tw[2] = n[0]*tu[1] - n[1]*tu[0];
+    float ctr[3] = { (c[0][0]+c[1][0]+c[2][0]+c[3][0]) * 0.25f,
+                     (c[0][1]+c[1][1]+c[2][1]+c[3][1]) * 0.25f,
+                     (c[0][2]+c[1][2]+c[2][2]+c[3][2]) * 0.25f };
+    float shade = vx_face_light(n[0], n[1], n[2]);
+    float shallow = 0, north = 0;
+    if (q->b == B_WATER && face == F_TOP) vx_water_edge(v, q->x, q->z, &shallow, &north);
+    VxVert corner[4];
+    for (int i = 0; i < 4; i++) {
+        // the pattern basis. The six axis faces keep exactly the mapping they had, so nothing that
+        // already looked right moved; a sloped face gets its own basis, with the run measured as arc
+        // length so a roof course is the same width on the pitch as it is on the flat.
+        float U, W;
+        if (axis && (face == F_TOP || face == F_BOT))      { U = c[i][0]; W = c[i][2]; }
+        else if (axis && (face == F_SOUTH || face == F_NORTH)) { U = c[i][0]; W = -c[i][1]; }
+        else if (axis)                                     { U = c[i][2]; W = -c[i][1]; }
+        else {
+            float hl = sqrtf(n[0]*n[0] + n[2]*n[2]);
+            float rx = hl > 0.001f ? n[0]/hl : 0.0f, rz = hl > 0.001f ? n[2]/hl : 1.0f;
+            U = c[i][0]*rz - c[i][2]*rx;
+            if (n[1] > 0.3f) W = (c[i][0]*rx + c[i][2]*rz) / (n[1] < 0.2f ? 0.2f : n[1]);
+            else W = -c[i][1];
+        }
+        // classic three-neighbour ambient occlusion, generalised: sample the two edge neighbours and
+        // the diagonal of the cell just outside the surface at this corner.
+        float base[3] = { c[i][0]/VOX_S + n[0]*0.5f, c[i][1]/VOX_S + n[1]*0.5f, c[i][2]/VOX_S + n[2]*0.5f };
+        float dv[3] = { c[i][0]-ctr[0], c[i][1]-ctr[1], c[i][2]-ctr[2] };
+        float su = (dv[0]*tu[0]+dv[1]*tu[1]+dv[2]*tu[2]) < 0 ? -0.6f : 0.6f;
+        float sw = (dv[0]*tw[0]+dv[1]*tw[1]+dv[2]*tw[2]) < 0 ? -0.6f : 0.6f;
+        bool s1 = vx_ao_solid(v, (int)floorf(base[0]+tu[0]*su), (int)floorf(base[1]+tu[1]*su), (int)floorf(base[2]+tu[2]*su));
+        bool s2 = vx_ao_solid(v, (int)floorf(base[0]+tw[0]*sw), (int)floorf(base[1]+tw[1]*sw), (int)floorf(base[2]+tw[2]*sw));
+        bool cc = vx_ao_solid(v, (int)floorf(base[0]+tu[0]*su+tw[0]*sw), (int)floorf(base[1]+tu[1]*su+tw[1]*sw), (int)floorf(base[2]+tu[2]*su+tw[2]*sw));
+        int ao = (s1 && s2) ? 0 : 3 - ((s1?1:0) + (s2?1:0) + (cc?1:0));
+        float lamp = 0;
+        vx_lamp_at(v, c[i][0], c[i][1], c[i][2], &lamp);
+        if (q->b == B_WINDOW) lamp = 0.9f;             // lit from inside; the bloom catches it at night
+        corner[i].x = c[i][0]; corner[i].y = c[i][1]; corner[i].z = c[i][2];
+        corner[i].u = U; corner[i].w = W;
+        corner[i].type = q->b; corner[i].face = (unsigned char)face;
+        corner[i].lit = (unsigned char)(shade * 255.0f + 0.5f);
+        corner[i].warm = (unsigned char)(lamp * 255.0f + 0.5f);
+        corner[i].ao = (unsigned char)(ao * 85);
+        corner[i].spare = (unsigned char)((int)(shallow * 127.0f) | (north > 0.5f ? 128 : 0));
+        corner[i].nx = (signed char)(n[0] * 127.0f); corner[i].ny = (signed char)(n[1] * 127.0f);
+        corner[i].nz = (signed char)(n[2] * 127.0f); corner[i].npad = 0;
+    }
+    VxVert q6[6];
+    q6[0] = corner[0]; q6[1] = corner[1]; q6[2] = corner[2];
+    q6[3] = corner[0]; q6[4] = corner[2]; q6[5] = corner[3];
+    tmp_push(q6);
+}
+
+// An axis-aligned box inside one voxel, in local 0..1 coordinates. A face flush with the voxel
+// boundary is cullable against the neighbour; a face inside the voxel never is.
+static void vx_emit_box(VxQuadCtx *q, float x0, float y0, float z0, float x1, float y1, float z1) {
+    const float EPS = 0.0005f;
+    for (int f = 0; f < 6; f++) {
+        float c[4][3]; float n[3] = { (float)FN[f][0], (float)FN[f][1], (float)FN[f][2] };
+        int cull = -1;
+        switch (f) {
+            case F_TOP:   if (y1 > 1 - EPS) cull = f;
+                c[0][0]=x0;c[0][1]=y1;c[0][2]=z0; c[1][0]=x1;c[1][1]=y1;c[1][2]=z0;
+                c[2][0]=x1;c[2][1]=y1;c[2][2]=z1; c[3][0]=x0;c[3][1]=y1;c[3][2]=z1; break;
+            case F_BOT:   if (y0 < EPS) cull = f;
+                c[0][0]=x0;c[0][1]=y0;c[0][2]=z1; c[1][0]=x1;c[1][1]=y0;c[1][2]=z1;
+                c[2][0]=x1;c[2][1]=y0;c[2][2]=z0; c[3][0]=x0;c[3][1]=y0;c[3][2]=z0; break;
+            case F_SOUTH: if (z1 > 1 - EPS) cull = f;
+                c[0][0]=x0;c[0][1]=y0;c[0][2]=z1; c[1][0]=x1;c[1][1]=y0;c[1][2]=z1;
+                c[2][0]=x1;c[2][1]=y1;c[2][2]=z1; c[3][0]=x0;c[3][1]=y1;c[3][2]=z1; break;
+            case F_NORTH: if (z0 < EPS) cull = f;
+                c[0][0]=x1;c[0][1]=y0;c[0][2]=z0; c[1][0]=x0;c[1][1]=y0;c[1][2]=z0;
+                c[2][0]=x0;c[2][1]=y1;c[2][2]=z0; c[3][0]=x1;c[3][1]=y1;c[3][2]=z0; break;
+            case F_EAST:  if (x1 > 1 - EPS) cull = f;
+                c[0][0]=x1;c[0][1]=y0;c[0][2]=z1; c[1][0]=x1;c[1][1]=y0;c[1][2]=z0;
+                c[2][0]=x1;c[2][1]=y1;c[2][2]=z0; c[3][0]=x1;c[3][1]=y1;c[3][2]=z1; break;
+            default:      if (x0 < EPS) cull = f;
+                c[0][0]=x0;c[0][1]=y0;c[0][2]=z0; c[1][0]=x0;c[1][1]=y0;c[1][2]=z1;
+                c[2][0]=x0;c[2][1]=y1;c[2][2]=z1; c[3][0]=x0;c[3][1]=y1;c[3][2]=z0; break;
+        }
+        vx_emit_quad(q, c, n, cull);
+    }
+}
+
+// The ramp family — slope, outer corner, inner corner — as one prism defined by its four corner
+// heights: two triangles for the top surface, a trapezoid per side, and a bottom.
+static void vx_emit_prism(VxQuadCtx *q, const float h[4]) {
+    static const float PX[4] = { 0, 1, 1, 0 }, PZ[4] = { 0, 0, 1, 1 };
+    // the top, as two triangles, each with its own normal
+    static const int TRI[2][3] = { {0,1,2}, {0,2,3} };
+    for (int t = 0; t < 2; t++) {
+        float c[4][3];
+        for (int i = 0; i < 3; i++) { int k = TRI[t][i]; c[i][0]=PX[k]; c[i][1]=h[k]; c[i][2]=PZ[k]; }
+        c[3][0]=c[2][0]; c[3][1]=c[2][1]; c[3][2]=c[2][2];
+        float e1[3] = { c[1][0]-c[0][0], c[1][1]-c[0][1], c[1][2]-c[0][2] };
+        float e2[3] = { c[2][0]-c[0][0], c[2][1]-c[0][1], c[2][2]-c[0][2] };
+        float n[3] = { e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0] };
+        float l = sqrtf(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);
+        if (l < 1e-6f) continue;
+        n[0]/=l; n[1]/=l; n[2]/=l;
+        if (n[1] < 0) { n[0]=-n[0]; n[1]=-n[1]; n[2]=-n[2]; }
+        vx_emit_quad(q, c, n, -1);
+    }
+    // the four sides; each is a trapezoid from y=0 to the two corner heights on that edge
+    static const int SIDE[4][2] = { {3,2}, {0,1}, {1,2}, {0,3} };   // S, N, E, W  (in F_* order - 2)
+    for (int s = 0; s < 4; s++) {
+        int a = SIDE[s][0], b = SIDE[s][1];
+        if (h[a] < 0.001f && h[b] < 0.001f) continue;
+        int face = s + 2;
+        float n[3] = { (float)FN[face][0], (float)FN[face][1], (float)FN[face][2] };
+        float c[4][3];
+        c[0][0]=PX[a]; c[0][1]=0;    c[0][2]=PZ[a];
+        c[1][0]=PX[b]; c[1][1]=0;    c[1][2]=PZ[b];
+        c[2][0]=PX[b]; c[2][1]=h[b]; c[2][2]=PZ[b];
+        c[3][0]=PX[a]; c[3][1]=h[a]; c[3][2]=PZ[a];
+        vx_emit_quad(q, c, n, (h[a] > 0.999f && h[b] > 0.999f) ? face : -1);
+    }
+    float c[4][3] = { {0,0,1}, {1,0,1}, {1,0,0}, {0,0,0} };
+    float n[3] = { 0, -1, 0 };
+    vx_emit_quad(q, c, n, F_BOT);
+}
+
+static void vx_emit_shape(VxQuadCtx *q, unsigned char s) {
+    int sh = SH_OF(s), o = OR_OF(s);
+    switch (sh) {
+        case SH_CUBE: vx_emit_box(q, 0,0,0, 1,1,1); break;
+        case SH_SLAB: if (o == SL_BOT) vx_emit_box(q, 0,0,0, 1,0.5f,1); else vx_emit_box(q, 0,0.5f,0, 1,1,1); break;
+        case SH_SLOPE: case SH_SLOPE_OUT: case SH_SLOPE_IN: { float h[4]; shape_corner_h(s, h);
+vx_emit_prism(q, h); } break;
+        case SH_STAIRS: {
+            for (int i = 0; i < 3; i++) {
+                float t0 = (float)i / 3.0f, hgt = (float)(i + 1) / 3.0f;
+                if (o == D_S)      vx_emit_box(q, 0, 0, t0, 1, hgt, 1);
+                else if (o == D_N) vx_emit_box(q, 0, 0, 0, 1, hgt, 1.0f - t0);
+                else if (o == D_E) vx_emit_box(q, t0, 0, 0, 1, hgt, 1);
+                else               vx_emit_box(q, 0, 0, 0, 1.0f - t0, hgt, 1);
             }
-            // Winding is DERIVED, not typed: the cross product of the first two edges must point
-            // along the face's own normal, else the quad is back-facing and vanishes under culling.
-            {
-                float e1[3] = { c[1][0]-c[0][0], c[1][1]-c[0][1], c[1][2]-c[0][2] };
-                float e2[3] = { c[2][0]-c[0][0], c[2][1]-c[0][1], c[2][2]-c[0][2] };
-                float nx2 = e1[1]*e2[2] - e1[2]*e2[1], ny2 = e1[2]*e2[0] - e1[0]*e2[2], nz2 = e1[0]*e2[1] - e1[1]*e2[0];
-                if (nx2 * FN[f][0] + ny2 * FN[f][1] + nz2 * FN[f][2] < 0) {
-                    for (int k = 0; k < 3; k++) { float t2 = c[1][k]; c[1][k] = c[3][k]; c[3][k] = t2; }
+        } break;
+        case SH_POST: {
+            vx_emit_box(q, 0.3f, 0, 0.3f, 0.7f, 1, 0.7f);
+            // rails, reaching out to any neighbouring fence or solid cell
+            for (int d = 0; d < 4; d++) {
+                unsigned char nb = get_blk(q->v, q->x + DIRV[d][0], q->y, q->z + DIRV[d][1]);
+                if (!blk_opaque(nb)) continue;
+                for (int r = 0; r < 2; r++) {
+                    float y0 = r ? 0.62f : 0.26f, y1 = y0 + 0.16f;
+                    if (d == D_S)      vx_emit_box(q, 0.38f, y0, 0.6f, 0.62f, y1, 1.0f);
+                    else if (d == D_N) vx_emit_box(q, 0.38f, y0, 0.0f, 0.62f, y1, 0.4f);
+                    else if (d == D_E) vx_emit_box(q, 0.6f, y0, 0.38f, 1.0f, y1, 0.62f);
+                    else               vx_emit_box(q, 0.0f, y0, 0.38f, 0.4f, y1, 0.62f);
                 }
             }
-            float shade = FACE_L[f] * (f == F_TOP ? vx_sun_shadow(v, ox + 0.5f, oy + 1.0f, oz + 0.5f)
-                                                  : vx_sun_shadow(v, ox + 0.5f + FN[f][0] * 0.6f, oy + 0.5f, oz + 0.5f + FN[f][2] * 0.6f));
-            VxVert q[6];
-            VxVert corner[4];
-            for (int i = 0; i < 4; i++) {
-                // classic 0-3 AO: the two edge neighbours and the diagonal, in the plane above the face
-                float fc[3] = { ox + 0.5f + FN[f][0] * 0.5f, oy + 0.5f + FN[f][1] * 0.5f, oz + 0.5f + FN[f][2] * 0.5f };
-                float dv[3] = { c[i][0] - fc[0], c[i][1] - fc[1], c[i][2] - fc[2] };
-                float du = dv[0]*au[0] + dv[1]*au[1] + dv[2]*au[2];
-                float dw = dv[0]*aw[0] + dv[1]*aw[1] + dv[2]*aw[2];
-                int su = du < 0 ? -1 : 1, sw = dw < 0 ? -1 : 1;
-                int bx = nx, by = ny, bz = nz;
-                bool s1 = vx_opaque_at(v, bx + au[0]*su, by + au[1]*su, bz + au[2]*su);
-                bool s2 = vx_opaque_at(v, bx + aw[0]*sw, by + aw[1]*sw, bz + aw[2]*sw);
-                bool cc = vx_opaque_at(v, bx + au[0]*su + aw[0]*sw, by + au[1]*su + aw[1]*sw, bz + au[2]*su + aw[2]*sw);
-                int ao = (s1 && s2) ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (cc ? 1 : 0));
-                float lamp = 0;
-                vx_lamp_at(v, c[i][0], c[i][1], c[i][2], &lamp);
-                corner[i].x = c[i][0]; corner[i].y = c[i][1]; corner[i].z = c[i][2];
-                corner[i].type = b; corner[i].face = (unsigned char)f;
-                corner[i].lit = (unsigned char)(shade * 255.0f + 0.5f);
-                corner[i].warm = (unsigned char)(lamp * 255.0f + 0.5f);
-                corner[i].ao = (unsigned char)(ao * 85);
-                corner[i].spare = 0; corner[i].pad[0] = corner[i].pad[1] = 0;
-            }
-            q[0] = corner[0]; q[1] = corner[1]; q[2] = corner[2];
-            q[3] = corner[0]; q[4] = corner[2]; q[5] = corner[3];
-            tmp_push(q);
+        } break;
+        case SH_PANE: {
+            if (o == PN_S)      vx_emit_box(q, 0, 0, 0.82f, 1, 1, 1);
+            else if (o == PN_N) vx_emit_box(q, 0, 0, 0, 1, 1, 0.18f);
+            else if (o == PN_E) vx_emit_box(q, 0.82f, 0, 0, 1, 1, 1);
+            else if (o == PN_W) vx_emit_box(q, 0, 0, 0, 0.18f, 1, 1);
+            else if (o == PN_MIDX) vx_emit_box(q, 0, 0, 0.41f, 1, 1, 0.59f);
+            else                   vx_emit_box(q, 0.41f, 0, 0, 0.59f, 1, 1);
+        } break;
+        default: vx_emit_box(q, 0,0,0, 1,1,1); break;
+    }
+}
+
+static void vx_mesh_chunk(VoxField *v, int cx, int cz) {
+    vx_tmp_n = 0;
+    int x0 = cx * VX_CHV, z0 = cz * VX_CHV;
+    int x1 = x0 + VX_CHV > v->vw ? v->vw : x0 + VX_CHV;
+    int z1 = z0 + VX_CHV > v->vd ? v->vd : z0 + VX_CHV;
+    float lo[3] = { 1e9f, 1e9f, 1e9f }, hi[3] = { -1e9f, -1e9f, -1e9f };
+    for (int z = z0; z < z1; z++) for (int x = x0; x < x1; x++) for (int y = 0; y < VX_VY; y++) {
+        unsigned char b = v->blk[y][z][x];
+        if (b == B_AIR) continue;
+        VxQuadCtx q = { v, x, y, z, b };
+        if (BLOCKS[b].water) {
+            // water draws only its surface, and only where there is nothing above it
+            if (get_blk(v, x, y + 1, z) != B_AIR) continue;
+            float c[4][3] = { {0,0.8f,0}, {1,0.8f,0}, {1,0.8f,1}, {0,0.8f,1} };
+            float n[3] = { 0, 1, 0 };
+            vx_emit_quad(&q, c, n, -1);
+        } else {
+            vx_emit_shape(&q, v->shp[y][z][x]);
+        }
+        for (int k = 0; k < 3; k++) {
+            float p = (k == 0 ? x : k == 1 ? y : z) * VOX_S;
+            if (p < lo[k]) lo[k] = p;
+            if (p + VOX_S > hi[k]) hi[k] = p + VOX_S;
         }
     }
     VxChunk *ch = &v->chunks[cz * VX_CHX + cx];
@@ -1202,6 +1891,7 @@ static void vx_mesh_chunk(VoxField *v, int cx, int cz) {
     glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(VxVert) * (size_t)vx_tmp_n, vx_tmp, GL_STATIC_DRAW);
     ch->verts = vx_tmp_n;
+    for (int k = 0; k < 3; k++) { ch->lo[k] = lo[k]; ch->hi[k] = hi[k]; }
     v->vert_total += vx_tmp_n;
     v->tris += vx_tmp_n / 3;
 }
@@ -1210,7 +1900,7 @@ static void vx_mesh_all(VoxField *v) {
     uint64_t t0 = SDL_GetTicksNS();
     v->tris = 0; v->vert_total = 0;
     for (int i = 0; i < VX_CHUNKS; i++) v->chunks[i].verts = 0;
-    for (int cz = 0; cz * VX_CH < v->md; cz++) for (int cx = 0; cx * VX_CH < v->mw; cx++) vx_mesh_chunk(v, cx, cz);
+    for (int cz = 0; cz * VX_CHV < v->vd; cz++) for (int cx = 0; cx * VX_CHV < v->vw; cx++) vx_mesh_chunk(v, cx, cz);
     v->mesh_ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
     v->built = true;
 }
@@ -1225,22 +1915,47 @@ static const char *VX_PREFIX = "#version 300 es\nprecision highp float;\nprecisi
 static const char *VX_PREFIX = "#version 330 core\n";
 #endif
 
+// Depth-only, for the sun's view of the static world. Rendered at map load and again only when the
+// sun moves; it is the whole of the cast shadow.
+static const char *VX_SHADOW_VS =
+    "layout(location=0) in vec3 a_pos;\n"
+    "uniform mat4 u_lmvp;\n"
+    "void main(){ gl_Position = u_lmvp * vec4(a_pos, 1.0); }\n";
+static const char *VX_SHADOW_FS = "void main(){}\n";
+
 static const char *VX_VS =
     "layout(location=0) in vec3 a_pos;\n"
-    "layout(location=1) in uvec4 a_meta;\n"          // type, face, ao(0..255), spare
-    "layout(location=2) in vec2 a_light;\n"          // baked sun*shadow, baked lamp
+    "layout(location=1) in vec2 a_uw;\n"             // the pattern basis, in world units
+    "layout(location=2) in uvec4 a_meta;\n"          // type, face, ao(0..255), spare
+    "layout(location=3) in vec2 a_light;\n"          // face term, baked lamp
+    "layout(location=4) in vec3 a_nrm;\n"
     "uniform mat4 u_mvp;\n"
     "uniform mat4 u_view;\n"
+    "uniform mat4 u_lmvp;\n"
+    "uniform float u_snap, u_noff;\n"
     "out vec3 v_world;\n"
     "flat out uint v_type;\n"
     "flat out uint v_face;\n"
     "out float v_ao;\n"
     "out vec2 v_light;\n"
+    "out vec2 v_uw;\n"
+    "out float v_spare;\n"
+    "out vec3 v_nrm;\n"
+    "out vec3 v_lpos;\n"
     "out float v_viewz;\n"
     "void main(){\n"
     "  v_world = a_pos;\n"
+    "  v_uw = a_uw;\n"
     "  v_type = a_meta.x; v_face = a_meta.y; v_ao = float(a_meta.z) / 255.0;\n"
+    "  v_spare = float(a_meta.w);\n"
     "  v_light = a_light;\n"
+    "  vec3 n = normalize(a_nrm);\n"
+    "  v_nrm = n;\n"
+    // Snapped: the shadow is looked up at the 1/16 texel grid, so its edge is a pixel-art staircase
+    // that belongs to the same grid the patterns are drawn on. Smooth: the true position.
+    "  vec3 sp = mix(a_pos, (floor(a_pos * 16.0) + 0.5) / 16.0, u_snap);\n"
+    "  vec4 lp = u_lmvp * vec4(sp + n * u_noff, 1.0);\n"
+    "  v_lpos = lp.xyz / lp.w * 0.5 + 0.5;\n"
     "  vec4 vp = u_view * vec4(a_pos, 1.0);\n"
     "  v_viewz = -vp.z;\n"
     "  gl_Position = u_mvp * vec4(a_pos, 1.0);\n"
@@ -1252,14 +1967,32 @@ static const char *VX_FS =
     "flat in uint v_face;\n"
     "in float v_ao;\n"
     "in vec2 v_light;\n"
+    "in vec2 v_uw;\n"
+    "in float v_spare;\n"
+    "in vec3 v_nrm;\n"
+    "in vec3 v_lpos;\n"
     "in float v_viewz;\n"
     "uniform sampler2D u_lut;\n"
     "uniform sampler2D u_cmap;\n"
+    "uniform sampler2DShadow u_shadow;\n"
     "uniform float u_amb, u_ao, u_levels, u_cmaph, u_rowa, u_rowb, u_time;\n"
     "uniform float u_fog, u_fognear, u_fogfar;\n"
+    "uniform float u_shstr, u_shsoft, u_shtexel;\n"
+    "uniform vec3 u_sundir;\n"
     "uniform vec3 u_sky;\n"
     "uniform vec4 u_player;\n"                 // screen x, y, view z, cutaway radius in px
     "out vec4 o;\n"
+    // Four rotated-poisson taps, UNROLLED (this repo has been bitten by a driver miscompiling a
+    // GLSL loop), each one hardware-PCF'd, so the edge is soft without being mush.
+    "float shadow_at(vec3 lp, float soft){\n"
+    "  if (lp.z > 1.0 || lp.x < 0.0 || lp.x > 1.0 || lp.y < 0.0 || lp.y > 1.0) return 1.0;\n"
+    "  float r = u_shtexel * soft;\n"
+    "  float s = texture(u_shadow, vec3(lp.xy + vec2( 0.94, 0.34) * r, lp.z));\n"
+    "  s += texture(u_shadow, vec3(lp.xy + vec2(-0.85, 0.52) * r, lp.z));\n"
+    "  s += texture(u_shadow, vec3(lp.xy + vec2(-0.20,-0.98) * r, lp.z));\n"
+    "  s += texture(u_shadow, vec3(lp.xy + vec2( 0.40,-0.30) * r * 0.4, lp.z));\n"
+    "  return s * 0.25;\n"
+    "}\n"
     "float h21(vec2 p){ p = fract(p * vec2(127.11, 311.7)); p += dot(p, p + 34.77); return fract(p.x * p.y); }\n"
     "float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);\n"
     "  float a = h21(i), b = h21(i+vec2(1,0)), c = h21(i+vec2(0,1)), d = h21(i+vec2(1,1));\n"
@@ -1269,10 +2002,8 @@ static const char *VX_FS =
     "  int ty = int(v_type);\n"
     "  int pat = int(texelFetch(u_lut, ivec2(12, ty), 0).r * 255.0 + 0.5);\n"
     "  bool top = (v_face == 0u || v_face == 1u);\n"
-    "  vec2 P; float vfrac;\n"
-    "  if (top) { P = v_world.xz; vfrac = 1.0; }\n"
-    "  else if (v_face == 2u || v_face == 3u) { P = vec2(v_world.x, -v_world.y); vfrac = fract(v_world.y + 0.0001); }\n"
-    "  else { P = vec2(v_world.z, -v_world.y); vfrac = fract(v_world.y + 0.0001); }\n"
+    "  vec2 P = v_uw;\n"
+    "  float vfrac = top ? 1.0 : fract(v_world.y * 2.0 + 0.0001);\n"
     "  vec2 T = floor(P * 16.0);\n"              // the block's own 16x16 pixel grid, in world space
     "  float s = 0.5; bool use_top = top; float glint = 0.0;\n"
     "  if (pat == 0) {\n"                        // mottle: earth, gravel, mud
@@ -1356,6 +2087,13 @@ static const char *VX_FS =
     "  } else {\n"
     "    s = 0.62;\n"
     "  }\n"
+    // the shallows: a lighter band of water near the bank, and a dark one under the north bank, both
+    // from a per-vertex distance-to-bank baked at mesh time
+    "  if (pat == 5) {\n"
+    "    float shal = mod(v_spare, 128.0) / 127.0;\n"
+    "    float nb = step(127.5, v_spare);\n"
+    "    s = clamp(s + shal * 0.30 - nb * 0.34, 0.0, 1.0);\n"
+    "  }\n"
     "  int step6 = int(clamp(floor(s * 5.0 + 0.5), 0.0, 5.0));\n"
     "  float idx = texelFetch(u_lut, ivec2(step6 + (use_top ? 0 : 6), ty), 0).r * 255.0;\n"
     // the cutaway: anything nearer than the party inside a circle round them is taken away, dithered
@@ -1365,7 +2103,12 @@ static const char *VX_FS =
     "  }\n"
     "  float ao = 1.0 - (1.0 - v_ao) * u_ao;\n"
     "  float lamp = v_light.y;\n"
-    "  float lv = clamp(u_amb * v_light.x * ao, 0.0, 1.0);\n"
+    // The cast shadow is a LIGHT LEVEL, not a multiply toward black: it pulls the colormap lookup
+    // down the table, so shade stays a cool palette colour (PALETTE.md / D19).
+    "  float ndl = clamp(dot(v_nrm, u_sundir), 0.0, 1.0);\n"
+    "  float sh = ndl > 0.02 ? shadow_at(v_lpos, u_shsoft) : 1.0;\n"
+    "  float shk = 1.0 - (1.0 - sh) * u_shstr * 0.55;\n"
+    "  float lv = clamp(u_amb * v_light.x * ao * shk, 0.0, 1.0);\n"
     "  float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
     "  lv = max(lv, lamp);\n"
     "  float f = (1.0 - lv) * (u_levels - 1.0);\n"
@@ -1384,18 +2127,34 @@ static const char *VX_SPR_VS =
     "layout(location=2) in vec4 a_par;\n"          // lit, warm, alpha, kind
     "uniform mat4 u_mvp;\n"
     "uniform mat4 u_view;\n"
-    "out vec2 v_uv; out vec4 v_par; out float v_viewz;\n"
+    "uniform mat4 u_lmvp;\n"
+    "out vec2 v_uv; out vec4 v_par; out float v_viewz; out vec3 v_lpos;\n"
     "void main(){ v_uv = a_uv; v_par = a_par;\n"
     "  vec4 vp = u_view * vec4(a_pos, 1.0); v_viewz = -vp.z;\n"
+    "  vec4 lp = u_lmvp * vec4(a_pos + vec3(0.0, 0.12, 0.0), 1.0);\n"
+    "  v_lpos = lp.xyz / lp.w * 0.5 + 0.5;\n"
     "  gl_Position = u_mvp * vec4(a_pos, 1.0); }\n";
 
 static const char *VX_SPR_FS =
-    "in vec2 v_uv; in vec4 v_par; in float v_viewz;\n"
+    "in vec2 v_uv; in vec4 v_par; in float v_viewz; in vec3 v_lpos;\n"
     "uniform sampler2D u_tex; uniform sampler2D u_cmap;\n"
+    "uniform sampler2DShadow u_shadow;\n"
     "uniform float u_amb, u_levels, u_cmaph, u_rowa, u_rowb, u_indexed;\n"
+    "uniform float u_shstr, u_shsoft, u_shtexel;\n"
     "uniform float u_fog, u_fognear, u_fogfar; uniform vec3 u_sky;\n"
     "out vec4 o;\n"
     "vec3 look(float idx, float row){ return texture(u_cmap, vec2((idx+0.5)/256.0, (row+0.5)/u_cmaph)).rgb; }\n"
+    // A character walking into a roof's or a tree's shadow darkens with it: the same map, sampled a
+    // little above the feet so the ground they stand on is what decides.
+    "float spr_shadow(vec3 lp){\n"
+    "  if (lp.z > 1.0 || lp.x < 0.0 || lp.x > 1.0 || lp.y < 0.0 || lp.y > 1.0) return 1.0;\n"
+    "  float r = u_shtexel * max(u_shsoft, 1.5);\n"
+    "  float s = texture(u_shadow, vec3(lp.xy + vec2( 0.94, 0.34) * r, lp.z));\n"
+    "  s += texture(u_shadow, vec3(lp.xy + vec2(-0.85, 0.52) * r, lp.z));\n"
+    "  s += texture(u_shadow, vec3(lp.xy + vec2(-0.20,-0.98) * r, lp.z));\n"
+    "  s += texture(u_shadow, vec3(lp.xy, lp.z));\n"
+    "  return s * 0.25;\n"
+    "}\n"
     "void main(){\n"
     "  int kind = int(v_par.w + 0.5);\n"
     "  if (kind == 1) {\n"                        // a blob shadow: no texture, a soft disc
@@ -1414,7 +2173,9 @@ static const char *VX_SPR_FS =
     "    float idx = t.r * 255.0;\n"
     "    if (idx < 0.5) discard;\n"
     "    float lamp = v_par.y;\n"
-    "    float lv = max(clamp(u_amb * v_par.x, 0.0, 1.0), lamp);\n"
+    "    float sh = spr_shadow(v_lpos);\n"
+    "    float shk = 1.0 - (1.0 - sh) * u_shstr * 0.55;\n"
+    "    float lv = max(clamp(u_amb * v_par.x * shk, 0.0, 1.0), lamp);\n"
     "    float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
     "    float f = (1.0 - lv) * (u_levels - 1.0);\n"
     "    float r0 = floor(f), fr = f - r0, r1 = min(r0 + 1.0, u_levels - 1.0);\n"
@@ -1477,6 +2238,35 @@ static const char *VX_POST_FS =
     "    c *= mix(1.0, clamp(1.12 - dot(q, q) * 1.9, 0.0, 1.0), u_vig); }\n"
     "  o = vec4(c, 1.0); }\n";
 
+// The sky: a vertical gradient between two palette indices through the colormap, with a slow band of
+// cloud across the top half. Drawn as one full-screen triangle before the world, which is also why
+// the fog colour and the horizon are by construction the same colour.
+static const char *VX_SKY_FS =
+    "in vec2 v_uv;\n"
+    "uniform sampler2D u_cmap;\n"
+    "uniform float u_levels, u_cmaph, u_rowa, u_amb, u_time, u_horizon, u_cloud;\n"
+    "uniform float u_iz, u_ih, u_ic;\n"                  // zenith, horizon, cloud palette indices
+    "out vec4 o;\n"
+    "float h21(vec2 p){ p = fract(p * vec2(127.11, 311.7)); p += dot(p, p + 34.77); return fract(p.x * p.y); }\n"
+    "float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);\n"
+    "  float a = h21(i), b = h21(i+vec2(1,0)), c = h21(i+vec2(0,1)), d = h21(i+vec2(1,1));\n"
+    "  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }\n"
+    "vec3 look(float idx){ float f = (1.0 - clamp(u_amb, 0.0, 1.0)) * (u_levels - 1.0);\n"
+    "  float r0 = floor(f), fr = f - r0, r1 = min(r0 + 1.0, u_levels - 1.0);\n"
+    "  vec3 a = texture(u_cmap, vec2((idx+0.5)/256.0, (u_rowa + r0 + 0.5)/u_cmaph)).rgb;\n"
+    "  vec3 b = texture(u_cmap, vec2((idx+0.5)/256.0, (u_rowa + r1 + 0.5)/u_cmaph)).rgb;\n"
+    "  return mix(a, b, fr); }\n"
+    "void main(){\n"
+    "  float t = clamp((v_uv.y - u_horizon) / max(1.0 - u_horizon, 0.001), 0.0, 1.0);\n"
+    "  vec3 c = mix(look(u_ih), look(u_iz), t * t);\n"
+    "  if (u_cloud > 0.0) {\n"
+    "    vec2 p = vec2(v_uv.x * 5.0 + u_time * 0.012, (v_uv.y - u_horizon) * 9.0);\n"
+    "    float n = vn(p) * 0.6 + vn(p * 2.3 + 7.0) * 0.4;\n"
+    "    float band = smoothstep(0.12, 0.45, t) * (1.0 - smoothstep(0.55, 1.0, t));\n"
+    "    float k = smoothstep(0.55, 0.72, n) * band * u_cloud;\n"
+    "    c = mix(c, look(u_ic), k); }\n"
+    "  o = vec4(c, 1.0); }\n";
+
 static GLuint vx_shader(GLenum type, const char *src, const char *what) {
     GLuint s = glCreateShader(type);
     const char *parts[2] = { VX_PREFIX, src };
@@ -1507,6 +2297,32 @@ static void vx_gl_init(VoxField *v) {
     v->spr_prog = vx_program(VX_SPR_VS, VX_SPR_FS, "sprite");
     v->blur_prog = vx_program(VX_QUAD_VS, VX_BLUR_FS, "blur");
     v->post_prog = vx_program(VX_QUAD_VS, VX_POST_FS, "post");
+    v->sky_prog = vx_program(VX_QUAD_VS, VX_SKY_FS, "sky");
+    v->shadow_prog = vx_program(VX_SHADOW_VS, VX_SHADOW_FS, "shadow");
+    // The shadow map of the static world: one depth texture, rendered at load and whenever the sun
+    // moves, sampled with hardware PCF.
+    v->shadow_dim = vx_max_tex >= 4096 ? 2048 : 1024;
+    glGenFramebuffers(1, &v->shadow_fbo);
+    glGenTextures(1, &v->shadow_tex);
+    glBindTexture(GL_TEXTURE_2D, v->shadow_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, v->shadow_dim, v->shadow_dim, 0,
+                 GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    glBindFramebuffer(GL_FRAMEBUFFER, v->shadow_fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, v->shadow_tex, 0);
+#if !defined(__ANDROID__)
+    glDrawBuffer(GL_NONE); glReadBuffer(GL_NONE);
+#endif
+    {
+        GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (st != GL_FRAMEBUFFER_COMPLETE) SDL_Log("voxfield: shadow FBO incomplete 0x%x", st);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glGenVertexArrays(1, &v->vao);
     glGenVertexArrays(1, &v->spr_vao);
     glGenVertexArrays(1, &v->quad_vao);
@@ -1727,8 +2543,8 @@ static void vx_scatter_detail(VoxField *v) {
     if (!v->decal_count) return;
     for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
         if (!v->walk[z][x] || v->place_at[z][x]) continue;
-        int y = v->hgt[z][x];
-        unsigned char top = get_blk(v, x, y - 1, z);
+        float y = vx_gy(v, x, z);
+        unsigned char top = get_blk(v, x * VX_VPC, v->hgt[z][x], z * VX_VPC);
         if (top != B_GRASS && top != B_GRASS_DRY) continue;
         for (int k = 0; k < 2; k++) {
             uint32_t r = vx_h32(x, z, k * 977);
@@ -1738,7 +2554,7 @@ static void vx_scatter_detail(VoxField *v) {
             if (d >= v->decal_count) d = v->decal_count - 1;
             v->det[v->det_count].x = x + 0.18f + vx_rnd(x, z, 51 + k) * 0.64f;
             v->det[v->det_count].z = z + 0.18f + vx_rnd(x, z, 71 + k) * 0.64f;
-            v->det[v->det_count].y = (short)y;
+            v->det[v->det_count].y = y;
             v->det[v->det_count].d = (unsigned char)d;
             v->det[v->det_count].size = (unsigned char)(28 + (int)(vx_rnd(x, z, 91 + k) * 22));
             v->det_count++;
@@ -1763,7 +2579,7 @@ static void vx_place_party(VoxField *v, int x, int z, int facing) {
         v->act[i].tx = v->act[i].px = (short)x;
         v->act[i].tz = v->act[i].pz = (short)z;
         v->act[i].facing = facing;
-        v->act[i].y = v->act[i].y0 = (float)v->hgt[z][x];
+        v->act[i].y = v->act[i].y0 = vx_gy(v, x, z);
     }
     v->moving = false; v->move_t = 0;
 }
@@ -1801,11 +2617,12 @@ bool vx_load_map(VoxField *v, const char *name) {
     vx_load_decals(v);
     vx_scatter_detail(v);
     vx_mesh_all(v);
+    vx_sun_defaults(v);
     for (int i = 0; i < VX_PARTY; i++) v->art_party[i] = vx_art_get(v, PARTY_ART[i]);
     for (int i = 0; i < v->npc_count; i++) {
         VxNpc *np = &v->npcs[i];
         np->art = vx_art_get(v, np->walker);
-        np->y = np->py_ = (float)v->hgt[np->tz][np->tx];
+        np->y = np->py_ = vx_gy(v, np->tx, np->tz);
     }
     vx_place_party(v, v->spawn_x, v->spawn_z, v->spawn_f);
     v->steps = 0;
@@ -1816,13 +2633,17 @@ bool vx_load_map(VoxField *v, const char *name) {
 
 // One line, the first time a map is drawn: everything a reader needs to know whether the world is
 // right, without a screenshot. Printed from the tick, once GL has actually drawn a frame.
+static void vx_render_shadow(VoxField *v);
+
 static void vx_selfcheck(VoxField *v, int dw, int dh, int draws, int sprites) {
     int chunks = 0;
     for (int i = 0; i < VX_CHUNKS; i++) if (v->chunks[i].verts) chunks++;
-    SDL_Log("SELFCHECK vox: map=%s %dx%d cells  chunks=%d  tris=%d  draws=%d  sprites=%d  "
-            "reach=%s  mesh=%.1fms  fbo=%dx%d  maxtex=%d  lamps=%d  npcs=%d  detail=%d  off-palette=%ld",
-            v->map_name, v->mw, v->md, chunks, v->tris, draws, sprites,
-            v->reach_missing ? "FAIL" : "ok", v->mesh_ms, dw, dh, vx_max_tex,
+    SDL_Log("SELFCHECK vox: map=%s %dx%d cells (%dx%d voxels)  chunks=%d/%d  tris=%d  draws=%d  sprites=%d  "
+            "shaped=%d  houses=%d  ramps=%d  reach=%s  mesh=%.1fms  shadow=%dpx/%.1fms  fbo=%dx%d  "
+            "maxtex=%d  lamps=%d  npcs=%d  detail=%d  off-palette=%ld",
+            v->map_name, v->mw, v->md, v->vw, v->vd, v->chunks_drawn, chunks, v->tris, draws, sprites,
+            v->shaped, v->houses, v->ramps,
+            v->reach_missing ? "FAIL" : "ok", v->mesh_ms, v->shadow_dim, v->shadow_ms, dw, dh, vx_max_tex,
             v->light_count, v->npc_count, v->det_count, v->off_pal);
     if (v->reach_missing) SDL_Log("SELFCHECK vox: %d cells the tile map can reach are unreachable here", v->reach_missing);
 }
@@ -1914,7 +2735,7 @@ static void npc_step(VoxField *v, float dt) {
         v->walk[np->tz][np->tx] = 1;
         np->px = np->tx; np->pz = np->tz; np->py_ = np->y;
         np->tx = (short)nx; np->tz = (short)nz;
-        np->y = (float)v->hgt[nz][nx];
+        np->y = vx_gy(v, nx, nz);
         np->t = 0; np->parity ^= 1;
         v->walk[nz][nx] = 0;
     }
@@ -2028,11 +2849,11 @@ static void vx_walk(VoxField *v, int w, float dt, VxEvent *ev) {
     for (int i = 0; i < VX_PARTY; i++) { ox[i] = v->act[i].tx; oz[i] = v->act[i].tz; oy[i] = v->act[i].y; }
     v->act[0].px = ox[0]; v->act[0].pz = oz[0]; v->act[0].y0 = oy[0];
     v->act[0].tx = (short)nx; v->act[0].tz = (short)nz;
-    v->act[0].y = (float)v->hgt[nz][nx];
+    v->act[0].y = vx_gy(v, nx, nz);
     for (int i = 1; i < VX_PARTY; i++) {
         v->act[i].px = ox[i]; v->act[i].pz = oz[i]; v->act[i].y0 = oy[i];
         v->act[i].tx = ox[i - 1]; v->act[i].tz = oz[i - 1];
-        v->act[i].y = (float)v->hgt[v->act[i].tz][v->act[i].tx];
+        v->act[i].y = vx_gy(v, v->act[i].tx, v->act[i].tz);
         if (v->act[i].tx != v->act[i].px || v->act[i].tz != v->act[i].pz) {
             int ddx = v->act[i].tx - v->act[i].px, ddz = v->act[i].tz - v->act[i].pz;
             v->act[i].facing = ddx < 0 ? 1 : ddx > 0 ? 2 : ddz < 0 ? 3 : 0;
@@ -2054,6 +2875,25 @@ static int walk_col(const VxArt *a, int parity, float k, bool moving) {
 
 static void spr_push(VoxField *v, const VxSpr *s) {
     if (v->spr_count < VX_SPRITES) v->spr[v->spr_count++] = *s;
+}
+
+// Where a walker's feet are, mid-step. On level ground or a one-voxel step it is a straight lerp; a
+// two-voxel step keeps the little hop it always had; a RAMP is read straight off the slope's own
+// plane at the fractional position, which is what makes climbing one smooth.
+static float vx_actor_y(VoxField *v, const VxActor *a, float x, float z, float k) {
+    bool on_ramp = (v->ramp[a->pz][a->px] || v->ramp[a->tz][a->tx]);
+    if (on_ramp) {
+        int cx = (int)floorf(x), cz = (int)floorf(z);
+        if (cx < 0) cx = 0; if (cz < 0) cz = 0;
+        if (cx >= v->mw) cx = v->mw - 1;
+        if (cz >= v->md) cz = v->md - 1;
+        return vx_surface_v(v, cx, cz, x - cx, z - cz) * VOX_S;
+    }
+    float y = vx_lerp(a->y0, a->y, k);
+    float d = a->y - a->y0;
+    if (d < 0) d = -d;
+    if (d > VOX_S * 1.5f) y += sinf(k * 3.14159f) * 0.18f;        // the hop over a two-voxel lip
+    return y;
 }
 
 static void vx_light_at_foot(VoxField *v, float x, float y, float z, float *lit, float *warm) {
@@ -2096,8 +2936,7 @@ static void vx_collect_sprites(VoxField *v) {
         VxActor *a = &v->act[i];
         float x = vx_lerp(a->px + 0.5f, a->tx + 0.5f, k);
         float z = vx_lerp(a->pz + 0.5f, a->tz + 0.5f, k);
-        float y = vx_lerp(a->y0, a->y, k);
-        if (a->y != a->y0) y += sinf(k * 3.14159f) * 0.18f;          // the little hop on a step
+        float y = vx_actor_y(v, a, x, z, k);
         int art = v->art_party[i];
         int col = art >= 0 ? walk_col(&v->art[art], v->step_parity ^ (i & 1), k, v->moving) : 0;
         push_walker(v, art, x, y, z, a->facing, col);
@@ -2127,7 +2966,7 @@ static void vx_collect_sprites(VoxField *v) {
             int hx = p->x < v->mw ? p->x : v->mw - 1, hz = p->z < v->md ? p->z : v->md - 1;
             VxSpr s;
             memset(&s, 0, sizeof(s));
-            s.x = fx; s.z = fz; s.y = (float)v->hgt[hz][hx];
+            s.x = fx; s.z = fz; s.y = vx_gy(v, hx, hz);
             s.w = (float)d->w; s.h = (float)d->h * 0.95f;
             s.u0 = px0 / aw; s.v0 = py0 / ah; s.u1 = (px0 + pw) / aw; s.v1 = (py0 + ph) / ah;
             s.tex = v->atlas; s.kind = 0; s.alpha = 1; s.tilt = 1;
@@ -2262,9 +3101,107 @@ static void vx_set_common(VoxField *v, GLuint prog, float sky[3]) {
     glUniform3f(glGetUniformLocation(prog, "u_sky"), sky[0], sky[1], sky[2]);
 }
 
+// ───────────────────────── the sun, and its shadow map ─────────────────────────
+// The world is static, so its shadow is too: one depth render at map load, and again only when the
+// sun moves. The result is a 0..1 factor that feeds the LIGHT LEVEL, not a multiply toward black, so
+// shade stays a palette colour (PALETTE.md / D19).
+
+static void vx_sun_defaults(VoxField *v) {
+    const char *t = (v->light_table >= 0 && v->light_table < v->cmap_tables) ? v->cmap_tname[v->light_table] : "day";
+    if (!strcmp(t, "dusk"))       { v->sun_az = 296; v->sun_el = 16; v->sh_str = 0.95f; v->sh_soft = 3.0f; }
+    else if (!strcmp(t, "night")) { v->sun_az = 70;  v->sun_el = 58; v->sh_str = 0.28f; v->sh_soft = 3.4f; }
+    else                          { v->sun_az = 312; v->sun_el = 38; v->sh_str = 1.0f;  v->sh_soft = 1.6f; }
+    v->shadow_dirty = true;
+}
+
+static void vx_sun_matrix(VoxField *v) {
+    float az = v->sun_az * 3.14159265f / 180.0f, el = v->sun_el * 3.14159265f / 180.0f;
+    v->sundir[0] = cosf(el) * sinf(az);
+    v->sundir[1] = sinf(el);
+    v->sundir[2] = cosf(el) * cosf(az);
+    float cx = v->mw * 0.5f, cz = v->md * 0.5f, cy = 3.0f;
+    float R = 0.5f * sqrtf((float)(v->mw * v->mw + v->md * v->md)) + 16.0f;
+    float eye[3] = { cx + v->sundir[0] * R * 2.0f, cy + v->sundir[1] * R * 2.0f, cz + v->sundir[2] * R * 2.0f };
+    float ctr[3] = { cx, cy, cz };
+    float view[16], proj[16];
+    mat_look(view, eye, ctr);
+    mat_ortho(proj, R, R, 0.5f, R * 4.5f);
+    mat_mul(proj, view, v->lmvp);
+}
+
+static void vx_render_shadow(VoxField *v) {
+    if (!v->gl_ready || !v->built) return;
+    uint64_t t0 = SDL_GetTicksNS();
+    vx_sun_matrix(v);
+    glBindFramebuffer(GL_FRAMEBUFFER, v->shadow_fbo);
+    glViewport(0, 0, v->shadow_dim, v->shadow_dim);
+    glClearDepthf(1.0f);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    // Front faces culled and a slope-scaled offset: between them the small voxels get neither acne
+    // nor a shadow that has come unstuck from its object.
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.4f, 4.0f);
+    glUseProgram(v->shadow_prog);
+    glUniformMatrix4fv(glGetUniformLocation(v->shadow_prog, "u_lmvp"), 1, GL_FALSE, v->lmvp);
+    glBindVertexArray(v->vao);
+    for (int i = 0; i < VX_CHUNKS; i++) {
+        VxChunk *ch = &v->chunks[i];
+        if (!ch->verts) continue;
+        glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)0);
+        glDisableVertexAttribArray(1); glDisableVertexAttribArray(2);
+        glDisableVertexAttribArray(3); glDisableVertexAttribArray(4);
+        glDrawArrays(GL_TRIANGLES, 0, ch->verts);
+    }
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glCullFace(GL_BACK);
+    glBindVertexArray(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    v->shadow_dirty = false;
+    v->shadow_ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
+}
+
+static void vx_set_shadow_uniforms(VoxField *v, GLuint prog, int unit) {
+    glUniform1i(glGetUniformLocation(prog, "u_shadow"), unit);
+    glUniformMatrix4fv(glGetUniformLocation(prog, "u_lmvp"), 1, GL_FALSE, v->lmvp);
+    glUniform1f(glGetUniformLocation(prog, "u_shstr"), v->sh_str);
+    glUniform1f(glGetUniformLocation(prog, "u_shsoft"), v->sh_soft);
+    glUniform1f(glGetUniformLocation(prog, "u_shtexel"), 1.0f / (float)v->shadow_dim);
+    glUniform3f(glGetUniformLocation(prog, "u_sundir"), v->sundir[0], v->sundir[1], v->sundir[2]);
+    glActiveTexture((GLenum)(GL_TEXTURE0 + unit));
+    glBindTexture(GL_TEXTURE_2D, v->shadow_tex);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+// Six frustum planes out of the view-projection, for the chunk AABB test.
+static void vx_frustum(const float *m, float pl[6][4]) {
+    for (int i = 0; i < 3; i++) for (int s = 0; s < 2; s++) {
+        int k = i * 2 + s;
+        for (int c = 0; c < 4; c++) pl[k][c] = m[c * 4 + 3] + (s ? -m[c * 4 + i] : m[c * 4 + i]);
+        float l = sqrtf(pl[k][0]*pl[k][0] + pl[k][1]*pl[k][1] + pl[k][2]*pl[k][2]);
+        if (l > 1e-6f) for (int c = 0; c < 4; c++) pl[k][c] /= l;
+    }
+}
+static bool vx_box_visible(const float pl[6][4], const float *lo, const float *hi) {
+    for (int k = 0; k < 6; k++) {
+        float x = pl[k][0] > 0 ? hi[0] : lo[0];
+        float y = pl[k][1] > 0 ? hi[1] : lo[1];
+        float z = pl[k][2] > 0 ? hi[2] : lo[2];
+        if (pl[k][0]*x + pl[k][1]*y + pl[k][2]*z + pl[k][3] < 0) return false;
+    }
+    return true;
+}
+
 static void vx_render(VoxField *v, int w, int h) {
     float proj[16];
     vx_camera(v, w, h, proj);
+    if (v->shadow_dirty) vx_render_shadow(v);
     // The sky and the fog take their colour from the palette, through the same colormap as everything
     // else, so a night sky is the night table's idea of that blue and not a number typed in here.
     float sky[3];
@@ -2275,6 +3212,33 @@ static void vx_render(VoxField *v, int w, int h) {
     glClearColor(sky[0], sky[1], sky[2], 1.0f);
     glClearDepthf(1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // the sky: a gradient from the horizon colour (which the fog also uses) up to a deeper zenith,
+    // with a slow cloud band, drawn before anything and with no depth
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glBindVertexArray(v->quad_vao);
+    glUseProgram(v->sky_prog);
+    glUniform1i(glGetUniformLocation(v->sky_prog, "u_cmap"), 1);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_levels"), (float)v->cmap_levels);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_cmaph"), (float)v->cmap_h);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_rowa"), (float)v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0]);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_amb"), v->amb * 0.9f + 0.1f);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_time"), v->anim_t);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_horizon"), 0.30f);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_cloud"), 0.75f);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_iz"), 143.0f);
+    glUniform1f(glGetUniformLocation(v->sky_prog, "u_ih"), 141.0f);
+    // the cloud colour is the top of the plaster ramp, looked up by NAME — never a number typed here
+    {
+        int r = vx_ramp_by_name(v, "neutral warm (plaster, cloth)");
+        float ci = 141.0f;
+        if (r >= 0 && v->ramp_len[r] > 0) ci = (float)v->ramp_idx[r][v->ramp_len[r] - 1];
+        glUniform1f(glGetUniformLocation(v->sky_prog, "u_ic"), ci);
+    }
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->cmap);
+    glActiveTexture(GL_TEXTURE0);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -2292,20 +3256,30 @@ static void vx_render(VoxField *v, int w, int h) {
     glUniform1f(glGetUniformLocation(v->prog, "u_time"), v->anim_t);
     glUniform4f(glGetUniformLocation(v->prog, "u_player"), v->player_screen[0], v->player_screen[1],
                 v->player_screen[2], v->cutaway ? (float)h * 0.16f : 0.0f);
+    glUniform1f(glGetUniformLocation(v->prog, "u_snap"), v->sh_snap ? 1.0f : 0.0f);
+    glUniform1f(glGetUniformLocation(v->prog, "u_noff"), 0.055f);
     vx_set_common(v, v->prog, sky);
+    vx_set_shadow_uniforms(v, v->prog, 2);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, v->lut);
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->cmap);
     glActiveTexture(GL_TEXTURE0);
 
+    float planes[6][4];
+    vx_frustum(v->mvp, planes);
     glBindVertexArray(v->vao);
     int draws = 0;
+    v->chunks_drawn = 0;
     for (int i = 0; i < VX_CHUNKS; i++) {
         VxChunk *ch = &v->chunks[i];
         if (!ch->verts) continue;
+        if (!vx_box_visible(planes, ch->lo, ch->hi)) continue;
+        v->chunks_drawn++;
         glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
         glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)0);
-        glEnableVertexAttribArray(1); glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, sizeof(VxVert), (void *)12);
-        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VxVert), (void *)16);
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)12);
+        glEnableVertexAttribArray(2); glVertexAttribIPointer(2, 4, GL_UNSIGNED_BYTE, sizeof(VxVert), (void *)20);
+        glEnableVertexAttribArray(3); glVertexAttribPointer(3, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VxVert), (void *)24);
+        glEnableVertexAttribArray(4); glVertexAttribPointer(4, 3, GL_BYTE, GL_TRUE, sizeof(VxVert), (void *)28);
         glDrawArrays(GL_TRIANGLES, 0, ch->verts);
         draws++;
     }
@@ -2322,6 +3296,7 @@ static void vx_render(VoxField *v, int w, int h) {
     glUniform1i(glGetUniformLocation(v->spr_prog, "u_cmap"), 1);
     glUniform1f(glGetUniformLocation(v->spr_prog, "u_indexed"), v->pal_ok ? 1.0f : 0.0f);
     vx_set_common(v, v->spr_prog, sky);
+    vx_set_shadow_uniforms(v, v->spr_prog, 2);
     // one batch per texture, in the order they were pushed
     GLuint done[32];
     int done_n = 0;
@@ -2635,7 +3610,7 @@ void vx_capture_to(VoxField *v, const char *map, int w, int h, const char *out_p
         int bx = v->act[i - 1].tx - DX[v->act[0].facing & 3], bz = v->act[i - 1].tz - DZ[v->act[0].facing & 3];
         if (!vx_can_stand(v, bx, bz)) break;
         v->act[i].tx = v->act[i].px = (short)bx; v->act[i].tz = v->act[i].pz = (short)bz;
-        v->act[i].y = v->act[i].y0 = (float)v->hgt[bz][bx];
+        v->act[i].y = v->act[i].y0 = vx_gy(v, bx, bz);
     }
     snprintf(v->cap_out, sizeof(v->cap_out), "%s", out_path);
     v->cap_req = 3;
@@ -2718,10 +3693,28 @@ bool vx_dev_ui(VoxField *v, char *out, int cap) {
         if (cur) ImGui::PopStyleColor();
     }
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
-    ImGui::SliderFloat("ambient", &v->amb, 0.0f, 1.0f, "%.2f");
+    if (ImGui::SliderFloat("ambient", &v->amb, 0.0f, 1.0f, "%.2f")) {}
+    // The sun and its shadow map. Every one of these re-renders the map's depth pass, which costs a
+    // couple of milliseconds once — nothing per frame.
+    ImGui::Separator();
+    ImGui::TextUnformatted("Sun / shadow");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+    if (ImGui::SliderFloat("azimuth", &v->sun_az, 0.0f, 360.0f, "%.0f")) v->shadow_dirty = true;
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+    if (ImGui::SliderFloat("elevation", &v->sun_el, 8.0f, 85.0f, "%.0f")) v->shadow_dirty = true;
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+    ImGui::SliderFloat("shadow", &v->sh_str, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10);
+    ImGui::SliderFloat("softness", &v->sh_soft, 0.3f, 8.0f, "%.1f");
+    ImGui::SameLine();
+    { bool sn = v->sh_snap != 0; if (ImGui::Checkbox("Snapped", &sn)) v->sh_snap = sn; }
+    ImGui::SameLine();
+    if (ImGui::Button("Sun default")) vx_sun_defaults(v);
     if (ImGui::Button("Print cell")) {
         int x = v->act[0].tx, z = v->act[0].tz;
-        unsigned char top = get_blk(v, x, v->hgt[z][x] - 1, z);
+        unsigned char top = get_blk(v, x * VX_VPC, v->hgt[z][x], z * VX_VPC);
         snprintf(out, cap, "%s: %d,%d height %d, top block %s, %s — %d tris, mesh %.1f ms, reach %s",
                  v->map_name, x, z, v->hgt[z][x], BLOCKS[top].name, v->walk[z][x] ? "walkable" : "blocked",
                  v->tris, v->mesh_ms, v->reach_missing ? "FAIL" : "ok");
@@ -2756,6 +3749,24 @@ void vx_destroy(VoxField *v) {
     free(v);
 }
 
+// Load every map once, mesh it, and say so. Non-zero means something a capture would have hidden:
+// a map that will not build, or a route the tile map has and the voxel world does not.
+int vx_selftest(VoxField *v) {
+    if (!v->gl_ready) vx_gl_init(v);
+    int bad = 0;
+    for (int i = 0; i < vx_map_count(); i++) {
+        const char *m = vx_map_name_at(i);
+        if (!vx_load_map(v, m)) { SDL_Log("SELFCHECK vox: map=%s FAILED TO LOAD", m); bad++; continue; }
+        vx_render_shadow(v);
+        vx_selfcheck(v, v->fbo_w, v->fbo_h, 0, 0);
+        v->selfchecked = true;
+        if (v->reach_missing) bad++;
+        if (!v->houses && v->place_count) SDL_Log("SELFCHECK vox: map=%s has no buildings", m);
+    }
+    SDL_Log("SELFCHECK vox: selftest %s (%d map%s bad)", bad ? "FAIL" : "ok", bad, bad == 1 ? "" : "s");
+    return bad;
+}
+
 void vx_save(VoxField *v, VxSave *s) {
     memset(s, 0, sizeof(*s));
     snprintf(s->map, sizeof(s->map), "%s", v->map_name);
@@ -2767,6 +3778,8 @@ void vx_save(VoxField *v, VxSave *s) {
     s->ao = v->ao_str; s->detail = v->detail; s->amb = v->amb; s->light_table = v->light_table;
     s->fog = v->fog; s->dof = v->dof; s->bloom = v->bloom; s->vignette = v->vignette; s->grade = v->grade;
     s->motes = v->motes; s->res_scale_pct = v->res_pct;
+    s->sun_az = v->sun_az; s->sun_el = v->sun_el;
+    s->sh_str = v->sh_str; s->sh_soft = v->sh_soft; s->sh_snap = v->sh_snap;
 }
 
 void vx_restore(VoxField *v, const VxSave *s) {
@@ -2794,6 +3807,15 @@ void vx_restore(VoxField *v, const VxSave *s) {
     v->dbg_coord = s->dbg_coord ? 1 : 0; v->noclip = s->noclip ? 1 : 0;
     if (s->light_table >= 0 && s->light_table < 8) v->light_table = s->light_table;
     if (s->amb >= 0.0f && s->amb <= 1.0f) v->amb = s->amb;
+    // the sun and its shadow, validated: an azimuth or elevation out of range falls back to the
+    // light table's own default rather than leaving the map lit from underneath
+    if (s->sun_el > 3.0f && s->sun_el < 89.0f && s->sh_str >= 0.0f && s->sh_str <= 1.0f) {
+        v->sun_az = s->sun_az; v->sun_el = s->sun_el; v->sh_str = s->sh_str;
+        v->sh_soft = (s->sh_soft > 0.0f && s->sh_soft < 12.0f) ? s->sh_soft : 1.6f;
+        v->sh_snap = s->sh_snap ? 1 : 0;
+    }
+    v->shadow_dirty = true;
+    v->map_poll = 1.0f;
     int lx = s->tx[0], lz = s->ty[0];
     if (lx < 0 || lz < 0 || lx >= v->mw || lz >= v->md) { SDL_Log("voxfield: restored cell %d,%d is off %s", lx, lz, map); return; }
     vx_place_party(v, lx, lz, s->facing[0] & 3);
@@ -2802,7 +3824,7 @@ void vx_restore(VoxField *v, const VxSave *s) {
         if (!vx_can_stand(v, x, z)) continue;
         v->act[i].tx = v->act[i].px = (short)x;
         v->act[i].tz = v->act[i].pz = (short)z;
-        v->act[i].y = v->act[i].y0 = (float)v->hgt[z][x];
+        v->act[i].y = v->act[i].y0 = vx_gy(v, x, z);
         v->act[i].facing = s->facing[i] & 3;
     }
 }

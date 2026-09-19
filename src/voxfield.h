@@ -37,6 +37,8 @@ struct VxSave {
     int32_t light_table;
     float fog, dof, bloom, vignette, grade;
     int32_t motes, res_scale_pct;
+    float sun_az, sun_el, sh_str, sh_soft;
+    int32_t sh_snap;
 };
 
 VoxField *vx_create();
@@ -50,6 +52,12 @@ void vx_message(VoxField *v, const char *text);
 // Desktop capture (capture.sh --vox): renders one frame at `w`x`h` into a PNG, no phone involved.
 void vx_capture_to(VoxField *v, const char *map, int w, int h, const char *out_path);
 bool vx_capture_done(VoxField *v);
+
+// The desktop self-test (capture.sh --vox-selftest): loads every map once and fails loudly.
+int vx_selftest(VoxField *v);
+
+// The desktop self-test (capture.sh --vox-selftest): loads every map once and fails loudly.
+int vx_selftest(VoxField *v);
 
 void vx_save(VoxField *v, VxSave *s);
 void vx_restore(VoxField *v, const VxSave *s);

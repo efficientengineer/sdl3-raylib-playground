@@ -41,6 +41,18 @@ fi
 #   ./capture.sh --vox halm --light night:0.35    -> the same colormap the phone uses
 #   ./capture.sh --vox halm --hd2d 0              -> the post pass off, for a side-by-side
 #   ./capture.sh --vox halm --pitch 40 --fov 32 --viewh 9 --face N --size 1920x1080 --name spawn
+# The self-test: every map loaded once, meshed and checked. Non-zero exit means a real failure.
+if [ "$1" = "--vox-selftest" ]; then
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    OUT=$(VOX_SELFTEST=1 "$ROOT/build_desktop/quest_glory" 2>&1 | grep "SELFCHECK vox")
+    echo "$OUT"
+    echo "$OUT" | grep -q "selftest ok" || { echo "ERROR: voxel field self-test FAILED" >&2; exit 1; }
+    exit 0
+fi
+
 if [ "$1" = "--vox" ]; then
     MAP=${2:-halm}
     shift 2 || true

@@ -15,19 +15,78 @@ files, the same `tiles.md` entry list, the same walker sheets, the same atlas, t
 
 ## The shape of it
 
-- **One block is one walk cell.** `blk[y][z][x]`, `uint8`, up to 96 x 96 cells and 24 blocks high.
-  X is east, **Z is south** (the `.tmap` row index), Y is up.
-- **Chunked 16x16 columns, meshed once at load** into one static VBO each — halm is 9 chunks,
-  ~7 850 triangles, 2.6 ms to mesh. Hidden faces are culled; there is no greedy meshing (it buys
-  little at this size and is a class of bug this round did not need).
+**A voxel is HALF a walk cell** (the owner, 2026-09-19: *"4 blocks should be able to fit into the
+smallest block size now… more detail, feel different than Minecraft"*). A WALK CELL is unchanged and
+is still one world unit: the maps, the triggers, the characters, the camera framing and the 16-texel
+pattern grid are all in walk cells, and 16 texels to the cell means 8 to the voxel. Everything
+structural is authored in voxels, 2x2x2 to the cell.
+
+- `blk[y][z][x]` and `shp[y][z][x]`, `uint8`, up to **192 x 192 voxels and 48 up** (96 x 96 cells,
+  24 cells high). X is east, **Z is south** (the `.tmap` row index), Y is up.
+- **Chunked 32x32 voxel columns** (the same 16-cell footprint as before), meshed once at load into
+  one static VBO each — halm is 9 chunks, **73 810 triangles, 29 ms to mesh**. That is 9x the
+  triangles of the whole-cell build for 8x the voxels; hidden-face culling is what keeps it from
+  being worse. **Greedy meshing was considered and not done**: 74 k triangles costs 2.4 ms a frame
+  at 1080p, the mesh happens once at load, and a greedy pass would have to reason about shapes and
+  per-vertex light as well as type. Revisit it if a 96x96 map lands.
+- **Frustum culling** is on: six planes out of the view-projection against each chunk's own AABB
+  (computed at mesh time). halm draws 6-9 of its 9 chunks depending on where you stand.
 - **Winding is derived, never typed.** Each quad's first two edges are crossed and the result checked
   against the face's own normal; if it disagrees the quad is flipped. The first build had every top
   face wound the wrong way and the ground vanished under back-face culling — this is why that can no
   longer happen for any face.
-- **Light is baked, per the project rule.** Each vertex carries the face's sun term times a marched
-  column shadow (`vx_sun_shadow`, twelve steps along a fixed sun), the classic 0-3 neighbour AO, and
-  the lamp level at that corner. The **ambient level and the AO strength stay live** because they are
-  applied in the shader to numbers that were baked; nothing is re-traced per frame.
+- **Light: baked contact, mapped shadow.** Each vertex carries the face term (from its REAL normal,
+  so a slope is lit between the two faces it lies between), the classic 0-3 neighbour AO, and the lamp
+  level at that corner. The **cast shadow is a shadow map**, not a marched column — see below.
+
+## Shaped blocks
+
+A parallel `shp` grid gives every voxel a shape and an orientation, `shape * 8 + orient`, so an
+untouched grid is all cubes. `SH_CUBE, SH_SLOPE (4), SH_SLOPE_OUT (4), SH_SLOPE_IN (4), SH_SLAB
+(bottom/top), SH_STAIRS (4), SH_POST, SH_PANE (6)`. At half scale the small ones still earn their
+place — a slab is a quarter of a walk cell and makes eaves, sills, thresholds and ridges; a post is a
+fence upright that grows rails toward any solid neighbour; a pane is glass, a shutter and a railing.
+
+- The mesher is a **quad emitter**, not a six-face switch. `vx_emit_box` does the boxy shapes;
+  `vx_emit_prism` does the ramp family from its four corner heights (two top triangles with their own
+  normals, a trapezoid a side, a bottom).
+- **Culling is by coverage, never by "is it solid".** A face may be culled only against a neighbour
+  whose shape FILLS the shared boundary (`shape_covers`). When in doubt it says no and the face is
+  drawn — that is why a shaped neighbour can never punch a hole in the world.
+- **Winding is still derived**, per quad, against the quad's own normal.
+- **AO is generalised**: the three neighbours at the corner, sampled in the plane just outside the
+  surface along the real normal. Only a full opaque CUBE occludes, so the corner under an eave does
+  not go black.
+- **Patterns follow the surface.** Each vertex carries its own `(u,w)` in world units, computed at
+  mesh time. The six axis faces keep exactly the mapping they had, so nothing that already looked
+  right moved; a sloped face gets a basis whose `u` runs along the horizontal edge and whose `w` is
+  ARC LENGTH up the pitch, so a roof course is the same width on the slope as on the flat.
+
+## The shadow map
+
+The owner, this round: the marched column shadow was per-block, fully on or fully off. It is gone.
+
+- **The world is static, so its shadow is too**: one depth-only render of the same chunk VBOs from the
+  sun's orthographic view, fitted to the map, at map load and again only when the sun moves. 2048x2048
+  where `GL_MAX_TEXTURE_SIZE` allows it, 1024 otherwise. **2.3-3.1 ms, once.**
+- Sampled as a `sampler2DShadow` with hardware PCF, **four rotated-poisson taps, unrolled** — this
+  repo has been bitten by a driver miscompiling a GLSL loop and the habit stays.
+- Front faces culled plus a slope-scaled polygon offset plus a normal offset in the vertex shader: no
+  acne and no peter-panning on voxels this small.
+- The result feeds the **LIGHT LEVEL** the colormap is looked up at, not a multiply toward black, so
+  shade is a cool palette colour and not a dark smear (PALETTE.md / D19).
+- A face turned away from the sun (`dot(n, sun) <= 0.02`) skips the lookup: the baked face term
+  already has it, and the test there is unreliable.
+- **Snapped** (Dev toggle) samples at the world position quantised to the 1/16 texel grid, so the
+  shadow edge is a staircase on the same grid the patterns are drawn on. **Default is off (smooth)**:
+  in captures the soft edge read better against the AO, and snapping fought the PCF. Both are one
+  checkbox apart.
+- **Sprites sample the same map** a little above their feet, so a character walking under a roof or a
+  tree darkens with it. They do NOT cast into it — a dynamic pass for four walkers was not worth a
+  second depth render on the phone. The blob shadow stays. Say so rather than pretending otherwise.
+- Per light table: **day** azimuth 312, elevation 38 (from the south-west, so shadows fall up and to
+  the right and the camera sees them); **dusk** 296 / 16, long and low; **night** a faint moon at 0.28
+  strength. `vx_sun_defaults` sets them at load and the Dev panel overrides.
 
 ## Blocks are palette colours plus arithmetic — no textures at all
 
@@ -47,28 +106,81 @@ roof courses, water, thatch, crop rows, leaves, bark, dressed stone, plaster.
 
 ## What the .tmap becomes
 
-- **Ground terrain id → the column's top block**; below it dirt then stone.
-- **Water cuts one block down.** The bed is `waterbed`, the water block sits at `land - 1` and its top
-  face is emitted **0.8 of a block high**, so the bank shows real depth and the neighbouring land's
-  side faces are drawn. Water draws only its top face, animated at 6 fps with hash glints the bloom
-  catches.
-- **Building stamps are extruded**: walls three high in plaster/timber/plank/stone chosen by the stamp
-  id, a **stepped gable** whose ridge runs along the longer side, a door block two high on the south
-  face at the x of the map's own door or message trigger, and window blocks either side of it. A door
-  is 2 blocks; the party is 1.6.
-- **Tree stamps** are a trunk of two or three and a squat ragged crown.
+- **Ground terrain id → the column's top voxel**; below it dirt then stone. The top voxel's MATERIAL
+  is chosen per voxel and may be borrowed from a neighbouring cell on a hash, so grass, dirt and
+  paving meet on a **ragged line instead of a cell edge**. Height stays per cell, so walking is
+  unaffected. This is what item 7's "soften the square boundaries" turned into, and it needed no
+  shader work at all.
+- **Water is a channel with a bed.** Three voxels down to the bed, the surface 1.2 voxels below the
+  land, wet stone for the banks, and **wet-stone shoulders pushed out into the water on a hash** for an
+  irregular shoreline. A **lighter shallows band** near the bank and a **dark band under the north
+  (camera-facing) bank** come from a distance-to-bank baked into the vertex's spare byte.
+- **Buildings come from the rule-based generator** below.
+- **Tree stamps** are one of three seeded silhouettes.
 - **Fences, walls and hedges** are one block high; posts two.
 - **Everything else stays a billboard** of its own atlas cells, standing on the map. That is the safe
   default — the well, the handcart, the market stall, barrels, crates, the trough. Nobody has to model
   anything for a map to work.
 - **Triggers, spawn, NPCs and `lamp:` meta carry over unchanged**, as does `light: <table> <level>`.
 
+## The house generator (no wave function collapse)
+
+A short list of rules in a fixed order, seeded per building, all of it in voxels — which is the whole
+point of the half-size grid, because at the old scale a sill or a door recess was a whole walk cell.
+
+1. a **stone foundation course** under the whole footprint;
+2. **walls** six voxels (seven on a big plan, eight on a grand one), with **timber framing** for the
+   plaster and plank styles: corner posts, a post every three voxels, a mid rail and a top plate;
+3. a **jettied upper storey** on a wide plan, seeded — built BEFORE the roof, because a roof laid on
+   the original footprint over jettied walls leaves an open tray;
+4. the **roof**, gable along the long axis or **hipped** when the plan is nearly square;
+5. **gable end walls** filled to the roofline;
+6. a **door**: a one-voxel recess with the leaf set back, a timber lintel, a threshold slab inside;
+7. **windows on a rhythm**: a recessed pane, a timber surround, a slate sill that oversails — and the
+   pane is baked `warm = 0.9`, so at dusk and night it is lit from inside and the bloom catches it;
+8. a **chimney** on a seeded spot, sized to clear its own pitch;
+9. a **porch** on a grand building, hung on **brackets** — a porch that reached the ground would close
+   the lane to its own door;
+10. an **L-wing**, only where the tile map already says those cells are solid.
+
+`guild_hall`, `barn` and anything 4x4 cells or bigger come out **grand**: taller walls, two rows of
+windows, a porch.
+
+**The roof is a HEIGHT MAP, not a shell.** For every column the surface level is decided first —
+distance to the nearer eave for a gable, the lesser of the two distances for a hip, the two tying at a
+corner giving `SH_SLOPE_OUT` — then the column is filled solid up to it and only the top voxel gets
+the slope. This is the one thing to not undo: a hollow shell of 45-degree slopes read as a HOLE at a
+42-degree camera, and three separate attempts at the course-by-course version all had it.
+
+**Everything a house grows must clear head height.** `vx_can_stand` wants three voxels (1.5 cells)
+wholly clear and will allow only a **top slab** in the fourth; a sill, an eave or a rail may oversail
+a lane, a post or a step may not. Breaking that rule is what made the first build fail its own reach
+check, and it is the rule to check first when it fails again.
+
+## Trees
+
+Three seeded silhouettes — a **round broadleaf**, a **stepped conifer**, a **small orchard tree** —
+with a 2x2-voxel (one cell) trunk. At half scale the crowns are genuinely round rather than blobby.
+A `vx_round_shell` pass turns every shell voxel with air above and air on exactly one side into a
+slope leaning that way, and a two-sided one into an outer corner; it is also what softens a hedge.
+A crown may oversail a walking cell but **never below four voxels**, the same number `vx_can_stand`
+enforces, and the cutaway takes it away when the party walks under it.
+
+## Ramps
+
+A slope or stairs cell is walkable from its low and high ends only, and the walker's height while
+crossing is the slope's own plane at the fractional position — **no hop** (`vx_surface_v`,
+`vx_actor_y`). The flood fill knows the rule. In terrain generation, a walkable cell that steps **two
+voxels** up to exactly one neighbour and is level with the one opposite becomes a 45-degree ramp
+instead of a lip: halm has 2, west_road 13. One voxel of rise is a free smooth step; two is the hop
+one old block used to be.
+
 ### Terrain height, and the flood fill that keeps it honest
 
-Grass, dry grass and crop get a deterministic two-octave height of 0..2 extra blocks. Everything else
-is **forced flat**: paths, paving, water, every stamp footprint, every trigger rectangle, and one cell
-of margin round all of it. Then eight passes clamp every neighbour to within one block, so a step is
-never more than one. Finally **two flood fills from spawn** — one under the `.tmap`'s own rules, one
+Grass, dry grass and crop get a deterministic two-octave height in **half steps, 0..4 voxels**.
+Everything else is **forced flat**: paths, paving, water, every stamp footprint, every trigger
+rectangle, and one cell of margin round all of it. Then ten passes clamp every neighbour to within two
+voxels. Finally **two flood fills from spawn** — one under the `.tmap`'s own rules, one
 under the voxel rules — are compared, and any cell the tile map can reach but the voxel world cannot
 is flattened and the check rerun, up to six rounds. The result is in the `SELFCHECK vox:` line as
 `reach=ok` or `reach=FAIL`. On halm it passes first time.
@@ -82,8 +194,12 @@ orientation, which is what the walker sheets were drawn for. (Standing north of 
 south mirrors the world; that was the first build's other bug.) Ortho is a Dev toggle and a real
 alternative; pitch, FOV and view height are sliders.
 
-A **far fog** toward the sky colour (itself a palette index through the colormap) makes the map edge
-fade instead of ending.
+A **far fog** toward the horizon colour makes the far map edge fade instead of ending.
+
+The **sky** is a full-screen gradient drawn before the world: a horizon colour up to a deeper zenith,
+both palette indices through the colormap, with a slow procedural cloud band in the top half tinted
+the lightest step of the plaster ramp (looked up by NAME — no colour is typed in). The fog colour and
+the horizon are the same colour by construction.
 
 ## Sprites
 
@@ -125,11 +241,18 @@ Measured on the Mac at 1920x1080 with `glFinish` around the world and post draws
 
 | | ms/frame |
 |---|---|
-| world only (`VOX_HD2D=0`) | **1.96** |
-| world + HD-2D | **2.90** |
+| world only (`VOX_HD2D=0`) | **2.42** |
+| world + HD-2D | **3.48** |
 
-So the post pass costs about **0.94 ms** at 1080p. halm: 9 chunks, 7 850 triangles, 25 draw calls,
-329 sprites, 304 detail billboards, 2.6 ms to mesh, 0 px off-palette.
+The post pass costs about **1.06 ms** at 1080p. Against the whole-cell build (1.96 / 2.90) the half-size
+voxels plus the shadow map cost about **0.46 ms** of world time for 9x the triangles — the extra
+shadow fetch set is four taps a fragment and the geometry is vertex-bound, not fill-bound. **On the
+phone that split will not hold**: four `sampler2DShadow` taps at 1080p on a mobile GPU is the thing to
+measure first, and the `res %` slider is the lever.
+
+halm: 9 chunks, **73 810 triangles**, 25 draw calls, 330 sprites, 305 detail billboards, **2 207 shaped
+voxels, 12 buildings, 2 ramps**, 29 ms to mesh, 2.3 ms to shadow, 0 px off-palette.
+hart_yard: 15 748 tris, 290 shaped, 2 buildings. west_road: 19 992 tris, 349 shaped, 13 ramps.
 
 **The phone has not been measured.** The device at 192.168.1.217:5555 was offline for this round, so
 no `fast_reload.sh` run and no device `SELFCHECK`/frame line. The budget lever is there: the Dev
@@ -139,7 +262,8 @@ with the NDK and `-DIMGUI_IMPL_OPENGL_ES3` to prove the GLES 3 path builds.
 
 ## Dev panel
 
-Map buttons and Respawn; Coords, No clip, Cut away; Ortho, pitch, FOV, view blocks, sprite tilt, AO,
+Sun / shadow: azimuth and elevation (each re-renders the shadow map), strength, softness, a
+**Snapped** toggle and **Sun default**. Then: map buttons and Respawn; Coords, No clip, Cut away; Ortho, pitch, FOV, view blocks, sprite tilt, AO,
 detail density, fog; HD-2D with tilt-shift, bloom, vignette, grade and res %; the colormap table
 buttons and the ambient slider; **Print cell** (height, top block, walkable, tris, mesh ms, reach).
 Above them, **Old 3D field** and **Old tile field**.
@@ -147,6 +271,7 @@ Above them, **Old 3D field** and **Old tile field**.
 ## Tooling
 
 ```
+./capture.sh --vox-selftest                               every map loaded, meshed and checked
 ./capture.sh --vox halm                                   build_desktop/vox_halm.png, 1920x1080
 ./capture.sh --vox halm --at 21,21 --name spawn           stand the party on a cell
 ./capture.sh --vox halm --ortho 1 / --hd2d 0              the toggles, for a side by side
@@ -168,18 +293,31 @@ a cell that is off the map or no longer standable is dropped rather than strandi
 wall. The look knobs are applied **before** `vx_load_map`, the light table and ambient after, so what
 the owner was tuning wins over the map's own `light:` line.
 
+## The self-test
+
+`./capture.sh --vox-selftest` loads halm, hart_yard and west_road in turn, builds and meshes each,
+renders its shadow map and prints a `SELFCHECK vox:` line with the shaped-voxel count, the number of
+buildings generated and `reach=ok|FAIL`, then a verdict line. The script greps that line and exits
+non-zero. All three pass.
+
 ## Known issues, in the order they matter
 
-1. **Not on the phone.** No device numbers, no device SELFCHECK. First job next round.
-2. **Trees read as a trunk under a green mass.** The crown is a ragged ellipsoid of leaf blocks and at
-   this camera height it is chunky. A two-block canopy with an overhang, or a billboard crown, would
-   read better.
-3. **Windows are flat blue rectangles.** They want a frame block or a shutter pattern.
-4. **Ground boundaries are square.** A voxel world has no dual grid; grass meets paving on a cell edge.
-   That is the honest cost of the pivot and may be exactly what the owner wants.
-5. **Particles (motes, fireflies) are not implemented.** `motes` rides the save blob and the Dev panel
-   has no control yet.
-6. **Sprite shadows are blobs**, not squashed copies of the sprite.
-7. **No frustum culling**: every chunk is drawn. At 9 chunks that is free; a 96x96 map is 36.
-8. **`map.flag` is polled in two places** (star_logic's title poll and `vx_tick`), so a flagged map can
-   load two or three times at startup. Harmless, wasteful, worth tidying.
+1. **Still not on the phone.** 192.168.1.217:5555 timed out again this round, so there are no device
+   numbers and no device SELFCHECK. Both `voxfield.cpp` and `star_logic.cpp` were compiled for
+   `aarch64-linux-android24` with the NDK and `-DIMGUI_IMPL_OPENGL_ES3` to prove the GLES 3 path
+   builds, which is all that could be proved. **Measure the shadow taps first** when it is reachable.
+2. **The map edge is a visible diorama cliff** where the world stops against the sky. The fog only
+   fades by view distance, so an edge eight cells from the party is sharp. A one-cell skirt of ground
+   dropped to the bottom of the world, or a ground plane under the whole map, would fix it.
+3. **Sprite decoration on structures is not done** (brief item 4). Lamps still get their additive glow
+   billboard and props still come from the atlas, but there are no wall-aligned signs, shutters, ivy
+   or flower boxes. The window frames, sills and recesses are real geometry instead, which is where
+   the budget went.
+4. **Sprites do not cast into the shadow map**, only receive from it. Blob shadows stay.
+5. **Chimney smoke is not animated** — the stack is there, the billboard puff is not.
+6. **Doors read as a dark recess** rather than a leaf, because the leaf is one voxel behind the wall
+   plane and in shade. It is charming at dusk and flat at noon.
+7. **Particles (motes, fireflies) are not implemented.** `motes` rides the save blob unused.
+8. **`map.flag` is now polled in one place only** — `vx_tick`, before the default load, with the first
+   tick polling immediately — so a flagged map loads once. star_logic's title poll only opens the
+   field; it does not consume the flag. (Fixed this round.)

@@ -898,6 +898,8 @@ static void *game_create(float dpi_scale) {
     if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_tiles = 1; }
     spec = SDL_getenv("VOX_CAPTURE");                  // <map>:<w>:<h>:<out.png>, one voxel-field frame
     if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 1; st->cap_tiles = 0; }
+    spec = SDL_getenv("VOX_SELFTEST");                 // load every map once and fail loudly
+    if (spec && spec[0] == '1') st->cap_vox = 2;
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
@@ -931,7 +933,7 @@ struct ReloadBlob {
     int32_t has_tf, old_field; TfSave tf;
     int32_t has_vx, tile_field; VxSave vx;
 };
-#define RELOAD_MAGIC 0x41525453u   // 'STRA' — bumped as the voxel field joined the blob
+#define RELOAD_MAGIC 0x42525453u   // 'STRB' — bumped for the half-size voxels and the sun knobs
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
@@ -1033,7 +1035,12 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             st->cap_state = 2;
         }
     }
-    if (st->cap_spec[0] && st->cap_vox && st->cap_state < 2) {
+    if (st->cap_vox == 2 && st->cap_state < 2) {
+        if (!st->vx) st->vx = vx_create();
+        st->screen = SCR_FIELD;
+        vx_selftest(st->vx);   // capture.sh --vox-selftest greps the SELFCHECK lines for the verdict
+        st->cap_state = 2;
+    } else if (st->cap_spec[0] && st->cap_vox && st->cap_state < 2) {
         if (!st->vx) st->vx = vx_create();
         st->screen = SCR_FIELD;
         st->fade = 0.0f;
