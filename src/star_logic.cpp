@@ -26,6 +26,7 @@
 #include "cutscene_data.h"
 #include "field.h"
 #include "tilefield.h"
+#include "voxfield.h"
 #include "dialogue.h"
 
 #define PREF_ORG "com.playground"
@@ -359,8 +360,10 @@ struct Star {
     bool to_field;                // this scene was started from the field, so it returns there when it ends
     bool from_field;              // set for the one fade that carries us from the field into that scene
     Field *field;                 // the parked 2.5D/painted world, still reachable from the Dev panel
-    TileField *tf;                // the tile field (TILES.md): what SCR_FIELD is by default
+    TileField *tf;                // the tile field (TILES.md): parked, one Dev button away
+    VoxField *vx;                 // the voxel + sprite field (VOXFIELD_NOTES.md): what SCR_FIELD is
     bool old_field;               // Dev: "Old 3D field" sends SCR_FIELD back to field.cpp
+    bool tile_field;              // Dev: "Old tile field" sends SCR_FIELD back to tilefield.cpp
     bool panel_on[MAX_PANELS];
     float panel_t[MAX_PANELS];
     int panel_z[MAX_PANELS], z_next;
@@ -376,6 +379,7 @@ struct Star {
     float title_t;
     char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
     int cap_tiles;                // 1 = TILE_CAPTURE=<map>:<scale>:<out.png> instead: the tile field
+    int cap_vox;                  // 1 = VOX_CAPTURE=<map>:<w>:<h>:<out.png>: the voxel field
     int cap_state;                // 0 idle, 1 asked, 2 done -> quit
     char dlg_spec[160];           // DIALOG_CAPTURE=<scene>:<line>[:page][:n|:x], the box on the Mac
     int dlg_frames;
@@ -755,7 +759,8 @@ static int scene_by_id(const char *id) {
 
 static void enter_field(Star *st) {
     if (st->old_field) { if (!st->field) st->field = field_create(); }
-    else if (!st->tf) st->tf = tf_create();
+    else if (st->tile_field) { if (!st->tf) st->tf = tf_create(); }
+    else if (!st->vx) st->vx = vx_create();
     star_free_textures(st);                       // the page art goes; the field has its own
     st->screen = SCR_FIELD;
     st->to_field = false;
@@ -771,6 +776,7 @@ static void field_scene(Star *st, const char *id, TileField *tf) {
     char msg[160];
     snprintf(msg, sizeof(msg), "(scene \"%s\" is not in the playlist yet)", id);
     if (tf) tf_message(tf, msg);
+    else if (st->vx && !st->old_field && !st->tile_field) vx_message(st->vx, msg);
     else if (st->field) field_message(st->field, msg);
 }
 
@@ -785,11 +791,19 @@ static void draw_field(Star *st, int w, int h, float dt) {
         if (field_take_warning(st->field, warn, sizeof(warn))) dev_send(warn);
         return;
     }
-    if (!st->tf) st->tf = tf_create();
-    TfEvent ev;
-    tf_tick(st->tf, w, h, dt, dev.open, &ev);
-    if (ev.kind == TFE_SCENE) field_scene(st, ev.arg, st->tf);
-    else if (ev.kind == TFE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
+    if (st->tile_field) {                                 // the parked tile field, on a Dev button
+        if (!st->tf) st->tf = tf_create();
+        TfEvent ev;
+        tf_tick(st->tf, w, h, dt, dev.open, &ev);
+        if (ev.kind == TFE_SCENE) field_scene(st, ev.arg, st->tf);
+        else if (ev.kind == TFE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
+        return;
+    }
+    if (!st->vx) st->vx = vx_create();
+    VxEvent ev;
+    vx_tick(st->vx, w, h, dt, dev.open, &ev);
+    if (ev.kind == VXE_SCENE) field_scene(st, ev.arg, nullptr);
+    else if (ev.kind == VXE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
 }
 
 // Small dev overlay: a corner button opening the phone <-> dev message log plus scene test controls.
@@ -843,7 +857,12 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGui::Separator();
     if (st->screen == SCR_FIELD) {
         char line[224];
-        if (!st->old_field && st->tf) { if (tf_dev_ui(st->tf, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
+        bool ofld = st->old_field, tfld = st->tile_field;
+        if (ImGui::Checkbox("Old 3D field", &ofld)) { st->old_field = ofld; if (ofld) st->tile_field = false; }
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Old tile field", &tfld)) { st->tile_field = tfld; if (tfld) st->old_field = false; }
+        if (!st->old_field && !st->tile_field && st->vx) { if (vx_dev_ui(st->vx, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
+        else if (!st->old_field && st->tile_field && st->tf) { if (tf_dev_ui(st->tf, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
         else if (st->old_field && st->field) { if (field_dev_ui(st->field, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
     }
     float input_h = ImGui::GetFrameHeightWithSpacing() + 4 * k;
@@ -877,6 +896,8 @@ static void *game_create(float dpi_scale) {
     if (spec) snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec);
     spec = SDL_getenv("TILE_CAPTURE");                 // <map>:<scale>:<out.png>, the whole map in one PNG
     if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_tiles = 1; }
+    spec = SDL_getenv("VOX_CAPTURE");                  // <map>:<w>:<h>:<out.png>, one voxel-field frame
+    if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 1; st->cap_tiles = 0; }
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
@@ -894,6 +915,7 @@ static void game_destroy(void *state) {
     star_free_textures(st);
     if (st->field) { field_destroy(st->field); st->field = nullptr; }
     if (st->tf) { tf_destroy(st->tf); st->tf = nullptr; }
+    if (st->vx) { vx_destroy(st->vx); st->vx = nullptr; }
     if (au_stream) { SDL_DestroyAudioStream(au_stream); au_stream = nullptr; }
     free(st);
 }
@@ -907,8 +929,9 @@ static int game_wants_quit(void *state) { return ((Star *)state)->cap_state == 2
 struct ReloadBlob {
     uint32_t magic; int32_t screen, scene, line, line_page, to_field, has_field; FieldSave field;
     int32_t has_tf, old_field; TfSave tf;
+    int32_t has_vx, tile_field; VxSave vx;
 };
-#define RELOAD_MAGIC 0x39525453u   // 'STR9' — bumped as the dialogue page index joined the blob
+#define RELOAD_MAGIC 0x41525453u   // 'STRA' — bumped as the voxel field joined the blob
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
@@ -919,7 +942,9 @@ static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     b.to_field = st->to_field ? 1 : 0;
     if (st->field) { b.has_field = 1; field_save(st->field, &b.field); }
     if (st->tf) { b.has_tf = 1; tf_save(st->tf, &b.tf); }
+    if (st->vx) { b.has_vx = 1; vx_save(st->vx, &b.vx); }
     b.old_field = st->old_field ? 1 : 0;
+    b.tile_field = st->tile_field ? 1 : 0;
     if (buf && buf_size >= sizeof(b)) memcpy(buf, &b, sizeof(b));
     return sizeof(b);
 }
@@ -932,8 +957,13 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     if (b.magic != RELOAD_MAGIC) return;               // blob from the old game or an older layout: title
     st->fade = 0.0f;
     st->old_field = b.old_field != 0;
+    st->tile_field = b.tile_field != 0;
     bool want_field = (b.screen == SCR_FIELD) || b.to_field;
-    if (b.has_tf && want_field) {                      // tf_restore validates every field it reads
+    if (b.has_vx && want_field && !st->old_field && !st->tile_field) {
+        if (!st->vx) st->vx = vx_create();
+        vx_restore(st->vx, &b.vx);                     // map and position survive the reload
+    }
+    if (b.has_tf && want_field && st->tile_field) {                      // tf_restore validates every field it reads
         if (!st->tf) st->tf = tf_create();
         tf_restore(st->tf, &b.tf);
     }
@@ -1003,7 +1033,19 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             st->cap_state = 2;
         }
     }
-    if (st->cap_spec[0] && st->cap_tiles && st->cap_state < 2) {
+    if (st->cap_spec[0] && st->cap_vox && st->cap_state < 2) {
+        if (!st->vx) st->vx = vx_create();
+        st->screen = SCR_FIELD;
+        st->fade = 0.0f;
+        st->fade_to_scene = -1;
+        if (st->cap_state == 0) {
+            char m[64] = "halm", out[256] = "capture.png";
+            int cw = 1920, chh = 1080;
+            sscanf(st->cap_spec, "%63[^:]:%d:%d:%255s", m, &cw, &chh, out);
+            vx_capture_to(st->vx, m, cw, chh, out);
+            st->cap_state = 1;
+        } else if (vx_capture_done(st->vx)) st->cap_state = 2;
+    } else if (st->cap_spec[0] && st->cap_tiles && st->cap_state < 2) {
         if (!st->tf) st->tf = tf_create();
         st->screen = SCR_FIELD;
         st->fade = 0.0f;

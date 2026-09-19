@@ -1,0 +1,2808 @@
+// voxfield.cpp — the voxel + sprite field. src/VOXFIELD_NOTES.md says what this actually does.
+// Part 1: platform glue, the master palette, the colormap, and the block table.
+#include <SDL3/SDL.h>
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#if defined(__ANDROID__)
+#include <GLES3/gl3.h>
+#else
+#include <OpenGL/gl3.h>
+#endif
+#include "imgui.h"
+#include "stb_image.h"          // implementations live in star_logic.cpp
+#include "stb_image_write.h"
+#include "voxfield.h"
+#include "dialogue.h"
+#include "field_text.h"
+
+#define PREF_ORG "com.playground"
+#define PREF_APP "questglory"
+
+#define VX_MAXW  96              // map cells east
+#define VX_MAXD  96              // map cells south
+#define VX_MAXY  24              // blocks up
+#define VX_CH    16              // chunk footprint, in cells
+#define VX_CHX   (VX_MAXW / VX_CH)
+#define VX_CHZ   (VX_MAXD / VX_CH)
+#define VX_CHUNKS (VX_CHX * VX_CHZ)
+#define VX_TRIGS 128
+#define VX_NPCS  48
+#define VX_ART   16
+#define VX_LIGHTS 16
+#define VX_DEFS  192             // tiles.md entries
+#define VX_PLACE 768             // stamps placed on a map
+#define VX_SPRITES 4096          // billboards in one frame
+#define VX_LEVELS 32
+
+#define WALK_STEP 0.16f
+#define RUN_STEP  0.10f
+#define TURN_HOLD 0.07f
+#define FADE_FRAMES 8
+#define VX_TYPE_CPS 42.0f
+
+static const int DX[4] = { 0, -1, 1, 0 }, DZ[4] = { 1, 0, 0, -1 };
+static const char *FACE_NAME[4] = { "S", "W", "E", "N" };
+static int facing_of(const char *s) { return s[0] == 'W' ? 1 : s[0] == 'E' ? 2 : s[0] == 'N' ? 3 : 0; }
+
+static const char *VX_MAPS[] = { "halm", "hart_yard", "west_road" };
+int vx_map_count() { return (int)(sizeof(VX_MAPS) / sizeof(VX_MAPS[0])); }
+const char *vx_map_name_at(int i) { return (i >= 0 && i < vx_map_count()) ? VX_MAPS[i] : "halm"; }
+
+static const char *vx_pref() {
+    static char path[512];
+    static bool got = false;
+    if (!got) { const char *p = SDL_GetPrefPath(PREF_ORG, PREF_APP); snprintf(path, sizeof(path), "%s", p ? p : ""); got = true; }
+    return path;
+}
+// Phone pref path first (fast_reload.sh pushes there), then the APK assets, then the repo on desktop.
+static void *vx_read(const char *rel, size_t *size) {
+    char path[768];
+    snprintf(path, sizeof(path), "%s%s", vx_pref(), rel);
+    void *d = SDL_LoadFile(path, size);
+    if (!d) d = SDL_LoadFile(rel, size);
+    if (!d) { snprintf(path, sizeof(path), "story/%s", rel); d = SDL_LoadFile(path, size); }
+    return d;
+}
+
+static char *vx_trim(char *s) {
+    while (*s == ' ' || *s == '\t') s++;
+    char *e = s + strlen(s);
+    while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\r')) *--e = 0;
+    return s;
+}
+
+static uint32_t vx_h32(int a, int b, int c) {         // FNV-1a over three ints, the tool's hash
+    uint32_t h = 2166136261u;
+    int vals[3] = { a, b, c };
+    for (int i = 0; i < 3; i++) {
+        uint32_t x = (uint32_t)vals[i];
+        h = (h ^ (x & 255)) * 16777619u; h = (h ^ ((x >> 8) & 255)) * 16777619u;
+        h = (h ^ ((x >> 16) & 255)) * 16777619u; h = (h ^ ((x >> 24) & 255)) * 16777619u;
+    }
+    return h;
+}
+static float vx_rnd(int a, int b, int c) { return (float)(vx_h32(a, b, c) & 0xFFFF) / 65535.0f; }
+static float vx_lerp(float a, float b, float k) { return a + (b - a) * k; }
+
+// ───────────────────────── Oklab, exactly the tool's transform ─────────────────────────
+
+static float srgb_lin(float c) { return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f); }
+static float lin_srgb(float c) {
+    c = c < 0 ? 0 : c > 1 ? 1 : c;
+    return c <= 0.0031308f ? c * 12.92f : 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+}
+static void rgb_to_oklab(float r, float g, float b, float *L, float *A, float *B) {
+    float lr = srgb_lin(r), lg = srgb_lin(g), lb = srgb_lin(b);
+    float l = cbrtf(0.4122214708f * lr + 0.5363325363f * lg + 0.0514459929f * lb);
+    float m = cbrtf(0.2119034982f * lr + 0.6806995451f * lg + 0.1073969566f * lb);
+    float s = cbrtf(0.0883024619f * lr + 0.2817188376f * lg + 0.6299787005f * lb);
+    *L = 0.2104542553f * l + 0.7936177850f * m - 0.0040720468f * s;
+    *A = 1.9779984951f * l - 2.4285922050f * m + 0.4505937099f * s;
+    *B = 0.0259040371f * l + 0.7827717662f * m - 0.8086757660f * s;
+}
+
+// ───────────────────────── blocks ─────────────────────────
+// A block type is two palette ramps (top and side), six steps of each, and a pattern the fragment
+// shader draws with. No textures anywhere in the world: PALETTE.md's 256 colours are the whole
+// material library, and the detail is arithmetic on a world position quantised to 1/16 of a block.
+
+enum {
+    B_AIR = 0, B_GRASS, B_GRASS_DRY, B_DIRT, B_MUD, B_GRAVEL, B_PAVING, B_STONE,
+    B_PLASTER, B_TIMBER, B_PLANK, B_ROOF, B_THATCH, B_WATER, B_WATERBED, B_CROP,
+    B_LEAVES, B_TRUNK, B_DOOR, B_WINDOW, B_HEDGE, B_COUNT
+};
+// patterns
+enum { P_MOTTLE = 0, P_GRASS, P_COBBLE, P_PLANK, P_ROOFTILE, P_WATER, P_THATCH, P_CROP,
+       P_LEAVES, P_BARK, P_FLAT, P_STONEWALL, P_PLASTER };
+
+struct VxBlockDef {
+    const char *name;
+    const char *top_ramp; float top_lo, top_hi;
+    const char *side_ramp; float side_lo, side_hi;
+    int pattern;
+    bool solid;            // blocks walking and sight
+    bool water;
+};
+
+// lo/hi are fractions along the ramp, dark -> light. Six steps are laid between them.
+static const VxBlockDef BLOCKS[B_COUNT] = {
+    { "air",       "",                              0,0,    "",                              0,0,    P_FLAT,      false, false },
+    { "grass",     "foliage green (warm)",       0.30f,0.72f, "earth / dirt",              0.28f,0.58f, P_GRASS,     true,  false },
+    { "grass_dry", "olive / dry grass",          0.28f,0.80f, "earth / dirt",              0.30f,0.60f, P_GRASS,     true,  false },
+    { "dirt",      "earth / dirt",               0.42f,0.74f, "earth / dirt",              0.26f,0.56f, P_MOTTLE,    true,  false },
+    { "mud",       "earth / dirt",               0.16f,0.44f, "earth / dirt",              0.12f,0.38f, P_MOTTLE,    true,  false },
+    { "gravel",    "neutral cool (stone, steel)",0.36f,0.72f, "neutral cool (stone, steel)",0.28f,0.56f, P_MOTTLE,    true,  false },
+    { "paving",    "neutral cool (stone, steel)",0.40f,0.78f, "neutral cool (stone, steel)",0.30f,0.60f, P_COBBLE,    true,  false },
+    { "stone",     "neutral cool (stone, steel)",0.34f,0.70f, "neutral cool (stone, steel)",0.26f,0.66f, P_STONEWALL, true,  false },
+    { "plaster",   "neutral warm (plaster, cloth)",0.52f,0.92f,"neutral warm (plaster, cloth)",0.44f,0.88f,P_PLASTER,  true,  false },
+    { "timber",    "wood",                       0.24f,0.54f, "wood",                      0.20f,0.50f, P_BARK,      true,  false },
+    { "plank",     "wood",                       0.40f,0.76f, "wood",                      0.34f,0.66f, P_PLANK,     true,  false },
+    { "roof",      "roof red / brick",           0.34f,0.76f, "roof red / brick",          0.26f,0.62f, P_ROOFTILE,  true,  false },
+    { "thatch",    "olive / dry grass",          0.40f,0.86f, "olive / dry grass",         0.30f,0.70f, P_THATCH,    true,  false },
+    { "water",     "teal / shallow water",       0.30f,0.95f, "water blue / metal",        0.20f,0.60f, P_WATER,     false, true  },
+    { "waterbed",  "earth / dirt",               0.14f,0.40f, "earth / dirt",              0.12f,0.34f, P_MOTTLE,    true,  false },
+    { "crop",      "olive / dry grass",          0.24f,0.70f, "earth / dirt",              0.26f,0.52f, P_CROP,      true,  false },
+    { "leaves",    "foliage green (warm)",       0.22f,0.72f, "foliage green (warm)",      0.16f,0.62f, P_LEAVES,    true,  false },
+    { "trunk",     "wood",                       0.20f,0.48f, "wood",                      0.16f,0.46f, P_BARK,      true,  false },
+    { "door",      "wood",                       0.14f,0.38f, "wood",                      0.12f,0.34f, P_PLANK,     true,  false },
+    { "window",    "water blue / metal",         0.08f,0.55f, "water blue / metal",        0.08f,0.55f, P_FLAT,      true,  false },
+    { "hedge",     "foliage green (cool)",       0.20f,0.62f, "foliage green (cool)",      0.16f,0.56f, P_LEAVES,    true,  false },
+};
+
+static bool blk_solid(unsigned char b) { return b != B_AIR && BLOCKS[b].solid; }
+static bool blk_opaque(unsigned char b) { return b != B_AIR && b != B_WATER; }   // water's neighbours still draw
+
+// ───────────────────────── data ─────────────────────────
+
+enum { TG_MESSAGE = 0, TG_EXIT, TG_DOOR, TG_ZONE, TG_TRAP, TG_SCENE };
+
+struct VxTrig { short x, z, w, d; int kind; char arg[96], map[32]; short ax, az, af; bool inside; };
+struct VxNpc {
+    short hx, hz, tx, tz, px, pz;
+    float t, wait, y, py_;
+    int facing, wander, art, parity;
+    char walker[24], text[48];
+};
+struct VxArt {                                  // a walker sheet, indexed on the master palette
+    char id[24];
+    GLuint tex;
+    int w, h, fw, fh, nrows, ncols;
+    int row_of[4]; bool flip[4];
+    int col_stand, col_a, col_b;
+};
+struct VxActor { short tx, tz, px, pz; int facing; float y, y0; };
+struct VxLight { float x, z, y, r, level; int flicker; };
+
+// One tiles.md entry, only what the voxel builder needs: how big a stamp is and what it is.
+struct VxDef { char name[24]; short index, w, h; unsigned char solid[8]; unsigned char kind; };
+enum { DK_TILE = 0, DK_TERRAIN, DK_DECAL };
+struct VxPlace { short def, x, z; };
+
+// A billboard, in world units. `tex` is an indexed R8 texture; `lit`/`warm` are its light at the foot.
+struct VxSpr {
+    float x, y, z, w, h;               // foot centre and size in blocks
+    float u0, v0, u1, v1;
+    GLuint tex;
+    float lit, warm, tilt, alpha;
+    int kind;                          // 0 sprite, 1 blob shadow, 2 additive glow
+};
+
+struct VxVert {                        // 20 bytes: pos, (type,face), (lit,warm,ao,spare)
+    float x, y, z;
+    unsigned char type, face, ao, spare;   // attr 1: integer, 4-byte aligned
+    unsigned char lit, warm, pad[2];       // attr 2: normalised, 4-byte aligned
+};
+
+struct VxChunk { GLuint vbo; int verts, cap; };
+
+struct VoxField {
+    // map
+    char map_name[32], set[24], music[24];
+    int mw, md;                                  // cells
+    unsigned char blk[VX_MAXY][VX_MAXD][VX_MAXW];
+    unsigned char hgt[VX_MAXD][VX_MAXW];         // walkable top: the y you stand ON (feet at hgt+1)
+    unsigned char walk[VX_MAXD][VX_MAXW];        // 1 = a body may stand here
+    unsigned char tsolid[VX_MAXD][VX_MAXW];      // the tile map's own solidity, for the check
+    short ground[VX_MAXD][VX_MAXW];              // tiles.md def of the ground terrain
+    VxDef defs[VX_DEFS]; int def_count;
+    VxPlace places[VX_PLACE]; int place_count;
+    short place_at[VX_MAXD][VX_MAXW];
+    VxTrig trigs[VX_TRIGS]; int trig_count;
+    VxNpc npcs[VX_NPCS]; int npc_count;
+    VxLight lights[VX_LIGHTS]; int light_count;
+    int spawn_x, spawn_z, spawn_f;
+
+    // palette
+    unsigned char pal[256][3];
+    float pal_lab[256][3];
+    bool pal_ok;
+    char ramp_name[24][40];
+    unsigned char ramp_idx[24][80];
+    int ramp_len[24], ramp_count;
+    GLuint cmap, lut;
+    int cmap_levels, cmap_tables, cmap_h;
+    char cmap_tname[8][16];
+    int cmap_row0[8], cmap_lamp_row0;
+    unsigned char *cmap_px;
+    int light_table;
+    float amb;
+    long off_pal;
+
+    // world geometry
+    VxChunk chunks[VX_CHUNKS];
+    int tris, vert_total;
+    double mesh_ms;
+    bool built;
+
+    // party
+    VxActor act[VX_PARTY];
+    int party, steps, art_party[VX_PARTY];
+    bool moving; float move_t, step_len;
+    int want_dir, last_axis, hold_t_dir; float hold_t;
+    int step_parity;
+    bool run;
+
+    // art
+    VxArt art[VX_ART]; int art_count;
+    GLuint atlas; int atlas_w, atlas_h, atlas_cell;
+    GLuint decal_tex[24]; int decal_w[24], decal_h[24]; char decal_id[24][24]; int decal_count;
+    // scattered detail billboards, built once per map
+    struct { float x, z; short y; unsigned char d, size; } det[3072];
+    int det_count;
+
+    // gl
+    bool gl_ready;
+    GLuint prog, vao, spr_prog, spr_vao, spr_vbo, post_prog, blur_prog, quad_vao, quad_vbo;
+    GLuint fbo, fbo_tex, fbo_depth; int fbo_w, fbo_h;
+    GLuint half_fbo[3], half_tex[3]; int half_w, half_h;
+    GLuint out_fbo, out_tex;
+    GLuint cap_fbo, cap_tex, cap_depth; int cap_w, cap_h;
+    VxSpr *spr; int spr_count;
+
+    // camera / look
+    int ortho, hd2d, cutaway;
+    float pitch, fov, view_h, tilt, ao_str, detail;
+    float fog, dof, bloom, vignette, grade;
+    int motes, res_pct;
+    float cam_eye[3], cam_tgt[3], mvp[16], view[16];
+    float player_screen[3];
+
+    // ui / flow
+    char msg[512], msg_who[64];
+    float msg_t; int msg_page; bool msg_typing, msg_more, tapped;
+    int exam_trig, exam_npc;
+    char to_map[32]; int to_x, to_z, to_f, fade, fade_dir;
+    float anim_t, map_poll;
+    int dbg_solid, dbg_trig, dbg_coord, noclip;
+    bool stick_on, act_on; SDL_FingerID stick_id, act_id;
+    float stick_x, stick_y, stick_ox, stick_oy, act_t;
+
+    // capture / selfcheck
+    char cap_out[320]; int cap_req, cap_wi, cap_hi; bool cap_ok;
+    bool selfchecked;
+    double frame_ms_sum; int frame_n;
+    int reach_missing;
+};
+
+static int vx_max_tex = 0;
+static void vx_probe_limits() {
+    if (!vx_max_tex) { GLint m = 0; glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m); vx_max_tex = m > 0 ? m : 2048; }
+}
+
+// ───────────────────────── palette + ramps + colormap ─────────────────────────
+
+static bool vx_load_palette(VoxField *v) {
+    size_t sz = 0;
+    char *text = (char *)vx_read("palette/master.hex", &sz);
+    if (!text) { SDL_Log("voxfield: no story/palette/master.hex — falling back to built-in colours"); return false; }
+    int n = 0;
+    for (char *c = text; *c && n < 256; c++) {
+        if (*c != '#') continue;
+        unsigned x = 0;
+        if (sscanf(c + 1, "%6x", &x) != 1) continue;
+        v->pal[n][0] = (unsigned char)(x >> 16); v->pal[n][1] = (unsigned char)((x >> 8) & 255);
+        v->pal[n][2] = (unsigned char)(x & 255);
+        n++; c += 6;
+    }
+    SDL_free(text);
+    if (n < 16) { SDL_Log("voxfield: master.hex has %d colours — ignoring", n); return false; }
+    for (int i = n; i < 256; i++) { v->pal[i][0] = v->pal[i][1] = v->pal[i][2] = 0; }
+    for (int i = 0; i < 256; i++)
+        rgb_to_oklab(v->pal[i][0] / 255.0f, v->pal[i][1] / 255.0f, v->pal[i][2] / 255.0f,
+                     &v->pal_lab[i][0], &v->pal_lab[i][1], &v->pal_lab[i][2]);
+    v->pal_ok = true;
+    SDL_Log("voxfield: palette master.hex — %d colours", n);
+    return true;
+}
+
+// master.json's ramps, by name. A block's colours are steps along one of these; nothing in this file
+// ever writes a hex value (PALETTE.md).
+static void vx_load_ramps(VoxField *v) {
+    size_t sz = 0;
+    char *js = (char *)vx_read("palette/master.json", &sz);
+    if (!js) { SDL_Log("voxfield: no master.json — block colours will be flat greys"); return; }
+    for (const char *c = strstr(js, "\"ramps\""); c; ) {
+        c = strstr(c, "\"name\"");
+        if (!c || v->ramp_count >= 24) break;
+        const char *q = strchr(c + 6, '"'); const char *e = q ? strchr(q + 1, '"') : nullptr;
+        if (!q || !e) break;
+        int len = (int)(e - q - 1); if (len > 39) len = 39;
+        memcpy(v->ramp_name[v->ramp_count], q + 1, (size_t)len);
+        v->ramp_name[v->ramp_count][len] = 0;
+        const char *ix = strstr(e, "\"indices\"");
+        if (!ix) break;
+        const char *b = strchr(ix, '[');
+        int k = 0;
+        for (const char *p = b; p && *p && *p != ']' && k < 80; p++) {
+            if ((*p >= '0' && *p <= '9') && (p == b || !(p[-1] >= '0' && p[-1] <= '9'))) {
+                int val = atoi(p);
+                if (val >= 0 && val < 256) v->ramp_idx[v->ramp_count][k++] = (unsigned char)val;
+            }
+        }
+        v->ramp_len[v->ramp_count] = k;
+        if (k) v->ramp_count++;
+        c = strchr(ix, ']');
+        if (!c) break;
+    }
+    SDL_free(js);
+    SDL_Log("voxfield: %d palette ramps", v->ramp_count);
+}
+
+static int vx_ramp_by_name(VoxField *v, const char *want) {
+    if (!want || !want[0]) return -1;
+    for (int i = 0; i < v->ramp_count; i++) if (!strcmp(v->ramp_name[i], want)) return i;
+    for (int i = 0; i < v->ramp_count; i++) if (strstr(v->ramp_name[i], want)) return i;
+    return -1;
+}
+
+// The block colour LUT: 16 wide, B_COUNT tall, R8. Columns 0..5 are the top's six steps (dark to
+// light), 6..11 the sides', 12 the pattern id, 13 the solid flag. One texelFetch in the shader.
+static void vx_build_lut(VoxField *v) {
+    unsigned char px[16 * B_COUNT];
+    memset(px, 0, sizeof(px));
+    for (int b = 0; b < B_COUNT; b++) {
+        const VxBlockDef *d = &BLOCKS[b];
+        int rt = vx_ramp_by_name(v, d->top_ramp), rs = vx_ramp_by_name(v, d->side_ramp);
+        for (int s = 0; s < 6; s++) {
+            float f = s / 5.0f;
+            int ti = 1, si = 1;
+            if (rt >= 0 && v->ramp_len[rt] > 1) {
+                float g = vx_lerp(d->top_lo, d->top_hi, f) * (v->ramp_len[rt] - 1);
+                ti = v->ramp_idx[rt][(int)(g + 0.5f)];
+            }
+            if (rs >= 0 && v->ramp_len[rs] > 1) {
+                float g = vx_lerp(d->side_lo, d->side_hi, f) * (v->ramp_len[rs] - 1);
+                si = v->ramp_idx[rs][(int)(g + 0.5f)];
+            }
+            px[b * 16 + s] = (unsigned char)ti;
+            px[b * 16 + 6 + s] = (unsigned char)si;
+        }
+        px[b * 16 + 12] = (unsigned char)d->pattern;
+        px[b * 16 + 13] = d->solid ? 1 : 0;
+    }
+    if (!v->lut) glGenTextures(1, &v->lut);
+    glBindTexture(GL_TEXTURE_2D, v->lut);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 16, B_COUNT, 0, GL_RED, GL_UNSIGNED_BYTE, px);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+// story/palette/colormap.png as it stands: 256 wide, one row per (table, level). Row 0 of a table is
+// full light. With no file, the rows are synthesised so night still works.
+static void vx_build_colormap(VoxField *v) {
+    static const char *NAMES[6] = { "day", "dusk", "night", "flash", "poison", "stone" };
+    v->cmap_levels = VX_LEVELS; v->cmap_tables = 6; v->cmap_h = 256;
+    for (int i = 0; i < 6; i++) { snprintf(v->cmap_tname[i], 16, "%s", NAMES[i]); v->cmap_row0[i] = i * 32; }
+    v->cmap_lamp_row0 = 0;
+
+    size_t isz = 0;
+    void *data = vx_read("palette/colormap.png", &isz);
+    unsigned char *file = nullptr;
+    int fw = 0, fh = 0, ch = 0;
+    if (data) { file = stbi_load_from_memory((const unsigned char *)data, (int)isz, &fw, &fh, &ch, 4); SDL_free(data); }
+    if (file && fw != 256) { stbi_image_free(file); file = nullptr; }
+    if (file) {
+        size_t jsz = 0;
+        char *js = (char *)vx_read("palette/colormap.json", &jsz);
+        if (js) {
+            const char *lv = strstr(js, "\"levels\"");
+            int n = 0;
+            if (lv && sscanf(lv + 8, " : %d", &n) == 1 && n >= 2 && n <= 64) v->cmap_levels = n;
+            int k = 0;
+            for (const char *c = strstr(js, "\"table\""); c && k < 8; c = strstr(c + 1, "\"table\"")) {
+                const char *q = strchr(c + 7, '"'), *e = q ? strchr(q + 1, '"') : nullptr;
+                if (!q || !e) break;
+                int len = (int)(e - q - 1); if (len > 15) len = 15;
+                char nm[16]; memcpy(nm, q + 1, (size_t)len); nm[len] = 0;
+                const char *r0 = strstr(e, "\"row0\"");
+                int row0 = 0;
+                if (!r0 || sscanf(r0 + 6, " : %d", &row0) != 1) break;
+                snprintf(v->cmap_tname[k], 16, "%s", nm);
+                v->cmap_row0[k] = row0;
+                if (!strcmp(nm, "lamp")) v->cmap_lamp_row0 = row0;
+                k++;
+            }
+            if (k) v->cmap_tables = k;
+            SDL_free(js);
+        }
+        v->cmap_h = fh;
+        if (!v->cmap) glGenTextures(1, &v->cmap);
+        glBindTexture(GL_TEXTURE_2D, v->cmap);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, fh, 0, GL_RGBA, GL_UNSIGNED_BYTE, file);
+        free(v->cmap_px);
+        v->cmap_px = (unsigned char *)malloc((size_t)256 * fh * 4);
+        if (v->cmap_px) memcpy(v->cmap_px, file, (size_t)256 * fh * 4);
+        stbi_image_free(file);
+        SDL_Log("voxfield: colormap.png 256x%d, %d tables, %d levels", fh, v->cmap_tables, v->cmap_levels);
+    } else {
+        // Synthesised: darken toward the table's cast. Good enough that a checkout with no colormap
+        // still has a night; the file replaces it the moment it is there.
+        static const float CAST[6][3] = { {1,1,1}, {1.05f,0.92f,0.80f}, {0.62f,0.72f,1.0f},
+                                          {1.2f,1.2f,1.1f}, {0.8f,1.1f,0.8f}, {0.9f,0.9f,0.95f} };
+        int h = 6 * VX_LEVELS;
+        unsigned char *px = (unsigned char *)calloc((size_t)256 * h, 4);
+        if (!px) return;
+        for (int tb = 0; tb < 6; tb++) for (int lv = 0; lv < VX_LEVELS; lv++) {
+            float k = 1.0f - (float)lv / (VX_LEVELS - 1) * 0.85f;
+            unsigned char *row = px + ((size_t)(tb * VX_LEVELS + lv) * 256) * 4;
+            for (int i = 1; i < 256; i++) {
+                for (int c = 0; c < 3; c++) {
+                    float x = v->pal[i][c] / 255.0f * k * CAST[tb][c];
+                    row[i * 4 + c] = (unsigned char)(255.0f * (x < 0 ? 0 : x > 1 ? 1 : x) + 0.5f);
+                }
+                row[i * 4 + 3] = 255;
+            }
+        }
+        v->cmap_h = h;
+        if (!v->cmap) glGenTextures(1, &v->cmap);
+        glBindTexture(GL_TEXTURE_2D, v->cmap);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        free(v->cmap_px); v->cmap_px = px;
+        SDL_Log("voxfield: colormap synthesised on the CPU (no palette/colormap.png)");
+    }
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+static int vx_table_by_name(VoxField *v, const char *name) {
+    for (int i = 0; i < v->cmap_tables && i < 8; i++) if (!SDL_strcasecmp(v->cmap_tname[i], name)) return i;
+    return 0;
+}
+
+// The colour a palette index takes under the current light — for the fog and the sky, which are
+// solved on the CPU because they are one colour a frame, not one a pixel.
+static void vx_cpu_colour(VoxField *v, int idx, float light, float out[3]) {
+    out[0] = out[1] = out[2] = 0.3f;
+    if (!v->cmap_px) return;
+    float f = (1.0f - (light < 0 ? 0 : light > 1 ? 1 : light)) * (v->cmap_levels - 1);
+    int row = v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0] + (int)(f + 0.5f);
+    if (row < 0) row = 0;
+    if (row >= v->cmap_h) row = v->cmap_h - 1;
+    const unsigned char *p = v->cmap_px + ((size_t)row * 256 + (idx & 255)) * 4;
+    for (int c = 0; c < 3; c++) out[c] = p[c] / 255.0f;
+}
+
+// ───────────────────────── indexing art on the palette ─────────────────────────
+
+#define VXQ_SLOTS 65536
+struct VxQCache { uint32_t key[VXQ_SLOTS]; unsigned char val[VXQ_SLOTS]; int colours; };
+
+static unsigned char vx_quant(VoxField *v, VxQCache *q, uint32_t rgba) {
+    if ((rgba >> 24) < 128) return 0;
+    uint32_t k = rgba | 0xFF000000u;
+    uint32_t s = ((k * 2654435761u) >> 12) & (VXQ_SLOTS - 1);
+    int slot = -1;
+    for (int probe = 0; probe < 64; probe++, s = (s + 1) & (VXQ_SLOTS - 1)) {
+        if (q->key[s] == k) return q->val[s];
+        if (!q->key[s]) { slot = (int)s; break; }
+    }
+    int r = (int)(k & 255), g = (int)((k >> 8) & 255), b = (int)((k >> 16) & 255);
+    int best = 1;
+    for (int i = 1; i < 256; i++)
+        if (v->pal[i][0] == r && v->pal[i][1] == g && v->pal[i][2] == b) { best = i; goto done; }
+    {
+        float L, A, B2, bd = 1e9f;
+        rgb_to_oklab(r / 255.0f, g / 255.0f, b / 255.0f, &L, &A, &B2);
+        for (int i = 1; i < 256; i++) {
+            float d = (L - v->pal_lab[i][0]) * (L - v->pal_lab[i][0])
+                    + (A - v->pal_lab[i][1]) * (A - v->pal_lab[i][1])
+                    + (B2 - v->pal_lab[i][2]) * (B2 - v->pal_lab[i][2]);
+            if (d < bd) { bd = d; best = i; }
+        }
+        v->off_pal++;
+    }
+done:
+    if (slot >= 0) { q->key[slot] = k; q->val[slot] = (unsigned char)best; q->colours++; }
+    return (unsigned char)best;
+}
+
+// RGBA -> an R8 texture of palette indices, the same currency the world is drawn in, so a sprite and
+// a block light through one colormap row and never disagree about a colour.
+static GLuint vx_tex_indexed(VoxField *v, const char *label, const unsigned char *rgba, int w, int h) {
+    GLuint tex = 0;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    if (!v->pal_ok) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    } else {
+        unsigned char *idx = (unsigned char *)malloc((size_t)w * h);
+        VxQCache *q = (VxQCache *)calloc(1, sizeof(VxQCache));
+        if (!idx || !q) { free(idx); free(q); return tex; }
+        for (size_t i = 0; i < (size_t)w * h; i++) idx[i] = vx_quant(v, q, ((const uint32_t *)rgba)[i]);
+        SDL_Log("voxfield: %s indexed — %dx%d, %d colours", label, w, h, q->colours);
+        free(q);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, idx);
+        free(idx);
+    }
+    // NEAREST both ways: the owner's pixels stay pixels (the HD-2D pass must not smooth texels).
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    return tex;
+}
+
+// ───────────────────────── tiles.md: only the shape of each entry ─────────────────────────
+// The voxel world needs to know how big a stamp is and what it is called. Colours, atlas indices,
+// masks, swatches and decal scatter rules all belong to the tile field; none of it is read here.
+
+static int def_by_name(VoxField *v, const char *name) {
+    for (int i = 0; i < v->def_count; i++) if (!strcmp(v->defs[i].name, name)) return i;
+    return -1;
+}
+
+static void parse_solid_rows(VxDef *d, const char *val) {
+    memset(d->solid, 0, sizeof(d->solid));
+    if (!strcmp(val, "yes")) { for (int r = 0; r < d->h && r < 8; r++) d->solid[r] = (unsigned char)((1 << d->w) - 1); return; }
+    if (!strcmp(val, "no")) return;
+    int r = 0, c = 0;
+    for (const char *p = val; *p && r < 8; p++) {
+        if (*p == '/') { r++; c = 0; continue; }
+        if (*p == '#' && c < 8) d->solid[r] |= (unsigned char)(1 << c);
+        if (*p == '#' || *p == '.') c++;
+    }
+}
+
+static bool vx_load_tileset(VoxField *v, const char *set) {
+    if (!strcmp(v->set, set) && v->def_count) return true;
+    snprintf(v->set, sizeof(v->set), "%s", set);
+    v->def_count = 0;
+    char rel[128];
+    snprintf(rel, sizeof(rel), "field/tilesets/%s/tiles.md", set);
+    size_t sz = 0;
+    char *text = (char *)vx_read(rel, &sz);
+    if (!text) { SDL_Log("voxfield: no %s — stamps will be 1x1", rel); return false; }
+    VxDef *d = nullptr;
+    char *save = nullptr;
+    for (char *line = SDL_strtok_r(text, "\n", &save); line; line = SDL_strtok_r(nullptr, "\n", &save)) {
+        char *s = vx_trim(line);
+        if (s[0] == '#' && s[1] == '#' && s[2] != '#') {
+            if (v->def_count >= VX_DEFS) { d = nullptr; continue; }
+            d = &v->defs[v->def_count++];
+            memset(d, 0, sizeof(*d));
+            snprintf(d->name, sizeof(d->name), "%s", vx_trim(s + 2));
+            d->w = d->h = 1; d->index = -1; d->kind = DK_TILE;
+            continue;
+        }
+        if (!d || s[0] != '-') continue;
+        char *val = strchr(s, ':');
+        if (!val) continue;
+        *val = 0;
+        char *key = vx_trim(s + 1);
+        val = vx_trim(val + 1);
+        if (!strcmp(key, "index")) {
+            int i = -1, w = 1, h = 1;
+            int n = sscanf(val, "%d %dx%d", &i, &w, &h);
+            d->index = (short)i;
+            if (n >= 3) { d->w = (short)w; d->h = (short)h; }
+        } else if (!strcmp(key, "kind")) {
+            d->kind = !strcmp(val, "terrain") ? DK_TERRAIN : !strcmp(val, "decal") ? DK_DECAL : DK_TILE;
+        } else if (!strcmp(key, "solid")) parse_solid_rows(d, val);
+    }
+    SDL_free(text);
+    // `- solid: yes` may come before `- index: N WxH`, so re-expand it now the size is known.
+    for (int i = 0; i < v->def_count; i++) {
+        VxDef *e = &v->defs[i];
+        bool any = false;
+        for (int r = 0; r < 8; r++) if (e->solid[r]) any = true;
+        if (any && e->solid[0] == 1 && e->w > 1) for (int r = 0; r < e->h && r < 8; r++) e->solid[r] = (unsigned char)((1 << e->w) - 1);
+    }
+    SDL_Log("voxfield: tileset %s — %d entries", set, v->def_count);
+    return true;
+}
+
+// ───────────────────────── what a tile NAME becomes, in blocks ─────────────────────────
+
+struct NameBlock { const char *name; unsigned char blk; };
+static const NameBlock TERR_BLOCK[] = {
+    { "grass", B_GRASS }, { "grass_dry", B_GRASS_DRY }, { "crop", B_CROP }, { "mud", B_MUD },
+    { "dirt", B_DIRT }, { "gravel", B_GRAVEL }, { "paving", B_PAVING }, { "bridge_deck", B_PLANK },
+    { "water", B_WATER }, { "sand", B_GRAVEL },
+};
+static unsigned char terr_block(const char *name) {
+    for (size_t i = 0; i < sizeof(TERR_BLOCK) / sizeof(TERR_BLOCK[0]); i++)
+        if (!strcmp(TERR_BLOCK[i].name, name)) return TERR_BLOCK[i].blk;
+    return B_GRASS;
+}
+
+// What kind of thing a stamp is. Names come from valley's tiles.md; anything unrecognised falls
+// through to a billboard, which is the safe answer — it never blocks a lane it should not.
+enum { OB_BILLBOARD = 0, OB_HOUSE, OB_TREE, OB_LOWWALL, OB_POST };
+struct ObjKind { const char *name; int kind; unsigned char wall, roof; };
+static const ObjKind OBJ_KINDS[] = {
+    { "house_a", OB_HOUSE, B_PLASTER, B_ROOF },   { "house_b", OB_HOUSE, B_TIMBER,  B_ROOF },
+    { "house_c", OB_HOUSE, B_PLASTER, B_ROOF },   { "house_d", OB_HOUSE, B_PLASTER, B_ROOF },
+    { "house_e", OB_HOUSE, B_PLASTER, B_ROOF },   { "hut",     OB_HOUSE, B_PLASTER, B_THATCH },
+    { "shed",    OB_HOUSE, B_PLANK,   B_PLANK },  { "stable",  OB_HOUSE, B_PLANK,   B_THATCH },
+    { "barn",    OB_HOUSE, B_PLANK,   B_ROOF },   { "grain_shed", OB_HOUSE, B_PLANK, B_THATCH },
+    { "ladder_house", OB_HOUSE, B_PLASTER, B_ROOF }, { "guild_hall", OB_HOUSE, B_STONE, B_ROOF },
+    { "tree", OB_TREE, 0, 0 }, { "tree_2", OB_TREE, 0, 0 }, { "tree_bare", OB_TREE, 0, 0 },
+    { "orchard_tree", OB_TREE, 0, 0 },
+    { "fence_ew", OB_LOWWALL, B_TIMBER, 0 }, { "fence_ns", OB_LOWWALL, B_TIMBER, 0 },
+    { "fence_corner", OB_LOWWALL, B_TIMBER, 0 }, { "hedge", OB_LOWWALL, B_HEDGE, 0 },
+    { "wall_ew", OB_LOWWALL, B_STONE, 0 }, { "wall_ns", OB_LOWWALL, B_STONE, 0 },
+    { "wall_corner", OB_LOWWALL, B_STONE, 0 },
+    { "practice_post", OB_POST, B_TIMBER, 0 }, { "gate_post", OB_POST, B_TIMBER, 0 },
+    { "signpost", OB_POST, B_TIMBER, 0 }, { "stump", OB_POST, B_TRUNK, 0 },
+};
+static const ObjKind *obj_kind(const char *name) {
+    for (size_t i = 0; i < sizeof(OBJ_KINDS) / sizeof(OBJ_KINDS[0]); i++)
+        if (!strcmp(OBJ_KINDS[i].name, name)) return &OBJ_KINDS[i];
+    return nullptr;
+}
+
+// ───────────────────────── the .tmap, read exactly as the tile field reads it ─────────────────────────
+
+static int split_words(char *s, char **w, int max) {
+    int n = 0;
+    for (char *c = s; *c && n < max;) {
+        while (*c == ' ' || *c == '\t') c++;
+        if (!*c) break;
+        w[n++] = c;
+        while (*c && *c != ' ' && *c != '\t') c++;
+        if (*c) *c++ = 0;
+    }
+    return n;
+}
+
+static void vx_parse_tmap(VoxField *v, char *text) {
+    char legend[128][24];
+    memset(legend, 0, sizeof(legend));
+    int sec = -1, row = 0;
+    char *save = nullptr;
+    for (char *line = SDL_strtok_r(text, "\n", &save); line; line = SDL_strtok_r(nullptr, "\n", &save)) {
+        char *e = line + strlen(line);
+        while (e > line && (e[-1] == '\r' || e[-1] == ' ')) *--e = 0;
+        if (line[0] == '#' && line[1] == '#') {
+            char *s = vx_trim(line + 2);
+            sec = !strcmp(s, "meta") ? 0 : !strcmp(s, "legend") ? 1 : !strcmp(s, "ground") ? 2
+                : !strcmp(s, "objects") ? 3 : !strcmp(s, "triggers") ? 4 : -1;
+            row = 0;
+            continue;
+        }
+        if (sec < 0 || !line[0]) continue;
+        if (sec == 0) {
+            char *val = strchr(line, ':');
+            if (!val) continue;
+            *val = 0;
+            char *key = vx_trim(line);
+            val = vx_trim(val + 1);
+            if (!strcmp(key, "name")) snprintf(v->map_name, sizeof(v->map_name), "%s", val);
+            else if (!strcmp(key, "tileset")) vx_load_tileset(v, val);
+            else if (!strcmp(key, "music")) snprintf(v->music, sizeof(v->music), "%s", val);
+            else if (!strcmp(key, "size")) {
+                int w = 0, h = 0;
+                sscanf(val, "%d %d", &w, &h);
+                v->mw = w < 1 ? 1 : w > VX_MAXW ? VX_MAXW : w;
+                v->md = h < 1 ? 1 : h > VX_MAXD ? VX_MAXD : h;
+            } else if (!strcmp(key, "light")) {
+                char tb[16] = "day"; float lv = 1.0f;
+                sscanf(val, "%15s %f", tb, &lv);
+                v->light_table = vx_table_by_name(v, tb);
+                v->amb = lv < 0 ? 0 : lv > 1 ? 1 : lv;
+            } else if (!strcmp(key, "lamp")) {
+                float x = 0, z = 0, r = 3, lv = 1; char fl[16] = "";
+                if (sscanf(val, "%f %f %f %f %15s", &x, &z, &r, &lv, fl) >= 4 && v->light_count < VX_LIGHTS) {
+                    VxLight *l = &v->lights[v->light_count++];
+                    l->x = x + 0.5f; l->z = z + 0.5f; l->y = 2.2f;
+                    l->r = r < 0.5f ? 0.5f : r;
+                    l->level = lv < 0 ? 0 : lv > 1 ? 1 : lv;
+                    l->flicker = !strcmp(fl, "flicker");
+                }
+            } else if (!strcmp(key, "spawn")) {
+                char f[8] = "S";
+                sscanf(val, "%d %d %7s", &v->spawn_x, &v->spawn_z, f);
+                v->spawn_f = facing_of(f);
+            }
+        } else if (sec == 1) {
+            char c = line[0];
+            char *nm = vx_trim(line + 1);
+            if (c && nm[0]) snprintf(legend[(unsigned char)c & 127], 24, "%s", nm);
+        } else if (sec == 2 || sec == 3) {
+            if (row >= v->md) { row++; continue; }
+            for (int x = 0; x < v->mw; x++) {
+                char c = line[x];
+                if (!c) break;
+                if (c == '+') continue;
+                if (c == '.' && sec == 3) continue;
+                const char *nm = legend[(unsigned char)c & 127];
+                if (!nm[0]) continue;
+                int def = def_by_name(v, nm);
+                if (def < 0) continue;
+                if (sec == 2) v->ground[row][x] = (short)def;
+                else {
+                    VxDef *d = &v->defs[def];
+                    bool clash = false;
+                    for (int r = 0; r < d->h; r++) for (int cc = 0; cc < d->w; cc++) {
+                        int mx = x + cc, mz = row + r;
+                        if (mx >= v->mw || mz >= v->md || v->place_at[mz][mx]) clash = true;
+                    }
+                    if (clash || v->place_count >= VX_PLACE) continue;
+                    VxPlace *p = &v->places[v->place_count++];
+                    p->def = (short)def; p->x = (short)x; p->z = (short)row;
+                    for (int r = 0; r < d->h; r++) for (int cc = 0; cc < d->w; cc++) {
+                        v->place_at[row + r][x + cc] = (short)v->place_count;
+                        if (d->solid[r] & (1 << cc)) v->tsolid[row + r][x + cc] = 1;
+                    }
+                }
+            }
+            row++;
+        } else if (sec == 4) {
+            char work[256];
+            snprintf(work, sizeof(work), "%s", line);
+            char *w[12];
+            int n = split_words(work, w, 12);
+            if (n < 5) continue;
+            int gx = atoi(w[0]), gz = atoi(w[1]), gw = atoi(w[2]) < 1 ? 1 : atoi(w[2]), gd = atoi(w[3]) < 1 ? 1 : atoi(w[3]);
+            const char *k = w[4];
+            if (!strcmp(k, "npc")) {
+                if (v->npc_count >= VX_NPCS || n < 8) continue;
+                VxNpc *np = &v->npcs[v->npc_count++];
+                memset(np, 0, sizeof(*np));
+                np->tx = np->px = np->hx = (short)gx; np->tz = np->pz = np->hz = (short)gz;
+                snprintf(np->walker, sizeof(np->walker), "%s", w[5]);
+                np->facing = facing_of(w[6]);
+                snprintf(np->text, sizeof(np->text), "%s", w[7]);
+                if (n >= 10 && !strcmp(w[8], "wander")) np->wander = atoi(w[9]);
+                np->wait = 1.0f + vx_rnd(v->npc_count, 3, 7) * 2.0f;
+                continue;
+            }
+            if (!strcmp(k, "light")) continue;
+            if (v->trig_count >= VX_TRIGS) continue;
+            VxTrig *g = &v->trigs[v->trig_count];
+            memset(g, 0, sizeof(*g));
+            g->x = (short)gx; g->z = (short)gz; g->w = (short)gw; g->d = (short)gd;
+            if (!strcmp(k, "message")) { g->kind = TG_MESSAGE; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
+            else if (!strcmp(k, "zone")) { g->kind = TG_ZONE; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
+            else if (!strcmp(k, "trap")) { g->kind = TG_TRAP; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
+            else if (!strcmp(k, "scene")) { g->kind = TG_SCENE; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
+            else if (!strcmp(k, "exit") || !strcmp(k, "door")) {
+                if (n < 9) continue;
+                g->kind = !strcmp(k, "exit") ? TG_EXIT : TG_DOOR;
+                snprintf(g->map, sizeof(g->map), "%s", w[5]);
+                g->ax = (short)atoi(w[6]); g->az = (short)atoi(w[7]); g->af = (short)facing_of(w[8]);
+            } else continue;
+            v->trig_count++;
+        }
+    }
+}
+
+// ───────────────────────── building the voxel world from the .tmap ─────────────────────────
+// Nothing new is authored: the same map the tile field walks becomes a column of blocks per cell,
+// buildings are extruded from the stamp footprints, and the triggers, spawn, NPCs and lamps carry
+// over untouched. The one thing invented here is a gentle terrain height, and it is FORCED FLAT
+// wherever the tile map has something that has to stay walkable — then checked by flood fill.
+
+static float vx_vnoise(float x, float z, uint32_t seed) {
+    int xi = (int)floorf(x), zi = (int)floorf(z);
+    float fx = x - xi, fz = z - zi;
+    fx = fx * fx * (3 - 2 * fx); fz = fz * fz * (3 - 2 * fz);
+    float a = vx_rnd(xi, zi, (int)seed), b = vx_rnd(xi + 1, zi, (int)seed);
+    float c = vx_rnd(xi, zi + 1, (int)seed), d = vx_rnd(xi + 1, zi + 1, (int)seed);
+    return vx_lerp(vx_lerp(a, b, fx), vx_lerp(c, d, fx), fz);
+}
+
+static void set_blk(VoxField *v, int x, int y, int z, unsigned char b) {
+    if (x < 0 || z < 0 || y < 0 || x >= v->mw || z >= v->md || y >= VX_MAXY) return;
+    v->blk[y][z][x] = b;
+}
+static unsigned char get_blk(VoxField *v, int x, int y, int z) {
+    if (x < 0 || z < 0 || y < 0 || x >= v->mw || z >= v->md || y >= VX_MAXY) return B_AIR;
+    return v->blk[y][z][x];
+}
+
+static bool trig_covers(VoxField *v, int x, int z) {
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (x >= g->x && z >= g->z && x < g->x + g->w && z < g->z + g->d) return true;
+    }
+    return false;
+}
+
+// The rectangle a building's front door should sit in: a door or message trigger on or beside the
+// footprint. Returns the x of its centre, or -1.
+static int door_x_for(VoxField *v, int x0, int z0, int w, int d) {
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (g->kind != TG_DOOR && g->kind != TG_MESSAGE) continue;
+        int cx = g->x + g->w / 2, cz = g->z + g->d / 2;
+        if (cx >= x0 - 1 && cx <= x0 + w && cz >= z0 - 1 && cz <= z0 + d + 1) return cx < x0 ? x0 : cx > x0 + w - 1 ? x0 + w - 1 : cx;
+    }
+    return -1;
+}
+
+static void vx_build_world(VoxField *v) {
+    memset(v->blk, 0, sizeof(v->blk));
+    // 1. the height field — low frequency, 0..2 extra blocks, flattened everywhere it matters
+    unsigned char flat[VX_MAXD][VX_MAXW];
+    memset(flat, 0, sizeof(flat));
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        int def = v->ground[z][x];
+        const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
+        unsigned char b = terr_block(nm);
+        bool rolls = (b == B_GRASS || b == B_GRASS_DRY || b == B_CROP);
+        if (!rolls || v->place_at[z][x] || v->tsolid[z][x] || trig_covers(v, x, z)) flat[z][x] = 1;
+    }
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {          // one cell of margin
+        if (!flat[z][x]) continue;
+        for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
+            int nx = x + dx, nz = z + dz;
+            if (nx >= 0 && nz >= 0 && nx < v->mw && nz < v->md && !flat[nz][nx]) flat[nz][nx] = 2;
+        }
+    }
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        if (flat[z][x]) { v->hgt[z][x] = 1; continue; }
+        float n = vx_vnoise(x / 9.0f, z / 9.0f, 7717u) * 0.75f + vx_vnoise(x / 4.0f, z / 4.0f, 313u) * 0.25f;
+        int h = 1 + (int)(n * 3.4f);
+        v->hgt[z][x] = (unsigned char)(h < 1 ? 1 : h > 3 ? 3 : h);
+    }
+    // Terraces: no neighbour may differ by more than one block, so every walk edge is a single step.
+    for (int pass = 0; pass < 8; pass++) {
+        bool changed = false;
+        for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+            int h = v->hgt[z][x];
+            for (int d = 0; d < 4; d++) {
+                int nx = x + DX[d], nz = z + DZ[d];
+                if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
+                if (h > v->hgt[nz][nx] + 1) { h = v->hgt[nz][nx] + 1; changed = true; }
+            }
+            v->hgt[z][x] = (unsigned char)h;
+        }
+        if (!changed) break;
+    }
+
+    // 2. the ground columns, and the water channel one block below the land
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        int def = v->ground[z][x];
+        const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
+        unsigned char top = terr_block(nm);
+        int h = v->hgt[z][x];
+        if (top == B_WATER) {
+            // The bed sits one block down, so the bank shows real depth; the surface is drawn at
+            // 0.8 of a block by the mesher, not by another block.
+            for (int y = 0; y < h - 1; y++) set_blk(v, x, y, z, B_WATERBED);
+            if (h >= 1) set_blk(v, x, h - 1, z, B_WATER);
+            v->walk[z][x] = 0;
+            v->hgt[z][x] = (unsigned char)(h - 1 < 0 ? 0 : h - 1);
+        } else {
+            for (int y = 0; y < h; y++) set_blk(v, x, y, z, y == h - 1 ? top : (y >= h - 3 ? B_DIRT : B_STONE));
+            v->walk[z][x] = v->tsolid[z][x] ? 0 : 1;
+        }
+    }
+
+    // 3. the objects: houses, trees, low walls and posts are built in blocks; everything else is left
+    //    to a billboard from the atlas, which is the safe default for a thing nobody has modelled.
+    for (int i = 0; i < v->place_count; i++) {
+        VxPlace *p = &v->places[i];
+        VxDef *d = &v->defs[p->def];
+        const ObjKind *k = obj_kind(d->name);
+        if (!k) continue;
+        int x0 = p->x, z0 = p->z, W = d->w, D = d->h;
+        int base = 0;
+        for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
+            if (x < v->mw && z < v->md && v->hgt[z][x] > base) base = v->hgt[z][x];
+        if (k->kind == OB_HOUSE) {
+            int dx_door = door_x_for(v, x0, z0, W, D);
+            if (dx_door < 0) dx_door = x0 + W / 2;
+            for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++) {
+                bool edge = (x == x0 || x == x0 + W - 1 || z == z0 || z == z0 + D - 1);
+                for (int y = base; y < base + 3; y++) set_blk(v, x, y, z, edge ? k->wall : k->wall);
+                if (z == z0 + D - 1) {                      // the south face: the door and two windows
+                    if (x == dx_door) { set_blk(v, x, base, z, B_DOOR); set_blk(v, x, base + 1, z, B_DOOR); }
+                    else if ((x == x0 + 1 || x == x0 + W - 2) && x != dx_door) set_blk(v, x, base + 1, z, B_WINDOW);
+                }
+            }
+            // A stepped gable: the ridge runs along the longer side, each course inset one block.
+            bool ridge_x = W >= D;
+            int span = ridge_x ? D : W;
+            int levels = (span + 1) / 2;
+            for (int r = 0; r < levels; r++) {
+                int y = base + 3 + r;
+                int ax0 = ridge_x ? x0 : x0 + r, ax1 = ridge_x ? x0 + W - 1 : x0 + W - 1 - r;
+                int az0 = ridge_x ? z0 + r : z0, az1 = ridge_x ? z0 + D - 1 - r : z0 + D - 1;
+                if (ax0 > ax1 || az0 > az1) break;
+                for (int z = az0; z <= az1; z++) for (int x = ax0; x <= ax1; x++) set_blk(v, x, y, z, k->roof);
+            }
+            for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
+                if (x < v->mw && z < v->md) v->walk[z][x] = 0;
+        } else if (k->kind == OB_TREE) {
+            int cx = x0 + W / 2, cz = z0 + D - 1;                  // the trunk stands on the solid row
+            // Short and wide, not a Minecraft mast: a trunk of two or three, then a squat crown that
+            // stays inside the frame at the camera's own height.
+            int th = 2 + (int)(vx_rnd(cx, cz, 9) * 2.0f);
+            for (int y = base; y < base + th; y++) set_blk(v, cx, y, cz, B_TRUNK);
+            int ly = base + th;
+            for (int dy = 0; dy <= 2; dy++) for (int dz = -2; dz <= 2; dz++) for (int dx2 = -2; dx2 <= 2; dx2++) {
+                float fx = dx2 / 1.85f, fz = dz / 1.85f, fy = (dy - 0.8f) / 1.45f;
+                float r2 = fx * fx + fz * fz + fy * fy;
+                if (r2 > 1.0f) continue;
+                if (r2 > 0.62f && vx_rnd(cx + dx2, cz + dz, ly + dy) > 0.55f) continue;   // a ragged edge
+                int yy = ly + dy;
+                if (get_blk(v, cx + dx2, yy, cz + dz) == B_AIR) set_blk(v, cx + dx2, yy, cz + dz, B_LEAVES);
+            }
+            for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++)
+                if (x < v->mw && z < v->md && (d->solid[z - z0] & (1 << (x - x0)))) v->walk[z][x] = 0;
+        } else {                                                   // low wall or post
+            int hh = k->kind == OB_POST ? 2 : 1;
+            for (int z = z0; z < z0 + D; z++) for (int x = x0; x < x0 + W; x++) {
+                if (x >= v->mw || z >= v->md) continue;
+                int b2 = v->hgt[z][x];
+                for (int y = b2; y < b2 + hh; y++) set_blk(v, x, y, z, k->wall);
+                v->walk[z][x] = 0;
+            }
+        }
+    }
+    // Anything the tile map calls solid stays solid, billboard or not.
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) if (v->tsolid[z][x]) v->walk[z][x] = 0;
+    for (int i = 0; i < v->npc_count; i++) {
+        VxNpc *np = &v->npcs[i];
+        if (np->tx >= 0 && np->tz >= 0 && np->tx < v->mw && np->tz < v->md) v->walk[np->tz][np->tx] = 0;
+    }
+}
+
+// ───────────────────────── walkability, and the check that it survived the height field ─────────
+// A step is legal when the target cell is walkable, its top is within one block, and there are two
+// blocks of headroom. Every route the .tmap allows must still exist; the flood fill says so at load.
+
+static bool vx_can_stand(VoxField *v, int x, int z) {
+    if (x < 0 || z < 0 || x >= v->mw || z >= v->md) return false;
+    if (!v->walk[z][x]) return false;
+    int y = v->hgt[z][x];
+    return get_blk(v, x, y, z) == B_AIR && get_blk(v, x, y + 1, z) == B_AIR;
+}
+static bool vx_can_step(VoxField *v, int fx, int fz, int tx, int tz) {
+    if (!vx_can_stand(v, tx, tz)) return false;
+    int a = v->hgt[fz][fx], b = v->hgt[tz][tx];
+    return (a > b ? a - b : b - a) <= 1;
+}
+
+static int npc_home_at(VoxField *v, int x, int z) {
+    for (int i = 0; i < v->npc_count; i++) if (v->npcs[i].tx == x && v->npcs[i].tz == z) return i;
+    return -1;
+}
+
+static void flood(VoxField *v, unsigned char *out, int sx, int sz, bool vox) {
+    static short qx[VX_MAXW * VX_MAXD], qz[VX_MAXW * VX_MAXD];
+    int head = 0, tail = 0;
+    memset(out, 0, (size_t)VX_MAXW * VX_MAXD);
+    if (sx < 0 || sz < 0 || sx >= v->mw || sz >= v->md) return;
+    out[sz * VX_MAXW + sx] = 1;
+    qx[tail] = (short)sx; qz[tail++] = (short)sz;
+    while (head < tail) {
+        int x = qx[head], z = qz[head]; head++;
+        for (int d = 0; d < 4; d++) {
+            int nx = x + DX[d], nz = z + DZ[d];
+            if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
+            if (out[nz * VX_MAXW + nx]) continue;
+            bool ok;
+            if (vox) ok = vx_can_step(v, x, z, nx, nz);
+            else {
+                int def = v->ground[nz][nx];
+                const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
+                ok = !v->tsolid[nz][nx] && terr_block(nm) != B_WATER && npc_home_at(v, nx, nz) < 0;
+            }
+            if (!ok) continue;
+            out[nz * VX_MAXW + nx] = 1;
+            qx[tail] = (short)nx; qz[tail++] = (short)nz;
+        }
+    }
+}
+
+// Flatten until the voxel world is at least as connected as the tile map. In practice the flatten
+// set above makes this pass first time; it exists so an edit to the noise can never strand a door.
+static int vx_verify_reach(VoxField *v) {
+    static unsigned char tile_r[VX_MAXW * VX_MAXD], vox_r[VX_MAXW * VX_MAXD];
+    int missing = 0;
+    for (int round = 0; round < 6; round++) {
+        flood(v, tile_r, v->spawn_x, v->spawn_z, false);
+        flood(v, vox_r, v->spawn_x, v->spawn_z, true);
+        missing = 0;
+        for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++)
+            if (tile_r[z * VX_MAXW + x] && !vox_r[z * VX_MAXW + x]) missing++;
+        if (!missing) return 0;
+        // Flatten every unreachable cell and its neighbours to 1 and rebuild the columns there.
+        for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+            if (!tile_r[z * VX_MAXW + x] || vox_r[z * VX_MAXW + x]) continue;
+            for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
+                int nx = x + dx, nz = z + dz;
+                if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
+                int h = v->hgt[nz][nx];
+                if (h <= 1) continue;
+                for (int y = 1; y < h; y++) {
+                    unsigned char b = v->blk[y][nz][nx];
+                    if (b == B_AIR) break;
+                    v->blk[y][nz][nx] = B_AIR;
+                }
+                v->blk[0][nz][nx] = v->blk[0][nz][nx] ? v->blk[0][nz][nx] : B_DIRT;
+                int def = v->ground[nz][nx];
+                const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
+                v->blk[0][nz][nx] = terr_block(nm) == B_WATER ? B_WATER : terr_block(nm);
+                v->hgt[nz][nx] = (unsigned char)(terr_block(nm) == B_WATER ? 0 : 1);
+            }
+        }
+        SDL_Log("voxfield: %d cells unreachable after the height field — flattened, retrying", missing);
+    }
+    return missing;
+}
+
+// ───────────────────────── meshing ─────────────────────────
+// Once, at load, into one static VBO per 16x16 chunk. Hidden faces are culled; every vertex carries
+// its baked ambient occlusion, the sun term for its face, whether a column shadows it, and the lamp
+// light at that corner. Nothing about the light is computed per frame (CLAUDE.md: no realtime
+// lighting) — the ambient level and the AO strength stay live because they are applied in the shader
+// to numbers that were baked.
+
+enum { F_TOP = 0, F_BOT, F_SOUTH, F_NORTH, F_EAST, F_WEST };
+static const float FACE_L[6] = { 1.00f, 0.42f, 0.90f, 0.56f, 0.78f, 0.66f };  // top, bottom, S(to camera), N, E, W
+static const int FN[6][3] = { {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}, {1,0,0}, {-1,0,0} };
+
+static VxVert *vx_tmp = nullptr;
+static int vx_tmp_cap = 0, vx_tmp_n = 0;
+static void tmp_push(const VxVert *v6) {
+    if (vx_tmp_n + 6 > vx_tmp_cap) {
+        vx_tmp_cap = vx_tmp_cap ? vx_tmp_cap * 2 : 65536;
+        vx_tmp = (VxVert *)realloc(vx_tmp, sizeof(VxVert) * (size_t)vx_tmp_cap);
+    }
+    if (!vx_tmp) return;
+    memcpy(vx_tmp + vx_tmp_n, v6, sizeof(VxVert) * 6);
+    vx_tmp_n += 6;
+}
+
+static bool vx_opaque_at(VoxField *v, int x, int y, int z) { return blk_opaque(get_blk(v, x, y, z)); }
+
+// The sun: a fixed direction, marched at mesh time. A wall between a face and the sun is the whole
+// of the shadowing — it is what makes the houses sit in the square rather than float on it.
+static float vx_sun_shadow(VoxField *v, float px, float py, float pz) {
+    float sx = 0.55f, sy = 1.0f, sz = -0.42f;
+    float x = px + sx * 0.6f, y = py + sy * 0.6f, z = pz + sz * 0.6f;
+    for (int i = 0; i < 12; i++) {
+        if (y >= VX_MAXY) break;
+        if (vx_opaque_at(v, (int)floorf(x), (int)floorf(y), (int)floorf(z))) return 0.72f;
+        x += sx; y += sy; z += sz;
+    }
+    return 1.0f;
+}
+
+static void vx_lamp_at(VoxField *v, float x, float y, float z, float *lamp) {
+    float s = 0;
+    for (int i = 0; i < v->light_count; i++) {
+        VxLight *l = &v->lights[i];
+        float dx = x - l->x, dy = y - l->y, dz = z - l->z;
+        float d = sqrtf(dx * dx + dy * dy + dz * dz);
+        float f = 1.0f - d / (l->r > 0.001f ? l->r : 0.001f);
+        if (f > 0) s += l->level * f * f;
+    }
+    *lamp = s > 1 ? 1 : s;
+}
+
+static void vx_mesh_chunk(VoxField *v, int cx, int cz) {
+    vx_tmp_n = 0;
+    int x0 = cx * VX_CH, z0 = cz * VX_CH;
+    int x1 = x0 + VX_CH > v->mw ? v->mw : x0 + VX_CH;
+    int z1 = z0 + VX_CH > v->md ? v->md : z0 + VX_CH;
+    for (int z = z0; z < z1; z++) for (int x = x0; x < x1; x++) for (int y = 0; y < VX_MAXY; y++) {
+        unsigned char b = v->blk[y][z][x];
+        if (b == B_AIR) continue;
+        bool is_water = BLOCKS[b].water;
+        for (int f = 0; f < 6; f++) {
+            if (is_water && f != F_TOP) continue;
+            int nx = x + FN[f][0], ny = y + FN[f][1], nz = z + FN[f][2];
+            unsigned char nb = get_blk(v, nx, ny, nz);
+            if (blk_opaque(nb)) continue;
+            if (!is_water && nb == b) continue;
+            if (f == F_BOT && y == 0) continue;
+            // Corner positions: u and w are the face's two tangent axes.
+            float ox = (float)x, oy = (float)y, oz = (float)z;
+            float top_drop = is_water ? 0.2f : 0.0f;
+            float c[4][3]; int au[3], aw[3];
+            switch (f) {
+                case F_TOP:   au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=0;aw[2]=1;
+                    c[0][0]=ox;   c[0][1]=oy+1-top_drop; c[0][2]=oz;
+                    c[1][0]=ox+1; c[1][1]=oy+1-top_drop; c[1][2]=oz;
+                    c[2][0]=ox+1; c[2][1]=oy+1-top_drop; c[2][2]=oz+1;
+                    c[3][0]=ox;   c[3][1]=oy+1-top_drop; c[3][2]=oz+1; break;
+                case F_BOT:   au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=0;aw[2]=1;
+                    c[0][0]=ox;   c[0][1]=oy; c[0][2]=oz+1;
+                    c[1][0]=ox+1; c[1][1]=oy; c[1][2]=oz+1;
+                    c[2][0]=ox+1; c[2][1]=oy; c[2][2]=oz;
+                    c[3][0]=ox;   c[3][1]=oy; c[3][2]=oz;   break;
+                case F_SOUTH: au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=1;aw[2]=0;
+                    c[0][0]=ox;   c[0][1]=oy;   c[0][2]=oz+1;
+                    c[1][0]=ox+1; c[1][1]=oy;   c[1][2]=oz+1;
+                    c[2][0]=ox+1; c[2][1]=oy+1; c[2][2]=oz+1;
+                    c[3][0]=ox;   c[3][1]=oy+1; c[3][2]=oz+1; break;
+                case F_NORTH: au[0]=1;au[1]=0;au[2]=0; aw[0]=0;aw[1]=1;aw[2]=0;
+                    c[0][0]=ox+1; c[0][1]=oy;   c[0][2]=oz;
+                    c[1][0]=ox;   c[1][1]=oy;   c[1][2]=oz;
+                    c[2][0]=ox;   c[2][1]=oy+1; c[2][2]=oz;
+                    c[3][0]=ox+1; c[3][1]=oy+1; c[3][2]=oz;  break;
+                case F_EAST:  au[0]=0;au[1]=0;au[2]=1; aw[0]=0;aw[1]=1;aw[2]=0;
+                    c[0][0]=ox+1; c[0][1]=oy;   c[0][2]=oz+1;
+                    c[1][0]=ox+1; c[1][1]=oy;   c[1][2]=oz;
+                    c[2][0]=ox+1; c[2][1]=oy+1; c[2][2]=oz;
+                    c[3][0]=ox+1; c[3][1]=oy+1; c[3][2]=oz+1; break;
+                default:      au[0]=0;au[1]=0;au[2]=1; aw[0]=0;aw[1]=1;aw[2]=0;
+                    c[0][0]=ox; c[0][1]=oy;   c[0][2]=oz;
+                    c[1][0]=ox; c[1][1]=oy;   c[1][2]=oz+1;
+                    c[2][0]=ox; c[2][1]=oy+1; c[2][2]=oz+1;
+                    c[3][0]=ox; c[3][1]=oy+1; c[3][2]=oz;   break;
+            }
+            // Winding is DERIVED, not typed: the cross product of the first two edges must point
+            // along the face's own normal, else the quad is back-facing and vanishes under culling.
+            {
+                float e1[3] = { c[1][0]-c[0][0], c[1][1]-c[0][1], c[1][2]-c[0][2] };
+                float e2[3] = { c[2][0]-c[0][0], c[2][1]-c[0][1], c[2][2]-c[0][2] };
+                float nx2 = e1[1]*e2[2] - e1[2]*e2[1], ny2 = e1[2]*e2[0] - e1[0]*e2[2], nz2 = e1[0]*e2[1] - e1[1]*e2[0];
+                if (nx2 * FN[f][0] + ny2 * FN[f][1] + nz2 * FN[f][2] < 0) {
+                    for (int k = 0; k < 3; k++) { float t2 = c[1][k]; c[1][k] = c[3][k]; c[3][k] = t2; }
+                }
+            }
+            float shade = FACE_L[f] * (f == F_TOP ? vx_sun_shadow(v, ox + 0.5f, oy + 1.0f, oz + 0.5f)
+                                                  : vx_sun_shadow(v, ox + 0.5f + FN[f][0] * 0.6f, oy + 0.5f, oz + 0.5f + FN[f][2] * 0.6f));
+            VxVert q[6];
+            VxVert corner[4];
+            for (int i = 0; i < 4; i++) {
+                // classic 0-3 AO: the two edge neighbours and the diagonal, in the plane above the face
+                float fc[3] = { ox + 0.5f + FN[f][0] * 0.5f, oy + 0.5f + FN[f][1] * 0.5f, oz + 0.5f + FN[f][2] * 0.5f };
+                float dv[3] = { c[i][0] - fc[0], c[i][1] - fc[1], c[i][2] - fc[2] };
+                float du = dv[0]*au[0] + dv[1]*au[1] + dv[2]*au[2];
+                float dw = dv[0]*aw[0] + dv[1]*aw[1] + dv[2]*aw[2];
+                int su = du < 0 ? -1 : 1, sw = dw < 0 ? -1 : 1;
+                int bx = nx, by = ny, bz = nz;
+                bool s1 = vx_opaque_at(v, bx + au[0]*su, by + au[1]*su, bz + au[2]*su);
+                bool s2 = vx_opaque_at(v, bx + aw[0]*sw, by + aw[1]*sw, bz + aw[2]*sw);
+                bool cc = vx_opaque_at(v, bx + au[0]*su + aw[0]*sw, by + au[1]*su + aw[1]*sw, bz + au[2]*su + aw[2]*sw);
+                int ao = (s1 && s2) ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (cc ? 1 : 0));
+                float lamp = 0;
+                vx_lamp_at(v, c[i][0], c[i][1], c[i][2], &lamp);
+                corner[i].x = c[i][0]; corner[i].y = c[i][1]; corner[i].z = c[i][2];
+                corner[i].type = b; corner[i].face = (unsigned char)f;
+                corner[i].lit = (unsigned char)(shade * 255.0f + 0.5f);
+                corner[i].warm = (unsigned char)(lamp * 255.0f + 0.5f);
+                corner[i].ao = (unsigned char)(ao * 85);
+                corner[i].spare = 0; corner[i].pad[0] = corner[i].pad[1] = 0;
+            }
+            q[0] = corner[0]; q[1] = corner[1]; q[2] = corner[2];
+            q[3] = corner[0]; q[4] = corner[2]; q[5] = corner[3];
+            tmp_push(q);
+        }
+    }
+    VxChunk *ch = &v->chunks[cz * VX_CHX + cx];
+    if (!ch->vbo) glGenBuffers(1, &ch->vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(VxVert) * (size_t)vx_tmp_n, vx_tmp, GL_STATIC_DRAW);
+    ch->verts = vx_tmp_n;
+    v->vert_total += vx_tmp_n;
+    v->tris += vx_tmp_n / 3;
+}
+
+static void vx_mesh_all(VoxField *v) {
+    uint64_t t0 = SDL_GetTicksNS();
+    v->tris = 0; v->vert_total = 0;
+    for (int i = 0; i < VX_CHUNKS; i++) v->chunks[i].verts = 0;
+    for (int cz = 0; cz * VX_CH < v->md; cz++) for (int cx = 0; cx * VX_CH < v->mw; cx++) vx_mesh_chunk(v, cx, cz);
+    v->mesh_ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
+    v->built = true;
+}
+
+// ───────────────────────── shaders ─────────────────────────
+// Three programs: the world, the billboards, and the HD-2D post pass. No loops anywhere in GLSL —
+// a small `for` was miscompiled by the Mac driver once in this repo and the habit stays.
+
+#if defined(__ANDROID__)
+static const char *VX_PREFIX = "#version 300 es\nprecision highp float;\nprecision highp sampler2D;\n";
+#else
+static const char *VX_PREFIX = "#version 330 core\n";
+#endif
+
+static const char *VX_VS =
+    "layout(location=0) in vec3 a_pos;\n"
+    "layout(location=1) in uvec4 a_meta;\n"          // type, face, ao(0..255), spare
+    "layout(location=2) in vec2 a_light;\n"          // baked sun*shadow, baked lamp
+    "uniform mat4 u_mvp;\n"
+    "uniform mat4 u_view;\n"
+    "out vec3 v_world;\n"
+    "flat out uint v_type;\n"
+    "flat out uint v_face;\n"
+    "out float v_ao;\n"
+    "out vec2 v_light;\n"
+    "out float v_viewz;\n"
+    "void main(){\n"
+    "  v_world = a_pos;\n"
+    "  v_type = a_meta.x; v_face = a_meta.y; v_ao = float(a_meta.z) / 255.0;\n"
+    "  v_light = a_light;\n"
+    "  vec4 vp = u_view * vec4(a_pos, 1.0);\n"
+    "  v_viewz = -vp.z;\n"
+    "  gl_Position = u_mvp * vec4(a_pos, 1.0);\n"
+    "}\n";
+
+static const char *VX_FS =
+    "in vec3 v_world;\n"
+    "flat in uint v_type;\n"
+    "flat in uint v_face;\n"
+    "in float v_ao;\n"
+    "in vec2 v_light;\n"
+    "in float v_viewz;\n"
+    "uniform sampler2D u_lut;\n"
+    "uniform sampler2D u_cmap;\n"
+    "uniform float u_amb, u_ao, u_levels, u_cmaph, u_rowa, u_rowb, u_time;\n"
+    "uniform float u_fog, u_fognear, u_fogfar;\n"
+    "uniform vec3 u_sky;\n"
+    "uniform vec4 u_player;\n"                 // screen x, y, view z, cutaway radius in px
+    "out vec4 o;\n"
+    "float h21(vec2 p){ p = fract(p * vec2(127.11, 311.7)); p += dot(p, p + 34.77); return fract(p.x * p.y); }\n"
+    "float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);\n"
+    "  float a = h21(i), b = h21(i+vec2(1,0)), c = h21(i+vec2(0,1)), d = h21(i+vec2(1,1));\n"
+    "  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }\n"
+    "vec3 look(float idx, float row){ return texture(u_cmap, vec2((idx+0.5)/256.0, (row+0.5)/u_cmaph)).rgb; }\n"
+    "void main(){\n"
+    "  int ty = int(v_type);\n"
+    "  int pat = int(texelFetch(u_lut, ivec2(12, ty), 0).r * 255.0 + 0.5);\n"
+    "  bool top = (v_face == 0u || v_face == 1u);\n"
+    "  vec2 P; float vfrac;\n"
+    "  if (top) { P = v_world.xz; vfrac = 1.0; }\n"
+    "  else if (v_face == 2u || v_face == 3u) { P = vec2(v_world.x, -v_world.y); vfrac = fract(v_world.y + 0.0001); }\n"
+    "  else { P = vec2(v_world.z, -v_world.y); vfrac = fract(v_world.y + 0.0001); }\n"
+    "  vec2 T = floor(P * 16.0);\n"              // the block's own 16x16 pixel grid, in world space
+    "  float s = 0.5; bool use_top = top; float glint = 0.0;\n"
+    "  if (pat == 0) {\n"                        // mottle: earth, gravel, mud
+    "    float n = vn(T / 3.1) * 0.6 + h21(T * 0.71) * 0.4;\n"
+    "    s = n < 0.30 ? 0.22 : n < 0.52 ? 0.44 : n < 0.74 ? 0.62 : n < 0.92 ? 0.80 : 1.0;\n"
+    "  } else if (pat == 1) {\n"                 // grass: clumps on top, a lip of turf over the sides
+    "    float n = vn(T / 2.6) * 0.65 + h21(T * 0.37) * 0.35;\n"
+    "    if (!top && vfrac < 0.80) {\n"
+    "      use_top = false;\n"
+    "      float m = vn(T / 3.0) * 0.6 + h21(T * 0.53) * 0.4;\n"
+    "      s = m < 0.34 ? 0.24 : m < 0.60 ? 0.46 : m < 0.84 ? 0.66 : 0.86;\n"
+    "    } else {\n"
+    "      use_top = true;\n"
+    "      float edge = top ? 1.0 : smoothstep(0.80, 0.86, vfrac + h21(T * 0.91) * 0.05);\n"
+    "      s = n < 0.26 ? 0.18 : n < 0.48 ? 0.42 : n < 0.70 ? 0.62 : n < 0.88 ? 0.82 : 1.0;\n"
+    "      s = mix(0.45, s, edge);\n"
+    "    }\n"
+    "  } else if (pat == 2) {\n"                 // cobble: a warped grid, dark mortar, a lit top lip
+    "    vec2 Q = T + vec2(vn(T / 5.0) * 1.7, vn(T / 6.0 + 4.0) * 1.3);\n"
+    "    vec2 cs = vec2(6.0, 4.0);\n"
+    "    float row = floor(Q.y / cs.y);\n"
+    "    float ox = (h21(vec2(row, 2.0)) * 0.7 + mod(row, 2.0) * 0.4) * cs.x;\n"
+    "    vec2 cell = vec2(floor((Q.x + ox) / cs.x), row);\n"
+    "    vec2 lp = vec2(mod(Q.x + ox, cs.x), mod(Q.y, cs.y));\n"
+    "    s = 0.56 + (h21(cell) - 0.5) * 0.45;\n"
+    "    if (lp.x < 1.0 || lp.y < 1.0) s = 0.10;\n"
+    "    else if (lp.y < 2.0) s += 0.18;\n"
+    "  } else if (pat == 3) {\n"                 // planks
+    "    float pw = 4.0;\n"
+    "    float pi = floor((top ? T.y : T.x) / pw), lp = mod((top ? T.y : T.x), pw);\n"
+    "    s = 0.55 + (h21(vec2(pi, 3.0)) - 0.5) * 0.36;\n"
+    "    if (lp < 1.0) s = 0.14;\n"
+    "    float along = top ? T.x : T.y;\n"
+    "    if (mod(along + h21(vec2(pi, floor(along / 22.0))) * 12.0, 22.0) < 1.0) s = 0.20;\n"
+    "  } else if (pat == 4) {\n"                 // roof tiles: short courses, each with a lit lip
+    "    float ch2 = 3.0;\n"
+    "    float row = floor(T.y / ch2), lp = mod(T.y, ch2);\n"
+    "    float ox = mod(row, 2.0) * 2.0;\n"
+    "    float cell = floor((T.x + ox) / 4.0);\n"
+    "    s = 0.55 + (h21(vec2(cell, row)) - 0.5) * 0.30;\n"
+    "    if (lp < 1.0) s = 0.12;\n"
+    "    else if (lp < 1.8) s += 0.22;\n"
+    "    if (mod(T.x + ox, 4.0) < 1.0) s -= 0.16;\n"
+    "  } else if (pat == 5) {\n"                 // water: bands quantised to 6 fps, with hard glints
+    "    float tq = floor(u_time * 6.0) / 6.0;\n"
+    "    float a = vn(vec2(P.x * 1.4 - tq * 0.7, P.y * 0.8));\n"
+    "    float b = vn(vec2(P.x * 3.1 - tq * 1.3, P.y * 1.9 + tq * 0.2));\n"
+    "    s = 0.18;\n"
+    "    if (a > 0.46) s = 0.42;\n"
+    "    if (b > 0.60) s = 0.70;\n"
+    "    float sp = h21(T + floor(tq * 6.0) * 7.0);\n"
+    "    if (sp > 0.992 && b > 0.5) { s = 1.0; glint = 1.0; }\n"
+    "  } else if (pat == 6) {\n"                 // thatch: long combed straw
+    "    float n = vn(vec2(T.x * 0.8, T.y * 0.12));\n"
+    "    s = n < 0.34 ? 0.28 : n < 0.58 ? 0.52 : n < 0.82 ? 0.72 : 0.92;\n"
+    "    if (mod(T.y, 5.0) < 1.0) s -= 0.22;\n"
+    "  } else if (pat == 7) {\n"                 // crop rows
+    "    float lp = mod(T.y, 4.0);\n"
+    "    s = 0.34 + vn(T / 7.0) * 0.10;\n"
+    "    if (lp < 1.5) s = 0.66;\n"
+    "    if (lp < 2.5 && h21(vec2(floor(T.x / 2.0), floor(T.y / 4.0))) > 0.45) s = 0.90;\n"
+    "  } else if (pat == 8) {\n"                 // leaves: chunky blobs, a little sky through them
+    "    float n = vn(T / 3.4) * 0.7 + h21(T * 0.29) * 0.3;\n"
+    "    s = n < 0.30 ? 0.12 : n < 0.50 ? 0.38 : n < 0.70 ? 0.60 : n < 0.88 ? 0.82 : 1.0;\n"
+    "  } else if (pat == 9) {\n"                 // bark
+    "    float n = vn(vec2(T.x * 1.6, T.y * 0.20));\n"
+    "    s = n < 0.36 ? 0.18 : n < 0.62 ? 0.46 : n < 0.85 ? 0.70 : 0.92;\n"
+    "  } else if (pat == 11) {\n"                // dressed stone: big courses
+    "    vec2 cs = vec2(8.0, 5.0);\n"
+    "    float row = floor(T.y / cs.y);\n"
+    "    float ox = mod(row, 2.0) * 4.0;\n"
+    "    vec2 cell = vec2(floor((T.x + ox) / cs.x), row);\n"
+    "    vec2 lp = vec2(mod(T.x + ox, cs.x), mod(T.y, cs.y));\n"
+    "    s = 0.56 + (h21(cell) - 0.5) * 0.30;\n"
+    "    if (lp.x < 1.0 || lp.y < 1.0) s = 0.14;\n"
+    "    else if (lp.y < 2.0) s += 0.16;\n"
+    "  } else if (pat == 12) {\n"                // plaster: nearly flat, a few worn patches
+    "    float n = vn(T / 6.0);\n"
+    "    s = 0.76 + (n - 0.5) * 0.34;\n"
+    "    if (h21(floor(T / 7.0) + 3.3) > 0.90) s -= 0.26;\n"
+    "  } else {\n"
+    "    s = 0.62;\n"
+    "  }\n"
+    "  int step6 = int(clamp(floor(s * 5.0 + 0.5), 0.0, 5.0));\n"
+    "  float idx = texelFetch(u_lut, ivec2(step6 + (use_top ? 0 : 6), ty), 0).r * 255.0;\n"
+    // the cutaway: anything nearer than the party inside a circle round them is taken away, dithered
+    "  if (u_player.w > 0.5 && v_viewz < u_player.z - 0.6) {\n"
+    "    float dsc = length(gl_FragCoord.xy - u_player.xy) / u_player.w;\n"
+    "    if (dsc < 1.0) { if (dsc < 0.76 || h21(floor(gl_FragCoord.xy / 3.0)) > (dsc - 0.76) / 0.24) discard; }\n"
+    "  }\n"
+    "  float ao = 1.0 - (1.0 - v_ao) * u_ao;\n"
+    "  float lamp = v_light.y;\n"
+    "  float lv = clamp(u_amb * v_light.x * ao, 0.0, 1.0);\n"
+    "  float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
+    "  lv = max(lv, lamp);\n"
+    "  float f = (1.0 - lv) * (u_levels - 1.0);\n"
+    "  float r0 = floor(f), fr = f - r0, r1 = min(r0 + 1.0, u_levels - 1.0);\n"
+    "  vec3 cA = mix(look(idx, u_rowa + r0), look(idx, u_rowa + r1), fr);\n"
+    "  vec3 col = warm > 0.002 ? mix(cA, mix(look(idx, u_rowb + r0), look(idx, u_rowb + r1), fr), warm) : cA;\n"
+    "  if (glint > 0.5) col = mix(col, vec3(1.0), 0.45);\n"
+    "  float fg = u_fog * smoothstep(u_fognear, u_fogfar, v_viewz);\n"
+    "  col = mix(col, u_sky, clamp(fg, 0.0, 0.92));\n"
+    "  o = vec4(col, 1.0);\n"
+    "}\n";
+
+static const char *VX_SPR_VS =
+    "layout(location=0) in vec3 a_pos;\n"
+    "layout(location=1) in vec2 a_uv;\n"
+    "layout(location=2) in vec4 a_par;\n"          // lit, warm, alpha, kind
+    "uniform mat4 u_mvp;\n"
+    "uniform mat4 u_view;\n"
+    "out vec2 v_uv; out vec4 v_par; out float v_viewz;\n"
+    "void main(){ v_uv = a_uv; v_par = a_par;\n"
+    "  vec4 vp = u_view * vec4(a_pos, 1.0); v_viewz = -vp.z;\n"
+    "  gl_Position = u_mvp * vec4(a_pos, 1.0); }\n";
+
+static const char *VX_SPR_FS =
+    "in vec2 v_uv; in vec4 v_par; in float v_viewz;\n"
+    "uniform sampler2D u_tex; uniform sampler2D u_cmap;\n"
+    "uniform float u_amb, u_levels, u_cmaph, u_rowa, u_rowb, u_indexed;\n"
+    "uniform float u_fog, u_fognear, u_fogfar; uniform vec3 u_sky;\n"
+    "out vec4 o;\n"
+    "vec3 look(float idx, float row){ return texture(u_cmap, vec2((idx+0.5)/256.0, (row+0.5)/u_cmaph)).rgb; }\n"
+    "void main(){\n"
+    "  int kind = int(v_par.w + 0.5);\n"
+    "  if (kind == 1) {\n"                        // a blob shadow: no texture, a soft disc
+    "    float d = length(v_uv - 0.5) * 2.0;\n"
+    "    float a = (1.0 - smoothstep(0.55, 1.0, d)) * v_par.z;\n"
+    "    if (a < 0.02) discard;\n"
+    "    o = vec4(0.0, 0.0, 0.0, a); return; }\n"
+    "  if (kind == 2) {\n"                        // an additive lamp glow
+    "    float d = length(v_uv - 0.5) * 2.0;\n"
+    "    float a = pow(clamp(1.0 - d, 0.0, 1.0), 2.2) * v_par.z;\n"
+    "    if (a < 0.004) discard;\n"
+    "    o = vec4(vec3(1.0, 0.86, 0.60) * a, 0.0); return; }\n"
+    "  vec4 t = texture(u_tex, v_uv);\n"
+    "  vec3 col;\n"
+    "  if (u_indexed > 0.5) {\n"
+    "    float idx = t.r * 255.0;\n"
+    "    if (idx < 0.5) discard;\n"
+    "    float lamp = v_par.y;\n"
+    "    float lv = max(clamp(u_amb * v_par.x, 0.0, 1.0), lamp);\n"
+    "    float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
+    "    float f = (1.0 - lv) * (u_levels - 1.0);\n"
+    "    float r0 = floor(f), fr = f - r0, r1 = min(r0 + 1.0, u_levels - 1.0);\n"
+    "    vec3 cA = mix(look(idx, u_rowa + r0), look(idx, u_rowa + r1), fr);\n"
+    "    col = warm > 0.002 ? mix(cA, mix(look(idx, u_rowb + r0), look(idx, u_rowb + r1), fr), warm) : cA;\n"
+    "  } else { if (t.a < 0.5) discard; col = t.rgb * v_par.x; }\n"
+    "  float fg = u_fog * smoothstep(u_fognear, u_fogfar, v_viewz);\n"
+    "  col = mix(col, u_sky, clamp(fg, 0.0, 0.92));\n"
+    "  o = vec4(col, 1.0);\n"
+    "}\n";
+
+// The HD-2D pass. One full-screen triangle; the blur is a separable 5-tap at half resolution, so the
+// expensive part runs on a quarter of the pixels. Every term has its own strength and can be zero.
+static const char *VX_QUAD_VS =
+    "out vec2 v_uv;\n"
+    "void main(){\n"
+    "  vec2 p = vec2((gl_VertexID == 2) ? 3.0 : -1.0, (gl_VertexID == 1) ? 3.0 : -1.0);\n"
+    "  v_uv = (p + 1.0) * 0.5;\n"
+    "  gl_Position = vec4(p, 0.0, 1.0); }\n";
+
+static const char *VX_BLUR_FS =
+    "in vec2 v_uv;\n"
+    "uniform sampler2D u_tex; uniform vec2 u_dir; uniform float u_thresh;\n"
+    "out vec4 o;\n"
+    "void main(){\n"
+    "  vec4 c0 = texture(u_tex, v_uv);\n"
+    "  vec4 c1 = texture(u_tex, v_uv + u_dir);\n"
+    "  vec4 c2 = texture(u_tex, v_uv - u_dir);\n"
+    "  vec4 c3 = texture(u_tex, v_uv + u_dir * 2.4);\n"
+    "  vec4 c4 = texture(u_tex, v_uv - u_dir * 2.4);\n"
+    "  vec4 c = c0 * 0.30 + (c1 + c2) * 0.245 + (c3 + c4) * 0.105;\n"
+    "  if (u_thresh > 0.0) {\n"
+    "    float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n"
+    "    c.rgb *= smoothstep(u_thresh, u_thresh + 0.22, l); }\n"
+    "  o = c; }\n";
+
+static const char *VX_POST_FS =
+    "in vec2 v_uv;\n"
+    "uniform sampler2D u_scene; uniform sampler2D u_blur; uniform sampler2D u_bloom;\n"
+    "uniform sampler2D u_depth;\n"
+    "uniform float u_dof, u_bloom_k, u_vig, u_grade, u_pdepth, u_near, u_far, u_band, u_ortho;\n"
+    "out vec4 o;\n"
+    "float lin(float d){ if (u_ortho > 0.5) return u_near + d * (u_far - u_near);\n"
+    "  float z = d * 2.0 - 1.0; return (2.0 * u_near * u_far) / (u_far + u_near - z * (u_far - u_near)); }\n"
+    "void main(){\n"
+    "  vec3 c = texture(u_scene, v_uv).rgb;\n"
+    "  if (u_dof > 0.0) {\n"
+    // Tilt shift: sharp in a band around the party's own depth, blurred away from it. The depth
+    // texture is the honest version; the band is in world units, so the focus follows the player.
+    "    float d = lin(texture(u_depth, v_uv).r);\n"
+    "    float k = clamp((abs(d - u_pdepth) - u_band) / (u_band * 2.2), 0.0, 1.0);\n"
+    "    c = mix(c, texture(u_blur, v_uv).rgb, k * u_dof); }\n"
+    "  if (u_bloom_k > 0.0) c += texture(u_bloom, v_uv).rgb * u_bloom_k;\n"
+    "  if (u_grade > 0.0) {\n"
+    "    float l = dot(c, vec3(0.299, 0.587, 0.114));\n"
+    "    vec3 warm = c * vec3(1.06, 1.01, 0.93), cool = c * vec3(0.92, 0.97, 1.10);\n"
+    "    c = mix(c, mix(cool, warm, smoothstep(0.30, 0.80, l)), u_grade); }\n"
+    "  if (u_vig > 0.0) {\n"
+    "    vec2 q = (v_uv - 0.5) * vec2(1.0, 0.86);\n"
+    "    c *= mix(1.0, clamp(1.12 - dot(q, q) * 1.9, 0.0, 1.0), u_vig); }\n"
+    "  o = vec4(c, 1.0); }\n";
+
+static GLuint vx_shader(GLenum type, const char *src, const char *what) {
+    GLuint s = glCreateShader(type);
+    const char *parts[2] = { VX_PREFIX, src };
+    glShaderSource(s, 2, parts, nullptr);
+    glCompileShader(s);
+    GLint ok = 0;
+    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    if (!ok) { char log[2048] = ""; glGetShaderInfoLog(s, sizeof(log) - 1, nullptr, log); SDL_Log("voxfield %s shader: %s", what, log); }
+    return s;
+}
+static GLuint vx_program(const char *vs_src, const char *fs_src, const char *what) {
+    GLuint vs = vx_shader(GL_VERTEX_SHADER, vs_src, what), fs = vx_shader(GL_FRAGMENT_SHADER, fs_src, what);
+    GLuint p = glCreateProgram();
+    glAttachShader(p, vs); glAttachShader(p, fs);
+    glLinkProgram(p);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { char log[2048] = ""; glGetProgramInfoLog(p, sizeof(log) - 1, nullptr, log); SDL_Log("voxfield %s link: %s", what, log); }
+    glDeleteShader(vs); glDeleteShader(fs);
+    return p;
+}
+
+// ───────────────────────── GL objects ─────────────────────────
+
+static void vx_gl_init(VoxField *v) {
+    vx_probe_limits();
+    v->prog = vx_program(VX_VS, VX_FS, "world");
+    v->spr_prog = vx_program(VX_SPR_VS, VX_SPR_FS, "sprite");
+    v->blur_prog = vx_program(VX_QUAD_VS, VX_BLUR_FS, "blur");
+    v->post_prog = vx_program(VX_QUAD_VS, VX_POST_FS, "post");
+    glGenVertexArrays(1, &v->vao);
+    glGenVertexArrays(1, &v->spr_vao);
+    glGenVertexArrays(1, &v->quad_vao);
+    glGenBuffers(1, &v->spr_vbo);
+    glGenTextures(1, &v->fbo_tex);
+    glGenTextures(1, &v->fbo_depth);
+    glGenFramebuffers(1, &v->fbo);
+    v->spr = (VxSpr *)calloc(VX_SPRITES, sizeof(VxSpr));
+    vx_load_palette(v);
+    vx_load_ramps(v);
+    vx_build_colormap(v);
+    vx_build_lut(v);
+    v->gl_ready = true;
+    SDL_Log("voxfield: GL ready, GL_MAX_TEXTURE_SIZE %d", vx_max_tex);
+}
+
+static void vx_attach_colour(GLuint fbo, GLuint tex, int w, int h) {
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+}
+
+static void vx_fbo_size(VoxField *v, int w, int h) {
+    if (v->fbo_w == w && v->fbo_h == h) return;
+    vx_attach_colour(v->fbo, v->fbo_tex, w, h);
+    // A depth TEXTURE, not a renderbuffer: the tilt-shift reads it. GLES3 and GL 3.3 both have it.
+    glBindTexture(GL_TEXTURE_2D, v->fbo_depth);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, w, h, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, v->fbo_depth, 0);
+    GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (st != GL_FRAMEBUFFER_COMPLETE) SDL_Log("voxfield: scene FBO incomplete 0x%x", st);
+    v->fbo_w = w; v->fbo_h = h;
+    // The half-res pair the blur ping-pongs through.
+    int hw = w / 2 < 1 ? 1 : w / 2, hh = h / 2 < 1 ? 1 : h / 2;
+    for (int i = 0; i < 3; i++) {
+        if (!v->half_fbo[i]) { glGenFramebuffers(1, &v->half_fbo[i]); glGenTextures(1, &v->half_tex[i]); }
+        vx_attach_colour(v->half_fbo[i], v->half_tex[i], hw, hh);
+    }
+    if (!v->out_fbo) { glGenFramebuffers(1, &v->out_fbo); glGenTextures(1, &v->out_tex); }
+    vx_attach_colour(v->out_fbo, v->out_tex, w, h);
+    v->half_w = hw; v->half_h = hh;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    SDL_Log("voxfield: scene FBO %dx%d (half %dx%d)", w, h, hw, hh);
+}
+
+// ───────────────────────── matrices ─────────────────────────
+
+static void mat_ident(float *m) { memset(m, 0, 64); m[0] = m[5] = m[10] = m[15] = 1; }
+static void mat_mul(const float *a, const float *b, float *o) {   // o = a * b, column major
+    float r[16];
+    for (int c = 0; c < 4; c++) for (int i = 0; i < 4; i++)
+        r[c * 4 + i] = a[0 * 4 + i] * b[c * 4 + 0] + a[1 * 4 + i] * b[c * 4 + 1]
+                     + a[2 * 4 + i] * b[c * 4 + 2] + a[3 * 4 + i] * b[c * 4 + 3];
+    memcpy(o, r, 64);
+}
+static void mat_persp(float *m, float fovy_deg, float aspect, float zn, float zf) {
+    float f = 1.0f / tanf(fovy_deg * 0.5f * 3.14159265f / 180.0f);
+    memset(m, 0, 64);
+    m[0] = f / aspect; m[5] = f; m[10] = (zf + zn) / (zn - zf); m[11] = -1;
+    m[14] = (2 * zf * zn) / (zn - zf);
+}
+static void mat_ortho(float *m, float hw, float hh, float zn, float zf) {
+    memset(m, 0, 64);
+    m[0] = 1 / hw; m[5] = 1 / hh; m[10] = -2 / (zf - zn); m[14] = -(zf + zn) / (zf - zn); m[15] = 1;
+}
+static void mat_look(float *m, const float *eye, const float *ctr) {
+    float f[3] = { ctr[0] - eye[0], ctr[1] - eye[1], ctr[2] - eye[2] };
+    float fl = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+    if (fl < 1e-6f) fl = 1;
+    f[0] /= fl; f[1] /= fl; f[2] /= fl;
+    float up[3] = { 0, 1, 0 };
+    float s[3] = { f[1] * up[2] - f[2] * up[1], f[2] * up[0] - f[0] * up[2], f[0] * up[1] - f[1] * up[0] };
+    float sl = sqrtf(s[0] * s[0] + s[1] * s[1] + s[2] * s[2]);
+    if (sl < 1e-6f) sl = 1;
+    s[0] /= sl; s[1] /= sl; s[2] /= sl;
+    float u[3] = { s[1] * f[2] - s[2] * f[1], s[2] * f[0] - s[0] * f[2], s[0] * f[1] - s[1] * f[0] };
+    m[0] = s[0]; m[4] = s[1]; m[8]  = s[2];  m[12] = -(s[0] * eye[0] + s[1] * eye[1] + s[2] * eye[2]);
+    m[1] = u[0]; m[5] = u[1]; m[9]  = u[2];  m[13] = -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]);
+    m[2] = -f[0]; m[6] = -f[1]; m[10] = -f[2]; m[14] = (f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2]);
+    m[3] = m[7] = m[11] = 0; m[15] = 1;
+}
+
+// ───────────────────────── the walker sheets and the atlas ─────────────────────────
+
+static int vx_art_get(VoxField *v, const char *id) {
+    for (int i = 0; i < v->art_count; i++) if (!strcmp(v->art[i].id, id)) return i;
+    if (v->art_count >= VX_ART) return -1;
+    VxArt *a = &v->art[v->art_count];
+    memset(a, 0, sizeof(*a));
+    snprintf(a->id, sizeof(a->id), "%s", id);
+    char rel[128];
+    snprintf(rel, sizeof(rel), "field/walkers/%s.png", id);
+    size_t sz = 0;
+    void *data = vx_read(rel, &sz);
+    if (!data) { SDL_Log("voxfield: walker \"%s\" has no sheet — no sprite", id); return -1; }
+    int w = 0, h = 0, c = 0;
+    unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &c, 4);
+    SDL_free(data);
+    if (!px || w < 4 || h < 4) { if (px) stbi_image_free(px); SDL_Log("voxfield: walker \"%s\" unreadable", id); return -1; }
+    char label[64];
+    snprintf(label, sizeof(label), "walker %s", id);
+    a->tex = vx_tex_indexed(v, label, px, w, h);
+    stbi_image_free(px);
+    a->w = w; a->h = h;
+    // Layout: the same rule the tile field uses — a 2:3 sheet is the 3-column contract, else 4x4.
+    a->ncols = 4; a->nrows = 4; a->fw = w / 4; a->fh = h / 4;
+    a->col_stand = 0; a->col_a = 1; a->col_b = 3;
+    for (int i = 0; i < 4; i++) { a->row_of[i] = i; a->flip[i] = false; }
+    if (w * 3 == h * 2) {
+        a->ncols = 3; a->nrows = 4; a->fw = w / 3; a->fh = h / 4;
+        a->col_stand = 0; a->col_a = 1; a->col_b = 2;
+    }
+    char jrel[128];
+    snprintf(jrel, sizeof(jrel), "field/walkers/%s.json", id);
+    size_t jsz = 0;
+    char *js = (char *)vx_read(jrel, &jsz);
+    if (js) {
+        char rows[8][8] = {{0}};
+        int nr = 0, fw = 0, fh = 0, nc = 0;
+        const char *r = strstr(js, "\"rows\"");
+        if (r) for (const char *cc = strchr(r, '['); cc && *cc && *cc != ']' && nr < 8; cc++)
+            if (*cc == '"') { const char *e = strchr(cc + 1, '"'); if (!e) break;
+                              int n2 = (int)(e - cc - 1); if (n2 > 7) n2 = 7;
+                              memcpy(rows[nr], cc + 1, (size_t)n2); rows[nr][n2] = 0; nr++; cc = e; }
+        const char *cl = strstr(js, "\"cols\"");
+        if (cl) for (const char *cc = strchr(cl, '['); cc && *cc && *cc != ']'; cc++) if (*cc == '"') { nc++; cc = strchr(cc + 1, '"'); if (!cc) break; }
+        const char *fr = strstr(js, "\"frame\"");
+        if (fr) sscanf(strchr(fr, '[') + 1, "%d , %d", &fw, &fh);
+        bool mirror = strstr(js, "\"mirror_side\"") && strstr(strstr(js, "\"mirror_side\""), "true");
+        if (nr > 0) {
+            a->nrows = nr;
+            for (int i = 0; i < 4; i++) { a->row_of[i] = 0; a->flip[i] = false; }
+            for (int i = 0; i < nr; i++) {
+                char rc = rows[i][0];
+                if (rc == 'S') a->row_of[0] = i;
+                else if (rc == 'W') { a->row_of[1] = i; if (mirror) { a->row_of[2] = i; a->flip[2] = true; } }
+                else if (rc == 'E') { a->row_of[2] = i; a->flip[2] = false; }
+                else if (rc == 'N') a->row_of[3] = i;
+            }
+        }
+        if (nc > 0) { a->ncols = nc; a->col_stand = 0; a->col_a = 1; a->col_b = nc > 2 ? 2 : 1; }
+        if (fw > 0 && fh > 0) { a->fw = fw; a->fh = fh; }
+        else { a->fw = w / (a->ncols > 0 ? a->ncols : 1); a->fh = h / (a->nrows > 0 ? a->nrows : 1); }
+        SDL_free(js);
+    }
+    SDL_Log("voxfield: walker \"%s\" %dx%d, %dx%d grid, frame %dx%d", id, w, h, a->ncols, a->nrows, a->fw, a->fh);
+    return v->art_count++;
+}
+
+static void vx_load_atlas(VoxField *v) {
+    if (v->atlas) return;
+    char rel[160];
+    snprintf(rel, sizeof(rel), "field/tilesets/%s/atlas.png", v->set[0] ? v->set : "valley");
+    size_t sz = 0;
+    void *data = vx_read(rel, &sz);
+    if (!data) { SDL_Log("voxfield: no %s — props will not be drawn", rel); return; }
+    int w = 0, h = 0, c = 0;
+    unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &c, 4);
+    SDL_free(data);
+    if (!px) return;
+    v->atlas_cell = 128;
+    char jrel[160];
+    snprintf(jrel, sizeof(jrel), "field/tilesets/%s/atlas.json", v->set[0] ? v->set : "valley");
+    size_t jsz = 0;
+    char *js = (char *)vx_read(jrel, &jsz);
+    if (js) { const char *k = strstr(js, "\"cell\""); int n = 0; if (k && sscanf(k + 6, " : %d", &n) == 1 && n > 0) v->atlas_cell = n; SDL_free(js); }
+    while (vx_max_tex > 0 && (w > vx_max_tex || h > vx_max_tex)) {   // halve rather than fail to upload
+        int nw = w / 2, nh = h / 2;
+        unsigned char *sm = (unsigned char *)malloc((size_t)nw * nh * 4);
+        for (int y = 0; y < nh; y++) for (int x = 0; x < nw; x++) for (int ch2 = 0; ch2 < 4; ch2++)
+            sm[(y * nw + x) * 4 + ch2] = px[((y * 2) * w + x * 2) * 4 + ch2];
+        stbi_image_free(px); px = sm; w = nw; h = nh; v->atlas_cell /= 2;
+        SDL_Log("voxfield: atlas over GL_MAX_TEXTURE_SIZE — halved to %dx%d", w, h);
+    }
+    v->atlas = vx_tex_indexed(v, "atlas", px, w, h);
+    v->atlas_w = w; v->atlas_h = h;
+    if (px) { if (v->atlas) stbi_image_free(px); }
+}
+
+static void vx_load_decals(VoxField *v) {
+    if (v->decal_count) return;
+    static const char *IDS[] = { "tuft", "tuft_tall", "clover", "flower_white", "flower_red",
+                                 "daisy_patch", "grass_sprout", "pebble", "pebbles", "mushroom" };
+    for (size_t i = 0; i < sizeof(IDS) / sizeof(IDS[0]) && v->decal_count < 24; i++) {
+        char rel[192];
+        snprintf(rel, sizeof(rel), "field/tilesets/%s/decals/%s.png", v->set[0] ? v->set : "valley", IDS[i]);
+        size_t sz = 0;
+        void *data = vx_read(rel, &sz);
+        if (!data) continue;
+        int w = 0, h = 0, c = 0;
+        unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &c, 4);
+        SDL_free(data);
+        if (!px) continue;
+        int k = v->decal_count++;
+        char label[64];
+        snprintf(label, sizeof(label), "decal %s", IDS[i]);
+        v->decal_tex[k] = vx_tex_indexed(v, label, px, w, h);
+        v->decal_w[k] = w; v->decal_h[k] = h;
+        snprintf(v->decal_id[k], 24, "%s", IDS[i]);
+        stbi_image_free(px);
+    }
+    SDL_Log("voxfield: %d detail sprites loaded", v->decal_count);
+}
+
+// Where the detail billboards stand: hashed over the grass, never on a path, never under anything.
+static void vx_scatter_detail(VoxField *v) {
+    v->det_count = 0;
+    if (!v->decal_count) return;
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        if (!v->walk[z][x] || v->place_at[z][x]) continue;
+        int y = v->hgt[z][x];
+        unsigned char top = get_blk(v, x, y - 1, z);
+        if (top != B_GRASS && top != B_GRASS_DRY) continue;
+        for (int k = 0; k < 2; k++) {
+            uint32_t r = vx_h32(x, z, k * 977);
+            if ((r & 255) > 46) continue;                   // sparse: about one in six cells
+            if (v->det_count >= 3072) return;
+            int d = (int)(vx_rnd(x, z, 31 + k) * v->decal_count);
+            if (d >= v->decal_count) d = v->decal_count - 1;
+            v->det[v->det_count].x = x + 0.18f + vx_rnd(x, z, 51 + k) * 0.64f;
+            v->det[v->det_count].z = z + 0.18f + vx_rnd(x, z, 71 + k) * 0.64f;
+            v->det[v->det_count].y = (short)y;
+            v->det[v->det_count].d = (unsigned char)d;
+            v->det[v->det_count].size = (unsigned char)(28 + (int)(vx_rnd(x, z, 91 + k) * 22));
+            v->det_count++;
+        }
+    }
+}
+
+// ───────────────────────── load ─────────────────────────
+
+static void vx_place_party(VoxField *v, int x, int z, int facing) {
+    if (!v->noclip && !vx_can_stand(v, x, z)) {
+        int bx = x, bz = z, best = 1 << 30;
+        for (int sz2 = 0; sz2 < v->md; sz2++) for (int sx = 0; sx < v->mw; sx++) {
+            if (!vx_can_stand(v, sx, sz2)) continue;
+            int d = (sx - x) * (sx - x) + (sz2 - z) * (sz2 - z);
+            if (d < best) { best = d; bx = sx; bz = sz2; }
+        }
+        SDL_Log("voxfield: spawn %d,%d is not standable — moved to %d,%d", x, z, bx, bz);
+        x = bx; z = bz;
+    }
+    for (int i = 0; i < VX_PARTY; i++) {
+        v->act[i].tx = v->act[i].px = (short)x;
+        v->act[i].tz = v->act[i].pz = (short)z;
+        v->act[i].facing = facing;
+        v->act[i].y = v->act[i].y0 = (float)v->hgt[z][x];
+    }
+    v->moving = false; v->move_t = 0;
+}
+
+static const char *PARTY_ART[VX_PARTY] = { "falke", "ottilie", "party_c", "party_d" };
+
+bool vx_load_map(VoxField *v, const char *name) {
+    if (!v->gl_ready) vx_gl_init(v);
+    char clean[32];
+    snprintf(clean, sizeof(clean), "%s", name && name[0] ? name : "halm");
+    for (char *c = clean; *c; c++) if (!((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '_')) { *c = 0; break; }
+    char rel[128];
+    snprintf(rel, sizeof(rel), "field/tmaps/%s.tmap", clean);
+    size_t sz = 0;
+    char *text = (char *)vx_read(rel, &sz);
+
+    v->place_count = 0; v->trig_count = 0; v->npc_count = 0; v->light_count = 0;
+    memset(v->place_at, 0, sizeof(v->place_at));
+    memset(v->tsolid, 0, sizeof(v->tsolid));
+    memset(v->walk, 0, sizeof(v->walk));
+    memset(v->hgt, 0, sizeof(v->hgt));
+    for (int z = 0; z < VX_MAXD; z++) for (int x = 0; x < VX_MAXW; x++) v->ground[z][x] = -1;
+    v->mw = 24; v->md = 16;
+    v->spawn_x = 4; v->spawn_z = 4; v->spawn_f = 0;
+    v->amb = 1.0f; v->light_table = 0;
+    snprintf(v->map_name, sizeof(v->map_name), "%s", clean);
+
+    if (text) { vx_parse_tmap(v, text); SDL_free(text); }
+    else SDL_Log("voxfield: no %s — using a bare fallback map", rel);
+    if (!v->def_count) vx_load_tileset(v, "valley");
+
+    vx_build_world(v);
+    v->reach_missing = vx_verify_reach(v);
+    vx_load_atlas(v);
+    vx_load_decals(v);
+    vx_scatter_detail(v);
+    vx_mesh_all(v);
+    for (int i = 0; i < VX_PARTY; i++) v->art_party[i] = vx_art_get(v, PARTY_ART[i]);
+    for (int i = 0; i < v->npc_count; i++) {
+        VxNpc *np = &v->npcs[i];
+        np->art = vx_art_get(v, np->walker);
+        np->y = np->py_ = (float)v->hgt[np->tz][np->tx];
+    }
+    vx_place_party(v, v->spawn_x, v->spawn_z, v->spawn_f);
+    v->steps = 0;
+    v->msg[0] = 0; v->msg_who[0] = 0;
+    v->selfchecked = false;
+    return true;
+}
+
+// One line, the first time a map is drawn: everything a reader needs to know whether the world is
+// right, without a screenshot. Printed from the tick, once GL has actually drawn a frame.
+static void vx_selfcheck(VoxField *v, int dw, int dh, int draws, int sprites) {
+    int chunks = 0;
+    for (int i = 0; i < VX_CHUNKS; i++) if (v->chunks[i].verts) chunks++;
+    SDL_Log("SELFCHECK vox: map=%s %dx%d cells  chunks=%d  tris=%d  draws=%d  sprites=%d  "
+            "reach=%s  mesh=%.1fms  fbo=%dx%d  maxtex=%d  lamps=%d  npcs=%d  detail=%d  off-palette=%ld",
+            v->map_name, v->mw, v->md, chunks, v->tris, draws, sprites,
+            v->reach_missing ? "FAIL" : "ok", v->mesh_ms, dw, dh, vx_max_tex,
+            v->light_count, v->npc_count, v->det_count, v->off_pal);
+    if (v->reach_missing) SDL_Log("SELFCHECK vox: %d cells the tile map can reach are unreachable here", v->reach_missing);
+}
+
+// ───────────────────────── walking ─────────────────────────
+
+static int npc_at(VoxField *v, int x, int z) {
+    for (int i = 0; i < v->npc_count; i++) if (v->npcs[i].tx == x && v->npcs[i].tz == z) return i;
+    return -1;
+}
+
+static void vx_say(VoxField *v, const char *who, const char *id) {
+    const char *text = nullptr, *name = nullptr;
+    for (int i = 0; i < FIELD_TEXT_COUNT; i++)
+        if (!strcmp(FIELD_TEXT[i].id, id)) { text = FIELD_TEXT[i].text; name = FIELD_TEXT[i].name; break; }
+    if (text) snprintf(v->msg, sizeof(v->msg), "%s", text);
+    else snprintf(v->msg, sizeof(v->msg), "[%s]", id);
+    const char *speaker = (name && name[0]) ? name : who;
+    snprintf(v->msg_who, sizeof(v->msg_who), "%s", speaker ? speaker : "");
+    v->msg_t = 0; v->msg_page = 0; v->msg_typing = true;
+}
+
+void vx_message(VoxField *v, const char *text) {
+    snprintf(v->msg, sizeof(v->msg), "%s", text ? text : "");
+    v->msg_who[0] = 0; v->msg_t = 0; v->msg_page = 0; v->msg_typing = true;
+}
+
+static void fire(VxEvent *ev, int kind, const char *arg) {
+    if (ev->kind != VXE_NONE) return;
+    ev->kind = kind;
+    snprintf(ev->arg, sizeof(ev->arg), "%s", arg);
+}
+
+static int trig_at(VoxField *v, int x, int z, int ka, int kb) {
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (x < g->x || z < g->z || x >= g->x + g->w || z >= g->z + g->d) continue;
+        if (g->kind == ka || g->kind == kb) return i;
+    }
+    return -1;
+}
+
+static void start_map_change(VoxField *v, const char *map, int x, int z, int f) {
+    snprintf(v->to_map, sizeof(v->to_map), "%s", map);
+    v->to_x = x; v->to_z = z; v->to_f = f;
+    v->fade = 1; v->fade_dir = 1;
+}
+
+static void on_enter_cell(VoxField *v, VxEvent *ev) {
+    v->steps++;
+    int x = v->act[0].tx, z = v->act[0].tz;
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        bool in = x >= g->x && z >= g->z && x < g->x + g->w && z < g->z + g->d;
+        bool was = g->inside;
+        g->inside = in;
+        if (!in || was) continue;
+        if (g->kind == TG_EXIT) { start_map_change(v, g->map, g->ax, g->az, g->af); return; }
+        if (g->kind == TG_DOOR && v->act[0].facing == 3) { start_map_change(v, g->map, g->ax, g->az, g->af); return; }
+        if (g->kind == TG_ZONE) fire(ev, VXE_ZONE, g->arg);
+        if (g->kind == TG_TRAP) vx_say(v, nullptr, g->arg);
+        if (g->kind == TG_SCENE) fire(ev, VXE_SCENE, g->arg);
+    }
+}
+
+static void npc_step(VoxField *v, float dt) {
+    for (int i = 0; i < v->npc_count; i++) {
+        VxNpc *np = &v->npcs[i];
+        if (np->px != np->tx || np->pz != np->tz) {
+            np->t += dt;
+            if (np->t >= 0.3f) { np->px = np->tx; np->pz = np->tz; np->t = 0.3f; np->py_ = np->y; }
+            continue;
+        }
+        if (!np->wander) continue;
+        np->wait -= dt;
+        if (np->wait > 0) continue;
+        np->wait = 1.0f + vx_rnd((int)(v->anim_t * 60) + i, i, 17) * 2.0f;
+        int d = (int)(vx_rnd((int)(v->anim_t * 97) + i, 5, 3) * 4) & 3;
+        int nx = np->tx + DX[d], nz = np->tz + DZ[d];
+        np->facing = d;
+        if (abs(nx - np->hx) > np->wander || abs(nz - np->hz) > np->wander) continue;
+        if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
+        if (v->tsolid[nz][nx] || !v->walk[nz][nx]) continue;
+        if (abs((int)v->hgt[nz][nx] - (int)v->hgt[np->tz][np->tx]) > 1) continue;
+        if (trig_at(v, nx, nz, TG_EXIT, TG_DOOR) >= 0 || trig_at(v, nx, nz, TG_MESSAGE, TG_ZONE) >= 0) continue;
+        bool blocked = false;
+        for (int p = 0; p < v->party && !blocked; p++) if (v->act[p].tx == nx && v->act[p].tz == nz) blocked = true;
+        if (blocked) continue;
+        v->walk[np->tz][np->tx] = 1;
+        np->px = np->tx; np->pz = np->tz; np->py_ = np->y;
+        np->tx = (short)nx; np->tz = (short)nz;
+        np->y = (float)v->hgt[nz][nx];
+        np->t = 0; np->parity ^= 1;
+        v->walk[nz][nx] = 0;
+    }
+}
+
+static bool vx_blocked(VoxField *v, int fx, int fz, int tx, int tz) {
+    if (v->noclip) return false;
+    if (!vx_can_step(v, fx, fz, tx, tz)) return true;
+    return npc_at(v, tx, tz) >= 0;
+}
+
+// ───────────────────────── input (the tile field's, unchanged in feel) ─────────────────────────
+
+struct VxTouch { SDL_FingerID id; float x, y; };
+
+static int vx_touches(VxTouch *out, int max, int w, int h) {
+    int n = 0, nd = 0;
+    SDL_TouchID *devs = SDL_GetTouchDevices(&nd);
+    if (devs) {
+        for (int d = 0; d < nd && n < max; d++) {
+            int nf = 0;
+            SDL_Finger **fg = SDL_GetTouchFingers(devs[d], &nf);
+            if (!fg) continue;
+            for (int i = 0; i < nf && n < max; i++) { out[n].id = fg[i]->id; out[n].x = fg[i]->x * w; out[n].y = fg[i]->y * h; n++; }
+            SDL_free(fg);
+        }
+        SDL_free(devs);
+        if (nd > 0) return n;
+    }
+    if (ImGui::IsMouseDown(0)) { out[0].id = 1; out[0].x = ImGui::GetIO().MousePos.x; out[0].y = ImGui::GetIO().MousePos.y; return 1; }
+    return 0;
+}
+
+static void vx_input(VoxField *v, int w, int h, bool blocked, float dt) {
+    VxTouch tt[8];
+    int n = blocked ? 0 : vx_touches(tt, 8, w, h);
+    v->tapped = false;
+    bool stick_seen = false, act_seen = false;
+    for (int i = 0; i < n; i++) {
+        if (v->stick_on && tt[i].id == v->stick_id) { stick_seen = true; v->stick_x = tt[i].x; v->stick_y = tt[i].y; }
+        if (v->act_on && tt[i].id == v->act_id) act_seen = true;
+    }
+    if (v->stick_on && !stick_seen) v->stick_on = false;
+    if (v->act_on && !act_seen) {
+        if (v->act_t <= 0.35f) v->tapped = true;
+        v->act_on = false; v->run = false; v->act_t = 0;
+    }
+    for (int i = 0; i < n; i++) {
+        if ((v->stick_on && tt[i].id == v->stick_id) || (v->act_on && tt[i].id == v->act_id)) continue;
+        if (tt[i].x < w * 0.5f && !v->stick_on) {
+            v->stick_on = true; v->stick_id = tt[i].id;
+            v->stick_ox = v->stick_x = tt[i].x; v->stick_oy = v->stick_y = tt[i].y;
+        } else if (tt[i].x >= w * 0.5f && !v->act_on) { v->act_on = true; v->act_id = tt[i].id; v->act_t = 0; }
+    }
+    if (v->act_on) { v->act_t += dt; if (v->act_t > 0.35f) v->run = true; }
+    if (!blocked) {
+        ImGuiIO &io = ImGui::GetIO();
+        if (!io.WantCaptureKeyboard) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Space, false) || ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_Z, false)) v->tapped = true;
+            if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) v->run = true;
+        }
+    }
+}
+
+static int vx_want_dir(VoxField *v, int w) {
+    float dx = 0, dy = 0;
+    if (v->stick_on) {
+        dx = v->stick_x - v->stick_ox; dy = v->stick_y - v->stick_oy;
+        if (dx * dx + dy * dy < (w * 0.024f) * (w * 0.024f)) { dx = dy = 0; }
+    }
+    ImGuiIO &io = ImGui::GetIO();
+    if (!io.WantCaptureKeyboard) {
+        if (ImGui::IsKeyDown(ImGuiKey_LeftArrow) || ImGui::IsKeyDown(ImGuiKey_A)) dx -= 100;
+        if (ImGui::IsKeyDown(ImGuiKey_RightArrow) || ImGui::IsKeyDown(ImGuiKey_D)) dx += 100;
+        if (ImGui::IsKeyDown(ImGuiKey_UpArrow) || ImGui::IsKeyDown(ImGuiKey_W)) dy -= 100;
+        if (ImGui::IsKeyDown(ImGuiKey_DownArrow) || ImGui::IsKeyDown(ImGuiKey_S)) dy += 100;
+    }
+    if (dx == 0 && dy == 0) { v->last_axis = -1; return -1; }
+    int axis;
+    float ax = fabsf(dx), ay = fabsf(dy);
+    if (ax > ay * 1.35f) axis = 0;
+    else if (ay > ax * 1.35f) axis = 1;
+    else axis = v->last_axis >= 0 ? v->last_axis : (ax >= ay ? 0 : 1);
+    v->last_axis = axis;
+    return axis == 0 ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);
+}
+
+static void vx_walk(VoxField *v, int w, float dt, VxEvent *ev) {
+    if (v->moving) {
+        v->move_t += dt;
+        if (v->move_t < v->step_len) return;
+        v->moving = false; v->move_t = 0;
+        for (int i = 0; i < VX_PARTY; i++) {
+            v->act[i].px = v->act[i].tx; v->act[i].pz = v->act[i].tz;
+            v->act[i].y0 = v->act[i].y;
+        }
+        on_enter_cell(v, ev);
+        if (v->fade_dir) return;
+    }
+    if (v->msg[0] || v->fade_dir) return;
+    int dir = vx_want_dir(v, w);
+    if (dir < 0) { v->hold_t = 0; v->want_dir = -1; return; }
+    if (dir != v->want_dir) { v->want_dir = dir; v->hold_t = 0; v->act[0].facing = dir; return; }
+    v->hold_t += dt;
+    if (v->hold_t < TURN_HOLD) return;
+    v->act[0].facing = dir;
+    int nx = v->act[0].tx + DX[dir], nz = v->act[0].tz + DZ[dir];
+    if (vx_blocked(v, v->act[0].tx, v->act[0].tz, nx, nz)) return;
+    short ox[VX_PARTY], oz[VX_PARTY];
+    float oy[VX_PARTY];
+    for (int i = 0; i < VX_PARTY; i++) { ox[i] = v->act[i].tx; oz[i] = v->act[i].tz; oy[i] = v->act[i].y; }
+    v->act[0].px = ox[0]; v->act[0].pz = oz[0]; v->act[0].y0 = oy[0];
+    v->act[0].tx = (short)nx; v->act[0].tz = (short)nz;
+    v->act[0].y = (float)v->hgt[nz][nx];
+    for (int i = 1; i < VX_PARTY; i++) {
+        v->act[i].px = ox[i]; v->act[i].pz = oz[i]; v->act[i].y0 = oy[i];
+        v->act[i].tx = ox[i - 1]; v->act[i].tz = oz[i - 1];
+        v->act[i].y = (float)v->hgt[v->act[i].tz][v->act[i].tx];
+        if (v->act[i].tx != v->act[i].px || v->act[i].tz != v->act[i].pz) {
+            int ddx = v->act[i].tx - v->act[i].px, ddz = v->act[i].tz - v->act[i].pz;
+            v->act[i].facing = ddx < 0 ? 1 : ddx > 0 ? 2 : ddz < 0 ? 3 : 0;
+        }
+    }
+    v->moving = true; v->move_t = 0;
+    v->step_len = v->run ? RUN_STEP : WALK_STEP;
+    v->step_parity ^= 1;
+}
+
+// ───────────────────────── billboards ─────────────────────────
+
+static int walk_col(const VxArt *a, int parity, float k, bool moving) {
+    if (!moving) return a->col_stand;
+    if (a->ncols >= 4) { int c = parity ? (k < 0.5f ? 3 : 0) : (k < 0.5f ? 1 : 2); return c; }
+    int c = parity ? a->col_b : a->col_a;
+    return k < 0.6f ? c : a->col_stand;
+}
+
+static void spr_push(VoxField *v, const VxSpr *s) {
+    if (v->spr_count < VX_SPRITES) v->spr[v->spr_count++] = *s;
+}
+
+static void vx_light_at_foot(VoxField *v, float x, float y, float z, float *lit, float *warm) {
+    float lamp = 0;
+    vx_lamp_at(v, x, y + 0.8f, z, &lamp);
+    *lit = 0.92f;                      // a body is lit by the sky, not by the face it stands on
+    *warm = lamp;
+}
+
+static void push_walker(VoxField *v, int art, float x, float y, float z, int facing, int col) {
+    if (art < 0 || art >= v->art_count) return;
+    VxArt *a = &v->art[art];
+    int row = a->row_of[facing & 3];
+    bool flip = a->flip[facing & 3];
+    float fw = 1.0f / (float)(a->ncols > 0 ? a->ncols : 1), fh = 1.0f / (float)(a->nrows > 0 ? a->nrows : 1);
+    if (col >= a->ncols) col = a->ncols - 1;
+    VxSpr s;
+    memset(&s, 0, sizeof(s));
+    s.x = x; s.y = y; s.z = z;
+    s.h = 1.6f;                                         // a door is 2 blocks; the party is 1.6
+    s.w = s.h * (float)a->fw / (float)(a->fh > 0 ? a->fh : 1);
+    s.u0 = flip ? (col + 1) * fw : col * fw;
+    s.u1 = flip ? col * fw : (col + 1) * fw;
+    s.v0 = row * fh; s.v1 = (row + 1) * fh;
+    s.tex = a->tex; s.kind = 0; s.alpha = 1; s.tilt = 1;
+    vx_light_at_foot(v, x, y, z, &s.lit, &s.warm);
+    spr_push(v, &s);
+    VxSpr sh;                                            // the blob shadow, flat on the ground
+    memset(&sh, 0, sizeof(sh));
+    sh.x = x; sh.y = y + 0.02f; sh.z = z;
+    sh.w = s.w * 0.85f; sh.h = s.w * 0.62f;
+    sh.kind = 1; sh.alpha = 0.42f; sh.tilt = 0;
+    spr_push(v, &sh);
+}
+
+static void vx_collect_sprites(VoxField *v) {
+    v->spr_count = 0;
+    float k = v->moving ? v->move_t / v->step_len : 1.0f;
+    for (int i = v->party - 1; i >= 0; i--) {
+        VxActor *a = &v->act[i];
+        float x = vx_lerp(a->px + 0.5f, a->tx + 0.5f, k);
+        float z = vx_lerp(a->pz + 0.5f, a->tz + 0.5f, k);
+        float y = vx_lerp(a->y0, a->y, k);
+        if (a->y != a->y0) y += sinf(k * 3.14159f) * 0.18f;          // the little hop on a step
+        int art = v->art_party[i];
+        int col = art >= 0 ? walk_col(&v->art[art], v->step_parity ^ (i & 1), k, v->moving) : 0;
+        push_walker(v, art, x, y, z, a->facing, col);
+    }
+    for (int i = 0; i < v->npc_count; i++) {
+        VxNpc *np = &v->npcs[i];
+        float nk = np->t >= 0.3f ? 1.0f : np->t / 0.3f;
+        bool mv = (np->px != np->tx || np->pz != np->tz);
+        float x = vx_lerp(np->px + 0.5f, np->tx + 0.5f, mv ? nk : 1.0f);
+        float z = vx_lerp(np->pz + 0.5f, np->tz + 0.5f, mv ? nk : 1.0f);
+        float y = vx_lerp(np->py_, np->y, mv ? nk : 1.0f);
+        int col = np->art >= 0 ? walk_col(&v->art[np->art], np->parity, nk, mv) : 0;
+        push_walker(v, np->art, x, y, z, np->facing, col);
+    }
+    // Props: any stamp nobody has modelled, as a billboard of its own atlas cells standing on the map.
+    if (v->atlas && v->atlas_cell > 0) {
+        float aw = (float)v->atlas_w, ah = (float)v->atlas_h;
+        for (int i = 0; i < v->place_count; i++) {
+            VxPlace *p = &v->places[i];
+            VxDef *d = &v->defs[p->def];
+            if (obj_kind(d->name) || d->index < 0) continue;
+            int cx = d->index % 16, cz = d->index / 16;
+            float px0 = cx * (float)v->atlas_cell, py0 = cz * (float)v->atlas_cell;
+            float pw = d->w * (float)v->atlas_cell, ph = d->h * (float)v->atlas_cell;
+            if (px0 + pw > aw || py0 + ph > ah) continue;
+            float fx = p->x + d->w * 0.5f, fz = p->z + d->h - 0.5f;
+            int hx = p->x < v->mw ? p->x : v->mw - 1, hz = p->z < v->md ? p->z : v->md - 1;
+            VxSpr s;
+            memset(&s, 0, sizeof(s));
+            s.x = fx; s.z = fz; s.y = (float)v->hgt[hz][hx];
+            s.w = (float)d->w; s.h = (float)d->h * 0.95f;
+            s.u0 = px0 / aw; s.v0 = py0 / ah; s.u1 = (px0 + pw) / aw; s.v1 = (py0 + ph) / ah;
+            s.tex = v->atlas; s.kind = 0; s.alpha = 1; s.tilt = 1;
+            vx_light_at_foot(v, s.x, s.y, s.z, &s.lit, &s.warm);
+            spr_push(v, &s);
+        }
+    }
+    // Detail: flowers, tufts and pebbles, hashed over the grass. The density slider is live.
+    int want = (int)(v->det_count * (v->detail < 0 ? 0 : v->detail > 1 ? 1 : v->detail));
+    for (int i = 0; i < want; i++) {
+        int d = v->det[i].d;
+        if (d >= v->decal_count) continue;
+        VxSpr s;
+        memset(&s, 0, sizeof(s));
+        s.x = v->det[i].x; s.z = v->det[i].z; s.y = (float)v->det[i].y;
+        s.h = v->det[i].size / 100.0f;
+        s.w = s.h * (float)v->decal_w[d] / (float)(v->decal_h[d] > 0 ? v->decal_h[d] : 1);
+        s.u0 = 0; s.v0 = 0; s.u1 = 1; s.v1 = 1;
+        s.tex = v->decal_tex[d]; s.kind = 0; s.alpha = 1; s.tilt = 1;
+        vx_light_at_foot(v, s.x, s.y, s.z, &s.lit, &s.warm);
+        spr_push(v, &s);
+    }
+    // Lamps at night: a soft additive glow the bloom picks up. Off in full daylight, where it is noise.
+    if (v->amb < 0.92f) {
+        for (int i = 0; i < v->light_count; i++) {
+            VxLight *l = &v->lights[i];
+            float fl = l->flicker ? 0.82f + 0.18f * vx_vnoise(v->anim_t * 7.0f + i * 3.7f, 0.5f, 55u) : 1.0f;
+            VxSpr s;
+            memset(&s, 0, sizeof(s));
+            s.x = l->x; s.z = l->z; s.y = l->y - 0.9f;
+            s.w = s.h = l->r * 0.9f;
+            s.kind = 2; s.alpha = l->level * fl * (1.0f - v->amb) * 0.85f; s.tilt = 1;
+            spr_push(v, &s);
+        }
+    }
+}
+
+// ───────────────────────── render ─────────────────────────
+
+struct VxSprVert { float x, y, z, u, vtex, lit, warm, alpha, kind; };
+
+static int vx_emit_sprites(VoxField *v, VxSprVert *out, int cap, int kind, GLuint tex, int from, int *next) {
+    float T = v->pitch * 3.14159265f / 180.0f;
+    int n = 0, i = from;
+    for (; i < v->spr_count; i++) {
+        VxSpr *s = &v->spr[i];
+        if (s->kind != kind) continue;
+        if (kind == 0 && s->tex != tex) continue;
+        if (n + 6 > cap) break;
+        float ang = kind == 1 ? 0.0f : (kind == 2 ? T : T * v->tilt);
+        float ux, uy, uz, rx = s->w * 0.5f;
+        if (kind == 1) { ux = 0; uy = 0; uz = s->h; }                    // flat on the ground
+        else { ux = 0; uy = s->h * cosf(ang); uz = -s->h * sinf(ang); }
+        float bx = s->x, by = s->y, bz = s->z;
+        if (kind == 1) { bz -= s->h * 0.5f; }                            // centre the disc on the feet, flat in XZ
+        if (kind == 2) { by -= uy * 0.5f; bz -= uz * 0.5f; bx -= 0; }    // centre the glow
+        float p[4][3];
+        p[0][0] = bx - rx;      p[0][1] = by;      p[0][2] = bz;
+        p[1][0] = bx + rx;      p[1][1] = by;      p[1][2] = bz;
+        p[2][0] = bx + rx + ux; p[2][1] = by + uy; p[2][2] = bz + uz;
+        p[3][0] = bx - rx + ux; p[3][1] = by + uy; p[3][2] = bz + uz;
+        float uv[4][2] = { { s->u0, s->v1 }, { s->u1, s->v1 }, { s->u1, s->v0 }, { s->u0, s->v0 } };
+        if (kind != 0) { uv[0][0] = 0; uv[0][1] = 1; uv[1][0] = 1; uv[1][1] = 1; uv[2][0] = 1; uv[2][1] = 0; uv[3][0] = 0; uv[3][1] = 0; }
+        static const int ORDER[6] = { 0, 1, 2, 0, 2, 3 };
+        for (int k = 0; k < 6; k++) {
+            int c = ORDER[k];
+            VxSprVert *o = &out[n++];
+            o->x = p[c][0]; o->y = p[c][1]; o->z = p[c][2];
+            o->u = uv[c][0]; o->vtex = uv[c][1];
+            o->lit = s->lit; o->warm = s->warm; o->alpha = s->alpha; o->kind = (float)s->kind;
+        }
+    }
+    if (next) *next = i;
+    return n;
+}
+
+static void vx_draw_sprite_batch(VoxField *v, const VxSprVert *vert, int n) {
+    if (n <= 0) return;
+    glBindVertexArray(v->spr_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, v->spr_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(VxSprVert) * (size_t)n, vert, GL_STREAM_DRAW);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)0);
+    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)12);
+    glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)20);
+    glDrawArrays(GL_TRIANGLES, 0, n);
+}
+
+static void vx_camera(VoxField *v, int w, int h, float *proj) {
+    float k = v->moving ? v->move_t / v->step_len : 1.0f;
+    VxActor *a = &v->act[0];
+    float px = vx_lerp(a->px + 0.5f, a->tx + 0.5f, k);
+    float pz = vx_lerp(a->pz + 0.5f, a->tz + 0.5f, k);
+    float py = vx_lerp(a->y0, a->y, k);
+    v->cam_tgt[0] = px; v->cam_tgt[1] = py + 0.9f; v->cam_tgt[2] = pz;
+    float p = v->pitch * 3.14159265f / 180.0f;
+    float aspect = (float)w / (h > 0 ? (float)h : 1.0f);
+    float D;
+    if (v->ortho) {
+        D = 40.0f;
+        mat_ortho(proj, v->view_h * 0.5f * aspect, v->view_h * 0.5f, 0.5f, 140.0f);
+    } else {
+        D = (v->view_h * 0.5f) / tanf(v->fov * 0.5f * 3.14159265f / 180.0f);
+        mat_persp(proj, v->fov, aspect, 0.5f, 200.0f);
+    }
+    v->cam_eye[0] = v->cam_tgt[0];
+    v->cam_eye[1] = v->cam_tgt[1] + D * sinf(p);
+    v->cam_eye[2] = v->cam_tgt[2] + D * cosf(p);
+    mat_look(v->view, v->cam_eye, v->cam_tgt);
+    mat_mul(proj, v->view, v->mvp);
+    // Where the party is on screen, and how deep — the cutaway and the tilt-shift both want it.
+    float cp[4] = { v->cam_tgt[0], v->cam_tgt[1], v->cam_tgt[2], 1 };
+    float cl[4];
+    for (int i = 0; i < 4; i++) cl[i] = v->mvp[0 * 4 + i] * cp[0] + v->mvp[1 * 4 + i] * cp[1] + v->mvp[2 * 4 + i] * cp[2] + v->mvp[3 * 4 + i];
+    float iw = cl[3] != 0 ? 1.0f / cl[3] : 1.0f;
+    v->player_screen[0] = (cl[0] * iw * 0.5f + 0.5f) * w;
+    v->player_screen[1] = (cl[1] * iw * 0.5f + 0.5f) * h;
+    float vz = v->view[2] * cp[0] + v->view[6] * cp[1] + v->view[10] * cp[2] + v->view[14];
+    v->player_screen[2] = -vz;
+}
+
+static void vx_set_common(VoxField *v, GLuint prog, float sky[3]) {
+    int rowa = v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0];
+    int rowb = v->cmap_lamp_row0;
+    glUniform1f(glGetUniformLocation(prog, "u_amb"), v->amb);
+    glUniform1f(glGetUniformLocation(prog, "u_levels"), (float)v->cmap_levels);
+    glUniform1f(glGetUniformLocation(prog, "u_cmaph"), (float)v->cmap_h);
+    glUniform1f(glGetUniformLocation(prog, "u_rowa"), (float)rowa);
+    glUniform1f(glGetUniformLocation(prog, "u_rowb"), (float)rowb);
+    glUniform1f(glGetUniformLocation(prog, "u_fog"), v->fog);
+    glUniform1f(glGetUniformLocation(prog, "u_fognear"), v->view_h * 1.1f);
+    glUniform1f(glGetUniformLocation(prog, "u_fogfar"), v->view_h * 4.2f);
+    glUniform3f(glGetUniformLocation(prog, "u_sky"), sky[0], sky[1], sky[2]);
+}
+
+static void vx_render(VoxField *v, int w, int h) {
+    float proj[16];
+    vx_camera(v, w, h, proj);
+    // The sky and the fog take their colour from the palette, through the same colormap as everything
+    // else, so a night sky is the night table's idea of that blue and not a number typed in here.
+    float sky[3];
+    vx_cpu_colour(v, 141, v->amb * 0.9f + 0.1f, sky);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
+    glViewport(0, 0, w, h);
+    glClearColor(sky[0], sky[1], sky[2], 1.0f);
+    glClearDepthf(1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    glUseProgram(v->prog);
+    glUniformMatrix4fv(glGetUniformLocation(v->prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glUniformMatrix4fv(glGetUniformLocation(v->prog, "u_view"), 1, GL_FALSE, v->view);
+    glUniform1i(glGetUniformLocation(v->prog, "u_lut"), 0);
+    glUniform1i(glGetUniformLocation(v->prog, "u_cmap"), 1);
+    glUniform1f(glGetUniformLocation(v->prog, "u_ao"), v->ao_str);
+    glUniform1f(glGetUniformLocation(v->prog, "u_time"), v->anim_t);
+    glUniform4f(glGetUniformLocation(v->prog, "u_player"), v->player_screen[0], v->player_screen[1],
+                v->player_screen[2], v->cutaway ? (float)h * 0.16f : 0.0f);
+    vx_set_common(v, v->prog, sky);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, v->lut);
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->cmap);
+    glActiveTexture(GL_TEXTURE0);
+
+    glBindVertexArray(v->vao);
+    int draws = 0;
+    for (int i = 0; i < VX_CHUNKS; i++) {
+        VxChunk *ch = &v->chunks[i];
+        if (!ch->verts) continue;
+        glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)0);
+        glEnableVertexAttribArray(1); glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, sizeof(VxVert), (void *)12);
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VxVert), (void *)16);
+        glDrawArrays(GL_TRIANGLES, 0, ch->verts);
+        draws++;
+    }
+
+    // Billboards. Alpha-tested with depth write, so they sort against the blocks for nothing.
+    vx_collect_sprites(v);
+    static VxSprVert *sv = nullptr;
+    static int sv_cap = 0;
+    if (sv_cap < VX_SPRITES * 6) { sv_cap = VX_SPRITES * 6; sv = (VxSprVert *)realloc(sv, sizeof(VxSprVert) * (size_t)sv_cap); }
+    glUseProgram(v->spr_prog);
+    glUniformMatrix4fv(glGetUniformLocation(v->spr_prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glUniformMatrix4fv(glGetUniformLocation(v->spr_prog, "u_view"), 1, GL_FALSE, v->view);
+    glUniform1i(glGetUniformLocation(v->spr_prog, "u_tex"), 0);
+    glUniform1i(glGetUniformLocation(v->spr_prog, "u_cmap"), 1);
+    glUniform1f(glGetUniformLocation(v->spr_prog, "u_indexed"), v->pal_ok ? 1.0f : 0.0f);
+    vx_set_common(v, v->spr_prog, sky);
+    // one batch per texture, in the order they were pushed
+    GLuint done[32];
+    int done_n = 0;
+    for (int i = 0; i < v->spr_count; i++) {
+        if (v->spr[i].kind != 0) continue;
+        GLuint tex = v->spr[i].tex;
+        bool seen = false;
+        for (int k = 0; k < done_n; k++) if (done[k] == tex) seen = true;
+        if (seen || done_n >= 32) continue;
+        done[done_n++] = tex;
+        int from = 0, n;
+        glBindTexture(GL_TEXTURE_2D, tex);
+        while ((n = vx_emit_sprites(v, sv, sv_cap, 0, tex, from, &from)) > 0) { vx_draw_sprite_batch(v, sv, n); draws++; }
+    }
+    // shadows, then the additive lamp glows
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    { int from = 0, n = vx_emit_sprites(v, sv, sv_cap, 1, 0, 0, &from); if (n) { vx_draw_sprite_batch(v, sv, n); draws++; } }
+    glBlendFunc(GL_ONE, GL_ONE);
+    { int from = 0, n = vx_emit_sprites(v, sv, sv_cap, 2, 0, 0, &from); if (n) { vx_draw_sprite_batch(v, sv, n); draws++; } }
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    glBindVertexArray(0);
+
+    if (!v->selfchecked) { vx_selfcheck(v, w, h, draws, v->spr_count); v->selfchecked = true; }
+}
+
+// The HD-2D pass: tilt-shift, bloom, vignette and a gentle grade. Everything but the composite runs
+// at half resolution. With `hd2d` off nothing here runs and the scene texture is shown as it is.
+static GLuint vx_post(VoxField *v, int w, int h) {
+    if (!v->hd2d) return v->fbo_tex;
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glBindVertexArray(v->quad_vao);
+    glUseProgram(v->blur_prog);
+    glUniform1i(glGetUniformLocation(v->blur_prog, "u_tex"), 0);
+    glActiveTexture(GL_TEXTURE0);
+    float hw = (float)v->half_w, hh = (float)v->half_h;
+    // scene -> half[0] (horizontal) -> half[1] (vertical): the blurred copy the tilt-shift mixes in
+    glBindFramebuffer(GL_FRAMEBUFFER, v->half_fbo[0]);
+    glViewport(0, 0, v->half_w, v->half_h);
+    glBindTexture(GL_TEXTURE_2D, v->fbo_tex);
+    glUniform2f(glGetUniformLocation(v->blur_prog, "u_dir"), 1.4f / hw, 0.0f);
+    glUniform1f(glGetUniformLocation(v->blur_prog, "u_thresh"), 0.0f);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindFramebuffer(GL_FRAMEBUFFER, v->half_fbo[1]);
+    glBindTexture(GL_TEXTURE_2D, v->half_tex[0]);
+    glUniform2f(glGetUniformLocation(v->blur_prog, "u_dir"), 0.0f, 1.4f / hh);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // half[1] -> half[2]: the same blur again, thresholded — the bloom
+    if (v->bloom > 0.0f) {
+        glBindFramebuffer(GL_FRAMEBUFFER, v->half_fbo[2]);
+        glBindTexture(GL_TEXTURE_2D, v->half_tex[1]);
+        glUniform2f(glGetUniformLocation(v->blur_prog, "u_dir"), 2.6f / hw, 2.6f / hh);
+        glUniform1f(glGetUniformLocation(v->blur_prog, "u_thresh"), 0.66f);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, v->out_fbo);
+    glViewport(0, 0, w, h);
+    glUseProgram(v->post_prog);
+    glUniform1i(glGetUniformLocation(v->post_prog, "u_scene"), 0);
+    glUniform1i(glGetUniformLocation(v->post_prog, "u_blur"), 1);
+    glUniform1i(glGetUniformLocation(v->post_prog, "u_bloom"), 2);
+    glUniform1i(glGetUniformLocation(v->post_prog, "u_depth"), 3);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_dof"), v->dof);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_bloom_k"), v->bloom);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_vig"), v->vignette);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_grade"), v->grade);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_pdepth"), v->player_screen[2]);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_near"), v->ortho ? 0.5f : 0.5f);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_far"), v->ortho ? 140.0f : 200.0f);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_band"), v->view_h * 0.42f);
+    glUniform1f(glGetUniformLocation(v->post_prog, "u_ortho"), v->ortho ? 1.0f : 0.0f);
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, v->fbo_tex);
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->half_tex[1]);
+    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, v->bloom > 0.0f ? v->half_tex[2] : v->half_tex[1]);
+    glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, v->fbo_depth);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return v->out_tex;
+}
+
+// ───────────────────────── the pad and the box (the tile field's, unchanged) ─────────────────────
+
+static void draw_touch_ui(VoxField *v, int w, int h) {
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    float r = h * 0.14f;
+    if (v->stick_on) {
+        float dx = v->stick_x - v->stick_ox, dy = v->stick_y - v->stick_oy;
+        float len = sqrtf(dx * dx + dy * dy);
+        if (len > r) { dx *= r / len; dy *= r / len; }
+        dl->AddCircleFilled(ImVec2(v->stick_ox, v->stick_oy), r, IM_COL32(255, 255, 255, 26), 32);
+        dl->AddCircle(ImVec2(v->stick_ox, v->stick_oy), r, IM_COL32(255, 255, 255, 70), 32, h * 0.006f);
+        dl->AddCircleFilled(ImVec2(v->stick_ox + dx, v->stick_oy + dy), r * 0.42f, IM_COL32(220, 228, 255, 110), 24);
+    }
+    float ax = w - h * 0.20f, ay = h * 0.74f;
+    dl->AddCircle(ImVec2(ax, ay), h * 0.10f, IM_COL32(255, 255, 255, v->act_on ? 130 : 45), 28, h * 0.006f);
+    if (v->act_on) dl->AddCircleFilled(ImVec2(ax, ay), h * 0.10f, IM_COL32(255, 255, 255, v->run ? 60 : 30), 28);
+    if (v->run) dl->AddText(ImGui::GetFont(), h * 0.05f, ImVec2(ax - h * 0.05f, ay - h * 0.025f), IM_COL32(255, 230, 150, 220), "RUN");
+    if (v->exam_trig >= 0 || v->exam_npc >= 0) {
+        float px = v->player_screen[0], py = (float)h - v->player_screen[1];
+        dl->AddText(ImGui::GetFont(), h * 0.09f, ImVec2(px - h * 0.02f, py - h * 0.22f), IM_COL32(255, 230, 120, 240), "!");
+    }
+}
+
+static void draw_msg_box(VoxField *v, int w, int h) {
+    if (!v->msg[0]) return;
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    ImFont *font = ImGui::GetFont();
+    float ts = h * 0.052f, u = ts * 0.12f;
+    float x0 = w * 0.06f, x1 = w * 0.94f, y1 = h * 0.96f, y0 = y1 - h * 0.24f;
+    dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), IM_COL32(8, 8, 20, 255), u * 1.6f);
+    dl->AddRectFilledMultiColor(ImVec2(x0 + u, y0 + u), ImVec2(x1 - u, y1 - u),
+        IM_COL32(24, 40, 150, 255), IM_COL32(24, 40, 150, 255), IM_COL32(8, 16, 84, 255), IM_COL32(8, 16, 84, 255));
+    dl->AddRect(ImVec2(x0 + u * 0.5f, y0 + u * 0.5f), ImVec2(x1 - u * 0.5f, y1 - u * 0.5f), IM_COL32(225, 225, 235, 255), u * 1.4f, 0, u * 0.7f);
+    DlgRect cr = dlg_content(x0, y0, x1, y1, ts);
+    float name_h = v->msg_who[0] ? ts * DLG_LINE_H : 0.0f;
+    float tw = cr.x1 - cr.x0;
+    DlgPages pg;
+    dlg_paginate(font, ts, tw, dlg_max_lines((cr.y1 - cr.y0) - name_h, ts), v->msg, &pg);
+    if (v->msg_page >= pg.count) v->msg_page = pg.count - 1;
+    if (v->msg_page < 0) v->msg_page = 0;
+    const char *pb = pg.beg[v->msg_page], *pe = pg.end[v->msg_page];
+    int chars = (int)(v->msg_t * VX_TYPE_CPS);
+    v->msg_typing = chars < (int)(pe - pb);
+    v->msg_more = v->msg_page + 1 < pg.count;
+    if (v->msg_who[0]) {
+        dl->AddText(font, ts * 0.92f, ImVec2(cr.x0, cr.y0), IM_COL32(255, 216, 74, 255), v->msg_who);
+        dlg_draw_text(dl, font, ts, ImVec2(cr.x0, cr.y0 + name_h), tw, IM_COL32_WHITE, pb, pe, chars, false);
+    } else {
+        float th = dlg_text_height(font, ts, tw, pb, pe);
+        dlg_draw_text(dl, font, ts, ImVec2(cr.x0, cr.y0 + ((cr.y1 - cr.y0) - th) * 0.5f), tw, IM_COL32_WHITE, pb, pe, chars, true);
+    }
+    if (!v->msg_typing) dlg_marker(dl, cr.x1 - ts * 0.45f, cr.y1 - ts * 0.45f, ts, v->msg_more, v->msg_t);
+}
+
+static void vx_poll_map_flag(VoxField *v, float dt) {
+    v->map_poll += dt;
+    if (v->map_poll < 0.4f) return;
+    v->map_poll = 0;
+    char path[600];
+    snprintf(path, sizeof(path), "%smap.flag", vx_pref());
+    size_t sz = 0;
+    char *text = (char *)SDL_LoadFile(path, &sz);
+    if (!text) return;
+    if (!sz) { SDL_free(text); return; }
+    char want[64] = "";
+    sscanf(text, "%63s", want);
+    SDL_free(text);
+    SDL_IOStream *tr = SDL_IOFromFile(path, "wb");
+    if (tr) SDL_CloseIO(tr);
+    for (char *c = want; *c; c++) if (!((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '_')) { *c = 0; break; }
+    if (!want[0]) return;
+    SDL_Log("voxfield: map.flag asks for \"%s\"", want);
+    vx_load_map(v, want);
+}
+
+// ───────────────────────── tick ─────────────────────────
+
+void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) {
+    ev->kind = VXE_NONE; ev->arg[0] = 0;
+    if (!v->gl_ready) vx_gl_init(v);
+    if (!v->built) {
+        vx_load_map(v, v->map_name[0] ? v->map_name : "halm");
+        const char *b = SDL_getenv("VOX_HD2D");            // a measuring switch, not a setting
+        if (b && b[0]) v->hd2d = atoi(b) ? 1 : 0;
+    }
+    vx_poll_map_flag(v, dt);
+    v->anim_t += dt;
+    v->msg_t += dt;
+
+    vx_input(v, w, h, ui_blocked, dt);
+
+    if (v->fade_dir) {
+        v->fade += v->fade_dir;
+        if (v->fade_dir > 0 && v->fade >= FADE_FRAMES) {
+            vx_load_map(v, v->to_map);
+            vx_place_party(v, v->to_x, v->to_z, v->to_f);
+            for (int i = 0; i < v->trig_count; i++)
+                v->trigs[i].inside = (v->act[0].tx >= v->trigs[i].x && v->act[0].tz >= v->trigs[i].z &&
+                                      v->act[0].tx < v->trigs[i].x + v->trigs[i].w && v->act[0].tz < v->trigs[i].z + v->trigs[i].d);
+            v->fade_dir = -1;
+        } else if (v->fade_dir < 0 && v->fade <= 0) { v->fade = 0; v->fade_dir = 0; }
+    }
+
+    vx_walk(v, w, dt, ev);
+    npc_step(v, dt);
+
+    v->exam_trig = v->exam_npc = -1;
+    {
+        int fx = v->act[0].tx + DX[v->act[0].facing & 3], fz = v->act[0].tz + DZ[v->act[0].facing & 3];
+        v->exam_npc = npc_at(v, fx, fz);
+        if (v->exam_npc < 0) {
+            v->exam_trig = trig_at(v, fx, fz, TG_MESSAGE, TG_DOOR);
+            if (v->exam_trig < 0) v->exam_trig = trig_at(v, v->act[0].tx, v->act[0].tz, TG_MESSAGE, TG_MESSAGE);
+        }
+    }
+    if (v->tapped && !v->fade_dir) {
+        if (v->msg[0]) {
+            if (v->msg_typing) v->msg_t = 99.0f;
+            else if (v->msg_more) { v->msg_page++; v->msg_t = 0; }
+            else { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; }
+        } else if (v->exam_npc >= 0) {
+            VxNpc *np = &v->npcs[v->exam_npc];
+            static const int OPP[4] = { 3, 2, 1, 0 };
+            np->facing = OPP[v->act[0].facing & 3];
+            vx_say(v, nullptr, np->text);
+        } else if (v->exam_trig >= 0) {
+            VxTrig *g = &v->trigs[v->exam_trig];
+            if (g->kind == TG_DOOR) start_map_change(v, g->map, g->ax, g->az, g->af);
+            else vx_say(v, nullptr, g->arg);
+        }
+    }
+
+    int rw = (int)(w * (v->res_pct / 100.0f) + 0.5f), rh = (int)(h * (v->res_pct / 100.0f) + 0.5f);
+    if (rw < 64) rw = 64;
+    if (rh < 64) rh = 64;
+    while (vx_max_tex > 0 && (rw > vx_max_tex || rh > vx_max_tex)) { rw /= 2; rh /= 2; }
+    vx_fbo_size(v, rw, rh);
+    uint64_t t0 = SDL_GetTicksNS();
+    vx_render(v, rw, rh);
+    GLuint shown = vx_post(v, rw, rh);
+    glFinish();
+    double ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
+    v->frame_ms_sum += ms; v->frame_n++;
+    if (v->frame_n >= 300) {
+        SDL_Log("voxfield: %d frames, world+post %.2f ms/frame at %dx%d (hd2d %s, dof %.2f bloom %.2f) — %s",
+                v->frame_n, v->frame_ms_sum / v->frame_n, rw, rh, v->hd2d ? "on" : "off",
+                v->dof, v->bloom, v->ortho ? "ortho" : "perspective");
+        v->frame_ms_sum = 0; v->frame_n = 0;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_DEPTH_TEST);
+
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
+    dl->AddImage((ImTextureID)(intptr_t)shown, ImVec2(0, 0), ImVec2((float)w, (float)h),
+                 ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+    draw_touch_ui(v, w, h);
+    draw_msg_box(v, w, h);
+    if (v->fade > 0) {
+        int a = v->fade * 255 / FADE_FRAMES;
+        dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, a > 255 ? 255 : a));
+    }
+    if (v->dbg_coord) {
+        char lbl[96];
+        snprintf(lbl, sizeof(lbl), "%s %d,%d %s  y%d  steps %d  %d tris", v->map_name, v->act[0].tx, v->act[0].tz,
+                 FACE_NAME[v->act[0].facing & 3], (int)v->act[0].y, v->steps, v->tris);
+        dl->AddText(ImGui::GetFont(), h * 0.04f, ImVec2(12, 12), IM_COL32(255, 240, 160, 230), lbl);
+    }
+}
+
+// ───────────────────────── capture ─────────────────────────
+
+static void vx_do_capture(VoxField *v) {
+    int w = v->cap_wi, h = v->cap_hi;
+    vx_probe_limits();
+    while (vx_max_tex > 0 && (w > vx_max_tex || h > vx_max_tex)) { w /= 2; h /= 2; }
+    vx_fbo_size(v, w, h);
+    vx_render(v, w, h);
+    GLuint shown = vx_post(v, w, h);
+    GLuint src_fbo = (shown == v->out_tex) ? v->out_fbo : v->fbo;
+    unsigned char *px = (unsigned char *)malloc((size_t)w * h * 4);
+    unsigned char *row = (unsigned char *)malloc((size_t)w * 4);
+    if (!px || !row) { free(px); free(row); return; }
+    glBindFramebuffer(GL_FRAMEBUFFER, src_fbo);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+    for (int y = 0; y < h / 2; y++) {
+        memcpy(row, px + (size_t)y * w * 4, (size_t)w * 4);
+        memcpy(px + (size_t)y * w * 4, px + (size_t)(h - 1 - y) * w * 4, (size_t)w * 4);
+        memcpy(px + (size_t)(h - 1 - y) * w * 4, row, (size_t)w * 4);
+    }
+    int ok = stbi_write_png(v->cap_out, w, h, 4, px, w * 4);
+    SDL_Log("voxfield: capture %s %dx%d %s", v->cap_out, w, h, ok ? "written" : "FAILED");
+    free(px); free(row);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    v->cap_ok = true;
+}
+
+void vx_capture_to(VoxField *v, const char *map, int w, int h, const char *out_path) {
+    if (!v->gl_ready) vx_gl_init(v);
+    vx_load_map(v, map);
+    v->cap_wi = w > 0 ? w : 1920;
+    v->cap_hi = h > 0 ? h : 1080;
+    // The knobs a shot can be taken with, from the Mac, with no phone:
+    const char *e;
+    if ((e = SDL_getenv("VOX_AT")) && e[0]) {
+        int x = 0, z = 0;
+        if (sscanf(e, "%d,%d", &x, &z) == 2) vx_place_party(v, x, z, 0);
+    }
+    if ((e = SDL_getenv("VOX_ORTHO")) && e[0]) v->ortho = atoi(e) ? 1 : 0;
+    if ((e = SDL_getenv("VOX_HD2D")) && e[0]) v->hd2d = atoi(e) ? 1 : 0;
+    if ((e = SDL_getenv("VOX_PITCH")) && e[0]) v->pitch = (float)atof(e);
+    if ((e = SDL_getenv("VOX_FOV")) && e[0]) v->fov = (float)atof(e);
+    if ((e = SDL_getenv("VOX_VIEWH")) && e[0]) v->view_h = (float)atof(e);
+    if ((e = SDL_getenv("VOX_LIGHT")) && e[0]) {
+        char tb[16] = "day"; float lv = 1.0f;
+        if (sscanf(e, "%15[^:]:%f", tb, &lv) >= 1) { v->light_table = vx_table_by_name(v, tb); v->amb = lv < 0 ? 0 : lv > 1 ? 1 : lv; }
+    }
+    if ((e = SDL_getenv("VOX_CUT")) && e[0]) v->cutaway = atoi(e) ? 1 : 0;
+    if ((e = SDL_getenv("VOX_FOG")) && e[0]) v->fog = (float)atof(e);
+    if ((e = SDL_getenv("VOX_TILT")) && e[0]) v->tilt = (float)atof(e);
+    if ((e = SDL_getenv("VOX_FACE")) && e[0]) { int f = facing_of(e); for (int i = 0; i < VX_PARTY; i++) v->act[i].facing = f; }
+    // The party stands on one cell at spawn: trail them out so the shot shows everyone.
+    for (int i = 1; i < v->party; i++) {
+        int bx = v->act[i - 1].tx - DX[v->act[0].facing & 3], bz = v->act[i - 1].tz - DZ[v->act[0].facing & 3];
+        if (!vx_can_stand(v, bx, bz)) break;
+        v->act[i].tx = v->act[i].px = (short)bx; v->act[i].tz = v->act[i].pz = (short)bz;
+        v->act[i].y = v->act[i].y0 = (float)v->hgt[bz][bx];
+    }
+    snprintf(v->cap_out, sizeof(v->cap_out), "%s", out_path);
+    v->cap_req = 3;
+}
+
+bool vx_capture_done(VoxField *v) {
+    if (v->cap_req > 0) { if (--v->cap_req == 0) vx_do_capture(v); return false; }
+    return v->cap_ok;
+}
+
+// ───────────────────────── dev, save, lifecycle ─────────────────────────
+
+bool vx_dev_ui(VoxField *v, char *out, int cap) {
+    bool printed = false;
+    ImGui::Text("vox field — %s  %d,%d %s  y%d  steps %d  (%dx%d, %d tris)", v->map_name,
+                v->act[0].tx, v->act[0].tz, FACE_NAME[v->act[0].facing & 3], (int)v->act[0].y,
+                v->steps, v->mw, v->md, v->tris);
+    for (int i = 0; i < vx_map_count(); i++) {
+        if (i) ImGui::SameLine();
+        bool cur = !strcmp(v->map_name, vx_map_name_at(i));
+        if (cur) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.3f, 1));
+        if (ImGui::Button(vx_map_name_at(i))) vx_load_map(v, vx_map_name_at(i));
+        if (cur) ImGui::PopStyleColor();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Respawn")) vx_load_map(v, v->map_name);
+    bool c = v->dbg_coord != 0, d = v->noclip != 0, ct = v->cutaway != 0;
+    if (ImGui::Checkbox("Coords", &c)) v->dbg_coord = c;
+    ImGui::SameLine();
+    if (ImGui::Checkbox("No clip", &d)) v->noclip = d;
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Cut away", &ct)) v->cutaway = ct;
+    // camera
+    bool o = v->ortho != 0;
+    if (ImGui::Checkbox("Ortho", &o)) v->ortho = o;
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("pitch", &v->pitch, 20.0f, 75.0f, "%.0f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("fov", &v->fov, 12.0f, 60.0f, "%.0f");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("view blocks", &v->view_h, 5.0f, 24.0f, "%.1f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("sprite tilt", &v->tilt, 0.0f, 1.0f, "%.2f");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("AO", &v->ao_str, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("detail", &v->detail, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("fog", &v->fog, 0.0f, 1.0f, "%.2f");
+    // HD-2D
+    ImGui::Separator();
+    bool hd = v->hd2d != 0;
+    if (ImGui::Checkbox("HD-2D", &hd)) v->hd2d = hd;
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7);
+    ImGui::SliderFloat("tilt-shift", &v->dof, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7);
+    ImGui::SliderFloat("bloom", &v->bloom, 0.0f, 1.5f, "%.2f");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7);
+    ImGui::SliderFloat("vignette", &v->vignette, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7);
+    ImGui::SliderFloat("grade", &v->grade, 0.0f, 1.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7);
+    ImGui::SliderInt("res %", &v->res_pct, 40, 100);
+    // light
+    ImGui::Separator();
+    for (int i = 0; i < v->cmap_tables && i < 8; i++) {
+        if (i) ImGui::SameLine();
+        bool cur = v->light_table == i;
+        if (cur) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.65f, 1));
+        if (ImGui::Button(v->cmap_tname[i][0] ? v->cmap_tname[i] : "?")) v->light_table = i;
+        if (cur) ImGui::PopStyleColor();
+    }
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+    ImGui::SliderFloat("ambient", &v->amb, 0.0f, 1.0f, "%.2f");
+    if (ImGui::Button("Print cell")) {
+        int x = v->act[0].tx, z = v->act[0].tz;
+        unsigned char top = get_blk(v, x, v->hgt[z][x] - 1, z);
+        snprintf(out, cap, "%s: %d,%d height %d, top block %s, %s — %d tris, mesh %.1f ms, reach %s",
+                 v->map_name, x, z, v->hgt[z][x], BLOCKS[top].name, v->walk[z][x] ? "walkable" : "blocked",
+                 v->tris, v->mesh_ms, v->reach_missing ? "FAIL" : "ok");
+        printed = true;
+    }
+    return printed;
+}
+
+VoxField *vx_create() {
+    VoxField *v = (VoxField *)calloc(1, sizeof(VoxField));
+    snprintf(v->map_name, sizeof(v->map_name), "halm");
+    v->exam_trig = v->exam_npc = -1;
+    v->want_dir = v->last_axis = -1;
+    v->party = 2;
+    v->step_len = WALK_STEP;
+    v->amb = 1.0f;
+    // Octopath, not Minecraft: a low pitched camera, a narrow field of view, the party about a fifth
+    // of the screen, and a far fog so the town fades out instead of ending in a cliff.
+    v->ortho = 0; v->hd2d = 1; v->cutaway = 1;
+    v->pitch = 42.0f; v->fov = 32.0f; v->view_h = 11.0f; v->tilt = 0.68f;
+    v->ao_str = 0.85f; v->detail = 1.0f; v->fog = 0.65f;
+    v->dof = 0.75f; v->bloom = 0.55f; v->vignette = 0.45f; v->grade = 0.6f;
+    v->motes = 0; v->res_pct = 100;
+    for (int i = 0; i < 256; i++) { v->pal[i][0] = (unsigned char)i; v->pal[i][1] = (unsigned char)i; v->pal[i][2] = (unsigned char)i; }
+    return v;
+}
+
+void vx_destroy(VoxField *v) {
+    if (!v) return;
+    free(v->cmap_px);
+    free(v->spr);
+    free(v);
+}
+
+void vx_save(VoxField *v, VxSave *s) {
+    memset(s, 0, sizeof(*s));
+    snprintf(s->map, sizeof(s->map), "%s", v->map_name);
+    for (int i = 0; i < VX_PARTY; i++) { s->tx[i] = v->act[i].tx; s->ty[i] = v->act[i].tz; s->facing[i] = v->act[i].facing; }
+    s->party = v->party; s->steps = v->steps;
+    s->dbg_coord = v->dbg_coord; s->noclip = v->noclip;
+    s->ortho = v->ortho; s->hd2d = v->hd2d; s->cutaway = v->cutaway;
+    s->pitch = v->pitch; s->fov = v->fov; s->view_h = v->view_h; s->tilt = v->tilt;
+    s->ao = v->ao_str; s->detail = v->detail; s->amb = v->amb; s->light_table = v->light_table;
+    s->fog = v->fog; s->dof = v->dof; s->bloom = v->bloom; s->vignette = v->vignette; s->grade = v->grade;
+    s->motes = v->motes; s->res_scale_pct = v->res_pct;
+}
+
+void vx_restore(VoxField *v, const VxSave *s) {
+    char map[32];
+    snprintf(map, sizeof(map), "%s", s->map[0] ? s->map : "halm");
+    for (char *c = map; *c; c++) if (!((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '_')) { *c = 0; break; }
+    // The look knobs first: vx_load_map re-reads the map's own `light:` line, and what the owner was
+    // tuning has to win over it, exactly as the tile field does.
+    if (s->pitch >= 10.0f && s->pitch <= 85.0f) v->pitch = s->pitch;
+    if (s->fov >= 8.0f && s->fov <= 70.0f) v->fov = s->fov;
+    if (s->view_h >= 3.0f && s->view_h <= 40.0f) v->view_h = s->view_h;
+    if (s->tilt >= 0.0f && s->tilt <= 1.0f) v->tilt = s->tilt;
+    if (s->ao >= 0.0f && s->ao <= 1.0f) v->ao_str = s->ao;
+    if (s->detail >= 0.0f && s->detail <= 1.0f) v->detail = s->detail;
+    if (s->fog >= 0.0f && s->fog <= 1.0f) v->fog = s->fog;
+    if (s->dof >= 0.0f && s->dof <= 1.0f) v->dof = s->dof;
+    if (s->bloom >= 0.0f && s->bloom <= 2.0f) v->bloom = s->bloom;
+    if (s->vignette >= 0.0f && s->vignette <= 1.0f) v->vignette = s->vignette;
+    if (s->grade >= 0.0f && s->grade <= 1.0f) v->grade = s->grade;
+    v->ortho = s->ortho ? 1 : 0; v->hd2d = s->hd2d ? 1 : 0; v->cutaway = s->cutaway ? 1 : 0;
+    v->res_pct = (s->res_scale_pct >= 40 && s->res_scale_pct <= 100) ? s->res_scale_pct : 100;
+    vx_load_map(v, map[0] ? map : "halm");
+    v->party = s->party < 1 ? 1 : s->party > VX_PARTY ? VX_PARTY : s->party;
+    v->steps = s->steps < 0 ? 0 : s->steps;
+    v->dbg_coord = s->dbg_coord ? 1 : 0; v->noclip = s->noclip ? 1 : 0;
+    if (s->light_table >= 0 && s->light_table < 8) v->light_table = s->light_table;
+    if (s->amb >= 0.0f && s->amb <= 1.0f) v->amb = s->amb;
+    int lx = s->tx[0], lz = s->ty[0];
+    if (lx < 0 || lz < 0 || lx >= v->mw || lz >= v->md) { SDL_Log("voxfield: restored cell %d,%d is off %s", lx, lz, map); return; }
+    vx_place_party(v, lx, lz, s->facing[0] & 3);
+    for (int i = 1; i < VX_PARTY; i++) {
+        int x = s->tx[i], z = s->ty[i];
+        if (!vx_can_stand(v, x, z)) continue;
+        v->act[i].tx = v->act[i].px = (short)x;
+        v->act[i].tz = v->act[i].pz = (short)z;
+        v->act[i].y = v->act[i].y0 = (float)v->hgt[z][x];
+        v->act[i].facing = s->facing[i] & 3;
+    }
+}

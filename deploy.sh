@@ -42,6 +42,10 @@ for d in story/field/tilesets/*/; do
     for n in atlas.png atlas.json tiles.md masks.png masks.json; do
         [ -f "$d$n" ] && cp "$d$n" "$ASSETS/field/tilesets/$(basename "$d")/$n"
     done
+    if [ -d "$d/decals" ]; then
+        mkdir -p "$ASSETS/field/tilesets/$(basename "$d")/decals"
+        cp "$d"decals/*.png "$ASSETS/field/tilesets/$(basename "$d")/decals/" 2>/dev/null || true
+    fi
     if [ -d "$d/swatches" ]; then
         mkdir -p "$ASSETS/field/tilesets/$(basename "$d")/swatches"
         cp "$d"swatches/*.png "$ASSETS/field/tilesets/$(basename "$d")/swatches/" 2>/dev/null || true

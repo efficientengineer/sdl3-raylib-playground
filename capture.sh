@@ -34,6 +34,53 @@ if [ "$1" = "--dialog" ]; then
     exit 0
 fi
 
+# The voxel field (VOXFIELD_NOTES.md):
+#   ./capture.sh --vox halm                       -> build_desktop/vox_halm.png, 1920x1080
+#   ./capture.sh --vox halm --at 21,21            -> the party stood on that cell
+#   ./capture.sh --vox halm --ortho 1             -> orthographic instead of the low perspective
+#   ./capture.sh --vox halm --light night:0.35    -> the same colormap the phone uses
+#   ./capture.sh --vox halm --hd2d 0              -> the post pass off, for a side-by-side
+#   ./capture.sh --vox halm --pitch 40 --fov 32 --viewh 9 --face N --size 1920x1080 --name spawn
+if [ "$1" = "--vox" ]; then
+    MAP=${2:-halm}
+    shift 2 || true
+    AT=""; ORTHO=""; HD2D=""; LIGHT=""; PITCH=""; FOV=""; VIEWH=""; FACE=""; SIZE="1920x1080"; NAME=""; SUFFIX=""; CUT=""; FOG=""; TILT=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --at) AT="$2"; SUFFIX="${SUFFIX}_at${2//,/-}"; shift ;;
+            --ortho) ORTHO="$2"; [ "$2" = "1" ] && SUFFIX="${SUFFIX}_ortho"; shift ;;
+            --hd2d) HD2D="$2"; SUFFIX="${SUFFIX}_hd$2"; shift ;;
+            --light) LIGHT="$2"; SUFFIX="${SUFFIX}_${2%%:*}"; shift ;;
+            --pitch) PITCH="$2"; shift ;;
+            --fov) FOV="$2"; shift ;;
+            --viewh) VIEWH="$2"; shift ;;
+            --face) FACE="$2"; shift ;;
+            --size) SIZE="$2"; shift ;;
+            --name) NAME="$2"; shift ;;
+            --cut) CUT="$2"; shift ;;
+            --fog) FOG="$2"; shift ;;
+            --tilt) TILT="$2"; shift ;;
+        esac
+        shift
+    done
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    W="${SIZE%%x*}"; H="${SIZE##*x}"
+    [ -n "$NAME" ] && SUFFIX="_$NAME"
+    OUT="$ROOT/build_desktop/vox_${MAP}${SUFFIX}.png"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -2
+    cd "$ROOT"
+    VOX_AT="$AT" VOX_ORTHO="$ORTHO" VOX_HD2D="$HD2D" VOX_LIGHT="$LIGHT" VOX_PITCH="$PITCH" \
+    VOX_FOV="$FOV" VOX_VIEWH="$VIEWH" VOX_FACE="$FACE" VOX_CUT="$CUT" VOX_FOG="$FOG" VOX_TILT="$TILT" \
+        VOX_CAPTURE="$MAP:$W:$H:$OUT" "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "SELFCHECK|voxfield: (capture|walker|[0-9]+ cells)" || true
+    if [ -f "$OUT" ]; then
+        echo "wrote $OUT"
+        exit 0
+    fi
+    echo "ERROR: no capture written to $OUT" >&2
+    exit 1
+fi
+
 if [ "$1" = "--tiles" ]; then
     MAP=${2:-halm}
     shift 2 || true

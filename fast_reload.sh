@@ -18,7 +18,7 @@ HASH="$(basename "$(dirname "$CXX_DIR")")"
 OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
 # Every translation unit of libgame_logic.so. CMakeLists.txt's game_logic target must match.
-GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/field.cpp $SCRIPT_DIR/src/tilefield.cpp"
+GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/field.cpp $SCRIPT_DIR/src/tilefield.cpp $SCRIPT_DIR/src/voxfield.cpp"
 
 IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
 SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"
@@ -150,6 +150,22 @@ for d in "$SCRIPT_DIR"/story/field/tilesets/*/; do
             "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/tilesets/$set_name/$n && rm /data/local/tmp/$n"
         fi
     done
+    # The voxel field's detail billboards (VOXFIELD_NOTES.md) come from the tileset's decals/.
+    if [ -d "$d/decals" ]; then
+        "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/tilesets/$set_name/decals"
+        HAVE_D="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets/$set_name/decals && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
+        for f in "$d"decals/*.png; do
+            [ -f "$f" ] || continue
+            n="$(basename "$f")"
+            echo "tilesets/$set_name/decals/$n" >> "$SHIP_FIELD"
+            sz="$(stat -f %z "$f")"
+            if ! echo "$HAVE_D" | grep -qx "$n $sz"; then
+                echo "  decal $set_name/$n"
+                "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
+                "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/tilesets/$set_name/decals/$n && rm /data/local/tmp/$n"
+            fi
+        done
+    fi
     # TILES2: the terrain swatches live in their own folder beside the atlas.
     if [ -d "$d/swatches" ]; then
         "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/tilesets/$set_name/swatches"
