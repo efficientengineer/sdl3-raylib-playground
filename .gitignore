@@ -19,3 +19,4 @@ android/app/src/main/assets/cutscenes/
 story/packages/**/returned.*
 build_desktop/
 imgui.ini
+tools/arttray/ArtTray.app/
