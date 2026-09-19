@@ -1,0 +1,15 @@
+{
+  "kind": "screen",
+  "map": "west_road",
+  "zone": "road",
+  "title": "west_road / road \u2014 painted screen",
+  "makes": "the painting, its two cleaned masks, the base map and `story/field/screens/west_road_road.screen`",
+  "outputs": [
+    "story/field/screens/west_road_road_paint.png",
+    "story/field/screens/west_road_road_walk.png",
+    "story/field/screens/west_road_road_fg.png",
+    "story/field/screens/west_road_road_base.png",
+    "story/field/screens/west_road_road.screen"
+  ],
+  "dir": "story/packages/ch01/west_road/screens/road"
+}

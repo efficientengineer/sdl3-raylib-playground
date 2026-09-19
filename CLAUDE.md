@@ -69,6 +69,7 @@ kept for reference and **no longer built**; don't add features there.
 ./compile_shaders.sh          # GLSL 450 → SPIR-V → glsl330, glsl300es, msl, hlsl
 ./fast_reload.sh              # hot reload game_logic.so to phone (~0.7s, NDK direct)
 ./hot_reload.sh android       # hot reload via gradle (~3s, use fast_reload.sh instead)
+./tools/arttray/run.sh        # Art Tray: the Mac GUI for story/packages (prompt + refs out, image back, ingest)
 ./dev_msg.sh "message"        # send dev message to in-game Messages tab
 ./watch_bugs.sh               # monitor bug reports on device
 ./story_prompt.py sheet <scene>  # scene file → ChatGPT package (prompt + refs to attach) in story/out/

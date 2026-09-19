@@ -39,15 +39,17 @@ unblock each other. A checked box is already cut; everything below this section 
       [`cast/falke/walker`](cast/falke/walker/prompt.md) · to generate · `ingest cast/falke/walker`
 - [ ] **8.** Ottilie's walk sprite — the figure walking the map  
       [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · to generate · `ingest cast/ottilie/walker`
-- [x] **9.** the ground and walls of `halm`, sheet 1 of 2  
+- [ ] **9.** the painted screen `square` of `halm` — the whole place in one picture, which is what the player walks around in  
+      [`ch01/halm/screens/square`](ch01/halm/screens/square/prompt.md) · to generate · `ingest ch01/halm/screens/square`
+- [x] **10.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
-- [ ] **10.** the ground and walls of `halm`, sheet 2 of 2  
+- [ ] **11.** the ground and walls of `halm`, sheet 2 of 2  
       [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) · to generate · `ingest ch01/halm/tiles_2`
-- [x] **11.** everything standing in `halm`  
+- [x] **12.** everything standing in `halm`  
       [`ch01/halm/props`](ch01/halm/props/prompt.md) · done · `ingest ch01/halm/props`
-- [ ] **12.** the front, wall and roof of every building in `halm`  
+- [ ] **13.** the front, wall and roof of every building in `halm`  
       [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · to generate · `ingest ch01/halm/buildings`
-- [x] **13.** the shot sheet for `0110_the_board` — the first scene the game plays  
+- [x] **14.** the shot sheet for `0110_the_board` — the first scene the game plays  
       [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) · done · `ingest ch01/halm/scenes/0110_the_board`
 
 Then `./story_prompt.py ingest` and `./fast_reload.sh`.
@@ -84,8 +86,10 @@ until their reference sheet exists, because the walker must match it.
 
 ## 4. Field art, by chapter and map
 
-Tiles are the big surfaces the ground is made of; a building is map geometry wearing three
-textures (the front wall, a wall sample, a roof sample); everything else is a prop sprite.
+A **screen** is the main path: one painting of the whole place plus two masks, and the game is
+fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces
+the ground is made of; a building is map geometry wearing three textures (the front wall, a wall
+sample, a roof sample); everything else is a prop sprite.
 A map named `common` means the entry carries no `- map:` line yet.
 
 ### ch01 — bridge  (no map file yet)
@@ -99,6 +103,17 @@ Shared tiles, drawn with another map so one id is never drawn twice: `grass` (wi
 Shared props, drawn with another map so one id is never drawn twice: `cart` (with `halm`)
 
 ### ch01 — halm
+
+**Screens — the main path.** ChatGPT paints the whole screen from its entry in
+`story/field/screens.md`, then traces two binary masks over it in the same chat, and the
+game is fitted to the painting: the walkable mask becomes the nav polygons, the
+foreground mask becomes the base map that decides what the walker is hidden behind.
+
+| zone | folder | status | after downloading |
+| --- | --- | --- | --- |
+| `square` | [`ch01/halm/screens/square`](ch01/halm/screens/square/prompt.md) | to generate | `ingest ch01/halm/screens/square` |
+
+Tiles, props and buildings below are the sprite path, which a painted screen does not need.
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
@@ -114,6 +129,17 @@ Shared props, drawn with another map so one id is never drawn twice: `cart` (wit
 | `square` | [`ch01/halm/views/square`](ch01/halm/views/square/prompt.md) | to generate | `ingest ch01/halm/views/square` |
 
 ### ch01 — hart_yard
+
+**Screens — the main path.** ChatGPT paints the whole screen from its entry in
+`story/field/screens.md`, then traces two binary masks over it in the same chat, and the
+game is fitted to the painting: the walkable mask becomes the nav polygons, the
+foreground mask becomes the base map that decides what the walker is hidden behind.
+
+| zone | folder | status | after downloading |
+| --- | --- | --- | --- |
+| `yard` | [`ch01/hart_yard/screens/yard`](ch01/hart_yard/screens/yard/prompt.md) | to generate | `ingest ch01/hart_yard/screens/yard` |
+
+Tiles, props and buildings below are the sprite path, which a painted screen does not need.
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
@@ -156,6 +182,17 @@ Shared tiles, drawn with another map so one id is never drawn twice: `dirt` (wit
 Shared props, drawn with another map so one id is never drawn twice: `bedroll` (with `ridge_camp`), `campfire` (with `ridge_camp`), `well` (with `halm`)
 
 ### ch01 — west_road  (no map file yet)
+
+**Screens — the main path.** ChatGPT paints the whole screen from its entry in
+`story/field/screens.md`, then traces two binary masks over it in the same chat, and the
+game is fitted to the painting: the walkable mask becomes the nav polygons, the
+foreground mask becomes the base map that decides what the walker is hidden behind.
+
+| zone | folder | status | after downloading |
+| --- | --- | --- | --- |
+| `road` | [`ch01/west_road/screens/road`](ch01/west_road/screens/road/prompt.md) | to generate | `ingest ch01/west_road/screens/road` |
+
+Tiles, props and buildings below are the sprite path, which a painted screen does not need.
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |

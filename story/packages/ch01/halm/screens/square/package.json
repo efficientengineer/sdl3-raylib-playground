@@ -1,0 +1,15 @@
+{
+  "kind": "screen",
+  "map": "halm",
+  "zone": "square",
+  "title": "halm / square \u2014 painted screen",
+  "makes": "the painting, its two cleaned masks, the base map and `story/field/screens/halm_square.screen`",
+  "outputs": [
+    "story/field/screens/halm_square_paint.png",
+    "story/field/screens/halm_square_walk.png",
+    "story/field/screens/halm_square_fg.png",
+    "story/field/screens/halm_square_base.png",
+    "story/field/screens/halm_square.screen"
+  ],
+  "dir": "story/packages/ch01/halm/screens/square"
+}
