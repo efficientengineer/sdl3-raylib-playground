@@ -2,8 +2,8 @@
 
 ## What exists already
 
-- `story/field/tilesets/valley/atlas.png` — not started yet
-- `story/field/tilesets/valley/cut/terrain.png` — not cut yet
+- `story/field/tilesets/valley/atlas.png` — **exists**
+- `story/field/tilesets/valley/cut/terrain.png` — **cut already**
 
 This sheet carries 24 of the tileset's entries: `water`, `grass`, `grass_tuft`, `grass_flower`, `dirt`, `dirt_rut`, `paving`, `paving_worn`, `gravel`, `crop`, `mud`, `bridge_deck`, `dirt_edge`, `dirt_corner_out`, `dirt_corner_in`, `paving_edge`, `paving_corner_out`, `paving_corner_in`, `water_edge`, `water_corner_out`, `water_corner_in`, `crop_edge`, `crop_corner_out`, `crop_corner_in`
 

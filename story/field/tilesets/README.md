@@ -47,6 +47,29 @@ What the cut does to a slot, in order:
    bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
 5. **Extrude** the silhouette two pixels outward under the transparency, so linear sampling at the
    edge of a sprite never pulls in black or magenta.
+6. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
+   blending: the tile is *rolled* along each axis in turn, so its first and last line were adjacent
+   lines of the drawing and the wrap is continuous by construction. The split is the **min-error**
+   one of the middle third, so the join lands where the art is quietest rather than across a mortar
+   course. The roll puts the original's own discontinuity in the middle of the tile, and that is
+   covered by a narrow strip of the tile's own interior (least-error source, 3 px held and 16 px of
+   feather) cut in with a **hashed dither** — each output pixel taken whole from one side or the
+   other, never averaged, so nothing is blurred. The old `--heal-seams` cross-blend is gone: it
+   removed the wrap error and left a soft ribbon at every border, which is what read on the phone as
+   a faint grid over grass, dirt and gravel.
+7. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
+   `grass_flower`, `dirt`/`dirt_rut` are scattered through each other by the maps, so they must
+   differ in detail and not in overall tone. Every variant after the first is shifted to the first's
+   **mean Oklab lightness** and scaled to its **mean chroma** — an offset and a gain, so each pixel
+   keeps its own distance from the mean and the drawing is untouched. Without it a 0.05 gap in L
+   between `paving` and `paving_worn` made the square read as a checkerboard of pale and dark
+   squares.
+
+Two numbers are printed for every ground tile. `wrap h/v` is the mean difference across the tile's
+own edges, and `border/interior gradient` is that compared with the texture's mean gradient on the
+same axis: **above 1.15 is a line** (something is still discontinuous) and **near 0 is a band**
+(something was averaged). A tile made seamless by construction sits below 1, because the split was
+chosen where the art is quiet.
 
 ## Sheets — as few generations as possible
 

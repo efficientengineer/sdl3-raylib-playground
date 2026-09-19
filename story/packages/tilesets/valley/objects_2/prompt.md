@@ -2,8 +2,8 @@
 
 ## What exists already
 
-- `story/field/tilesets/valley/atlas.png` — not started yet
-- `story/field/tilesets/valley/cut/objects_2.png` — not cut yet
+- `story/field/tilesets/valley/atlas.png` — **exists**
+- `story/field/tilesets/valley/cut/objects_2.png` — **cut already**
 
 This sheet carries 6 of the tileset's entries: `ladder_house`, `house_e`, `house_c`, `barn`, `shed`, `stable`
 

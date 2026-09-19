@@ -2,8 +2,8 @@
 
 ## What exists already
 
-- `story/field/tilesets/valley/atlas.png` — not started yet
-- `story/field/tilesets/valley/cut/objects_4.png` — not cut yet
+- `story/field/tilesets/valley/atlas.png` — **exists**
+- `story/field/tilesets/valley/cut/objects_4.png` — **cut already**
 
 This sheet carries 12 of the tileset's entries: `handcart`, `woodpile`, `haystack`, `market_stall`, `barrel`, `crate`, `boulder`, `signpost`, `trough`, `grain_sack`, `stump`, `gate_post`
 

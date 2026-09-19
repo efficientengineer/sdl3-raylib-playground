@@ -39,8 +39,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        64,
-        32
+        256,
+        128
       ]
     },
     {
@@ -68,8 +68,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -97,8 +97,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -126,8 +126,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -155,8 +155,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -184,8 +184,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -213,8 +213,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -242,8 +242,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -271,8 +271,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -300,8 +300,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -329,8 +329,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -358,8 +358,8 @@
       "opaque": true,
       "kind": "ground",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -387,8 +387,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -416,8 +416,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -445,8 +445,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -474,8 +474,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -503,8 +503,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -532,8 +532,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -561,8 +561,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -590,8 +590,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -619,8 +619,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -648,8 +648,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -677,8 +677,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -706,8 +706,8 @@
       "opaque": false,
       "kind": "fringe",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     }
   ],

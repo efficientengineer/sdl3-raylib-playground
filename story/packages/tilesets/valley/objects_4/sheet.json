@@ -39,8 +39,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        64,
-        64
+        256,
+        256
       ]
     },
     {
@@ -68,8 +68,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        64,
-        64
+        256,
+        256
       ]
     },
     {
@@ -97,8 +97,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        64,
-        64
+        256,
+        256
       ]
     },
     {
@@ -126,8 +126,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        64,
-        64
+        256,
+        256
       ]
     },
     {
@@ -155,8 +155,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -184,8 +184,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -213,8 +213,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -242,8 +242,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -271,8 +271,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -300,8 +300,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -329,8 +329,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     },
     {
@@ -358,8 +358,8 @@
       "opaque": false,
       "kind": "stamp",
       "target": [
-        32,
-        32
+        128,
+        128
       ]
     }
   ],

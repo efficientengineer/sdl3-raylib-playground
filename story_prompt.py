@@ -42,7 +42,7 @@
                                                edge), cut the slots, write story/field/tiles|props|walkers/
                                                and regenerate story/field/manifest.md ('slice' redirects here).
                                                A tileset sheet takes --palette N (quantise the sheet) and
-                                               --heal-seams (cross-blend a ground tile's wrap).
+                                               --no-heal (leave a ground tile's wrap alone).
 
   ./story_prompt.py preview story/scenes/003_x.md
                                                write story/out/<scene>.preview.html: panels layered manga-style and
@@ -3428,10 +3428,10 @@ def cmd_cut(args):
             palette = int(next(it, "0"))
         elif not a.startswith("--"):
             pos.append(a)
-    heal, snap = "--heal-seams" in args, "--snap32" in args
+    heal, snap = "--no-heal" not in args, "--snap32" in args
     if len(pos) != 2:
         die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] [--nearest] "
-            "[--palette N] [--heal-seams] [--snap32]")
+            "[--palette N] [--no-heal] [--snap32]")
     data = json.loads(Path(pos[0]).read_text())
     image = Path(pos[1]).expanduser()
     kind = data.get("kind")
@@ -3550,6 +3550,21 @@ FRINGE_DEPTH = 10                     # how far the bordering terrain creeps in,
 SEAM_WARN = 24.0                      # mean per-channel difference across a ground tile's wrap: warn above
 TSET_ALPHA_CUT = 128                  # the engine alpha-tests at 0.5; a tile pixel is on or off
 ATLAS_JSON = "atlas.json"
+
+# ── ground families: variants of one material, meant to be MIXED on the map ──
+#
+# A `.tmap` scatters `paving_worn` through `paving` and `grass_tuft` through `grass` so the ground
+# does not repeat. That only works if the variants differ in DETAIL. ChatGPT draws each slot on its
+# own and gives one a lighter cast than the next, and the map then reads as a checkerboard of pale
+# and dark squares — which is exactly what the first Halm capture showed on the square. So every
+# variant is pulled to the FIRST member's mean lightness and mean chroma in Oklab (a perceptual
+# space: shifting L there does not swing the hue the way scaling RGB does). Detail, texture and
+# local contrast are untouched; only the overall tone is matched.
+GROUND_FAMILIES = (
+    ("grass", "grass_tuft", "grass_flower"),
+    ("paving", "paving_worn"),
+    ("dirt", "dirt_rut"),
+)
 
 # ── how full a sheet is packed ──
 #
@@ -4222,6 +4237,29 @@ What the cut does to a slot, in order:
    bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
 5. **Extrude** the silhouette two pixels outward under the transparency, so linear sampling at the
    edge of a sprite never pulls in black or magenta.
+6. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
+   blending: the tile is *rolled* along each axis in turn, so its first and last line were adjacent
+   lines of the drawing and the wrap is continuous by construction. The split is the **min-error**
+   one of the middle third, so the join lands where the art is quietest rather than across a mortar
+   course. The roll puts the original's own discontinuity in the middle of the tile, and that is
+   covered by a narrow strip of the tile's own interior (least-error source, 3 px held and 16 px of
+   feather) cut in with a **hashed dither** — each output pixel taken whole from one side or the
+   other, never averaged, so nothing is blurred. The old `--heal-seams` cross-blend is gone: it
+   removed the wrap error and left a soft ribbon at every border, which is what read on the phone as
+   a faint grid over grass, dirt and gravel.
+7. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
+   `grass_flower`, `dirt`/`dirt_rut` are scattered through each other by the maps, so they must
+   differ in detail and not in overall tone. Every variant after the first is shifted to the first's
+   **mean Oklab lightness** and scaled to its **mean chroma** — an offset and a gain, so each pixel
+   keeps its own distance from the mean and the drawing is untouched. Without it a 0.05 gap in L
+   between `paving` and `paving_worn` made the square read as a checkerboard of pale and dark
+   squares.
+
+Two numbers are printed for every ground tile. `wrap h/v` is the mean difference across the tile's
+own edges, and `border/interior gradient` is that compared with the texture's mean gradient on the
+same axis: **above 1.15 is a line** (something is still discontinuous) and **near 0 is a band**
+(something was averaged). A tile made seamless by construction sits below 1, because the split was
+chosen where the art is quiet.
 
 ## Sheets — as few generations as possible
 
@@ -4381,28 +4419,210 @@ def seam_error(px, w, h):
     return hz, vt
 
 
-def heal_seams(px, w, h, width=2):
-    """A cross-blend `width` pixels deep at the wrap, so a tile's last row reads as its own first.
+def _hash01(x, y, salt):
+    """A cheap hashed [0,1) per pixel — the dither threshold. Deterministic, so a recut is identical."""
+    n = (x * 374761393 + y * 668265263 + salt * 2246822519) & 0xFFFFFFFF
+    n = ((n ^ (n >> 13)) * 1274126177) & 0xFFFFFFFF
+    return ((n ^ (n >> 16)) & 0xFFFF) / 65535.0
 
-    The outermost ring is averaged outright (the two pixels that actually sit next to each other in a
-    tiled field); each ring inside it is pulled towards that average by a share that falls off to
-    nothing, so the repair fades into the art instead of ending in a line of its own."""
-    def blend(a, b, t):
-        return bytes(int(round(a[i] * (1 - t) + b[i] * t)) for i in range(3))
 
-    for y in range(h):
-        mid = blend(px[y][0:3], px[y][(w - 1) * 4:(w - 1) * 4 + 3], 0.5)
-        for k in range(min(width, w // 2)):
-            t = 1.0 if k == 0 else 0.5 * (1 - k / width)
-            for x in (k, w - 1 - k):
-                px[y][x * 4:x * 4 + 3] = blend(px[y][x * 4:x * 4 + 3], mid, t)
-    for x in range(w):
-        mid = blend(px[0][x * 4:x * 4 + 3], px[h - 1][x * 4:x * 4 + 3], 0.5)
-        for k in range(min(width, h // 2)):
-            t = 1.0 if k == 0 else 0.5 * (1 - k / width)
-            for y in (k, h - 1 - k):
-                px[y][x * 4:x * 4 + 3] = blend(px[y][x * 4:x * 4 + 3], mid, t)
+def _smoothstep(t):
+    t = 0.0 if t < 0 else (1.0 if t > 1 else t)
+    return t * t * (3 - 2 * t)
+
+
+def border_gradient(px, w, h):
+    """((across-x, interior-x), (across-y, interior-y)) mean gradients — the band / line test.
+
+    The wrap error on its own cannot tell a healed tile from a blurred one: an averaged edge scores
+    zero and looks like a crease. What separates them is the gradient *across* the tile border
+    compared with the texture's own mean gradient on that axis. Much lower than 1 and the border is
+    a soft band (averaged pixels); much higher than 1 and it is a line (a real discontinuity). A
+    make-seamless by construction puts real adjacent pixels there, so it sits at or just under 1 —
+    under, because the split is chosen where the art happens to be quietest."""
+    def d(ax, ay, bx, by):
+        return sum(abs(px[ay][ax * 4 + c] - px[by][bx * 4 + c]) for c in range(3)) / 3.0
+    xs, ys = list(range(0, w - 1, 3)), list(range(0, h - 1, 3))
+    cx = sum(d(0, y, w - 1, y) for y in range(h)) / h
+    ix = sum(d(x, y, x + 1, y) for y in range(h) for x in xs) / (h * len(xs))
+    cy = sum(d(x, 0, x, h - 1) for x in range(w)) / w
+    iy = sum(d(x, y, x, y + 1) for x in range(w) for y in ys) / (w * len(ys))
+    return (cx, ix), (cy, iy)
+
+
+def make_seamless(px, w, h, feather=16, hold=3):
+    """Make an opaque ground tile tile perfectly, *by construction*, keeping its detail crisp.
+
+    The old `--heal-seams` cross-blended a band at each edge: it removed the wrap error and put a
+    soft, blurred ribbon in its place. That ribbon is exactly the faint grid the phone showed on
+    grass, dirt and gravel — every tile border was a line of averaged pixels, and averaged pixels
+    read as a crease whatever the art either side of them is.
+
+    Nothing is averaged here. The construction is an offset, one axis at a time, so each axis is
+    exact and no pixel of the output is anything but one real pixel of the returned art:
+
+    1. **Roll the tile** along the axis by `k`, wrapping. The output's first and last line were
+       *adjacent* lines of the original, so the wrap on that axis is now continuous by construction.
+       `k` is not h/2 but the **min-error split**: of the middle third of the possible splits, the
+       one whose two lines are most alike, so the join is not merely legal but invisible. (At a flat
+       h/2 the split can land on a mortar course or a furrow and read as a line even though it
+       wraps.)
+    2. The roll has moved the original's own discontinuity into the middle, as a line across the
+       tile. **Cover it with a strip of the tile's own interior**, copied as whole lines of the
+       *other* axis, so the (already exact) continuity of that other axis is carried along with it.
+       The source offset is picked from a dozen candidates by least mean error against what it lands
+       on, and the strip is narrow — 3 px held, 16 px of feather.
+    3. The strip's own two boundaries are cut with a **hashed dither** against the feather ramp, not
+       an alpha average: each pixel is taken whole from one source or the other, chosen by a hash of
+       its position. Detail stays crisp and the join reads as texture rather than as an edge.
+    4. Repeat on the other axis. A roll along x permutes columns only, so step 1's y-continuity
+       survives it exactly, and a whole-column patch carries its own y-continuity with it.
+
+    The result: the tile's border pixels *are* interior pixels, so the border is neither a line
+    (nothing was left discontinuous) nor a band (nothing was blurred)."""
+    R = hold + feather
+
+    def alpha(dist):
+        return _smoothstep((R - dist) / float(feather))
+
+    for axis in (0, 1):                                  # 0 = roll in y, 1 = roll in x
+        n = h if axis == 0 else w                        # the length along the rolled axis
+        m = w if axis == 0 else h                        # the length of one line
+        if n < 4 * R:
+            continue
+
+        # 1. the min-error split, over the middle third, so the old seam lands clear of both edges
+        lo, hi = max(R + 4, n // 3), min(n - R - 4, 2 * n // 3)
+        best_k, best_e = n // 2, None
+        for kk in range(lo, hi + 1):
+            if axis == 0:
+                a, b = px[kk - 1], px[kk]
+                e = sum(abs(a[t * 4 + c] - b[t * 4 + c]) for t in range(0, m, 3) for c in range(3))
+            else:
+                e = sum(abs(px[t][kk * 4 + c] - px[t][(kk - 1) * 4 + c])
+                        for t in range(0, m, 3) for c in range(3))
+            if best_e is None or e < best_e:
+                best_k, best_e = kk, e
+        k = best_k
+        if axis == 0:
+            rows = [bytearray(px[(y + k) % h]) for y in range(h)]
+            line = lambda i: rows[i]
+        else:
+            c = k * 4
+            rows = [bytearray(px[y][c:] + px[y][:c]) for y in range(h)]
+            line = lambda i: bytes(bb for y in range(h) for bb in rows[y][i * 4:i * 4 + 4])
+
+        # 2. the old seam now sits between n-k-1 and n-k; patch a strip of interior over it
+        mid = n - k
+        band = [i for i in range(n) if abs(i - mid) <= R and 0 <= i < n]
+        cands = [o for o in range(R + 6, n - R - 5, 5)]  # never puts the seam back inside the band
+        src_off, berr = cands[0] if cands else n // 2, None
+        for o in cands:
+            err = 0
+            for i in band[::3]:
+                a, b = line(i), line((i + o) % n)
+                for t in range(0, m, 7):
+                    err += abs(a[t * 4] - b[t * 4]) + abs(a[t * 4 + 1] - b[t * 4 + 1]) \
+                         + abs(a[t * 4 + 2] - b[t * 4 + 2])
+            if berr is None or err < berr:
+                src_off, berr = o, err
+        patch = {i: bytes(line((i + src_off) % n)) for i in band}
+        # 3. hashed dither across the feather — a whole pixel from one side or the other, never a mix
+        for i in band:
+            a = alpha(abs(i - mid))
+            if a <= 0:
+                continue
+            s = patch[i]
+            for j in range(m):
+                if _hash01(i, j, axis + 1) >= a:
+                    continue
+                if axis == 0:
+                    rows[i][j * 4:j * 4 + 3] = s[j * 4:j * 4 + 3]
+                else:
+                    rows[j][i * 4:i * 4 + 3] = s[j * 4:j * 4 + 3]
+        px[:] = rows
     return px
+
+
+_SRGB_LIN = [((v / 255.0 / 12.92) if v / 255.0 <= 0.04045
+              else (((v / 255.0 + 0.055) / 1.055) ** 2.4)) for v in range(256)]
+
+
+def _to_oklab(r, g, b):
+    R, G, B = _SRGB_LIN[r], _SRGB_LIN[g], _SRGB_LIN[b]
+    l = (0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B) ** (1 / 3.0)
+    m = (0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B) ** (1 / 3.0)
+    s = (0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B) ** (1 / 3.0)
+    return (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s)
+
+
+def _from_oklab(L, A, B_):
+    l = (L + 0.3963377774 * A + 0.2158037573 * B_) ** 3
+    m = (L - 0.1055613458 * A - 0.0638541728 * B_) ** 3
+    s = (L - 0.0894841775 * A - 1.2914855480 * B_) ** 3
+    out = []
+    for lin in (+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+                -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+                -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s):
+        lin = 0.0 if lin < 0 else (1.0 if lin > 1 else lin)
+        v = 12.92 * lin if lin <= 0.0031308 else 1.055 * lin ** (1 / 2.4) - 0.055
+        out.append(max(0, min(255, int(round(v * 255)))))
+    return out
+
+
+def oklab_means(px, w, h):
+    """(mean L, mean chroma) of an opaque tile, in Oklab."""
+    n, sL, sC = 0, 0.0, 0.0
+    for y in range(h):
+        row = px[y]
+        for x in range(w):
+            L, A, B = _to_oklab(row[x * 4], row[x * 4 + 1], row[x * 4 + 2])
+            sL += L
+            sC += (A * A + B * B) ** 0.5
+            n += 1
+    return (sL / n, sC / n) if n else (0.0, 0.0)
+
+
+def match_tone(px, w, h, want_L, want_C):
+    """Shift a variant's mean lightness and scale its mean chroma to the family's first member.
+
+    An offset on L and a gain on chroma: every pixel keeps its own distance from the mean, so the
+    tile's detail, its local contrast and its hue relationships are all left exactly as drawn. Only
+    the tone the eye reads from three tiles away moves."""
+    have_L, have_C = oklab_means(px, w, h)
+    dL = want_L - have_L
+    gC = (want_C / have_C) if have_C > 1e-6 else 1.0
+    gC = max(0.5, min(2.0, gC))
+    if abs(dL) < 0.002 and abs(gC - 1) < 0.02:
+        return have_L, have_C, have_L, have_C
+    for y in range(h):
+        row = px[y]
+        for x in range(w):
+            L, A, B = _to_oklab(row[x * 4], row[x * 4 + 1], row[x * 4 + 2])
+            row[x * 4:x * 4 + 3] = bytes(_from_oklab(max(0.0, L + dL), A * gC, B * gC))
+    now_L, now_C = oklab_means(px, w, h)
+    return have_L, have_C, now_L, now_C
+
+
+def normalise_families(cut):
+    """Pull every ground variant on this sheet onto the tone of the first tile of its family."""
+    by_id = {s["id"]: (px, w, h) for px, w, h, s in cut if s["opaque"] and tuple(s["cells"]) == (1, 1)}
+    notes = []
+    for fam in GROUND_FAMILIES:
+        head = next((n for n in fam if n in by_id), None)
+        if head is None:
+            continue
+        want = oklab_means(*by_id[head])
+        notes.append(f"  tone {head}: L {want[0]:.3f} chroma {want[1]:.3f} (the family's reference)")
+        for name in fam:
+            if name == head or name not in by_id:
+                continue
+            wasL, wasC, nowL, nowC = match_tone(*by_id[name], want[0], want[1])
+            notes.append(f"  tone {name}: L {wasL:.3f} -> {nowL:.3f}, "
+                         f"chroma {wasC:.3f} -> {nowC:.3f}")
+    return notes
 
 
 def median_cut(colours, n):
@@ -4586,7 +4806,7 @@ def snap32(px, w, h):
     return out
 
 
-def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False, snap=False):
+def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=True, snap=False):
     """A returned tile sheet: localise, resample onto the atlas grid, key, pack into the atlas.
 
     Nothing is thrown away here. The sheet is drawn at TSET_SCALE and the atlas keeps it at that
@@ -4630,6 +4850,8 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False, snap
         cut.append((px, tw, th, s))
     if scrubbed:
         print(f"  border scrub: {scrubbed} white edge-run pixel(s) removed")
+    for n in normalise_families(cut):
+        print(n)
     if palette:
         was, now = apply_palette(cut, palette)
         print(f"  palette: {was} colours -> {now}")
@@ -4642,15 +4864,23 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False, snap
         note = ""
         if s["opaque"] and cw == chh == 1:
             if heal:
-                heal_seams(px, tw, th, ATLAS_CELL // TSET_TILE * 2)
+                make_seamless(px, tw, th)
             hz, vt = seam_error(px, tw, th)
-            note = f"  seam h{hz:.0f}/v{vt:.0f}"
-            if max(hz, vt) > SEAM_WARN:
-                LOUD.append(f"{s['id']} does not tile cleanly: mean edge difference {hz:.0f} across "
-                            f"and {vt:.0f} down (warn above {SEAM_WARN:.0f}). Rerun with --heal-seams, "
-                            f"or ask for that slot again with its edges made to meet.")
+            (cx, ix), (cy, iy) = border_gradient(px, tw, th)
+            rx, ry = (cx / ix if ix else 0.0), (cy / iy if iy else 0.0)
+            note = (f"  wrap h{hz:.0f}/v{vt:.0f}  border/interior gradient "
+                    f"h{rx:.2f} v{ry:.2f}")
+            if max(rx, ry) > 1.15:                       # a real discontinuity is left on some edge
+                LOUD.append(f"{s['id']} does not tile cleanly: the gradient across its border is "
+                            f"{max(rx, ry):.2f}x its own interior gradient — a line. Recut without "
+                            f"--no-heal, or ask for that slot again.")
                 print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
-                note += "  <-- SEAM"
+                note += "  <-- LINE"
+            elif min(rx, ry) < 0.08:                     # nothing real is that flat: it was averaged
+                LOUD.append(f"{s['id']}'s border is far flatter than its interior "
+                            f"(h{rx:.2f} v{ry:.2f}) — a soft band, not a join.")
+                print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+                note += "  <-- BAND"
         elif not s["opaque"]:
             clear = sum(1 for r in px for i in range(3, len(r), 4) if not r[i])
             note = f"  ({100 * clear // (tw * th)}% transparent)"
@@ -6810,7 +7040,7 @@ def cmd_ingest(args):
         elif a in ("--fringe", "--palette"):
             extra.append(a)
             skip = True
-        elif a in ("--nearest", "--debug", "--heal-seams"):
+        elif a in ("--nearest", "--debug", "--no-heal"):
             extra.append(a)
     roots = [Path(a).expanduser().resolve() for a in args
              if not a.startswith("--") and a not in extra] or [PACKAGES]
