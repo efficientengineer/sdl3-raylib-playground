@@ -41,6 +41,17 @@ screen navmesh."** This file is the contract between the engine, the art pipelin
   (for a stamp: which of its tiles block, as rows of `#`/`.`), `- desc:` the one-line artist description the
   art pipeline uses. Houses, trees, wells, carts, fences are **stamps** built from tiles; the top rows of a
   tall stamp (roof ridge, tree crown) are `layer: over` so a walker passes behind them.
+- **What looks solid is solid, and nothing solid is small** (owner, 2026-09-19). A building is **at
+  least 2x2 tiles** in nearly every case (the rare exception is a deliberate hut or kiosk), and a
+  building's art **fills its footprint edge to edge** — walls to the left and right edges of its tiles,
+  the front wall down to the bottom edge — so there is no strip of grass inside a solid tile that looks
+  walkable and is not. The same goes for any solid stamp (well, cart, woodpile, stall): draw it to fill
+  its tiles, or make it smaller in tiles. Roof rows that are `over` are the only part of a building the
+  walker can overlap. The tileset prompt states this per slot, and `tmap check` warns when a solid
+  stamp's art leaves more than ~15% of a solid tile transparent.
+- **Walk sheets are 9 frames, not 16** (owner accepted the trade-off, 2026-09-19): rows S, side, N;
+  columns stand, step-A, step-B. The engine mirrors the side row for the other direction and reuses the
+  stand frame; a character flagged `- asymmetric: yes` in `characters.md` keeps both side rows (12 frames).
 - **Edges without an autotile explosion**: each terrain that borders grass (dirt, paving, water) has three
   fringe tiles — `edge` (straight, facing north), `corner_out`, `corner_in` — which the engine rotates and
   overlays where that terrain meets another. Three tiles per terrain, not forty-seven.
