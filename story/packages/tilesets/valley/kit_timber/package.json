@@ -1,0 +1,41 @@
+{
+  "kind": "kit",
+  "set": "valley",
+  "kit": "timber",
+  "ids": [
+    "kit_timber_roof_tl",
+    "kit_timber_roof_t",
+    "kit_timber_roof_tr",
+    "kit_timber_roof_l",
+    "kit_timber_roof_m",
+    "kit_timber_roof_r",
+    "kit_timber_roof_el",
+    "kit_timber_roof_e",
+    "kit_timber_roof_er",
+    "kit_timber_gable_l",
+    "kit_timber_gable_r",
+    "kit_timber_wall_up_l",
+    "kit_timber_wall_up_m",
+    "kit_timber_wall_up_r",
+    "kit_timber_wall_gr_l",
+    "kit_timber_wall_gr_m",
+    "kit_timber_wall_gr_r",
+    "kit_timber_door",
+    "kit_timber_door_dl",
+    "kit_timber_door_dr",
+    "kit_timber_window",
+    "kit_timber_window_shut",
+    "kit_timber_shopfront",
+    "kit_timber_chimney",
+    "kit_timber_dormer",
+    "kit_timber_sign_bracket",
+    "kit_timber_lantern",
+    "kit_timber_ivy"
+  ],
+  "title": "valley \u2014 the 'timber' building kit (28 pieces)",
+  "makes": "28 kit pieces, which assemble into a building of any size from 2x2 tiles up",
+  "outputs": [
+    "story/field/tilesets/valley/cut/kit_timber.png"
+  ],
+  "dir": "story/packages/tilesets/valley/kit_timber"
+}

@@ -1,0 +1,15 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "objects_5",
+  "ids": [
+    "bridge_rail"
+  ],
+  "title": "valley \u2014 objects_5 tile sheet (5 of 5)",
+  "makes": "1 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/objects_5.png"
+  ],
+  "dir": "story/packages/tilesets/valley/objects_5"
+}

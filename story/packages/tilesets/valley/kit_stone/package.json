@@ -1,0 +1,41 @@
+{
+  "kind": "kit",
+  "set": "valley",
+  "kit": "stone",
+  "ids": [
+    "kit_stone_roof_tl",
+    "kit_stone_roof_t",
+    "kit_stone_roof_tr",
+    "kit_stone_roof_l",
+    "kit_stone_roof_m",
+    "kit_stone_roof_r",
+    "kit_stone_roof_el",
+    "kit_stone_roof_e",
+    "kit_stone_roof_er",
+    "kit_stone_gable_l",
+    "kit_stone_gable_r",
+    "kit_stone_wall_up_l",
+    "kit_stone_wall_up_m",
+    "kit_stone_wall_up_r",
+    "kit_stone_wall_gr_l",
+    "kit_stone_wall_gr_m",
+    "kit_stone_wall_gr_r",
+    "kit_stone_door",
+    "kit_stone_door_dl",
+    "kit_stone_door_dr",
+    "kit_stone_window",
+    "kit_stone_window_shut",
+    "kit_stone_shopfront",
+    "kit_stone_chimney",
+    "kit_stone_dormer",
+    "kit_stone_sign_bracket",
+    "kit_stone_lantern",
+    "kit_stone_ivy"
+  ],
+  "title": "valley \u2014 the 'stone' building kit (28 pieces)",
+  "makes": "28 kit pieces, which assemble into a building of any size from 2x2 tiles up",
+  "outputs": [
+    "story/field/tilesets/valley/cut/kit_stone.png"
+  ],
+  "dir": "story/packages/tilesets/valley/kit_stone"
+}

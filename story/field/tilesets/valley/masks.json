@@ -18,6 +18,13 @@
   "variants": 3,
   "inside": 2,
   "outside": 1,
+  "sdf": {
+    "file": "masks_sdf.png",
+    "zero": 128,
+    "units_per_px": 2,
+    "format": "8-bit greyscale, same layout and variants as masks.png",
+    "note": "signed distance to the boundary of the SAME displaced shape. 128 is the boundary, above it is inside the terrain, below it outside; one unit is 1/units_per_px art pixels, so the usable range is about +/-64 px. Bands parallel to a ragged edge come from the value, the edge's direction from the gradient."
+  },
   "note": "1-bit masks, GENERATED \u2014 never art. A display tile's four corners are four world cells; bits 1 NW, 2 NE, 4 SE, 8 SW pick a shape and a clockwise rotation from 'cases'. Rotation is a UV swizzle, so no mask is stored twice. variant = hash(i, j, terrain) % 3. Every boundary crosses a tile edge at that edge's midpoint, which is what makes any two shapes meet cleanly.",
   "cases": {
     "0": null,

@@ -44,6 +44,9 @@
 #define TF_TABLES 8              // colormap tables we have room for
 #define TF_TERR   32             // terrains in one tileset (TILES2 / D20)
 #define MS_COUNT  5              // mask shapes: corner, edge, diag, inv, full
+#define TF_CHUNK_TILES 16        // the ground is baked in chunks of this many tiles a side
+#define TF_CHUNKS 64             // and at most this many chunks cover a map
+#define TF_BAKE_MB 64            // over this much baked texture, the bake resolution drops
 #define TF_FLIPS  128            // `## flips` entries in one map
 #define TF_HAND   128            // `## decals` entries placed by hand
 
@@ -496,6 +499,23 @@ struct TileField {
     float decal_density;                      // dev multiplier
     int decal_placed;
 
+    // The BAKE. The ground is static per map, so terrains + masks + trim (+ decals) are rendered once
+    // into R8 INDEX chunks and the frame draws those as plain quads. Everything that varies per frame —
+    // light, drift, clouds, palette cycling — is still per fragment at draw time, on the baked index.
+    GLuint bake_fbo, chunk_tex[TF_CHUNKS];
+    int chunk_nx, chunk_ny, chunk_count;
+    int chunk_w[TF_CHUNKS], chunk_h[TF_CHUNKS];     // px, so an edge chunk is not padded
+    int bake_ct, bake_ppt;                          // tiles per chunk, bake px per tile
+    size_t bake_bytes;
+    double bake_ms;
+    bool baked_ok;                                  // the chunks are live and cover the map
+    int baked;                                      // Dev: 1 = draw the bake, 0 = the old live path
+    int bake_atlas;                                 // Dev: fold the decals and trim into the bake too
+    // What the bake was made for; anything here changing re-bakes.
+    float sig_decal;
+    int sig_ppt, sig_mode, sig_snap, sig_atlas;
+    char sig_map[32];
+
     // map
     char map_name[32], music[16];
     int mw, mh;
@@ -578,11 +598,12 @@ struct TileField {
     GLuint prog, vao, vbo, fbo, fbo_tex, white;
     GLint u_res, u_tex, u_cmap, u_texsz, u_cmaph, u_rowa, u_rowb, u_levels, u_amb,
           u_indexed, u_nl, u_lights, u_sc, u_taps, u_drift, u_clouds, u_time, u_cam, u_mask,
-          u_pscale, u_poff, u_recipe, u_ramp, u_ramp_n, u_snap, u_wind, u_havemask;
+          u_pscale, u_poff, u_recipe, u_ramp, u_ramp_n, u_snap, u_wind, u_havemask, u_bake;
     TfVert *v;
     int vn;
     GLuint cur_tex;
     int cur_mode;                             // 0 = plain RGBA texture, 1 = palette index texture
+    int cur_tw, cur_th;                       // an explicit texture size, for a baked chunk (0 = look it up)
     bool ground_pass;                         // the quads being pushed are ground: they take the drift
 
     TfArt art[TF_ART];
@@ -971,6 +992,7 @@ static void tf_cycle(TileField *t, float dt) {
 static void tf_gl_init(TileField *t);                        // the palette must exist before a tileset
 static bool tf_load_masks(TileField *t, const char *set);     // TILES2: the generated boundaries
 static void tf_load_ramps(TileField *t);
+static void tf_selfcheck(TileField *t);
 static void tf_pick_recipe(TileField *t, TfTile *e);
 static void tf_build_terrains(TileField *t, const char *set); // and the terrains' swatches
 
@@ -2214,6 +2236,23 @@ static void tf_build_decals(TileField *t) {
                         placed, no_art);
 }
 
+// THE SELF-CHECK. One line, device-side, after everything the map needs has been loaded —
+// fast_reload.sh greps for it and fails loudly when the ground came out empty, which is what a missing
+// masks.json or a missing swatch folder looks like from the Mac (i.e. invisible). It is emitted twice:
+// once at map load, and again the moment the ground has been baked, because the bake needs the display
+// scale and only the first render knows that.
+static void tf_selfcheck(TileField *t) {
+    int sw_found = 0;
+    for (int i = 0; i < t->terr_count; i++) if (t->tiles[t->terr[i]].swatch_art) sw_found++;
+    int sidecars = 0;
+    for (int i = 0; i < t->art_count; i++) if (t->art[i].has_sidecar) sidecars++;
+    SDL_Log("tilefield: SELFCHECK %s — ground quads %d, swatches found %d/%d, masks %s, "
+            "walkers with sidecar %d/%d, ramps %d, max_tex %d, baked chunks %d (%.1f MB), bake %.0f ms",
+            t->map_name, (t->gv_count - t->dv_count) / 6, sw_found, t->terr_count,
+            t->mask_tex ? "ok" : "MISSING", sidecars, t->art_count, t->ramp_count, tf_max_tex,
+            t->baked_ok ? t->chunk_count : 0, (double)t->bake_bytes / (1024 * 1024), t->bake_ms);
+}
+
 // Both static lists live in one VBO, uploaded once when the map loads.
 static void tf_upload_static(TileField *t) {
     if (!t->gv_count) return;
@@ -2276,6 +2315,7 @@ bool tf_load_map(TileField *t, const char *name) {
     tf_build_decals(t);
     tf_build_trim(t);        // after the decals: same buffer, same atlas draw
     tf_upload_static(t);
+    t->sig_map[0] = 0;       // and the bake is now a picture of the previous map: tf_render re-makes it
 
     t->party = 2;                                             // the party the intro leaves us with
     tf_place_party(t, t->spawn_x, t->spawn_y, t->spawn_f);
@@ -2286,18 +2326,7 @@ bool tf_load_map(TileField *t, const char *name) {
             TBL_NAMES[t->light_table >= 0 && t->light_table < TBL_COUNT ? t->light_table : 0],
             t->ambient, t->light_count);
     SDL_Log("tilefield: %s weather — drift %.2f, clouds %.2f", name, t->drift, t->clouds);
-    {   // THE SELF-CHECK. One line, device-side, after everything the map needs has been loaded —
-        // fast_reload.sh greps for it and fails loudly when the ground came out empty, which is what
-        // a missing masks.json or a missing swatch folder looks like from the Mac (i.e. invisible).
-        int sw_found = 0;
-        for (int i = 0; i < t->terr_count; i++) if (t->tiles[t->terr[i]].swatch_art) sw_found++;
-        int sidecars = 0;
-        for (int i = 0; i < t->art_count; i++) if (t->art[i].has_sidecar) sidecars++;
-        SDL_Log("tilefield: SELFCHECK %s — ground quads %d, swatches found %d/%d, masks %s, "
-                "walkers with sidecar %d/%d, ramps %d, max_tex %d",
-                name, (t->gv_count - t->dv_count) / 6, sw_found, t->terr_count,
-                t->mask_tex ? "ok" : "MISSING", sidecars, t->art_count, t->ramp_count, tf_max_tex);
-    }
+    tf_selfcheck(t);
     return ok;
 }
 
@@ -2341,7 +2370,7 @@ static const char *TF_FS =
     "uniform vec2 u_texsz;\n"
     "uniform float u_cmaph, u_rowa, u_rowb, u_levels, u_amb, u_drift, u_clouds, u_time;\n"
     "uniform vec2 u_cam;\n"
-    "uniform int u_indexed, u_nl, u_taps, u_recipe, u_ramp_n, u_snap, u_wind, u_havemask;\n"
+    "uniform int u_indexed, u_nl, u_taps, u_recipe, u_ramp_n, u_snap, u_wind, u_havemask, u_bake;\n"
     "uniform float u_ramp[16];\n"
     "uniform vec4 u_lights[16];\n"
     "out vec4 o;\n"
@@ -2449,6 +2478,31 @@ static const char *TF_FS =
     "  vec4 b = mix(look(idx, rb0), look(idx, rb1), fr);\n"
     "  return mix(a, b, w); }\n"
     "void main(){\n"
+    // THE BAKE (the ground is static per map, so it is drawn ONCE into an R8 INDEX texture). The output
+    // is a palette INDEX, never a colour: no colormap, no light, no blending, no filtering — indices
+    // must stay exact, so every path here is nearest and the boundary mask is a hard test. Everything
+    // the live path did per fragment per frame (light, drift, clouds, cycling) is done at DRAW time on
+    // the baked index instead, so nothing is lost but the per-frame cost of ten overlapping layers.
+    "  if (u_bake == 1) {\n"
+    "    float idx = 0.0;\n"
+    "    if (u_indexed == 3) {\n"                    // procedural terrain: the recipe, evaluated once
+    "      float cov = (u_havemask == 1) ? smoothstep(0.42, 0.58, texture(u_mask, v_uv).r) : 1.0;\n"
+    "      if (cov < 0.5) discard;\n"
+    "      float st = recipe_step(v_world + u_cam, cov);\n"
+    "      float k = float(u_ramp_n - 1);\n"
+    "      idx = u_ramp[int(clamp(floor(st * k + 0.5), 0.0, k))];\n"
+    "    } else if (u_indexed == 2) {\n"             // a swatch through its mask, in world space
+    "      float cov = (u_havemask == 1) ? smoothstep(0.42, 0.58, texture(u_mask, v_uv).r) : 1.0;\n"
+    "      if (cov < 0.5) discard;\n"
+    "      vec2 sz = v_rect.zw;\n"
+    "      idx = texelFetch(u_tex, ivec2(mod(floor((v_world + u_cam) * 4.0), sz)), 0).r * 255.0;\n"
+    "    } else {\n"                                 // atlas art: a decal, or a square terrain's trim
+    "      vec2 pp = clamp(floor(v_uv * u_texsz), v_rect.xy, v_rect.zw - 1.0);\n"
+    "      idx = texelFetch(u_tex, ivec2(pp), 0).r * 255.0;\n"
+    "    }\n"
+    "    if (idx < 0.5) discard;\n"                  // index 0 is transparent: leave what is underneath
+    "    o = vec4(idx / 255.0, 0.0, 0.0, 1.0);\n"
+    "    return; }\n"
     "  if (u_indexed == 0) {\n"
     "    vec4 t = texture(u_tex, v_uv) * v_col;\n"
     "    if (t.a < 0.01) discard;\n"
@@ -2564,6 +2618,7 @@ static void tf_gl_init(TileField *t) {
     t->u_taps = glGetUniformLocation(t->prog, "u_taps");
     t->u_mask = glGetUniformLocation(t->prog, "u_mask");
     t->u_havemask = glGetUniformLocation(t->prog, "u_havemask");
+    t->u_bake = glGetUniformLocation(t->prog, "u_bake");
     t->u_wind = glGetUniformLocation(t->prog, "u_wind");
     t->u_snap = glGetUniformLocation(t->prog, "u_snap");
     t->u_ramp_n = glGetUniformLocation(t->prog, "u_ramp_n");
@@ -2638,7 +2693,8 @@ static void tf_flush(TileField *t) {
     glUniform1i(t->u_indexed, t->cur_mode);
     if (t->cur_mode) {
         float tw = 1, th = 1;
-        if (t->cur_tex == t->atlas) { tw = (float)t->atlas_w; th = (float)t->atlas_h; }
+        if (t->cur_tw > 0) { tw = (float)t->cur_tw; th = (float)t->cur_th; }   // a baked chunk says its own size
+        else if (t->cur_tex == t->atlas) { tw = (float)t->atlas_w; th = (float)t->atlas_h; }
         else for (int i = 0; i < t->art_count; i++)
             if (t->art[i].tex == t->cur_tex) { tw = (float)t->art[i].w; th = (float)t->art[i].h; break; }
         glUniform2f(t->u_texsz, tw, th);
@@ -2648,7 +2704,15 @@ static void tf_flush(TileField *t) {
 }
 
 static void tf_use(TileField *t, GLuint tex, int mode) {
-    if (t->cur_tex != tex || t->cur_mode != mode) { tf_flush(t); t->cur_tex = tex; t->cur_mode = mode; }
+    if (t->cur_tex != tex || t->cur_mode != mode || t->cur_tw) {
+        tf_flush(t); t->cur_tex = tex; t->cur_mode = mode; t->cur_tw = t->cur_th = 0;
+    }
+}
+// The same, for a texture the batch cannot look the size of up: a baked ground chunk.
+static void tf_use_sz(TileField *t, GLuint tex, int mode, int w, int h) {
+    if (t->cur_tex != tex || t->cur_mode != mode || t->cur_tw != w || t->cur_th != h) {
+        tf_flush(t); t->cur_tex = tex; t->cur_mode = mode; t->cur_tw = w; t->cur_th = h;
+    }
 }
 
 // One quad. `rot` turns the source image 90 degrees clockwise per step, which is how three fringe
@@ -2767,13 +2831,250 @@ static void tf_draw_static(TileField *t, int first, int count, GLuint tex, int m
     glUniform1i(t->u_indexed, mode);
     glUniform2f(t->u_texsz, (float)tw, (float)th);
     glDrawArrays(GL_TRIANGLES, first, count);
-    t->cur_tex = 0; t->cur_mode = -1;                        // the dynamic batch re-binds what it needs
+    t->cur_tex = 0; t->cur_mode = -1; t->cur_tw = t->cur_th = 0;   // the dynamic batch re-binds what it needs
+}
+
+// ───────────────────────── the bake ─────────────────────────
+// The ground is STATIC per map, and it was costing a full-screen base quad plus up to nine masked
+// terrain layers plus the decals EVERY FRAME, each fragment doing a four-tap index fetch and up to
+// sixteen colormap lookups. So it is drawn ONCE, into R8 INDEX chunks, and the frame draws those
+// chunks as plain quads through the ordinary indexed path — one layer instead of ten.
+//
+// What is baked: palette INDICES, nothing else. What is NOT baked, and is still per fragment every
+// frame: the light level (ambient + point lights), the macro drift, the cloud shadows, and the palette
+// cycling (which is a rewrite of colormap columns and therefore animates a baked index for free —
+// which is exactly why water is `- cycle: water` rather than a shader motion).
+//
+// **The bake resolution is the ART's, not the screen's.** The swatches are 128 px to the tile, the
+// masks are a 128-px cell and the atlas cell is 128; baking at the display's ~96 px a tile would
+// nearest-resample every one of them and throw away the detail the whole art pipeline exists to
+// deliver — and indices cannot be filtered, so there is no smoothing to get it back. Baking at 128
+// keeps the masks at 1:1 (so the hard threshold IS the mask, exactly) and leaves the 128->96
+// minification where it already was: the draw pass's four-tap colour blend, unchanged.
+
+static void tf_free_chunks(TileField *t) {
+    for (int i = 0; i < t->chunk_count; i++)
+        if (t->chunk_tex[i]) { glDeleteTextures(1, &t->chunk_tex[i]); t->chunk_tex[i] = 0; }
+    t->chunk_count = 0; t->bake_bytes = 0; t->baked_ok = false;
+}
+
+// One chunk: the same draw list the live ground path uses, into an R8 target, with u_bake on.
+static void tf_bake_chunk(TileField *t, int ci, int cx, int cy) {
+    int ct = t->bake_ct, ppt = t->bake_ppt;
+    int cw = t->chunk_w[ci], ch = t->chunk_h[ci];
+    float bs = (float)ppt / (float)TS;                     // bake px per LOGICAL px
+    int ox = cx * ct * TS, oy = cy * ct * TS;              // the chunk's origin in world logical px
+
+    glBindFramebuffer(GL_FRAMEBUFFER, t->bake_fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->chunk_tex[ci], 0);
+    GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (st != GL_FRAMEBUFFER_COMPLETE) {
+        SDL_Log("tilefield: bake FBO incomplete 0x%x (R8 colour) — staying on the live ground path", st);
+        t->baked_ok = false;
+        return;
+    }
+    glViewport(0, 0, cw, ch);
+    glDisable(GL_BLEND);                                   // indices never blend
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(t->prog);
+    glUniform1i(t->u_bake, 1);
+    glUniform2f(t->u_res, (float)cw, (float)ch);
+    glUniform1f(t->u_sc, bs);
+    glUniform1f(t->u_time, 0.0f);                          // a bake has no clock
+    glUniform1i(t->u_wind, 0);
+    glUniform1i(t->u_tex, 0);
+    glUniform1i(t->u_mask, 2);
+    glUniform1i(t->u_havemask, t->mask_tex ? 1 : 0);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, t->mask_tex);
+    glActiveTexture(GL_TEXTURE0);
+    glUniform2f(t->u_cam, (float)ox, (float)oy);
+
+    // tf_draw_static and dev() both read t->sc / t->cam_*; the chunk IS the camera for this pass.
+    float keep_sc = t->sc;
+    int keep_cx = t->cam_x, keep_cy = t->cam_y;
+    t->sc = bs; t->cam_x = ox; t->cam_y = oy;
+    t->vn = 0; t->cur_tex = 0; t->cur_mode = -1; t->cur_tw = t->cur_th = 0;
+
+    {   // the base terrain floods the chunk, exactly as it floods the screen in the live path
+        TfTile *base = &t->tiles[t->terr[0]];
+        int es = base->edge_style < ES_COUNT ? base->edge_style : ES_RAGGED;
+        float mw = (float)t->mask_w, mh = (float)t->mask_h, mc = (float)t->mask_cell;
+        float mx = t->mask_slot[es][MS_COUNT - 1][0], my = t->mask_slot_y[es][MS_COUNT - 1][0];
+        float u0 = (mx + 8) / mw, v0 = (my + 8) / mh, u1 = (mx + mc - 8) / mw, v1 = (my + mc - 8) / mh;
+        int bm = tf_terr_mode(t, base);
+        tf_use(t, base->swatch, bm);
+        if (bm == 3) tf_set_recipe(t, base);
+        float rect[4] = { 0, 0, (float)base->swatch_px_w, (float)base->swatch_px_h };
+        push_quad(t, 0, 0, (float)cw, (float)ch, u0, v0, u1, v1, 0, TF_WHITE, rect, -1.0f, 0.0f);
+        tf_flush(t);
+    }
+    // Every other terrain, ascending priority: the display rows this chunk touches. The dual grid is
+    // offset half a tile, so a chunk needs the row before it and the row after it as well.
+    int j0 = cy * ct - 1, j1 = cy * ct + ct + 2;
+    if (j0 < 0) j0 = 0;
+    if (j1 > t->mh + 1) j1 = t->mh + 1;
+    for (int n = 1; n < t->terr_count; n++) {
+        TfTile *e = &t->tiles[t->terr[n]];
+        int first = t->gv_row[n][j0], last = t->gv_row[n][j1];
+        int md = tf_terr_mode(t, e);
+        if (md == 3) { tf_flush(t); tf_set_recipe(t, e); }
+        tf_draw_static(t, first, last - first, e->swatch, md, e->swatch_px_w, e->swatch_px_h);
+    }
+    if (t->bake_atlas) {
+        if (t->dv_count) {
+            int d0 = t->dv_row[j0 < t->mh ? j0 : t->mh - 1], d1 = t->dv_row[j1 - 1 < t->mh ? j1 - 1 : t->mh];
+            tf_draw_static(t, d0, d1 - d0, t->atlas, 1, t->atlas_w, t->atlas_h);
+        }
+        if (t->tv_count) tf_draw_static(t, t->tv_first, t->tv_count, t->atlas, 1, t->atlas_w, t->atlas_h);
+    }
+    tf_flush(t);
+
+    t->sc = keep_sc; t->cam_x = keep_cx; t->cam_y = keep_cy;
+    glUniform1i(t->u_bake, 0);
+    glEnable(GL_BLEND);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// The art's resolution, never below the screen's: 128 px a tile is the swatch, the mask cell and the
+// atlas cell alike, and anything less resamples all three with no filter to save them. In practice
+// this comes out 128 at every scale the game or a capture uses, which is why the bake survives a
+// capture at a different scale instead of being thrown away and remade every frame.
+static int tf_bake_ppt(TileField *t, float sc) {
+    int ppt = (int)(TS * sc + 0.5f);
+    int art = t->mask_cell > 0 ? t->mask_cell : 128;
+    for (int i = 0; i < t->terr_count; i++) {
+        TfTile *e = &t->tiles[t->terr[i]];
+        int p = e->sw_w ? e->swatch_px_w / e->sw_w : 0;
+        if (e->swatch_art && p > art) art = p;
+    }
+    return art > ppt ? art : ppt;
+}
+
+static void tf_bake_all(TileField *t, float sc) {
+    tf_free_chunks(t);
+    snprintf(t->sig_map, sizeof(t->sig_map), "%s", t->map_name);
+    t->sig_ppt = tf_bake_ppt(t, sc); t->sig_mode = t->ground_mode; t->sig_snap = t->snap_px;
+    t->sig_decal = t->decal_density; t->sig_atlas = t->bake_atlas;
+    t->bake_ms = 0;
+    if (!t->pal_ok || !t->terr_count || !t->gl_ready) return;
+
+    uint64_t t0 = SDL_GetTicksNS();
+    int ppt = tf_bake_ppt(t, sc);
+    int ct = TF_CHUNK_TILES;
+    while (ct > 1 && tf_max_tex > 0 && ct * ppt > tf_max_tex) ct /= 2;
+    // The budget. Halving the bake resolution is the graceful failure: a big map comes out softer
+    // rather than not at all, and the log says so.
+    for (;;) {
+        int nx = (t->mw + ct - 1) / ct, ny = (t->mh + ct - 1) / ct;
+        double mb = (double)t->mw * ppt * t->mh * ppt / (1024.0 * 1024.0);
+        if (nx * ny <= TF_CHUNKS && mb <= TF_BAKE_MB) break;
+        if (nx * ny > TF_CHUNKS && ct < 64) { ct *= 2; continue; }
+        if (ppt <= 32) { SDL_Log("tilefield: %s is too big to bake (%.0f MB at %d px/tile) — live ground",
+                                 t->map_name, mb, ppt); return; }
+        ppt /= 2;
+        SDL_Log("tilefield: bake over %d MB — dropping to %d px a tile", TF_BAKE_MB, ppt);
+    }
+    t->bake_ct = ct; t->bake_ppt = ppt;
+    t->chunk_nx = (t->mw + ct - 1) / ct;
+    t->chunk_ny = (t->mh + ct - 1) / ct;
+    t->chunk_count = t->chunk_nx * t->chunk_ny;
+    if (!t->bake_fbo) glGenFramebuffers(1, &t->bake_fbo);
+
+    for (int cy = 0; cy < t->chunk_ny; cy++) for (int cx = 0; cx < t->chunk_nx; cx++) {
+        int ci = cy * t->chunk_nx + cx;
+        int tw = t->mw - cx * ct, th = t->mh - cy * ct;     // an edge chunk is allocated short, not padded
+        if (tw > ct) tw = ct;
+        if (th > ct) th = ct;
+        t->chunk_w[ci] = tw * ppt; t->chunk_h[ci] = th * ppt;
+        glGenTextures(1, &t->chunk_tex[ci]);
+        glBindTexture(GL_TEXTURE_2D, t->chunk_tex[ci]);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, t->chunk_w[ci], t->chunk_h[ci], 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        t->bake_bytes += (size_t)t->chunk_w[ci] * t->chunk_h[ci];
+    }
+    t->baked_ok = true;
+    for (int cy = 0; cy < t->chunk_ny && t->baked_ok; cy++)
+        for (int cx = 0; cx < t->chunk_nx && t->baked_ok; cx++)
+            tf_bake_chunk(t, cy * t->chunk_nx + cx, cx, cy);
+    glFinish();
+    t->bake_ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
+    if (!t->baked_ok) { tf_free_chunks(t); return; }
+    SDL_Log("tilefield: baked %s — %d chunk(s) of %d tiles at %d px/tile, %.1f MB, %.0f ms%s",
+            t->map_name, t->chunk_count, ct, ppt, (double)t->bake_bytes / (1024 * 1024), t->bake_ms,
+            t->bake_atlas ? " (decals and trim folded in)" : "");
+    tf_selfcheck(t);                       // now the line has its bake numbers
+}
+
+// Re-bake when anything the bake depends on has moved: the map, the ground mode, the pixel snap, the
+// decal density, or the display scale by more than a few percent (a rotation, or a capture).
+static void tf_bake_check(TileField *t, float sc) {
+    if (!t->baked) return;
+    bool stale = !t->baked_ok
+              || strcmp(t->sig_map, t->map_name) != 0
+              || t->sig_mode != t->ground_mode || t->sig_snap != t->snap_px
+              || t->sig_atlas != t->bake_atlas
+              || t->sig_decal != t->decal_density
+              || t->sig_ppt != tf_bake_ppt(t, sc);
+    if (stale) tf_bake_all(t, sc);
 }
 
 // The ground, TILES2: the base terrain floods the view with one quad, then every other terrain draws
 // the display cells the dual grid gave it — static geometry, only the visible rows.
 static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
     if (!t->terr_count || !t->pal_ok) return;
+    if (t->baked && t->baked_ok) {
+        // The baked path: one quad per visible chunk, through the ordinary indexed route, with
+        // `lit = -3` so it still takes the per-fragment light, the drift and the clouds. Nothing about
+        // the ground is rebuilt or re-evaluated per frame.
+        int ct = t->bake_ct;
+        // A map smaller than the view letterboxes, and the camera clamp then puts world space the map
+        // does not cover on screen. The chunks only cover the map, so the base still floods first in
+        // that one case — and only in that case, which is what keeps the normal frame to one layer.
+        if (t->mw * TS < t->rvw || t->mh * TS < t->rvh) {
+            TfTile *base = &t->tiles[t->terr[0]];
+            int es = base->edge_style < ES_COUNT ? base->edge_style : ES_RAGGED;
+            float mw = (float)t->mask_w, mh = (float)t->mask_h, mc = (float)t->mask_cell;
+            float mx = t->mask_slot[es][MS_COUNT - 1][0], my = t->mask_slot_y[es][MS_COUNT - 1][0];
+            int bm = tf_terr_mode(t, base);
+            tf_use(t, base->swatch, bm);
+            if (bm == 3) tf_set_recipe(t, base);
+            float rect[4] = { 0, 0, (float)base->swatch_px_w, (float)base->swatch_px_h };
+            push_quad(t, 0, 0, (float)t->rvw * t->sc, (float)t->rvh * t->sc,
+                      (mx + 8) / mw, (my + 8) / mh, (mx + mc - 8) / mw, (my + mc - 8) / mh,
+                      0, TF_WHITE, rect, -3.0f, 0.0f);
+            tf_flush(t);
+        }
+        for (int cy = 0; cy < t->chunk_ny; cy++) for (int cx = 0; cx < t->chunk_nx; cx++) {
+            int ci = cy * t->chunk_nx + cx;
+            int tx0 = cx * ct, ty0 = cy * ct;
+            int tx1 = tx0 + t->chunk_w[ci] / t->bake_ppt, ty1 = ty0 + t->chunk_h[ci] / t->bake_ppt;
+            if (tx1 <= x0 || ty1 <= y0 || tx0 >= x1 || ty0 >= y1) continue;
+            float lx = (float)(tx0 * TS - t->cam_x), ly = (float)(ty0 * TS - t->cam_y);
+            float dx0 = dev(t, lx), dy0 = dev(t, ly);
+            float dx1 = dev(t, lx + (float)((tx1 - tx0) * TS)), dy1 = dev(t, ly + (float)((ty1 - ty0) * TS));
+            float rect[4] = { 0, 0, (float)t->chunk_w[ci], (float)t->chunk_h[ci] };
+            tf_use_sz(t, t->chunk_tex[ci], 1, t->chunk_w[ci], t->chunk_h[ci]);
+            // v is flipped: the bake went through the same vertex shader as the screen, whose
+            // gl_Position negates y, so a chunk — like the view FBO — is stored bottom-up.
+            push_quad(t, dx0, dy0, dx1 - dx0, dy1 - dy0, 0, 1, 1, 0, 0, TF_WHITE, rect, -3.0f, 0.0f);
+        }
+        tf_flush(t);
+        if (!t->bake_atlas) {           // the decals and the trim, still live: atlas art, still filtered
+            int j0 = y0 - 1 < 0 ? 0 : y0 - 1, j1 = y1 + 1 > t->mh ? t->mh + 1 : y1 + 1;
+            if (t->dv_count) {
+                int d0 = t->dv_row[j0 < t->mh ? j0 : t->mh - 1], d1 = t->dv_row[j1 - 1 < t->mh ? j1 - 1 : t->mh];
+                tf_draw_static(t, d0, d1 - d0, t->atlas, 1, t->atlas_w, t->atlas_h);
+            }
+            if (t->tv_count) tf_draw_static(t, t->tv_first, t->tv_count, t->atlas, 1, t->atlas_w, t->atlas_h);
+        }
+        return;
+    }
     TfTile *base = &t->tiles[t->terr[0]];
     int st = base->edge_style < ES_COUNT ? base->edge_style : ES_RAGGED;
     // One screen-filling quad for the base. Its UV is a `full` mask slot, which is inside everywhere,
@@ -2931,6 +3232,7 @@ static int tf_gather_lights(TileField *t, float *out, float leader_x, float lead
 static void tf_render(TileField *t, int vw, int vh, float sc) {
     t->sc = sc;
     t->rvw = vw; t->rvh = vh;   // a capture renders a whole map, not the player's view
+    tf_bake_check(t, sc);       // the ground is static: bake it once, re-bake when its inputs move
     int dw = (int)(vw * sc + 0.5f), dh = (int)(vh * sc + 0.5f);
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glViewport(0, 0, dw, dh);
@@ -2947,6 +3249,7 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
     glUniform2f(t->u_res, (float)dw, (float)dh);        // the batch is built in device pixels
     glUniform1i(t->u_tex, 0);
     glUniform1f(t->u_sc, sc);
+    glUniform1i(t->u_bake, 0);
 
     // Light, once for the frame. The lights are handed over in logical VIEW pixels, which is what the
     // vertex shader recovers from the device-pixel position, so nothing in the shader knows about the
@@ -2983,7 +3286,7 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
         if (nl) glUniform4fv(t->u_lights, nl, lights);
     }
     glActiveTexture(GL_TEXTURE0);
-    t->vn = 0; t->cur_tex = 0; t->cur_mode = -1;
+    t->vn = 0; t->cur_tex = 0; t->cur_mode = -1; t->cur_tw = t->cur_th = 0;
 
     int x0 = t->cam_x / TS - 1, y0 = t->cam_y / TS - 1;
     int x1 = (t->cam_x + vw) / TS + 2, y1 = (t->cam_y + vh) / TS + 2;
@@ -3596,6 +3899,14 @@ void tf_capture_to(TileField *t, const char *map, int scale, const char *out_pat
             t->ambient = lv < 0 ? 0 : lv > 1 ? 1 : lv;
         }
     }
+    const char *bk = SDL_getenv("TILE_BAKE");          // 0 = the live ground path, for the side by side
+    if (bk && bk[0]) t->baked = atoi(bk) ? 1 : 0;
+    const char *at = SDL_getenv("TILE_AT");            // stand the party somewhere: "x,y"
+    if (at && at[0]) {
+        int ax = 0, ay = 0;
+        if (sscanf(at, "%d,%d", &ax, &ay) == 2 && ax >= 0 && ay >= 0 && ax < t->mw && ay < t->mh)
+            tf_place_party(t, ax, ay, t->act[0].facing);
+    }
     const char *ot = SDL_getenv("TILE_ONETAP");        // measurement: skip the 4-tap blend
     if (ot && ot[0] == '1') t->one_tap = true;
     const char *fc = SDL_getenv("TILE_FACE");           // which way the party faces in the shot
@@ -3690,6 +4001,17 @@ bool tf_dev_ui(TileField *t, char *out, int cap) {
             ImGui::SameLine();
             if (ImGui::Checkbox("wind", &wd)) t->wind = wd;
         }
+        {   // The measuring instrument for this round: the same ground, baked or drawn live.
+            bool bk = t->baked != 0, ba = t->bake_atlas != 0;
+            if (ImGui::Checkbox("ground baked", &bk)) { t->baked = bk; t->draw_ns = 0; }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("bake decals too", &ba)) t->bake_atlas = ba;
+            ImGui::SameLine();
+            if (t->baked_ok)
+                ImGui::Text("%d chunk(s), %.1f MB, %.0f ms", t->chunk_count,
+                            (double)t->bake_bytes / (1024 * 1024), t->bake_ms);
+            else ImGui::TextUnformatted("(live)");
+        }
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9);
         if (ImGui::SliderFloat("decals", &t->decal_density, 0.0f, 3.0f, "%.2f")) {
             tf_build_decals(t);                       // the scatter is static: rebuild it, don't redraw it
@@ -3740,6 +4062,7 @@ TileField *tf_create() {
     t->decal_density = 1.0f;
     t->ground_mode = 2;   // per terrain: tiles.md's `- fill:` (swatch art unless it says otherwise)
     t->snap_px = 1;
+    t->baked = 1;         // the ground is static: bake it (Dev can put it back on the live path)
     return t;
 }
 
@@ -3760,6 +4083,7 @@ void tf_save(TileField *t, TfSave *s) {
     s->ambient = t->ambient; s->lantern_r = t->lantern_r;
     s->drift = t->drift; s->clouds = t->clouds;
     s->ground_mode = t->ground_mode; s->snap_px = t->snap_px;
+    s->baked = t->baked; s->bake_atlas = t->bake_atlas;
 }
 
 // Everything read back is validated: a map that no longer has that tile, or a tile that is now solid,
@@ -3782,6 +4106,7 @@ void tf_restore(TileField *t, const TfSave *s) {
     if (s->clouds >= 0.0f && s->clouds <= 4.0f) t->clouds = s->clouds;
     if (s->ground_mode >= 0 && s->ground_mode <= 2) t->ground_mode = s->ground_mode;
     t->snap_px = s->snap_px ? 1 : 0;
+    t->baked = s->baked ? 1 : 0; t->bake_atlas = s->bake_atlas ? 1 : 0;
     int lx = s->tx[0], ly = s->ty[0];
     if (lx < 0 || ly < 0 || lx >= t->mw || ly >= t->mh) { SDL_Log("tilefield: restored tile %d,%d is off %s", lx, ly, map); return; }
     tf_place_party(t, lx, ly, s->facing[0] & 3);

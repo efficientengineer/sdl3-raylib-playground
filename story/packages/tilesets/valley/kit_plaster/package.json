@@ -1,0 +1,41 @@
+{
+  "kind": "kit",
+  "set": "valley",
+  "kit": "plaster",
+  "ids": [
+    "kit_plaster_roof_tl",
+    "kit_plaster_roof_t",
+    "kit_plaster_roof_tr",
+    "kit_plaster_roof_l",
+    "kit_plaster_roof_m",
+    "kit_plaster_roof_r",
+    "kit_plaster_roof_el",
+    "kit_plaster_roof_e",
+    "kit_plaster_roof_er",
+    "kit_plaster_gable_l",
+    "kit_plaster_gable_r",
+    "kit_plaster_wall_up_l",
+    "kit_plaster_wall_up_m",
+    "kit_plaster_wall_up_r",
+    "kit_plaster_wall_gr_l",
+    "kit_plaster_wall_gr_m",
+    "kit_plaster_wall_gr_r",
+    "kit_plaster_door",
+    "kit_plaster_door_dl",
+    "kit_plaster_door_dr",
+    "kit_plaster_window",
+    "kit_plaster_window_shut",
+    "kit_plaster_shopfront",
+    "kit_plaster_chimney",
+    "kit_plaster_dormer",
+    "kit_plaster_sign_bracket",
+    "kit_plaster_lantern",
+    "kit_plaster_ivy"
+  ],
+  "title": "valley \u2014 the 'plaster' building kit (28 pieces)",
+  "makes": "28 kit pieces, which assemble into a building of any size from 2x2 tiles up",
+  "outputs": [
+    "story/field/tilesets/valley/cut/kit_plaster.png"
+  ],
+  "dir": "story/packages/tilesets/valley/kit_plaster"
+}

@@ -1,4 +1,4 @@
-# valley — objects_3 tile sheet (3 of 4) — save the image here
+# valley — objects_3 tile sheet (3 of 5) — save the image here
 
 1. Open `prompt.md` in this folder. Attach the files it lists, in that order, then paste its prompt.
 2. Save what ChatGPT gives back **into this folder**, named `returned.png`.

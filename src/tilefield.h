@@ -30,6 +30,7 @@ struct TfSave {
     float ambient, lantern_r;
     float drift, clouds;         // weather, so a tuned sky survives a reload
     int32_t ground_mode, snap_px; // swatch art vs procedural terrain, and the pixel snap
+    int32_t baked, bake_atlas;    // the ground is baked into index chunks; and whether decals are in it
 };
 
 TileField *tf_create();

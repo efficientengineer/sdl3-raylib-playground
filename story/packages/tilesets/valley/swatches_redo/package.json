@@ -1,0 +1,16 @@
+{
+  "kind": "swatch",
+  "set": "valley",
+  "ids": [
+    "grass_dry",
+    "dirt"
+  ],
+  "title": "valley \u2014 redo of slot(s) 2 (grass_dry), 5 (dirt)",
+  "makes": "the file(s) for slot(s) 2 (grass_dry), 5 (dirt)",
+  "outputs": [
+    "story/field/tilesets/valley/swatches/grass_dry.png",
+    "story/field/tilesets/valley/swatches/dirt.png"
+  ],
+  "redo_of": "/Users/jlampkey/Desktop/sdl3-raylib-playground/.claude/worktrees/bridge-cse_014xSfaggePQrdo4gdg7sw4E/story/packages/tilesets/valley/swatches",
+  "dir": "story/packages/tilesets/valley/swatches_redo"
+}

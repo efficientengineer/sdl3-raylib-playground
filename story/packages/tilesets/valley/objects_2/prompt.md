@@ -1,4 +1,4 @@
-# ChatGPT package: valley — objects_2 tile sheet (2 of 4)
+# ChatGPT package: valley — objects_2 tile sheet (2 of 5)
 
 ## What exists already
 

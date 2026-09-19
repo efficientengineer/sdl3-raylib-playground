@@ -130,6 +130,12 @@ O+........+++...K+++...................G+++..N..
 .......++++..............++++.....N+++.++....N..
 .......++++..............++++.....xwwwwwwwwwwx..
 ................................................
+## buildings
+# x y w h kit [storeys=N] [roof=N] [door=col] [windows=auto|none|cols] [chimney=col] [seed=n] [id=name]
+# One test building (D21) on the north side of the square: assembled from the 'plaster' kit rather
+# than drawn as a stamp. Everything else on this map is still a stamp and still works.
+20 13 4 3 plaster door=1 seed=4 id=square_house
+
 ## triggers
 21 19 2 1 message halm.well
 35 20 2 1 message halm.guild_hall_door

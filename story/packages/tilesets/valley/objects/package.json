@@ -13,7 +13,7 @@
     "wall_ns",
     "wall_corner"
   ],
-  "title": "valley \u2014 objects tile sheet (1 of 4)",
+  "title": "valley \u2014 objects tile sheet (1 of 5)",
   "makes": "9 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
   "outputs": [
     "story/field/tilesets/valley/atlas.png",

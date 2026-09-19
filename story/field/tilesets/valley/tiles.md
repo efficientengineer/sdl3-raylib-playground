@@ -99,7 +99,8 @@ walkable and readable with no art at all.
 - kind: terrain
 - priority: 7
 - swatch: 2x2
-- edge_style: smooth
+- edge_style: square
+- trim: bridge_rail
 - solid: no
 - desc: weathered timber decking boards laid across a bridge, gapped, nail heads at the joins
 
@@ -110,6 +111,11 @@ walkable and readable with no art at all.
 - edge_style: bank
 - solid: yes
 - cycle: water
+- bank_face: earth 12
+- lip: 1
+- shadow: 10
+- shallows: 14
+- foam: yes
 # - border: sand 0.085   # the owner chose a HARD bank (Phantasy Star); uncomment for a sand rim
 - desc: shallow running stream water, the current read as long soft bands of two close blues
 
@@ -342,7 +348,33 @@ walkable and readable with no art at all.
 - size_tiles: 0.55
 - desc: a small scatter of loose straw stems lying flat, dropped from a cart
 
+### Building kits — one sheet of pieces, any size of house
+
+## kit plaster
+- kind: kit
+- desc: cream lime-plaster walls over a grey fieldstone foundation, dark timber framing on the upper storey, deep red clay pantiles on the roof, dark oak doors and shutters, a warm and well-kept village house
+- layer: object
+- solid: yes
+
+## kit timber
+- kind: kit
+- desc: dark tarred plank walls with wide boards, a low fieldstone base, a thick golden thatch roof with a bound ridge, plain heavy plank doors, a working barn or a store rather than a home
+- layer: object
+- solid: yes
+
+## kit stone
+- kind: kit
+- desc: grey fieldstone walls of uneven blocks with pale mortar, a heavy grey slate roof, deep-set narrow windows, iron-strapped doors, the oldest and most solid building in the valley
+- layer: object
+- solid: yes
+
 ### Tiles and stamps — the atlas, unchanged
+
+## bridge_rail
+- index: 21
+- layer: over
+- solid: no
+- desc: a low timber bridge rail seen from above, two posts and a top rail running the length of the tile, drawn along the edge of a bridge deck and nothing else in the tile
 
 ## fence_ew
 - index: 32

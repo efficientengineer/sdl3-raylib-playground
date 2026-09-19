@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "size": 256,
   "reserved": {
     "0": "transparent",
@@ -9,11 +9,15 @@
   "cycles": [
     {
       "name": "water",
-      "family": "water blue / metal",
+      "family": "the water swatch (story/field/tilesets/valley/swatches/water.png)",
       "start": 3,
       "len": 8,
       "fps": 6,
-      "what": "the light moving on running water"
+      "what": "the light moving on running water: a shimmer through its own mid tones, not a gradient",
+      "lightness": [
+        0.673,
+        0.758
+      ]
     },
     {
       "name": "fire_lamp",
@@ -21,7 +25,11 @@
       "start": 11,
       "len": 8,
       "fps": 10,
-      "what": "a fire, a lantern, a forge: the warm end flickering"
+      "what": "a fire, a lantern, a forge: the warm end flickering",
+      "lightness": [
+        0.46,
+        0.86
+      ]
     },
     {
       "name": "foliage_wind",
@@ -29,7 +37,11 @@
       "start": 19,
       "len": 6,
       "fps": 4,
-      "what": "leaves turning in the wind, a slow shimmer through a canopy"
+      "what": "leaves turning in the wind, a slow shimmer through a canopy",
+      "lightness": [
+        0.38,
+        0.64
+      ]
     },
     {
       "name": "sparkle",
@@ -37,7 +49,11 @@
       "start": 25,
       "len": 4,
       "fps": 12,
-      "what": "a glint on water or metal, and anything that has to twinkle"
+      "what": "a glint on water or metal: this is where a highlight belongs, not in the water ramp",
+      "lightness": [
+        0.74,
+        0.96
+      ]
     }
   ],
   "corpus_weights": [
@@ -80,7 +96,7 @@
   "shadow_hue": 295.0,
   "highlight_hue": 95.0,
   "merge_dE": 0.015,
-  "merged": 29,
+  "merged": 28,
   "corpus": [
     {
       "file": "story/sheets/cast-falke-walker.png",
@@ -254,15 +270,15 @@
         45,
         46,
         47,
-        12,
-        13,
         48,
         49,
         50,
+        51,
+        52,
         44
       ],
       "len": 10,
-      "own": 6,
+      "own": 8,
       "corpus_px": 89947,
       "share": 0.0743
     },
@@ -270,8 +286,6 @@
       "name": "skin",
       "class": "long",
       "indices": [
-        51,
-        52,
         53,
         54,
         55,
@@ -285,7 +299,9 @@
         63,
         64,
         65,
-        66
+        66,
+        67,
+        68
       ],
       "len": 16,
       "own": 16,
@@ -296,22 +312,22 @@
       "name": "wood",
       "class": "long",
       "indices": [
-        51,
-        52,
         53,
         54,
         55,
-        67,
-        68,
+        56,
+        57,
         69,
         70,
         71,
         72,
         73,
         74,
-        64,
-        65,
-        66
+        75,
+        76,
+        66,
+        67,
+        68
       ],
       "len": 16,
       "own": 8,
@@ -322,22 +338,22 @@
       "name": "earth / dirt",
       "class": "long",
       "indices": [
-        51,
-        52,
         53,
         54,
         55,
-        67,
-        68,
+        56,
+        57,
         69,
         70,
         71,
         72,
-        75,
-        76,
+        73,
+        74,
         77,
         78,
-        66
+        79,
+        80,
+        68
       ],
       "len": 16,
       "own": 4,
@@ -348,16 +364,16 @@
       "name": "gold / blond",
       "class": "med",
       "indices": [
-        51,
-        79,
-        80,
-        67,
+        53,
         81,
         82,
+        69,
         83,
         84,
         85,
-        86
+        86,
+        87,
+        88
       ],
       "len": 10,
       "own": 8,
@@ -368,14 +384,14 @@
       "name": "olive / dry grass",
       "class": "short",
       "indices": [
-        87,
-        88,
         89,
         90,
         91,
         92,
         93,
-        94
+        94,
+        95,
+        96
       ],
       "len": 8,
       "own": 8,
@@ -386,8 +402,6 @@
       "name": "foliage green (warm)",
       "class": "long",
       "indices": [
-        95,
-        96,
         97,
         98,
         99,
@@ -401,7 +415,9 @@
         107,
         108,
         109,
-        110
+        110,
+        111,
+        112
       ],
       "len": 16,
       "own": 16,
@@ -412,8 +428,6 @@
       "name": "foliage green (cool)",
       "class": "long",
       "indices": [
-        111,
-        112,
         113,
         114,
         115,
@@ -427,7 +441,9 @@
         123,
         124,
         125,
-        126
+        126,
+        127,
+        128
       ],
       "len": 16,
       "own": 16,
@@ -438,14 +454,14 @@
       "name": "teal / shallow water",
       "class": "short",
       "indices": [
-        127,
-        128,
         129,
         130,
         131,
         132,
         133,
-        134
+        134,
+        135,
+        136
       ],
       "len": 8,
       "own": 8,
@@ -456,8 +472,6 @@
       "name": "sky / cyan",
       "class": "med",
       "indices": [
-        135,
-        136,
         137,
         138,
         139,
@@ -465,10 +479,12 @@
         141,
         142,
         143,
-        144
+        9,
+        144,
+        145
       ],
       "len": 10,
-      "own": 10,
+      "own": 9,
       "corpus_px": 30730,
       "share": 0.0254
     },
@@ -476,7 +492,6 @@
       "name": "water blue / metal",
       "class": "med",
       "indices": [
-        145,
         146,
         147,
         148,
@@ -485,7 +500,8 @@
         151,
         152,
         153,
-        154
+        154,
+        155
       ],
       "len": 10,
       "own": 10,
@@ -496,14 +512,14 @@
       "name": "purple / shadow",
       "class": "short",
       "indices": [
-        155,
         156,
         157,
         158,
         159,
         160,
         161,
-        162
+        162,
+        163
       ],
       "len": 8,
       "own": 8,
@@ -514,7 +530,6 @@
       "name": "neutral warm (plaster, cloth)",
       "class": "med",
       "indices": [
-        163,
         164,
         165,
         166,
@@ -523,7 +538,8 @@
         169,
         170,
         171,
-        172
+        172,
+        173
       ],
       "len": 10,
       "own": 10,
@@ -534,13 +550,12 @@
       "name": "neutral cool (stone, steel)",
       "class": "long",
       "indices": [
-        163,
-        173,
+        164,
         174,
         175,
         176,
-        166,
         177,
+        167,
         178,
         179,
         180,
@@ -549,7 +564,8 @@
         183,
         184,
         185,
-        172
+        186,
+        173
       ],
       "len": 16,
       "own": 13,
@@ -560,7 +576,6 @@
       "name": "worst-served corpus colours",
       "class": "extra",
       "indices": [
-        186,
         187,
         188,
         189,
@@ -631,8 +646,8 @@
         254,
         255
       ],
-      "len": 70,
-      "own": 70,
+      "len": 69,
+      "own": 69,
       "corpus_px": 0,
       "share": 0.0
     }

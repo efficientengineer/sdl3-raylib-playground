@@ -174,6 +174,15 @@ amplitudes come from the terrain's `- edge_style:`:
 | `ragged` | 0.105 / 5.5 | 0.045 / 13 | grass, dirt, crop, mud |
 | `smooth` | 0.022 / 3 | 0.010 / 7 | paving, plank, any laid floor |
 | `bank` | 0.060 / 3.5 | 0.022 / 9 | water — a **hard bank**, the owner's Phantasy Star call |
+| `square` | **no mask at all** | — | bridges, docks, floors, stairs, interiors |
+
+**`square` is the structural one** (owner, 2026-09-19: *"Dual grids work for organics but look bad
+for structural things like bridges."*). A square terrain is drawn **cell-aligned on the world grid**
+with straight hard edges: no mask, no dual grid, no raggedness, no half-tile offset. Its swatch is
+still sampled in world space, so the planking runs continuously across the whole bridge rather than
+restarting at each cell. It may carry **`- trim: <tile>`**, a rail or kerb tile the engine draws along
+the terrain's border cells — a bridge rail, a dock edge, a step nosing. `bridge_deck` is `square` now;
+floors, docks, stairs and interiors will all use it.
 
 The **saddle** (bits 5 and 10) is genuinely ambiguous and the convention is fixed here: `diag`'s two
 quarter discs **touch at the centre**, so diagonal terrain reads as connected. A pinch reads as a
@@ -249,3 +258,75 @@ lit from the upper left, so a mirrored building is lit from the wrong side. `tma
 `./story_prompt.py tmap preview <map>` renders a map the v2 way on the Mac — masks, swatches, the
 same hash scatter — so a map and the masks can be judged before the engine lands. A terrain with no
 swatch yet draws as a flat colour, which is still the right *shape*.
+
+## Buildings from kits (D21)
+
+Owner, 2026-09-19: *"I'd rather have a structure generator for buildings that pieces them together
+with reusable tiles, so we can easily have structures of various sizes."* A drawn stamp is one
+building at one size; a **kit** is one *style*, and the game assembles it into a building of any size
+from 2x2 tiles up. Drawn stamp houses stay valid — kits are additive.
+
+### The kit
+
+`## kit <name>` in `tiles.md`, with `- kind: kit` and a `- desc:` that is the style in one sentence
+(`plaster` = cream plaster, timber framing, red pantiles; `timber` = dark plank and thatch; `stone` =
+grey fieldstone and slate). It takes **one `- index:`**, and its **28 pieces sit contiguously from it
+in a fixed order**, so one number in `tiles.md` is the whole kit and the pieces can never drift apart.
+A kit reserves whole atlas rows. `atlas.json` lists every piece as `kit_<name>_<piece>`.
+
+| block | pieces |
+| --- | --- |
+| roof 3x3 | `roof_tl roof_t roof_tr` / `roof_l roof_m roof_r` / `roof_el roof_e roof_er` |
+| gable 2x1 | `gable_l gable_r` |
+| wall_up 3x1 | `wall_up_l wall_up_m wall_up_r` |
+| wall_gr 3x1 | `wall_gr_l wall_gr_m wall_gr_r` (foundation along the bottom edge) |
+| openings 6x1 | `door door_dl door_dr window window_shut shopfront` |
+| extras 5x1 | `chimney dormer sign_bracket lantern ivy` |
+
+**Which edge must match which** — this is the whole contract, and the sheet is drawn with the pieces
+of a block **touching, no gutter**, because that is the only way a generator can make them join:
+
+- Across a row: `_l`'s **right** edge continues into `_m`'s **left**; `_m`'s **own left and right
+  edges match each other**, because it repeats; `_m`'s right continues into `_r`'s left.
+- Down the roof: the top row's **bottom** edge continues into the middle row's **top**; the middle
+  row's **own top and bottom match each other**, because it repeats downward; its bottom continues
+  into the eave row's top.
+- An **opening replaces a wall middle**, so its left and right edges must match `wall_*_m`'s edges of
+  the **same storey**. `door`, `door_dl/dr` and `shopfront` are ground-storey only; `window` is either.
+- The eave row's **bottom** edge meets the wall's **top**; the ground storey's bottom edge is where
+  the building meets the ground.
+- Every tile fills its cell **edge to edge** — so the owner's fill-the-footprint rule holds by
+  construction — except where the building's shape genuinely leaves sky: the roof corners, the verges,
+  the gables and the extras. `extras` are mostly empty by design.
+
+### Assembly — `## buildings` in a `.tmap`
+
+```
+## buildings
+# x y w h kit [storeys=N] [roof=N] [door=col[,col]] [windows=auto|none|cols] [chimney=col] [seed=n] [id=name]
+20 13 4 3 plaster door=1 seed=4 id=square_house
+```
+
+`w`,`h` are in tiles and `h = roof rows + wall storeys`. Rows from the top: `roof` rows of roof (top /
+middle… / eave, or just an eave row when `roof` is 1), then the storeys, the last of which is the
+ground storey. Columns: left end, any number of middles, right end. Defaults: `roof` is 2 up to
+`h == 4` and 3 above it; the door takes an interior column (the middle when the width is odd,
+otherwise by seed); windows take **every other free column**, never touching a door, never two side
+by side, symmetric about the middle on an odd width, fewer on the ground floor; a chimney lands on an
+interior roof column and a lantern beside the door. Every choice is a pure function of
+`(seed, w, h)`, so the tool's preview and the engine agree without sharing state.
+
+**Collision follows the drawn-stamp convention exactly**: the **wall rows are solid**, the **roof rows
+are `over` and not solid**, so a walker passes behind the roof and is stopped by the wall — which is
+what a 2x3 tree already does. **Minimum 2x2.** The door column gets a `door`-capable trigger tile in
+front of it; `tmap check` warns if that tile is off the map.
+
+### The tooling
+
+- `./story_prompt.py tileset <set>` writes one **kit sheet package** per kit — the blocks at the
+  atlas's own 128-px cell, an ASCII diagram of an assembled 5-wide house in the prompt, and the
+  matching rules above written out. `ingest` cuts each block into its cells and packs them into the
+  atlas, warning if a wall or roof middle came back transparent.
+- `./story_prompt.py kit preview <set> <kit> [WxH …]` assembles 2x2, 3x3, 4x3, 6x4 and 8x5 from the
+  cut pieces — flat placeholders until the art exists — so the seams and the window rules can be
+  judged before the engine lands. `tmap preview` draws `## buildings` too.

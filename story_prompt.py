@@ -41,7 +41,12 @@
                                                under story/packages/tilesets/valley/<sheet>/ (slots at 4x:
                                                a tile is a 128-px slot, a 4x3 stamp a 512x384 one)
   ./story_prompt.py tmap check   halm | --all  validate story/field/tmaps/<map>.tmap against its tileset
-  ./story_prompt.py tmap preview halm          render it from the atlas -> story/out/<map>.tmap.png
+  ./story_prompt.py tmap preview halm          render it the v2 way -> story/out/<map>.tmap.png
+  ./story_prompt.py kit preview valley plaster [WxH...]
+                                               assemble a building kit at several sizes, so the
+                                               9-slice seams can be judged before the engine lands
+  ./story_prompt.py redo <package> <slot>...   a follow-up sheet for one wrong slot: the returned
+                                               image is the canvas, only those slots are cleared
 
   ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png [--fringe N]
                                                key the magenta (--fringe N shaves N more pixels off the
@@ -3742,7 +3747,7 @@ def cmd_cut(args):
         if not image.exists():
             die(f"{image} not found")
         return cut_view(data, image, "--nearest" in args)
-    if kind not in FIELD_KINDS + ("tileset", "swatch", "decal"):
+    if kind not in FIELD_KINDS + ("tileset", "swatch", "decal", "kit"):
         die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
     if not image.exists():
         die(f"{image} not found")
@@ -3768,6 +3773,11 @@ def cmd_cut(args):
             f"this package, or the generator repainted the background. Nothing written.")
     print(f"{image.name}: {w}x{h}, template {tw}x{th} ({sx:.2f}x), {len(slots)} slot(s), kind {kind}")
     localise_slots(rows, w, h, ch, slots, sx, sy, f" ({image.name})")
+    if data.get("only"):                                 # a redo package: write those slots, no others
+        only = set(data["only"])
+        slots = [s for s in slots if s["n"] in only]
+        print(f"  redo of {data.get('redo_of', '?')}: writing slot(s) "
+              + ", ".join(f"{s['n']} ({s['id']})" for s in slots) + " and nothing else")
 
     if kind == "tileset":                                 # a tile sheet: snap, key, pack into the atlas
         return cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette, heal, snap)
@@ -3775,6 +3785,8 @@ def cmd_cut(args):
         return cut_swatches(data, slots, rows, w, h, ch, sx, sy)
     if kind == "decal":                                   # D20: key, trim to the object, palettise
         return cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe)
+    if kind == "kit":                                     # D21: split each block into its cells
+        return cut_kit(data, slots, rows, w, h, ch, sx, sy, fringe)
     if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
         FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
         for s in slots:
@@ -3958,6 +3970,8 @@ def tileset_entries(name):
             f"or stamp, with '- layer:', '- solid:' and '- desc:' (see TILES.md).")
     out, unknown = {}, []
     for ident, body in h2_sections(detok(path.read_text(), unknown)).items():
+        if is_kit_heading(ident):                    # '## kit plaster' == '## kit_plaster'
+            ident = "kit_" + kit_name(ident)
         if not re.fullmatch(r"[a-z0-9_]+", ident):
             die(f"{path.name}: '## {ident}' is not a usable tile id (lower case, digits, underscores)")
         kv = kv_lines(body)
@@ -4002,9 +4016,17 @@ def tileset_entries(name):
             parse_terrain(ident, kv, e, path.name)
         elif e["kind"] == "decal":
             parse_decal(ident, kv, e, path.name)
+        elif e["kind"] == "kit":
+            # One entry, one index, and the kit's pieces sit contiguously from it in KIT_PIECES
+            # order. It reserves whole atlas rows so the pieces never straddle a row start.
+            e["kit"] = kit_name(ident)
+            e["cells"] = (ATLAS_COLS, KIT_ROWS)
+            e["w"], e["h"], e["foot"] = ATLAS_COLS, KIT_ROWS, (ATLAS_COLS, KIT_ROWS)
+            e["pieces"] = list(KIT_PIECES)
         e["opaque"] = e["layer"] == "ground" and not is_fringe(ident)
-        e["cells"] = (w * frames, h)                 # what it occupies in the atlas and on the sheet
-        e["foot"] = (w, h)                           # what it occupies on a map: frames are alternatives
+        if e["kind"] != "kit":
+            e["cells"] = (w * frames, h)             # what it occupies in the atlas and on the sheet
+            e["foot"] = (w, h)                       # on a map: frames are alternatives, not tiles
         e["sheet"] = sheet_guess(ident, e)
         if not desc:
             die(f"{path.name}: '## {ident}' has no '- desc:' line; the art pipeline has nothing to ask for")
@@ -4497,6 +4519,16 @@ def tileset_plan(setname, entries=None):
                       "makes": f"{len(terr)} seamless swatch(es) and the generated masks",
                       "outputs": [str(swatch_path(setname, t).relative_to(ROOT.parent)) for t in terr]},
                      [setname, "--swatches"]))
+    for kit in set_kits(entries):                         # one sheet a building kit (D21)
+        k = entries[kit]["kit"]
+        plan.append((here / f"kit_{k}",
+                     {"kind": "kit", "set": setname, "kit": k,
+                      "ids": [kit_piece_id(k, pc) for pc in KIT_PIECES],
+                      "title": f"{setname} — the '{k}' building kit ({len(KIT_PIECES)} pieces)",
+                      "makes": f"{len(KIT_PIECES)} kit pieces, which assemble into a building of any "
+                               f"size from 2x2 tiles up",
+                      "outputs": [str(cut_sheet_path(setname, f"kit_{k}").relative_to(ROOT.parent))]},
+                     [setname, "--kit", k]))
     if decs:                                              # ...and one for the whole biome's decals
         plan.append((here / "decals",
                      {"kind": "decal", "set": setname, "ids": decs,
@@ -4677,12 +4709,14 @@ def write_tilesets_readme():
 
 def cmd_tileset(args):
     pos = []
-    sheet, what, it = None, None, iter(args)
+    sheet, what, kit, it = None, None, None, iter(args)
     for a in it:
         if a == "--sheet":
             sheet = next(it, None)
         elif a in ("--swatches", "--decals"):
             what = a[2:]
+        elif a == "--kit":
+            what, kit = "kit", next(it, None)
         elif not a.startswith("--"):
             pos.append(a)
     if not pos:
@@ -4695,6 +4729,8 @@ def cmd_tileset(args):
         return build_swatch_sheet(setname, set_terrains(entries), entries)
     if what == "decals":
         return build_decal_sheet(setname, set_decals(entries), entries)
+    if what == "kit":
+        return build_kit_sheet(setname, kit, entries)
     if sheet:                                        # one sheet, called by `packages` as a builder
         return build_tileset_sheet(setname, sheet, pos[1:], entries)
     write_tilesets_readme()
@@ -4726,6 +4762,7 @@ def cmd_tileset(args):
 # reason any shape meets any other shape in any rotation with no break.
 
 TSET_MASKS = "masks.png"
+TSET_MASKS_SDF = "masks_sdf.png"      # the same shapes as a signed distance field, for depth
 TSET_MASKS_JSON = "masks.json"
 TSET_SWATCHES = "swatches"            # <set>/swatches/<terrain>.png
 MASK_PX = ATLAS_CELL                  # a mask is one display tile at the atlas's own cell size
@@ -4735,12 +4772,22 @@ EDGE_STYLES = {                       # amp/freq of two octaves of value noise d
     "ragged": (0.105, 5.5, 0.045, 13.0),      # grass, dirt, crop, mud
     "smooth": (0.022, 3.0, 0.010, 7.0),       # paving, plank, any laid floor
     "bank":   (0.060, 3.5, 0.022, 9.0),       # water: a hard Phantasy Star bank, not a soft shore
+    # `square` is not a mask at all. The owner: *"Dual grids work for organics but look bad for
+    # structural things like bridges."* A square terrain is drawn CELL-ALIGNED on the world grid with
+    # straight hard edges — a bridge deck, a dock, a floor, a stair, an interior — and the dual grid
+    # never touches it. It is in this table so the rest of the code can look an edge_style up without
+    # a special case; the amplitudes are zero and nothing reads them.
+    "square": (0.0, 1.0, 0.0, 1.0),
+    # `ledge` is `bank`'s vocabulary applied to raised ground — a cliff, a terrace, a quarry step.
+    # Same depth keys, same face on the side you are looking at. Nothing uses it yet.
+    "ledge":  (0.075, 4.0, 0.030, 10.0),
 }
+SQUARE_STYLE = "square"               # the one edge_style that is drawn on the world grid, not masked
 MASK_WINDOW = 0.16                    # the displacement is windowed to zero this close to the border,
                                       # so the pinned midpoints survive whatever the noise does
 SWATCH_MIN, SWATCH_MAX = 2, 4         # tiles a side
 DECAL_MIN_SLOT = 96                   # a decal slot smaller than this is not worth asking for
-TERRAIN_KINDS = ("terrain", "decal", "tile")
+TERRAIN_KINDS = ("terrain", "decal", "tile", "kit")
 
 
 def h32(*v):
@@ -4784,14 +4831,24 @@ def mask_sdf(shape, x, y):
     die(f"unknown mask shape '{shape}'")
 
 
+SDF_ZERO = 128                        # the boundary, in masks_sdf.png
+SDF_UNITS_PER_PX = 2                  # one unit is half an art pixel, so +/-127 is about +/-64 px
+
+
 def bake_mask(shape, style, variant, px=MASK_PX):
-    """One mask as rows of 0/1. Rotation is not baked: the engine swizzles the UV."""
+    """(bits, sdf) — the 1-bit mask, and the same field as a signed distance in SDF units.
+
+    The bit is what the tile shader alpha-tests. The SDF is what DEPTH is drawn from: the owner, off
+    the phone, *"where the water transitions into land, there's absolutely no sense of depth."* A band
+    parallel to a ragged edge cannot be drawn from a bit — you cannot ask a bit how far away the shore
+    is, or which way it faces. Both come from the same displaced expression, so they can never
+    disagree about where the boundary is."""
     a1, f1, a2, f2 = EDGE_STYLES[style]
     seed = h32(MASK_SHAPES.index(shape), sorted(EDGE_STYLES).index(style), variant)
-    rows = []
+    rows, sdf = [], []
     for py in range(px):
         y = (py + 0.5) / px
-        line = bytearray(px)
+        line, srow = bytearray(px), bytearray(px)
         for x_ in range(px):
             x = (x_ + 0.5) / px
             d = mask_sdf(shape, x, y)
@@ -4800,8 +4857,23 @@ def bake_mask(shape, style, variant, px=MASK_PX):
                 d += win * (a1 * vnoise(x * f1, y * f1, seed)
                             + a2 * vnoise(x * f2, y * f2, seed + 7))
             line[x_] = 1 if d > 0 else 0
+            v = SDF_ZERO + int(round(d * px * SDF_UNITS_PER_PX))
+            srow[x_] = 0 if v < 0 else (255 if v > 255 else v)
         rows.append(line)
-    return rows
+        sdf.append(srow)
+    return rows, sdf
+
+
+def write_grey_png(path, w, h, rows):
+    """8-bit greyscale (colour type 0). For DATA, never for art: the SDF is a measurement."""
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+    raw = b"".join(b"\x00" + bytes(r) for r in rows)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
 def bits_rot(b):
@@ -4830,16 +4902,20 @@ DUAL_CASES = dual_grid_cases()
 _MASK_CACHE = {}
 
 
-def tile_mask(shape, style, variant, rot=0):
+def _rot_rows(m, rot):
+    for _ in range(rot):
+        n = len(m)
+        m = [bytearray(m[n - 1 - x][y] for x in range(n)) for y in range(n)]
+    return m
+
+
+def tile_mask(shape, style, variant, rot=0, sdf=False):
     """A baked mask, rotated clockwise `rot` quarter turns. Cached; the preview asks for these a lot."""
     key = (shape, style, variant, rot)
     if key not in _MASK_CACHE:
-        m = bake_mask(shape, style, variant)
-        for _ in range(rot):
-            n = len(m)
-            m = [bytearray(m[n - 1 - x][y] for x in range(n)) for y in range(n)]
-        _MASK_CACHE[key] = m
-    return _MASK_CACHE[key]
+        bits, dist = bake_mask(shape, style, variant)
+        _MASK_CACHE[key] = (_rot_rows(bits, rot), _rot_rows(dist, rot))
+    return _MASK_CACHE[key][1 if sdf else 0]
 
 
 def write_masks(setname, styles=None):
@@ -4847,32 +4923,44 @@ def write_masks(setname, styles=None):
 
     An indexed PNG like everything else the game ships: index 1 (black) outside the terrain, index 2
     (white) inside, so `palette check` covers it and the engine reads one byte a pixel."""
-    styles = sorted(set(styles or EDGE_STYLES))
+    styles = sorted(set(styles or EDGE_STYLES) - {SQUARE_STYLE})   # a square terrain has no mask
     for s in styles:
         if s not in EDGE_STYLES:
             die(f"unknown edge_style '{s}'; use one of {', '.join(sorted(EDGE_STYLES))}")
     cols = len(MASK_SHAPES) * MASK_VARIANTS
     W, H = cols * MASK_PX, len(styles) * MASK_PX
     idx = [bytearray(W) for _ in range(H)]
+    sdf = [bytearray(SDF_ZERO for _ in range(W)) for _ in range(H)]
     slots = []
     for r, style in enumerate(styles):
         for si, shape in enumerate(MASK_SHAPES):
             for v in range(MASK_VARIANTS):
                 c = si * MASK_VARIANTS + v
                 m = tile_mask(shape, style, v)
+                dm = tile_mask(shape, style, v, sdf=True)
                 for y in range(MASK_PX):
                     row, src = idx[r * MASK_PX + y], m[y]
+                    srow, ssrc = sdf[r * MASK_PX + y], dm[y]
                     for x in range(MASK_PX):
                         row[c * MASK_PX + x] = PAL_WHITE if src[x] else PAL_BLACK
+                        srow[c * MASK_PX + x] = ssrc[x]
                 slots.append({"style": style, "shape": shape, "variant": v,
                               "x": c * MASK_PX, "y": r * MASK_PX})
     d = tileset_dir(setname)
     d.mkdir(parents=True, exist_ok=True)
     write_indexed_png(d / TSET_MASKS, W, H, idx, master_palette())
+    write_grey_png(d / TSET_MASKS_SDF, W, H, sdf)
     (d / TSET_MASKS_JSON).write_text(json.dumps({
         "set": setname, "cell": MASK_PX, "width": W, "height": H,
         "styles": styles, "shapes": list(MASK_SHAPES), "variants": MASK_VARIANTS,
         "inside": PAL_WHITE, "outside": PAL_BLACK,
+        "sdf": {"file": TSET_MASKS_SDF, "zero": SDF_ZERO, "units_per_px": SDF_UNITS_PER_PX,
+                "format": "8-bit greyscale, same layout and variants as masks.png",
+                "note": "signed distance to the boundary of the SAME displaced shape. "
+                        f"{SDF_ZERO} is the boundary, above it is inside the terrain, below it "
+                        "outside; one unit is 1/units_per_px art pixels, so the usable range is "
+                        "about +/-64 px. Bands parallel to a ragged edge come from the value, the "
+                        "edge's direction from the gradient."},
         "note": "1-bit masks, GENERATED — never art. A display tile's four corners are four world "
                 "cells; bits 1 NW, 2 NE, 4 SE, 8 SW pick a shape and a clockwise rotation from "
                 "'cases'. Rotation is a UV swizzle, so no mask is stored twice. "
@@ -4913,6 +5001,33 @@ def parse_terrain(ident, kv, e, where):
             die(f"{where}: '## {ident}' border width '{f[1]}' is not a number")
     e["drift"] = float(kv.get("drift", 0.0))
     e["cycle"] = (kv.get("cycle") or "").strip() or None
+    # Depth at the boundary (the owner, off the phone: *"where the water transitions into land,
+    # there's absolutely no sense of depth"*). Every one of these is measured in ART PIXELS and drawn
+    # as a RAMP STEP of a named master-palette ramp — never as a blended colour, because a blend
+    # lands between two ramps and the light tables then have nothing to darken it along.
+    e["bank"] = None
+    if e["edge_style"] in ("bank", "ledge"):
+        b = {"face": None, "face_px": 0, "lip": 1, "shadow": 10, "shallows": 13, "foam": True}
+        if kv.get("bank_face"):
+            f = kv["bank_face"].split()
+            if len(f) != 2:
+                die(f"{where}: '## {ident}' has '- bank_face: {kv['bank_face']}'; write "
+                    f"'bank_face: <ramp or terrain> <pixels>'")
+            b["face"] = f[0]
+            b["face_px"] = int(float(f[1]))
+        for key, lo, hi in (("lip", 0, 4), ("shadow", 0, 32), ("shallows", 0, 48)):
+            if kv.get(key):
+                b[key] = int(float(kv[key]))
+                if not lo <= b[key] <= hi:
+                    die(f"{where}: '## {ident}' has '- {key}: {kv[key]}'; {lo}..{hi} art pixels")
+        if kv.get("foam"):
+            b["foam"] = kv["foam"].strip().lower() in ("yes", "true", "1")
+        e["bank"] = b
+    e["trim"] = (kv.get("trim") or "").strip() or None      # a rail or kerb tile along a square edge
+    if e["trim"] and e["edge_style"] != SQUARE_STYLE:
+        die(f"{where}: '## {ident}' has '- trim: {e['trim']}' but '- edge_style: {e['edge_style']}'. "
+            f"A trim is drawn along a straight cell-aligned border, so it only means anything on a "
+            f"'square' terrain.")
     return e
 
 
@@ -4954,6 +5069,60 @@ def parse_passmask(text, ident, where):
         die(f"{where}: '## {ident}' has '- pass: {text}'; write the open sides as letters from "
             f"N, E, S, W (each at most once), or 'none'")
     return "".join(c for c in "NESW" if c in text)
+
+
+# The named material ramps of master.json, by the short word a tiles.md line uses. A depth band is a
+# STEP of one of these, never a blended colour: a blend lands between two ramps and the light tables
+# then have nothing to darken it along.
+RAMP_KEYS = {
+    "earth": "earth / dirt", "dirt": "earth / dirt", "stone": "neutral cool (stone, steel)",
+    "grey": "neutral cool (stone, steel)", "plaster": "neutral warm (plaster, cloth)",
+    "wood": "wood", "roof": "roof red / brick", "skin": "skin", "gold": "gold / blond",
+    "olive": "olive / dry grass", "foliage": "foliage green (warm)",
+    "foliage_cool": "foliage green (cool)", "teal": "teal / shallow water", "sky": "sky / cyan",
+    "water": "water blue / metal", "purple": "purple / shadow",
+    "orange": "orange / terracotta (hair)",
+}
+
+
+def ramp_indices(key):
+    """The palette indices of a named ramp, dark to light. [] when master.json has no such ramp."""
+    name = RAMP_KEYS.get(key, key)
+    if not MASTER_JSON.exists():
+        return []
+    for r in json.loads(MASTER_JSON.read_text()).get("ramps", []):
+        if r["name"] == name:
+            return list(r["indices"])
+    return []
+
+
+def ramp_step(key, t):
+    """The colour t of the way up a named ramp (0 dark, 1 light). None when the ramp is unknown."""
+    idx = ramp_indices(key)
+    if not idx:
+        return None
+    pal = master_palette()
+    return pal[idx[max(0, min(len(idx) - 1, int(round(t * (len(idx) - 1)))))]]
+
+
+def shade_step(rgb, steps):
+    """`steps` steps darker (negative) or lighter along whichever master ramp this colour sits on.
+
+    Depth is drawn in ramp steps, so a bank face is always exactly the same *material* as the land
+    above it, two or three steps down — never a multiply, never a blend."""
+    if rgb is None:
+        return None
+    pal = master_palette()
+    best, bi, bd = None, None, 1e9
+    for r in json.loads(MASTER_JSON.read_text()).get("ramps", []):
+        for k, i in enumerate(r["indices"]):
+            q = pal[i]
+            d = sum((a - b) ** 2 for a, b in zip(q, rgb))
+            if d < bd:
+                bd, best, bi = d, r["indices"], k
+    if best is None:
+        return rgb
+    return pal[best[max(0, min(len(best) - 1, bi + steps))]]
 
 
 def set_terrains(entries):
@@ -5348,6 +5517,577 @@ def cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe=0):
           f"({len(slots)} decal(s) packed), atlas.json updated")
 
 
+# ───────────────────── Building kits (D21): structures from reusable tiles ─────────────────────
+#
+# The owner: *"I'd rather have a structure generator for buildings that pieces them together with
+# reusable tiles, so we can easily have structures of various sizes."* A KIT is one style's worth of
+# 9-slice pieces — a roof that stretches, a wall row that stretches, openings that replace a wall
+# middle, extras laid over the top — and a map says `x y w h kit` instead of naming a drawn stamp of
+# exactly that size. One sheet gives every building in that style, at every size.
+#
+# The pieces are laid out on the sheet in BLOCKS with no gutter inside a block, because the whole
+# point is that neighbouring pieces must join: ChatGPT can only draw a roof's left, middle and right
+# so they meet if it draws them touching.
+
+KIT_ROOF = ("roof_tl", "roof_t", "roof_tr",
+            "roof_l", "roof_m", "roof_r",
+            "roof_el", "roof_e", "roof_er")
+KIT_GABLE = ("gable_l", "gable_r")
+KIT_WALL_UP = ("wall_up_l", "wall_up_m", "wall_up_r")
+KIT_WALL_GR = ("wall_gr_l", "wall_gr_m", "wall_gr_r")
+KIT_OPENINGS = ("door", "door_dl", "door_dr", "window", "window_shut", "shopfront")
+KIT_EXTRAS = ("chimney", "dormer", "sign_bracket", "lantern", "ivy")
+
+# (block id, columns, rows, pieces row-major, what the block is for)
+KIT_BLOCKS = (
+    ("roof", 3, 3, KIT_ROOF,
+     "the roof, as a 9-slice: the middle column repeats across a wide house and the middle row "
+     "repeats down a tall one"),
+    ("gable", 2, 1, KIT_GABLE, "the two gable ends, for a roof seen end-on"),
+    ("wall_up", 3, 1, KIT_WALL_UP, "an upper storey: left end, middle, right end"),
+    ("wall_gr", 3, 1, KIT_WALL_GR, "the ground storey, with the foundation along its bottom edge"),
+    ("openings", 6, 1, KIT_OPENINGS, "each one REPLACES a wall middle, so it must join the wall "
+                                     "either side of it exactly"),
+    ("extras", 5, 1, KIT_EXTRAS, "laid over a roof or wall tile, so each one is mostly empty"),
+)
+KIT_PIECES = tuple(p for _, _, _, ps, _ in KIT_BLOCKS for p in ps)
+KIT_ROWS = (len(KIT_PIECES) + ATLAS_COLS - 1) // ATLAS_COLS      # atlas rows a kit reserves
+
+KIT_DESC = {
+    "roof_tl": "the roof's top-left corner: the ridge end, with the pitch falling away right and down",
+    "roof_t": "the roof's top edge: the ridge running across, the pitch falling away below it",
+    "roof_tr": "the roof's top-right corner: the ridge end, the pitch falling away left and down",
+    "roof_l": "the roof's left edge: the pitch, with the verge board down the left side",
+    "roof_m": "the middle of the roof: nothing but pitch, and it repeats in both directions",
+    "roof_r": "the roof's right edge: the pitch, with the verge board down the right side",
+    "roof_el": "the roof's bottom-left corner: the eave and the gutter end, the wall starting below",
+    "roof_e": "the roof's bottom edge: the eave overhanging, its shadow on the wall below",
+    "roof_er": "the roof's bottom-right corner: the eave and the gutter end",
+    "gable_l": "a gable end seen from the left: the triangle of wall under the roof's slope",
+    "gable_r": "a gable end seen from the right: the triangle of wall under the roof's slope",
+    "wall_up_l": "an upper storey's left end: the corner of the wall, the quoin or the corner post",
+    "wall_up_m": "an upper storey's middle: blank wall, and it repeats across any width",
+    "wall_up_r": "an upper storey's right end: the corner of the wall",
+    "wall_gr_l": "the ground storey's left end: the corner, with the foundation along the bottom edge",
+    "wall_gr_m": "the ground storey's middle: blank wall over the foundation, and it repeats",
+    "wall_gr_r": "the ground storey's right end: the corner, with the foundation along the bottom edge",
+    "door": "a single door in the ground storey's wall, closed, its frame and step drawn",
+    "door_dl": "the left half of a double door, closed",
+    "door_dr": "the right half of a double door, closed, matching the left half exactly",
+    "window": "a window in the wall: frame, glazing bars and a sill",
+    "window_shut": "the same window with its shutters closed over it",
+    "shopfront": "a shop's open front in the ground storey: a wide counter opening under a lintel",
+    "chimney": "a brick or stone chimney stack with its pot, standing on the roof, the rest empty",
+    "dormer": "a small dormer window sitting in the roof pitch, the rest empty",
+    "sign_bracket": "an iron bracket on the wall with a small blank hanging sign, the rest empty",
+    "lantern": "a lantern on a bracket by a door, lit, the rest empty",
+    "ivy": "a patch of ivy growing up a wall, ragged at its edges, the rest empty",
+}
+KIT_KEYED = set(KIT_ROOF[:3]) | {"roof_l", "roof_r", "roof_el", "roof_e", "roof_er"} \
+    | set(KIT_GABLE) | set(KIT_EXTRAS)          # the pieces that legitimately have empty space in them
+
+
+def kit_name(ident):
+    """`## kit plaster` and `## kit_plaster` are the same entry; the id is the second form."""
+    return re.sub(r"^kit[ _]+", "", ident.strip().lower())
+
+
+def is_kit_heading(ident):
+    return bool(re.match(r"^kit[ _]+[a-z0-9_]+$", ident.strip().lower()))
+
+
+def kit_piece_id(kit, piece):
+    return f"kit_{kit}_{piece}"
+
+
+def kit_piece_index(e, piece):
+    """A kit's pieces sit contiguously from its own index, in KIT_PIECES order. One number in
+    tiles.md, twenty-eight cells in the atlas, and no way for them to drift apart."""
+    return e["index"] + KIT_PIECES.index(piece)
+
+
+def set_kits(entries):
+    return sorted(i for i, e in entries.items() if e.get("kind") == "kit")
+
+
+def kit_block_layout():
+    """[(block, cols, rows, pieces, what, (x, y) in cells)] packed into a sheet, in a fixed order."""
+    out, x, y, rowh = [], 0, 0, 0
+    width = 6                                        # cells across the sheet, before the margins
+    for block, cw, chh, pieces, what in KIT_BLOCKS:
+        if x and x + cw > width:
+            x, y, rowh = 0, y + rowh, 0
+        out.append((block, cw, chh, pieces, what, (x, y)))
+        x += cw
+        rowh = max(rowh, chh)
+    return out, width, y + rowh
+
+
+ASSEMBLY_DIAGRAM = """\
+        column:   0      1      2      3      4
+        row 0   roof_tl roof_t roof_t roof_t roof_tr
+        row 1   roof_l  roof_m roof_m roof_m roof_r
+        row 2   roof_el roof_e roof_e roof_e roof_er
+        row 3   wall_up_l wall_up_m window wall_up_m wall_up_r
+        row 4   wall_gr_l wall_gr_m door  wall_gr_m wall_gr_r
+"""
+
+
+def build_kit_sheet(setname, kit, entries=None, style=None):
+    """One package: every piece of one kit, in blocks, at the atlas's own cell size."""
+    entries = entries or tileset_entries(setname)
+    style, warn = style or load_style(), []
+    ident = kit_piece_id(kit, "").rstrip("_")
+    e = entries.get(f"kit_{kit}") or entries.get(kit)
+    if not e:
+        die(f"{tileset_doc(setname).name}: no '## kit {kit}' entry")
+    blocks, cells_w, cells_h = kit_block_layout()
+    u = ATLAS_CELL
+    gutter = SLOT_GUTTER
+    rows_used = {}
+    for block, cw, chh, pieces, what, (cx, cy) in blocks:
+        rows_used[cy] = max(rows_used.get(cy, 0), chh)
+    ys, y = {}, SLOT_MARGIN
+    for cy in sorted(rows_used):
+        ys[cy] = y
+        y += rows_used[cy] * u + gutter + DIGIT_SCALE * 5
+    total_h = y - gutter + SLOT_MARGIN
+    total_w = 2 * SLOT_MARGIN + cells_w * u + gutter
+    # The canvas is TRIMMED to the blocks, as the tile sheets are: ChatGPT returns about 1.5
+    # megapixels whatever it is given, so empty canvas is detail thrown away.
+    W = min(max(total_w, 640), max(c[0] for c in TEMPLATE_CANVASES))
+    H = min(max(total_h, 640), max(c[1] for c in TEMPLATE_CANVASES))
+    if total_w > W or total_h > H:
+        die(f"the {kit} kit's blocks need {total_w}x{total_h}px, which fits no template canvas. "
+            f"Split the kit, or draw it in two sheets.")
+    label = f"{W}x{H}"
+    slots, n = [], 0
+    for block, cw, chh, pieces, what, (cx, cy) in blocks:
+        n += 1
+        bx = SLOT_MARGIN + cx * u + (gutter if cx else 0)
+        box = (bx, ys[cy], cw * u + 2 * SLOT_BORDER, chh * u + 2 * SLOT_BORDER)
+        slots.append({"n": n, "id": f"{kit}_{block}", "block": block, "kit": kit,
+                      "cells": [cw, chh], "pieces": list(pieces), "what": what,
+                      "box": list(box), "inner": list(inner_box(box)),
+                      "target": [cw * u, chh * u]})
+    name = f"kit_{setname}_{kit}"
+    b = style["blocks"]
+    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered blocks filled in. "
+         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
+         b["map_header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {i}: {note}" for i, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "",
+          f"WHAT THIS IS: a BUILDING KIT — a set of square tiles the game assembles into houses of "
+          f"any size. It is not a picture of a house. Each numbered block is a strip or a grid of "
+          f"{u}x{u} tiles drawn TOUCHING, with no gap and no line between them, because the game "
+          f"cuts them apart and puts them back together in a different order.", "",
+          f"THE STYLE OF THIS KIT: {e['desc']}", "",
+          "HOW THE GAME ASSEMBLES THEM — a 5-wide, 2-storey house with a 3-row roof:", "",
+          ASSEMBLY_DIAGRAM,
+          "So these edges must match, exactly, pixel for pixel:",
+          "- The RIGHT edge of `roof_tl` must continue into the LEFT edge of `roof_t`; `roof_t`'s own "
+          "left and right edges must match EACH OTHER, because it repeats; and its right edge must "
+          "continue into `roof_tr`'s left edge. The same for the `roof_l / roof_m / roof_r` row and "
+          "the `roof_el / roof_e / roof_er` row.",
+          "- The BOTTOM edge of the top roof row must continue into the TOP edge of the middle row, "
+          "and the middle row's bottom into the eave row's top. The middle row repeats downward, so "
+          "its own top and bottom edges must match each other.",
+          "- Every wall strip works the same way across: `_l` then any number of `_m` then `_r`, and "
+          "`_m`'s left and right edges must match each other.",
+          "- An OPENING replaces a wall middle, so its left and right edges must match the wall "
+          "middle's edges of the same storey. A door and a shopfront sit in the GROUND storey, a "
+          "window in either.",
+          "- The wall's top edge meets the eave row's bottom edge; the ground storey's bottom edge is "
+          "where the building meets the ground.", "",
+          "EVERY TILE FILLS ITS CELL EDGE TO EDGE — no margin, no rounded corner, no drop shadow "
+          "outside the tile — EXCEPT where the shape of the building genuinely leaves sky: the roof "
+          "corners, the verges, the gable ends and the extras. There the rest of the cell is the flat "
+          "background colour and nothing else.", "",
+          "BLOCKS:"]
+    for s in slots:
+        L.append(f"Block {s['n']} ({s['block']}), {s['cells'][0]}x{s['cells'][1]} tiles of "
+                 f"{u}x{u} px — {s['what']}:")
+        for k, piece in enumerate(s["pieces"]):
+            c, r = k % s["cells"][0], k // s["cells"][0]
+            L.append(f"    cell ({c},{r}) {piece}: {KIT_DESC[piece]}")
+    L += ["", f"RENDERING: {field_rendering(b)}", "",
+          f"AVOID: {b['map_negative']}, a gap or a line between the tiles of one block, a drop "
+          f"shadow or a glow outside a tile, a whole house drawn in one block, perspective, a "
+          f"vanishing point, ground or grass under the building, people, drawing outside a block, "
+          f"moving or covering a block number, changing the size of the image"]
+    made = [f"`{kit_piece_id(kit, p)}`" for p in KIT_PIECES]
+    after = field_after(pkg_path(name, "sheet.json"), [
+        f"- [ ] All {len(slots)} blocks filled, every border and number still exactly where it was",
+        "- [ ] The tiles inside a block TOUCH: no gutter, no line, no border between them",
+        "- [ ] A middle tile's left and right edges match each other (it has to repeat)",
+        "- [ ] The roof's three rows stack: bottom of one continues into the top of the next",
+        "- [ ] An opening's left and right edges match the wall middle of its own storey",
+        "- [ ] One light direction, upper left, across every piece", "",
+        "If one block fails, reply in the same chat: \"Redraw only block 3 and keep every other block "
+        "and the whole template exactly as it is. <what was wrong>\"."],
+        makes=f"the {len(KIT_PIECES)} kit pieces into `{atlas_path(setname).relative_to(ROOT.parent)}`")
+    status = [f"- `{kit}` kit, {len(KIT_PIECES)} pieces at atlas index "
+              f"{e['index']}-{e['index'] + len(KIT_PIECES) - 1}"]
+    template, manifest, md = write_field_package(
+        "kit", name, label, W, H, MAGENTA, slots, "\n".join(L), attach, after, status=status)
+    data = json.loads(manifest.read_text())
+    data.update({"set": setname, "kit": kit, "cell": u, "base_index": e["index"]})
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} blocks, {len(KIT_PIECES)} pieces, {label})")
+    return slots
+
+
+def cut_kit(data, slots, rows, w, h, ch, sx, sy, fringe=0):
+    """A returned kit sheet: subdivide each block into its cells and pack them into the atlas."""
+    setname, kit = data["set"], data["kit"]
+    entries = tileset_entries(setname)
+    e = entries[f"kit_{kit}"]
+    pal, pidx = master_palette(), PalIndex(master_palette())
+    need = (e["index"] + len(KIT_PIECES)) // ATLAS_COLS + 1
+    atlas = load_atlas(setname, need)
+    u = ATLAS_CELL
+    made = 0
+    for s in slots:
+        x, y, bw, bh = exact_inner(s, sx, sy, w, h)
+        cw, chh = s["cells"]
+        art = resample(crop(rows, ch, x, y, bw, bh), bw, bh, ch, cw * u, chh * u)
+        for k, piece in enumerate(s["pieces"]):
+            c, r = k % cw, k // cw
+            cell = crop(art, ch, c * u, r * u, u, u)
+            px = key_magenta(cell, u, u, ch, fringe)
+            scrub_border(px, u, u, 4, True, max(2, int(round(2 * sx))))
+            idx = kit_piece_index(e, piece)
+            place_in_atlas(atlas, idx, px, 1, 1)
+            clear = sum(1 for rr in px for i in range(3, len(rr), 4) if rr[i] < 128)
+            pct = 100 * clear // (u * u)
+            if piece not in KIT_KEYED and pct > 8:
+                LOUD.append(f"{kit_piece_id(kit, piece)} is a wall or a roof middle but came back "
+                            f"{pct}% transparent; it has to fill its cell edge to edge or the "
+                            f"assembled building shows sky through its wall.")
+                print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+            made += 1
+        print(f"  block {s['n']} {s['block']}: {bw}x{bh} -> {cw * chh} piece(s) at "
+              f"index {kit_piece_index(e, s['pieces'][0])}+")
+    ap = atlas_path(setname)
+    ship_png(ap, ATLAS_COLS * ATLAS_CELL, len(atlas), 4, atlas, pal, pidx)
+    write_atlas_json(setname, entries)
+    # the receipt: every piece of the kit at 1:1, which is also what tells `packages` it is cut
+    cols = 7
+    rws = (len(KIT_PIECES) + cols - 1) // cols
+    strip = [bytearray(cols * u * 4) for _ in range(rws * u)]
+    for k, piece in enumerate(KIT_PIECES):
+        idx = kit_piece_index(e, piece)
+        ax, ay = (idx % ATLAS_COLS) * u, (idx // ATLAS_COLS) * u
+        cx, cy = (k % cols) * u, (k // cols) * u
+        for y in range(u):
+            strip[cy + y][cx * 4:(cx + u) * 4] = atlas[ay + y][ax * 4:(ax + u) * 4]
+    rp = cut_sheet_path(setname, f"kit_{kit}")
+    rp.parent.mkdir(parents=True, exist_ok=True)
+    ship_png(rp, cols * u, rws * u, 4, strip, pal, pidx)
+    print(f"  -> {ap.relative_to(ROOT.parent)} ({made} kit piece(s) packed), atlas.json updated, "
+          f"{rp.relative_to(ROOT.parent)}")
+
+
+# ── assembly: the same arithmetic the engine will run ──
+
+def kit_plan(kit, w, h, opts, entries):
+    """[[piece id or None per column] per row] for one building, plus the extras laid over it.
+
+    This is the contract the engine implements, written once, here, so the preview and the phone
+    cannot disagree. Rows from the top: `roof` rows of roof, then the wall storeys, the last of
+    which is the ground storey. Columns: left end, any number of middles, right end."""
+    roof = int(opts.get("roof", 2 if h <= 4 else 3))     # a roof taller than this reads as a tent
+    roof = max(1, min(roof, h - 1))
+    storeys = h - roof
+    if w < 2 or h < 2:
+        die(f"a building is at least 2x2 tiles; got {w}x{h}")
+    seed = int(opts.get("seed", 0))
+    cols = list(range(w))
+
+    def band(row_pieces):
+        return [row_pieces[0]] + [row_pieces[1]] * max(0, w - 2) + [row_pieces[2] if w > 1 else None]
+
+    grid = []
+    for r in range(roof):
+        if roof == 1:
+            grid.append(band(("roof_el", "roof_e", "roof_er")))
+        elif r == 0:
+            grid.append(band(("roof_tl", "roof_t", "roof_tr")))
+        elif r == roof - 1:
+            grid.append(band(("roof_el", "roof_e", "roof_er")))
+        else:
+            grid.append(band(("roof_l", "roof_m", "roof_r")))
+    for st in range(storeys):
+        ground = st == storeys - 1
+        grid.append(band(("wall_gr_l", "wall_gr_m", "wall_gr_r") if ground else
+                         ("wall_up_l", "wall_up_m", "wall_up_r")))
+
+    # the door: an interior column of the ground storey (any column if the house is 2 wide)
+    inner = cols[1:-1] or cols
+    door = opts.get("door")
+    if door is None:
+        door = inner[(h32(seed, w, h) >> 3) % len(inner)] if w % 2 == 0 else inner[len(inner) // 2]
+    doors = [int(v) for v in str(door).split(",") if v != ""]
+    grow = roof + storeys - 1
+    for n, dc in enumerate(doors):
+        if not 0 <= dc < w:
+            die(f"door column {dc} is outside a {w}-tile building")
+        grid[grow][dc] = "door" if len(doors) == 1 else ("door_dl" if n == 0 else "door_dr")
+
+    # windows: never touching a door, symmetric when the width is odd, and never every column
+    wopt = str(opts.get("windows", "auto"))
+    if wopt != "none":
+        want = ([int(v) for v in wopt.split(",")] if wopt != "auto" else None)
+        for st in range(storeys):
+            row = roof + st
+            ground = st == storeys - 1
+            free = [c for c in inner if not (ground and any(abs(c - d) <= 1 for d in doors))]
+            # Every other free column, so no two windows ever touch, with the phase chosen to keep
+            # an odd-width wall symmetric about its middle and by the seed otherwise.
+            if want is not None:
+                pick = [c for c in want if c in cols]
+            elif not free:
+                pick = []
+            else:
+                phase = (free[len(free) // 2] % 2) if w % 2 == 1 else ((h32(seed, row) >> 5) & 1)
+                pick = [c for c in free if c % 2 == phase]
+                if not pick:
+                    pick = free[:1]
+                if len(pick) > 1 and ground and len(free) > 3:
+                    pick = pick[:max(1, len(pick) - 1)]     # the ground floor wears fewer windows
+            last = -9
+            for c in sorted(pick):
+                if c - last < 2:                            # never two windows side by side
+                    continue
+                last = c
+                if grid[row][c] in ("wall_up_m", "wall_gr_m"):
+                    shut = (h32(seed + 1, row, c) >> 7) % 5 == 0
+                    grid[row][c] = "window_shut" if shut else "window"
+
+    extras = []
+    ch_col = opts.get("chimney")
+    if ch_col is None and roof >= 2 and w >= 3:
+        ch_col = inner[(h32(seed, 7, w) >> 9) % len(inner)]
+    if ch_col not in (None, "none"):
+        extras.append(("chimney", int(ch_col), 0))
+    if storeys >= 1 and doors:
+        extras.append(("lantern", max(0, min(w - 1, doors[0] + 1)), grow))
+    return {"grid": grid, "roof": roof, "storeys": storeys, "extras": extras,
+            "doors": doors, "w": w, "h": h, "kit": kit}
+
+
+def kit_solid_rows(plan):
+    """`- solid:`-style rows for an assembled building, and how many top rows are `over`.
+
+    The wall rows are solid, exactly as a drawn stamp's base rows are. The roof rows overhang the
+    ground the walker walks on, so they are `over` and not solid — the same convention a 2x3 tree
+    already uses, and it is what lets somebody walk behind a house."""
+    rows = []
+    for r in range(plan["h"]):
+        rows.append("".join("#" if r >= plan["roof"] else "." for _ in range(plan["w"])))
+    return rows, plan["roof"]
+
+
+def parse_building_line(f, where):
+    """`x y w h kit [key=value ...]` -> (x, y, w, h, kit, opts). Raises SystemExit on nonsense."""
+    if len(f) < 5:
+        die(f"{where}: '{' '.join(f)}' is not 'x y w h <kit> [storeys=N] [roof=N] [door=col] "
+            f"[windows=auto|none|cols] [chimney=col] [seed=n] [id=name]'")
+    try:
+        x, y, w, h = (int(v) for v in f[:4])
+    except ValueError:
+        die(f"{where}: '{' '.join(f)}' has a non-numeric box")
+    opts = {}
+    for part in f[5:]:
+        if "=" not in part:
+            die(f"{where}: '{part}' is not key=value")
+        k, v = part.split("=", 1)
+        opts[k.strip().lower()] = v.strip()
+    return x, y, w, h, f[4], opts
+
+
+def check_map_buildings(m, name, w, h, entries):
+    """`## buildings` — the assembled buildings. (errors, warnings)."""
+    err, warn = [], []
+    for f in m.get("buildings", []):
+        try:
+            bx, by, bw, bh, kit, opts = parse_building_line(f, name)
+        except SystemExit as e:
+            err.append(squash(str(e.code)))
+            continue
+        e = entries.get(f"kit_{kit_name(kit)}")
+        if not e or e["kind"] != "kit":
+            err.append(f"{name}: building at {bx},{by} names kit '{kit}', which has no "
+                       f"'## kit {kit}' entry in {tileset_doc(slug(m['meta'].get('tileset','')))
+                       .name}")
+            continue
+        if bw < 2 or bh < 2:
+            err.append(f"{name}: the building at {bx},{by} is {bw}x{bh}; the owner's rule is at "
+                       f"least 2x2 tiles, and nothing solid is small")
+            continue
+        if not (0 <= bx and 0 <= by and bx + bw <= w and by + bh <= h):
+            err.append(f"{name}: the {bw}x{bh} building at {bx},{by} runs off the {w}x{h} map")
+            continue
+        try:
+            plan = kit_plan(kit_name(kit), bw, bh, opts, entries)
+        except SystemExit as ex:
+            err.append(f"{name}: building at {bx},{by}: {squash(str(ex.code))}")
+            continue
+        if plan["storeys"] < 1:
+            err.append(f"{name}: the building at {bx},{by} has {plan['roof']} roof rows of {bh}, "
+                       f"leaving no wall. Give it fewer roof rows or more height.")
+        # the ground in front of the door has to be walkable, or nobody can go in
+        for dc in plan["doors"]:
+            fx, fy = bx + dc, by + bh
+            if fy >= h:
+                warn.append(f"{name}: the door of the building at {bx},{by} is on the bottom edge of "
+                            f"the map, so there is no tile in front of it to stand on")
+    return err, warn
+
+
+def kit_piece_art(setname, entries, kit, piece, cell):
+    """One kit piece out of the atlas, at `cell` px. A flat stand-in when the art is not cut yet."""
+    e = entries.get(f"kit_{kit}")
+    key = (setname, kit, piece, cell)
+    if key in _KIT_ART:
+        return _KIT_ART[key]
+    art = None
+    ap = atlas_path(setname)
+    if e and e["index"] is not None and ap.exists():
+        aw, ah, ach, apx = _atlas_rgba(setname)
+        idx = kit_piece_index(e, piece)
+        ax, ay = (idx % ATLAS_COLS) * ATLAS_CELL, (idx // ATLAS_COLS) * ATLAS_CELL
+        if ay + ATLAS_CELL <= ah:
+            cut = crop(apx, 4, ax, ay, ATLAS_CELL, ATLAS_CELL)
+            if any(cut[y][x * 4 + 3] for y in range(0, ATLAS_CELL, 4)
+                   for x in range(0, ATLAS_CELL, 4)):
+                art = resize_box(cut, ATLAS_CELL, ATLAS_CELL, 4, cell, cell)
+    if art is None:                                   # a readable placeholder: the piece's own colour
+        art = kit_placeholder(piece, cell)
+    _KIT_ART[key] = art
+    return art
+
+
+_KIT_ART = {}
+_ATLAS_RGBA = {}
+
+
+def _atlas_rgba(setname):
+    if setname not in _ATLAS_RGBA:
+        aw, ah, ach, apx = read_png(atlas_path(setname))
+        _ATLAS_RGBA[setname] = (aw, ah, 4, to_rgba(apx, aw, ah, ach))
+    return _ATLAS_RGBA[setname]
+
+
+KIT_STANDIN = {"roof": (168, 74, 56), "gable": (206, 196, 176), "wall": (214, 203, 182),
+               "door": (110, 74, 48), "window": (92, 120, 140), "shopfront": (120, 90, 60),
+               "chimney": (140, 128, 120), "dormer": (150, 80, 62), "lantern": (232, 196, 110),
+               "sign": (150, 120, 80), "ivy": (86, 120, 62)}
+
+
+def kit_placeholder(piece, cell):
+    """A flat stand-in tile so an assembly preview reads before any art exists."""
+    base = next((v for k, v in KIT_STANDIN.items() if piece.startswith(k)), (150, 150, 150))
+    empty = piece in KIT_KEYED and piece in set(KIT_EXTRAS) | set(KIT_GABLE)
+    rows = []
+    for y in range(cell):
+        line = bytearray()
+        for x in range(cell):
+            inset = min(x, y, cell - 1 - x, cell - 1 - y)
+            if empty and inset < cell // 4:
+                line += b"\x00\x00\x00\x00"
+                continue
+            v = base
+            if inset < 2:                              # a hairline so the cell grid is visible
+                v = tuple(max(0, c - 34) for c in base)
+            line += bytes(v) + b"\xff"
+        rows.append(line)
+    return rows
+
+
+def draw_building(img, W, H, setname, entries, kit, bx, by, plan, cell, over_only=None):
+    """Blit one assembled building into an RGBA canvas at `cell` px a tile. (tiles drawn)"""
+    n = 0
+    for r, row in enumerate(plan["grid"]):
+        if over_only is not None and (r < plan["roof"]) != over_only:
+            continue
+        for c, piece in enumerate(row):
+            if piece is None:
+                continue
+            art = kit_piece_art(setname, entries, kit, piece, cell)
+            px0, py0 = (bx + c) * cell, (by + r) * cell
+            for y in range(cell):
+                ty = py0 + y
+                if not (0 <= ty < H):
+                    continue
+                src, dst = art[y], img[ty]
+                for x in range(cell):
+                    tx = px0 + x
+                    if 0 <= tx < W and src[x * 4 + 3] >= 128:
+                        dst[tx * 4:tx * 4 + 4] = src[x * 4:x * 4 + 4]
+            n += 1
+    for piece, c, r in plan["extras"]:
+        if over_only is not None and (r < plan["roof"]) != over_only:
+            continue
+        art = kit_piece_art(setname, entries, kit, piece, cell)
+        px0, py0 = (bx + c) * cell, (by + r) * cell
+        for y in range(cell):
+            ty = py0 + y
+            if not (0 <= ty < H):
+                continue
+            src, dst = art[y], img[ty]
+            for x in range(cell):
+                tx = px0 + x
+                if 0 <= tx < W and src[x * 4 + 3] >= 128:
+                    dst[tx * 4:tx * 4 + 4] = src[x * 4:x * 4 + 4]
+        n += 1
+    return n
+
+
+def cmd_kit(args):
+    """`kit preview <set> <kit> [WxH ...]` — assemble several sizes, so seams can be judged."""
+    if not args or args[0] != "preview":
+        die("usage: kit preview <set> <kit> [WxH ...]")
+    pos = [a for a in args[1:] if not a.startswith("--")]
+    if len(pos) < 2:
+        die("usage: kit preview <set> <kit> [WxH ...]   e.g. kit preview valley plaster 3x3 6x4")
+    setname, kit = slug(pos[0]), kit_name(pos[1])
+    sizes = pos[2:] or ["2x2", "3x3", "4x3", "6x4", "8x5"]
+    entries = tileset_entries(setname)
+    if f"kit_{kit}" not in entries:
+        die(f"{tileset_doc(setname).name}: no '## kit {kit}' entry. Known: "
+            + ", ".join(kit_name(k) for k in set_kits(entries)) or "(none)")
+    cell, pad, gap = 48, 1, 2
+    plans = []
+    for sz in sizes:
+        w, h = parse_wh(sz, "kit preview")
+        plans.append((w, h, kit_plan(kit, w, h, {"seed": 3}, entries)))
+    cols = sum(p[0] for p in plans) + gap * (len(plans) - 1) + 2 * pad
+    rowsN = max(p[1] for p in plans) + 2 * pad
+    W, H = cols * cell, rowsN * cell
+    img = [bytearray(b"\x2a\x30\x26\xff" * W) for _ in range(H)]
+    x = pad
+    made = 0
+    for w, h, plan in plans:
+        made += draw_building(img, W, H, setname, entries, kit, x, pad + (rowsN - 2 * pad - h), plan, cell)
+        x += w + gap
+    OUT.mkdir(exist_ok=True)
+    out = OUT / f"kit_{setname}_{kit}.png"
+    write_png(out, W, H, 4, img)
+    have = atlas_path(setname).exists() and entries[f"kit_{kit}"]["index"] is not None
+    print(f"{kit}: {', '.join(sizes)} -> {out.relative_to(ROOT.parent)}  {W}x{H}  "
+          f"({made} tiles, {'from the atlas' if have else 'flat placeholders — no art cut yet'})")
+    for w, h, plan in plans:
+        rows, over = kit_solid_rows(plan)
+        print(f"  {w}x{h}: {plan['roof']} roof row(s), {plan['storeys']} storey(s), "
+              f"door at column {','.join(str(d) for d in plan['doors'])}, "
+              f"solid {'/'.join(rows)}, over {over}")
+
+
 # ── cutting a returned tile sheet ──
 
 def mode_region(rows, ch, x0, y0, bw, bh, ow, oh):
@@ -5727,7 +6467,9 @@ def write_atlas_json(setname, entries):
                   for i, e in entries.items() if e["index"] is not None},
         "terrains": {i: {"priority": e["priority"], "edge_style": e["edge_style"],
                          "swatch": list(e["swatch"]), "border": list(e["border"]) if e["border"] else None,
-                         "drift": e["drift"], "cycle": e["cycle"], "solid": e["solid"]}
+                         "drift": e["drift"], "cycle": e["cycle"], "solid": e["solid"],
+                         **({"trim": e["trim"]} if e.get("trim") else {}),
+                         **({"bank": e["bank"]} if e.get("bank") else {})}
                      for i, e in entries.items() if e["kind"] == "terrain"},
     }, indent=2) + "\n")
 
@@ -6006,7 +6748,9 @@ def parse_tmap(mp):
             # is dense enough to be worth that. `## decals` places one by hand where the scatter
             # cannot be trusted to (the flowers on a grave); `## flips` names the top-left cell of
             # a stamp placement that is drawn mirrored. A map with neither reads exactly as before.
-            "decals": lines_of("decals"), "flips": lines_of("flips")}
+            "decals": lines_of("decals"), "flips": lines_of("flips"),
+            # D21: buildings assembled from a kit. `x y w h kit [key=value…]`, one a line.
+            "buildings": lines_of("buildings")}
 
 
 def tmap_todo():
@@ -6289,6 +7033,9 @@ def check_tmap(mp):
         walkable(int(sp[0]), int(sp[1]), "spawn")
     err += check_map_light(m, name, w, h)
     err += check_map_decals(m, name, w, h, entries)
+    berr, bwarn = check_map_buildings(m, name, w, h, entries)
+    err += berr
+    warn += bwarn
     warn += stamp_fill_warnings(m, name, entries, setname)
     text_ids = set(load_field_text())
     todo = tmap_todo()
@@ -6406,6 +7153,27 @@ def preview_tmap(mp):
         e = entries[t]
         style = e["edge_style"]
         sww, swh, swpx = sw[t]
+        if style == SQUARE_STYLE and n:
+            # Structural ground — a bridge, a dock, a floor. Straight hard edges on the world grid,
+            # no mask, no dual grid: the owner's call, because a rounded, ragged bridge is a bad
+            # bridge. The swatch is still sampled in world space, so it is continuous across cells.
+            for j in range(h):
+                for i in range(w):
+                    if at(i, j) != t:
+                        continue
+                    for py in range(T):
+                        cy = j * T + py
+                        row, src = img[cy], swpx[cy % swh]
+                        for px in range(T):
+                            cx = i * T + px
+                            o, so = cx * 4, (cx % sww) * 4
+                            row[o:o + 4] = src[so:so + 4]
+            trim = e.get("trim")
+            if trim and trim in entries:
+                pass                                          # the engine draws the rail; the
+                                                              # preview shows the deck, which is what
+                                                              # the shape question is about
+            continue
         if n == 0:                                             # the lowest terrain floods the map
             for py in range(H):
                 src = swpx[py % swh]
@@ -6539,6 +7307,14 @@ def preview_tmap(mp):
             for x in range(cw * T):
                 edge = x < 1 or y < 1 or x >= cw * T - 1 or y >= chh * T - 1
                 row[(px + x) * 4:(px + x) * 4 + 4] = b"\x18\x18\x18\xff" if edge else rgb
+
+    for f in m.get("buildings", []):                          # D21: assembled from a kit
+        try:
+            bx, by, bw, bh, kit, opts = parse_building_line(f, m["path"].name)
+            plan = kit_plan(kit_name(kit), bw, bh, opts, entries)
+        except SystemExit:
+            continue
+        draw_building(img, W, H, setname, entries, kit_name(kit), bx, by, plan, T)
 
     miss = set()
     for y, line in enumerate(m["objects"][:h]):
@@ -7981,6 +8757,16 @@ def cmd_packages(args):
             write_masks(setname, [tset[t]["edge_style"] for t in set_terrains(tset)])
         for d, meta, bargs in plan:
             add(d, meta, cmd_tileset, bargs, group="tileset", tileset=setname)
+        for rd in sorted((PACKAGES / "tilesets" / setname).glob("*_redo")):
+            # A redo is made by hand with `./story_prompt.py redo`, never by this command, so it is
+            # only indexed and protected from the prune. It leads the tray: a sheet with one wrong
+            # slot blocks everything that sheet feeds.
+            mf = rd / PKG_META
+            if not mf.exists():
+                continue
+            built.add(rd.resolve())
+            index.append({"dir": rd, "meta": json.loads(mf.read_text()), "ok": True,
+                          "group": "tileset", "tileset": setname})
         write_atlas_json(setname, tset)
 
     # ── the cast: a reference sheet, then a walk sheet ──
@@ -8168,6 +8954,8 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     rows = lambda g: [r for r in index if r["group"] == g]
 
     def state(r):
+        if r["meta"].get("redo_of") and not pkg_returned(r["dir"]):
+            return "to generate"          # its outputs exist — that is the point; the art is wrong
         return r.get("blocked") or pkg_state(r["dir"], r["meta"])[0] if r["ok"] or r.get("blocked") \
             else "_could not be built, see the command output_"
 
@@ -8190,24 +8978,31 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     # ── the tilesets, first on the page: this is the field now (TILES.md, D18) ──
     tsets = [r for r in index if r["group"] == "tileset"]
     L += ["## 1. Tilesets — the tile field", "",
-          "The field is tile sheets and grid walking (`TILES.md`). **Start with the two sheets at the",
-          "top of this table.** Under TILES2 (D20) a terrain is ONE seamless **swatch** and its edges",
-          "are computed, so the swatch sheet is the whole ground of the world in one generation; the",
-          "**decal** sheet is the variety scattered over it — tufts, flowers, pebbles, reeds — and",
-          "between them they replace every transition tile that used to have to match its neighbours.",
-          "The stamp sheets after them are unchanged: drawn at 4x, a 32x32 tile in a 128-px slot,",
-          "packed into the set's `atlas.png` at the index `tiles.md` gives it. A sheet that has been",
-          "generated is frozen; new ids go into a fresh `<sheet>_2` beside it.", "",
+          "The field is tile sheets and grid walking (`TILES.md`). **Work down this table in order.**",
+          "A **REDO** comes first when there is one: the sheet you already drew, attached with only",
+          "the wrong slots cleared, so nothing else can change. Then, under TILES2 (D20), a terrain is",
+          "ONE seamless **swatch** and its edges are computed, so the swatch sheet is the whole ground",
+          "of the world in one generation; the **decal** sheet is the variety scattered over it —",
+          "tufts, flowers, pebbles, reeds. A **building kit** (D21) is a set of 9-slice pieces the",
+          "game assembles into a house of any size, so a map stops needing a drawn stamp per",
+          "building; `./story_prompt.py kit preview <set> <kit>` shows the assembled sizes. The stamp",
+          "sheets after them are unchanged: drawn at 4x, a 32x32 tile in a 128-px slot, packed into",
+          "the set's `atlas.png` at the index `tiles.md` gives it. A sheet that has been generated is",
+          "frozen; new ids go into a fresh `<sheet>_2` beside it.", "",
           "The masks are **generated by the tool** into `<set>/masks.png` — there is nothing to draw",
           "and nothing to review. The conventions are in `story/field/tilesets/README.md` and the",
           "contract is `TILES.md`.", "",
           "| set | sheet | slots | folder | status | after downloading |",
           "| --- | --- | --- | --- | --- | --- |"]
-    order = {"swatch": 0, "decal": 1, "tileset": 2}
-    for r in sorted(tsets, key=lambda r: (order.get(r["meta"].get("kind"), 3), r["dir"])):
+    order = {"redo": 0, "swatch": 1, "decal": 2, "kit": 3, "tileset": 4}
+    kindof = lambda m: "redo" if m.get("redo_of") else m.get("kind")
+    for r in sorted(tsets, key=lambda r: (order.get(kindof(r["meta"]), 5), str(r["dir"]))):
         m = r["meta"]
-        what = m.get("sheet") or {"swatch": "swatches (the ground)",
-                                  "decal": "decals (the variety)"}.get(m.get("kind"), m.get("kind"))
+        what = (f"REDO: {', '.join(m['ids'])}" if m.get("redo_of") else
+                m.get("sheet") or {"swatch": "swatches (the ground)",
+                                   "decal": "decals (the variety)",
+                                   "kit": f"the '{m.get('kit')}' building kit"}.get(m.get("kind"),
+                                                                                    m.get("kind")))
         L.append(f"| `{r['tileset']}` | `{what}` | {len(m['ids'])} | "
                  f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | {state(r)} | {cmd(r['dir'])} |")
     if not tsets:
@@ -8222,16 +9017,23 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
             short.append((r, what))
     todo_first = lambda rs: sorted(rs, key=lambda r: pkg_state(r["dir"], r["meta"])[0] == "done")
     for r in todo_first(sorted(rows("tileset"),
-                               key=lambda r: order.get(r["meta"].get("kind"), 3))):
+                               key=lambda r: order.get(kindof(r["meta"]), 5))):
         m = r["meta"]
-        if m.get("kind") == "swatch":
+        if m.get("redo_of"):
+            step(r, f"a REDO of {', '.join(m['ids'])} in `{Path(m['redo_of']).name}` — the sheet is "
+                    f"attached with only those slots cleared, so nothing else can change")
+        elif m.get("kind") == "kit":
+            step(r, f"the `{m.get('kit')}` building kit — {len(m['ids'])} pieces that assemble into "
+                    f"a house of any size from 2x2 tiles up, so a map stops needing a drawn stamp "
+                    f"per building")
+        elif m.get("kind") == "swatch":
             step(r, f"the `{r['tileset']}` ground swatches — {len(m['ids'])} terrains in one image, "
                     f"and every edge between them is computed from it. This is the whole ground of "
                     f"the world.")
         elif m.get("kind") == "decal":
             step(r, f"the `{r['tileset']}` decals — {len(m['ids'])} cut-outs the game scatters over "
                     f"the ground, which is what stops it looking like a sheet of one colour")
-        else:
+        elif m.get("sheet"):
             step(r, f"the `{m['sheet']}` sheet of the `{r['tileset']}` tileset — "
                     f"{len(m['ids'])} tile(s) into that set's atlas, which the map is built from")
     for r in todo_first(rows("refsheet")):       # what is left to do first, then the ones already cut
@@ -8385,8 +9187,13 @@ MASTER_PAL_PNG = PALETTE_DIR / "master.pal.png"
 COLORMAP_PNG = PALETTE_DIR / "colormap.png"
 COLORMAP_JSON = PALETTE_DIR / "colormap.json"
 CYCLES_MD = PALETTE_DIR / "cycles.md"
-PALETTE_VERSION = 2           # v2 (2026-09-19): refitted to the owner's flat luminous field style,
-                              # and the first version to reserve contiguous ramps for palette cycling
+PALETTE_VERSION = 3           # v2 refitted to the owner's flat luminous field style and reserved the
+                              # cycle ramps; v3 (same day, off the phone) narrowed the WATER cycle.
+                              # v2's water ran deep blue to near-white across its eight cycled
+                              # indices, so the cycle swept a highlight through every pixel of the
+                              # stream at 6 fps and half of it read as ice. A cycle is a shimmer, not
+                              # a gradient: the eight entries now sit within about 0.12 of lightness
+                              # of each other and the highlights live in `sparkle` instead.
 PAL_SIZE = 256
 PAL_TRANSPARENT, PAL_BLACK, PAL_WHITE = 0, 1, 2
 PAL_FREE = PAL_SIZE - 3               # 253 colours the build gets to choose
@@ -8419,15 +9226,22 @@ RAMP_FAMILIES = [
 # colormap every frame, so an index shared with a roof tile would make the roof flicker. Reserved
 # immediately after black and white, before any ramp, and recorded in master.json and cycles.md.
 # (name, family the colours come from, length, fps, lightness window, what it is)
+CYCLE_MAX_DL = 0.12                   # the most lightness a cycle's entries may span
+CYCLE_HUE_SHIFT = 0.25                # how much of a material ramp's hue swing a cycle gets
 CYCLE_RAMPS = (
-    ("water",        "water blue / metal",        8, 6,  (0.34, 0.66),
-     "the light moving on running water"),
+    # `water` is fitted to the water SWATCH's own colours when there is one, not to a hue family:
+    # the family called "water blue / metal" is half steel, and a cycle of grey-navy under a bright
+    # cyan stream does nothing at all. The L window is then the swatch's own middle, squeezed to
+    # CYCLE_MAX_DL — a cycle is a shimmer, and eight indices spanning half the lightness range is a
+    # gradient sweeping through the whole stream, which is what read as ice on the phone.
+    ("water",        "@terrain:water",             8, 6,  None,
+     "the light moving on running water: a shimmer through its own mid tones, not a gradient"),
     ("fire_lamp",    "orange / terracotta (hair)", 8, 10, (0.46, 0.86),
      "a fire, a lantern, a forge: the warm end flickering"),
     ("foliage_wind", "foliage green (warm)",       6, 4,  (0.38, 0.64),
      "leaves turning in the wind, a slow shimmer through a canopy"),
-    ("sparkle",      "sky / cyan",                 4, 12, (0.72, 0.95),
-     "a glint on water or metal, and anything that has to twinkle"),
+    ("sparkle",      "sky / cyan",                 4, 12, (0.74, 0.96),
+     "a glint on water or metal: this is where a highlight belongs, not in the water ramp"),
 )
 NEUTRAL_C = 0.030                     # chroma under this is a neutral, not a hue
 RAMP_LO, RAMP_HI = 0.16, 0.93         # a ramp's lightness range: black and white are indices 1 and 2
@@ -8437,6 +9251,7 @@ SHADOW_HUE, HILITE_HUE = 295.0, 95.0  # shadows rotate toward blue-violet, highl
 SHIPPED_MASTER = ("field/tilesets", "field/walkers", "field/props", "field/tiles",
                   "field/buildings", "portraits")
 SHIPPED_SCENE = "panels"
+PALETTE_DATA_FILES = {"masks_sdf.png"}   # shipped, but data: not palettised and not checked
 
 
 # ── the hex file ──
@@ -8780,7 +9595,7 @@ def _thirds(g):
     return res
 
 
-def build_ramp(g, n, lo=RAMP_LO, hi=RAMP_HI):
+def build_ramp(g, n, lo=RAMP_LO, hi=RAMP_HI, shift=1.0):
     """n steps through one family's own colours, shadows blue-violet, highlights yellow."""
     t3 = _thirds(g)
     Ls = [t3[0][0], t3[1][0], t3[2][0]]
@@ -8802,14 +9617,18 @@ def build_ramp(g, n, lo=RAMP_LO, hi=RAMP_HI):
         else:
             C, H = t3[2][1], t3[2][2]
         mid = (Ls[0] + Ls[2]) / 2
+        # `shift` scales the hue rotation and the chroma wash. A material ramp wants the full
+        # amount — that is what makes it shade gracefully. A CYCLE does not: its entries stand in for
+        # each other frame by frame, so a hue that swings from blue to teal across the ramp reads as
+        # the water changing colour rather than as light moving on it.
         if L < mid:
             k = min(1.0, (mid - L) / max(1e-6, mid - lo))
-            H = _lerp_ang(H, sh, 0.22 * k)
-            C *= 1.0 - 0.45 * k * k
+            H = _lerp_ang(H, sh, 0.22 * k * shift)
+            C *= 1.0 - 0.45 * k * k * shift
         else:
             k = min(1.0, (L - mid) / max(1e-6, hi - mid))
-            H = _lerp_ang(H, hl, 0.18 * k)
-            C *= 1.0 - 0.55 * k * k
+            H = _lerp_ang(H, hl, 0.18 * k * shift)
+            C *= 1.0 - 0.55 * k * k * shift
         out.append(tuple(_from_oklab(L, C * math.cos(H), C * math.sin(H))))
     return out
 
@@ -8872,15 +9691,40 @@ def cmd_palette_build(args):
     for c in pal[1:]:
         labs.append(_to_oklab(*c))
     cycles = []
-    for cname, fam, n, fps, (lo, hi), what in CYCLE_RAMPS:
-        g = groups.get(fam) or pts
+    for cname, fam, n, fps, window, what in CYCLE_RAMPS:
+        source = fam
+        if fam.startswith("@terrain:"):
+            terr = fam.split(":", 1)[1]
+            sw = next((swatch_path(sn, terr) for sn in sorted(
+                {q.parent.name for q in TILESETS.glob("*/tiles.md")})
+                if swatch_path(sn, terr).exists()), None)
+            if sw:
+                g = palette_histogram([(sw, 1.0)], thumbs=False, keep=None)
+                source = f"the {terr} swatch ({sw.relative_to(ROOT.parent)})"
+            else:
+                g = groups.get("water blue / metal") or pts
+                source = "water blue / metal (no swatch cut yet)"
+        else:
+            g = groups.get(fam) or pts
+        if window is None:                       # the source's own middle, squeezed to CYCLE_MAX_DL
+            ls = sorted(p[0] for p in g for _ in range(max(1, int(p[3]))))
+            if not ls:
+                ls = [0.4, 0.5]
+            lo = ls[int(len(ls) * 0.15)]
+            hi = ls[int(len(ls) * 0.85) - 1]
+            mid = (lo + hi) / 2
+            span = min(hi - lo, CYCLE_MAX_DL)
+            lo, hi = mid - span / 2, mid + span / 2
+        else:
+            lo, hi = window
         start = len(pal)
-        for c in build_ramp(g, n, lo, hi):
+        for c in build_ramp(g, n, lo, hi, shift=CYCLE_HUE_SHIFT):
             pal.append(tuple(c))
             labs.append(_to_oklab(*c))
-        cycles.append({"name": cname, "family": fam, "start": start, "len": n, "fps": fps,
-                       "what": what})
-        print(f"  cycle {cname:13s} {n} indices {start}-{start + n - 1} at {fps} fps, from {fam}")
+        cycles.append({"name": cname, "family": source, "start": start, "len": n, "fps": fps,
+                       "what": what, "lightness": [round(lo, 3), round(hi, 3)]})
+        print(f"  cycle {cname:13s} {n} indices {start}-{start + n - 1} at {fps} fps, "
+              f"L {lo:.2f}-{hi:.2f}, from {source}")
     for name, ramp, cls, px in ramps:
         # A ramp keeps every step it asked for, but a step within MERGE_DE of a colour the palette
         # already holds SHARES that index instead of spending a new one. Skin, wood and earth really
@@ -9264,6 +10108,8 @@ def shipped_images():
         if not d.exists():
             continue
         for p in sorted(d.rglob("*.png")):
+            if p.name in PALETTE_DATA_FILES:
+                continue                          # a measurement, not art: greyscale by design
             out.append((p, "master"))
     for p in sorted(PANELS.glob("*.png")):
         scene = re.sub(r"_p\d+_.*$", "", p.stem)
@@ -9326,6 +10172,142 @@ def cmd_palette(args):
             "scene <scene stem>")
 
 
+# ───────────────────── Redo: one slot of a sheet, without losing the rest ─────────────────────
+#
+# A sheet comes back with nineteen good slots and one wrong one, and the whole sheet is frozen the
+# moment it is generated. Regenerating it risks the nineteen. `redo` makes a follow-up package: the
+# SAME template geometry, the returned image painted back in as the background so the generator can
+# see the palette and the neighbours it has to match, and only the named slots cleared out and
+# outlined. `ingest` then writes only those slots.
+
+REDO_NOTE = {
+    "grass_dry": "dry, slightly yellower grass, only a small step from slot 1 — the same green "
+                 "family, a shade paler and warmer, not a different material and nowhere near "
+                 "orange. Somebody should read it as the same field in a dry summer.",
+    "dirt": "packed earth of a village lane: pale, greyish tan, much less saturated, NO orange. "
+            "Think dust and dry mud walked flat, not clay and not sand.",
+}
+
+
+def redo_dir(src):
+    return src.parent / f"{src.name}_redo"
+
+
+def draw_redo_template(W, H, bg, slots, redo, back, digit=None):
+    """The source sheet as the canvas, with the redo slots cleared to `bg` and outlined."""
+    rows = [bytearray(r) for r in back]
+    for s in slots:
+        x, y, w, h = s["box"]
+        if s["n"] in redo:
+            fill_rect(rows, x, y, w, h, bg)
+            stroke_rect(rows, x, y, w, h, SLOT_BORDER, WHITE)
+            draw_digits(rows, str(s["n"]), x, max(0, y - (digit or DIGIT_SCALE) * 5 - DIGIT_GAP),
+                        digit or DIGIT_SCALE, WHITE)
+        else:
+            stroke_rect(rows, x, y, w, h, 1, (96, 96, 104))       # a quiet outline: do not touch
+    return rows
+
+
+def cmd_redo(args):
+    """`redo <package folder> <slot number>… [--why "text"]` — a follow-up sheet for those slots."""
+    pos, why, it = [], None, iter(args)
+    for a in it:
+        if a == "--why":
+            why = next(it, None)
+        elif not a.startswith("--"):
+            pos.append(a)
+    if len(pos) < 2:
+        die('usage: redo <package folder> <slot number> [more slots] [--why "what was wrong"]\n'
+            '       e.g. redo story/packages/tilesets/valley/swatches 2 5')
+    src = Path(pos[0]).expanduser().resolve()
+    if not (src / "sheet.json").exists():
+        die(f"{src} has no sheet.json; give the package folder itself")
+    data = json.loads((src / "sheet.json").read_text())
+    returned = pkg_returned(src)
+    if not returned:
+        die(f"{src.relative_to(ROOT.parent)} has no returned image yet, so there is nothing to keep. "
+            f"Generate the sheet first; `redo` is for fixing one slot of a sheet that came back.")
+    try:
+        want = {int(v) for v in pos[1:]}
+    except ValueError:
+        die(f"slot numbers are numbers: {' '.join(pos[1:])}")
+    slots = data["slots"]
+    bad = want - {s["n"] for s in slots}
+    if bad:
+        die(f"{src.name} has no slot {', '.join(str(b) for b in sorted(bad))}; "
+            f"it has 1..{len(slots)}")
+
+    W, H = data["canvas"]
+    bg = tuple(data.get("background") or MAGENTA)
+    w0, h0, ch0, back = read_png(returned)
+    if (w0, h0) != (W, H):
+        back = resize_box(back, w0, h0, ch0, W, H)
+    if ch0 == 4:
+        back = [bytearray(b for x in range(W) for b in r[x * 4:x * 4 + 3]) for r in back]
+    d = redo_dir(src)
+    d.mkdir(parents=True, exist_ok=True)
+    picked = [s for s in slots if s["n"] in want]
+    names = ", ".join(f"{s['n']} ({s['id']})" for s in picked)
+
+    style, warn = load_style(), []
+    with in_package(d, f"{data.get('kind', 'sheet')} redo — slot(s) {names}"):
+        template = pkg_path(f"redo_{src.name}", "template.png")
+        write_png(template, W, H, 3,
+                  draw_redo_template(W, H, bg, slots, want, back, data.get("digit")))
+        attach = field_attachments(style, template, None, warn)
+        L = [f"Create ONE image: the attached sheet with ONLY the outlined slot(s) redrawn. "
+             f"Canvas: exactly the same size and proportions as the image I attached.", "",
+             style["blocks"]["map_header"], "",
+             "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+        L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+        L += ["", "THIS IS A CORRECTION, NOT A NEW SHEET. The image I attached is the sheet you "
+                  "already drew. Every slot in it is finished and approved EXCEPT the one or two "
+                  "that have been cleared to the flat background colour and outlined in white with "
+                  "a number beside them. Return the whole image again with those slots filled in "
+                  "and EVERY OTHER PIXEL of the image identical to what I sent — same slots, same "
+                  "colours, same positions, down to the pixel. Do not redraw, retouch, recolour, "
+                  "shift or re-light anything else.", "",
+              "The slot(s) to redraw, and what was wrong:"]
+        for s in picked:
+            note = why or REDO_NOTE.get(s["id"]) or "redraw this slot; the first attempt was wrong."
+            L.append(f"  Slot {s['n']} ({s['id']}): {note}")
+            if data.get("kind") == "swatch":
+                L.append(f"    It is still a {s.get('tiles', ['?', '?'])[0]}x"
+                         f"{s.get('tiles', ['?', '?'])[1]}-tile ground texture: flat, seamless on all "
+                         f"four edges, no border, no lit side, no vignette, no object, calm and low "
+                         f"in contrast. It has to sit beside the other slots in this sheet without "
+                         f"looking like it came from a different game, so take its palette from them.")
+        L += ["", f"RENDERING: {field_rendering(style['blocks'])}", "",
+              f"AVOID: {style['blocks']['map_negative']}, changing any slot that is not outlined, "
+              f"moving a slot, changing the size of the image, adding a border or a caption"]
+        after = field_after(pkg_path(f"redo_{src.name}", "sheet.json"), [
+            f"- [ ] Only slot(s) {names} changed; every other slot is pixel-identical",
+            "- [ ] The new slot sits in the same palette as its neighbours",
+            "- [ ] Nothing moved, nothing resized", "",
+            "If it comes back with other slots altered, say so in the same chat and ask again: "
+            "\"Keep every other slot exactly as I sent it.\""],
+            makes=f"only the file(s) for slot(s) {names}")
+        manifest = pkg_path(f"redo_{src.name}", "sheet.json")
+        manifest.write_text(json.dumps({**data, "template": f"redo_{src.name}",
+                                        "only": sorted(want), "redo_of": str(src.relative_to(ROOT.parent)),
+                                        "prompt": "\n".join(L)}, indent=2) + "\n")
+        md = pkg_path(f"redo_{src.name}", "chatgpt.md")
+        md.write_text(package(f"redo — {names}", attach, "\n".join(L), after,
+                              status=[f"- redo of `{src.relative_to(ROOT.parent)}`",
+                                      f"- only slot(s) {names} are written; the rest of the sheet is "
+                                      f"left exactly as it is"]))
+    meta = {"kind": data.get("kind"), "set": data.get("set"), "ids": [s["id"] for s in picked],
+            "title": f"{data.get('set', '')} — redo of slot(s) {names}",
+            "makes": f"the file(s) for slot(s) {names}",
+            "outputs": [s["out"] for s in picked if s.get("out")], "redo_of": str(src)}
+    (d / PKG_META).write_text(json.dumps({**meta, "dir": str(d.relative_to(ROOT.parent))}, indent=2) + "\n")
+    write_return_here(d, meta)
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {d.relative_to(ROOT.parent)}/prompt.md  (redo of {src.name}, slot(s) {names})")
+    return d
+
+
 # ───────────────────────── Ingest: one command for every returned image ─────────────────────────
 
 def to_png(src, dst):
@@ -9368,7 +10350,7 @@ def ingest_one(d, meta, returned, extra=()):
         ok, msg = run_quiet(cmd_screen_cut, [str(d / "sheet.json"), str(d),
                                              *[a for a in extra if a == "--debug"]])
         return ok, (SCREEN_SUMMARY[0] if ok and SCREEN_SUMMARY else msg)
-    if kind in FIELD_KINDS or kind in ("view", "tileset", "swatch", "decal"):
+    if kind in FIELD_KINDS or kind in ("view", "tileset", "swatch", "decal", "kit"):
         return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]
@@ -9595,6 +10577,10 @@ def main():
         cmd_view(args[1:])
     elif cmd == "tileset":
         cmd_tileset(args[1:])
+    elif cmd == "redo":
+        cmd_redo(args[1:])
+    elif cmd == "kit":
+        cmd_kit(args[1:])
     elif cmd == "tmap":
         cmd_tmap(args[1:])
     elif cmd == "screen":

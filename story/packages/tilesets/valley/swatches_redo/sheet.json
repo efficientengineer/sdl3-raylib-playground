@@ -1,0 +1,269 @@
+{
+  "template": "redo_swatches",
+  "kind": "swatch",
+  "canvas": [
+    1024,
+    1536
+  ],
+  "canvas_label": "portrait, 1024x1536",
+  "background": [
+    56,
+    56,
+    60
+  ],
+  "border": 3,
+  "out": null,
+  "slots": [
+    {
+      "n": 1,
+      "id": "grass",
+      "kind": "swatch",
+      "box": [
+        52,
+        52,
+        396,
+        396
+      ],
+      "inner": [
+        55,
+        55,
+        390,
+        390
+      ],
+      "tiles": [
+        4,
+        4
+      ],
+      "target": [
+        512,
+        512
+      ],
+      "edge_style": "ragged",
+      "out": "story/field/tilesets/valley/swatches/grass.png"
+    },
+    {
+      "n": 2,
+      "id": "grass_dry",
+      "kind": "swatch",
+      "box": [
+        496,
+        52,
+        396,
+        396
+      ],
+      "inner": [
+        499,
+        55,
+        390,
+        390
+      ],
+      "tiles": [
+        4,
+        4
+      ],
+      "target": [
+        512,
+        512
+      ],
+      "edge_style": "ragged",
+      "out": "story/field/tilesets/valley/swatches/grass_dry.png"
+    },
+    {
+      "n": 3,
+      "id": "crop",
+      "kind": "swatch",
+      "box": [
+        52,
+        496,
+        297,
+        297
+      ],
+      "inner": [
+        55,
+        499,
+        291,
+        291
+      ],
+      "tiles": [
+        3,
+        3
+      ],
+      "target": [
+        384,
+        384
+      ],
+      "edge_style": "ragged",
+      "out": "story/field/tilesets/valley/swatches/crop.png"
+    },
+    {
+      "n": 4,
+      "id": "mud",
+      "kind": "swatch",
+      "box": [
+        397,
+        496,
+        297,
+        297
+      ],
+      "inner": [
+        400,
+        499,
+        291,
+        291
+      ],
+      "tiles": [
+        3,
+        3
+      ],
+      "target": [
+        384,
+        384
+      ],
+      "edge_style": "ragged",
+      "out": "story/field/tilesets/valley/swatches/mud.png"
+    },
+    {
+      "n": 5,
+      "id": "dirt",
+      "kind": "swatch",
+      "box": [
+        52,
+        841,
+        297,
+        297
+      ],
+      "inner": [
+        55,
+        844,
+        291,
+        291
+      ],
+      "tiles": [
+        3,
+        3
+      ],
+      "target": [
+        384,
+        384
+      ],
+      "edge_style": "ragged",
+      "out": "story/field/tilesets/valley/swatches/dirt.png"
+    },
+    {
+      "n": 6,
+      "id": "gravel",
+      "kind": "swatch",
+      "box": [
+        397,
+        841,
+        297,
+        297
+      ],
+      "inner": [
+        400,
+        844,
+        291,
+        291
+      ],
+      "tiles": [
+        3,
+        3
+      ],
+      "target": [
+        384,
+        384
+      ],
+      "edge_style": "ragged",
+      "out": "story/field/tilesets/valley/swatches/gravel.png"
+    },
+    {
+      "n": 7,
+      "id": "paving",
+      "kind": "swatch",
+      "box": [
+        742,
+        940,
+        198,
+        198
+      ],
+      "inner": [
+        745,
+        943,
+        192,
+        192
+      ],
+      "tiles": [
+        2,
+        2
+      ],
+      "target": [
+        256,
+        256
+      ],
+      "edge_style": "smooth",
+      "out": "story/field/tilesets/valley/swatches/paving.png"
+    },
+    {
+      "n": 8,
+      "id": "bridge_deck",
+      "kind": "swatch",
+      "box": [
+        52,
+        1285,
+        198,
+        198
+      ],
+      "inner": [
+        55,
+        1288,
+        192,
+        192
+      ],
+      "tiles": [
+        2,
+        2
+      ],
+      "target": [
+        256,
+        256
+      ],
+      "edge_style": "smooth",
+      "out": "story/field/tilesets/valley/swatches/bridge_deck.png"
+    },
+    {
+      "n": 9,
+      "id": "water",
+      "kind": "swatch",
+      "box": [
+        298,
+        1186,
+        297,
+        297
+      ],
+      "inner": [
+        301,
+        1189,
+        291,
+        291
+      ],
+      "tiles": [
+        3,
+        3
+      ],
+      "target": [
+        384,
+        384
+      ],
+      "edge_style": "bank",
+      "out": "story/field/tilesets/valley/swatches/water.png"
+    }
+  ],
+  "prompt": "Create ONE image: the attached sheet with ONLY the outlined slot(s) redrawn. Canvas: exactly the same size and proportions as the image I attached.\n\nTop-down JRPG field art in the clean 16-bit manner: flat luminous fields of colour, big simple shapes, soft painted edges, sparse deliberate detail. Every shadow is a single cool blue-violet tone, never a gradient and never grey.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. STYLE reference \u2014 this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.\nImage 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.\n\nTHIS IS A CORRECTION, NOT A NEW SHEET. The image I attached is the sheet you already drew. Every slot in it is finished and approved EXCEPT the one or two that have been cleared to the flat background colour and outlined in white with a number beside them. Return the whole image again with those slots filled in and EVERY OTHER PIXEL of the image identical to what I sent \u2014 same slots, same colours, same positions, down to the pixel. Do not redraw, retouch, recolour, shift or re-light anything else.\n\nThe slot(s) to redraw, and what was wrong:\n  Slot 2 (grass_dry): dry, slightly yellower grass, only a small step from slot 1 \u2014 the same green family, a shade paler and warmer, not a different material and nowhere near orange. Somebody should read it as the same field in a dry summer.\n    It is still a 4x4-tile ground texture: flat, seamless on all four edges, no border, no lit side, no vignette, no object, calm and low in contrast. It has to sit beside the other slots in this sheet without looking like it came from a different game, so take its palette from them.\n  Slot 5 (dirt): packed earth of a village lane: pale, greyish tan, much less saturated, NO orange. Think dust and dry mud walked flat, not clay and not sand.\n    It is still a 3x3-tile ground texture: flat, seamless on all four edges, no border, no lit side, no vignette, no object, calm and low in contrast. It has to sit beside the other slots in this sheet without looking like it came from a different game, so take its palette from them.\n\nRENDERING: Flat luminous colour, drawn from the palette image attached last. Big simple shapes read first; detail is sparse and deliberate, placed where it means something and absent everywhere else. Shading is 2 or 3 flat steps of one colour with one light direction from the upper left, and every shadow is a single cool blue-violet tone. Edges are soft-painted, not hard-aliased, and clean: no dithering anywhere, no checkerboard, no stipple, no noise, no gradient, no texture for its own sake. Warm greens and earths against that cool shadow, with saturated accents on roofs, cloth, water and flowers.\n\nAVOID: perspective, vanishing point, horizon, sky, isometric view, three-quarter view, side view, things shrinking with distance, smooth gradients, anti-aliasing, blur, soft shading, dithering, checkerboard texture, stippling, painterly, 3D render, photorealistic, high resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout, buildings in rows, repeated spacing, people, characters, animals, text, letters, numbers, labels, captions, watermark, signature, user interface, map legend, compass, frame, border, vignette, letterboxing, changing any slot that is not outlined, moving a slot, changing the size of the image, adding a border or a caption",
+  "set": "valley",
+  "cell": 128,
+  "only": [
+    2,
+    5
+  ],
+  "redo_of": "story/packages/tilesets/valley/swatches"
+}

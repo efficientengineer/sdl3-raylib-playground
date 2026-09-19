@@ -84,6 +84,8 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py tmap check <map>|--all    # validate a .tmap against its tileset, text ids and exits
 ./story_prompt.py tmap preview <map>        # render it the v2 way (dual-grid masks + swatches +
                                             # hashed decals) → story/out/<map>.tmap.png
+./story_prompt.py kit preview <set> <kit>   # assemble a building kit at several sizes (D21)
+./story_prompt.py redo <package> <slot>...  # a follow-up sheet that redraws only those slots
 ./story_prompt.py tiles <id>...  # (parked) field art: template sheet of square slots → story/field/tiles/
 ./story_prompt.py props <id>...  # field art: slots sized by each prop's footprint → story/field/props/
 ./story_prompt.py walker <Name> [<Name>…]   # the 9-frame walk sheet (S/side/N x stand/A/B), up to 3
@@ -557,6 +559,12 @@ leave the background untouched, no text.
   decals"** before touching any of it; `TILES2_PROPOSAL.md` is the research behind it. The invariant
   that must never change: *a mask's boundary crosses each tile edge at that edge's midpoint*. Four
   images a terrain became one, and `tmap preview` renders a map the v2 way on the Mac.
+  **Building kits (D21)** are the other half: `- kind: kit` is one style's worth of 9-slice pieces
+  (roof 3x3, wall rows, openings, extras) that the game assembles into a building of **any** size
+  from a `## buildings` line in a `.tmap` — `x y w h kit [door= windows= chimney= seed=]`. Wall rows
+  solid, roof rows `over`, minimum 2x2, drawn stamps still valid. `edge_style: square` is the
+  structural terrain — cell-aligned, straight edges, no mask — for bridges, docks, floors and stairs.
+  `kit preview` and `redo` are the two commands that go with them.
   A **tileset** is `story/field/tilesets/<set>/`: `tiles.md` (**the engine's file** — one `## <id>` per
   entry), `atlas.png` (16 columns of **128x128 cells**, index 0 empty, indexed on the master palette),
   `atlas.json` (its `cell` field is the cell size — read it, don't assume), `masks.png` + `masks.json`

@@ -1,18 +1,17 @@
-# valley — objects_2 tile sheet (2 of 5) — save the image here
+# valley — the 'stone' building kit (28 pieces) — save the image here
 
 1. Open `prompt.md` in this folder. Attach the files it lists, in that order, then paste its prompt.
 2. Save what ChatGPT gives back **into this folder**, named `returned.png`.
-   The whole path is `story/packages/tilesets/valley/objects_2/returned.png`. A `.jpg` or `.webp` works too; the tool converts it.
+   The whole path is `story/packages/tilesets/valley/kit_stone/returned.png`. A `.jpg` or `.webp` works too; the tool converts it.
 3. From the repository root:
 
 ```
-./story_prompt.py ingest story/packages/tilesets/valley/objects_2
+./story_prompt.py ingest story/packages/tilesets/valley/kit_stone
 ```
 
 That cuts the image into:
 
-- `story/field/tilesets/valley/atlas.png`
-- `story/field/tilesets/valley/cut/objects_2.png`
+- `story/field/tilesets/valley/cut/kit_stone.png`
 
 `returned.png` is never deleted, so a bad cut can be redone after a fix, and a regeneration is just
 saving the new image over it and running `ingest` again. `./story_prompt.py ingest` with no path does
