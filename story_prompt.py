@@ -1930,12 +1930,16 @@ def draw_digits(rows, text, x, y, scale, rgb):
     return cx - x
 
 
-def draw_template(W, H, bg, slots):
+def draw_template(W, H, bg, slots, digit=None):
+    """The template: a white border round each slot and its number in the gutter above it.
+
+    `digit` is (scale, gap); the tile sheets pass a smaller one because their gutters are tight."""
+    scale, gap = digit or (DIGIT_SCALE, DIGIT_GAP)
     rows = new_canvas(W, H, bg)
     for s in slots:
         x, y, w, h = s["box"]
         stroke_rect(rows, x, y, w, h, SLOT_BORDER, WHITE)
-        draw_digits(rows, str(s["n"]), x, y - DIGIT_GAP - 5 * DIGIT_SCALE, DIGIT_SCALE, WHITE)
+        draw_digits(rows, str(s["n"]), x, y - gap - 5 * scale, scale, WHITE)
     return rows
 
 
@@ -2072,10 +2076,10 @@ def field_status(kind, slots, out_file=None):
 
 
 def write_field_package(kind, name, canvas_label, W, H, bg, slots, prompt, attach, after, out_file=None,
-                        status=()):
+                        status=(), digit=None):
     OUT.mkdir(exist_ok=True)
     template = pkg_path(name, "template.png")
-    write_png(template, W, H, 3, draw_template(W, H, bg, slots))
+    write_png(template, W, H, 3, draw_template(W, H, bg, slots, digit))
     manifest = pkg_path(name, "sheet.json")
     manifest.write_text(json.dumps({
         "template": name, "kind": kind, "canvas": [W, H], "canvas_label": canvas_label,
@@ -3240,14 +3244,33 @@ SEAM_WARN = 24.0                      # mean per-channel difference across a gro
 TSET_ALPHA_CUT = 128                  # the engine alpha-tests at 0.5; a tile pixel is on or off
 ATLAS_JSON = "atlas.json"
 
-# Which sheet an entry lands on when it carries no '- sheet:' line. Ground and its fringes are split,
-# because a ground tile is opaque and wants a neutral background while a fringe has to be keyed.
+# ── how full a sheet is packed ──
+#
+# A tile slot is fixed at 4x (128 px) and cannot be shrunk to fit, so the only way to ask for fewer
+# generations is to put more slots on each canvas. The first cut of this laid one sheet out per
+# category, one shelf-row at a time, and left most of nine canvases empty: 12 ground tiles took a
+# whole 1536x1024 sheet, the guild hall took another with a quarter of the canvas used. These
+# numbers and the skyline packer below fill the canvas instead — big things first, small stamps
+# tucked into the space beside and under them.
+TSET_MARGIN = 20                      # canvas edge to the first slot border
+TSET_GUTTER_X, TSET_GUTTER_Y = 20, 28 # between slot borders; the vertical one holds the slot number
+TSET_DIGIT = (4, 4)                   # (scale, gap): a 3x5 digit at 4x is 12x20, inside GUTTER_Y
+TSET_MAX_SLOTS = 26                   # more than this on one sheet and the detail per slot suffers
+TSET_MAX_FILL = 0.85                  # ...and no more than this much of the canvas is slot area
+
+# Which sheet an entry lands on when it carries no '- sheet:' line. The keyword decides the *family*;
+# the packer below then merges families onto shared canvases, because a family rarely fills one.
 TSET_SHEET_WORDS = (
     ("buildings", ("house", "roof", "wall", "door", "window", "shop", "inn", "gate", "chimney",
                    "eave", "porch", "hut", "tower", "shrine", "steps", "stair")),
     ("nature", ("tree", "bush", "rock", "stump", "log", "flower", "grass_tuft", "reed", "cliff",
                 "boulder", "hedge", "crop", "vine", "water_", "fall")),
 )
+# Families that share a canvas. Ground and its fringes go together (they must share one palette —
+# a fringe is the same material as its ground, drawn ragged), which means one background for both:
+# magenta, with the ground slots painted edge to edge so nothing of it survives to be keyed.
+TSET_FAMILY = {"ground": "terrain", "fringes": "terrain"}
+TSET_OBJECT_FAMILIES = ("buildings", "nature", "props")
 
 
 def tileset_dir(name):
@@ -3411,61 +3434,194 @@ def write_indices(path, fresh):
 
 
 # ── laying the sheets out ──
+#
+# Two jobs here: which entries share a canvas, and where on that canvas each one goes. The first cut
+# of this did one sheet per category and one shelf-row at a time, and left most of nine canvases
+# empty — twelve ground tiles had a whole 1536x1024 to themselves, the guild hall used a quarter of
+# another. The owner's question ("can't we generate more tiles per image?") is answered here.
+#
+# GROUPING. A category is rarely a canvas's worth on its own, so they are merged into two pools:
+# `terrain` (ground plus its fringes — they are the same materials and must share one palette) and
+# `objects` (buildings, nature and props together). A `- sheet:` line in tiles.md still wins outright.
+#
+# PLACEMENT. A skyline packer, biggest first: each slot is dropped at the lowest, then leftmost,
+# place it fits. That is what stands three 1x1 props up the side of an 8x6 guild hall instead of
+# opening a ninth sheet for them. A sheet stops at TSET_MAX_SLOTS slots or TSET_MAX_FILL of the
+# canvas, whichever comes first; slots are numbered afterwards, in reading order.
+
+def tset_slot_box(cells):
+    """(w, h) of the white rectangle for an entry of (cw, ch) cells: the art area plus its border."""
+    return (cells[0] * TSET_SLOT + 2 * SLOT_BORDER, cells[1] * TSET_SLOT + 2 * SLOT_BORDER)
+
+
+class TsetSheet:
+    """One canvas being filled. `place` drops a slot at the lowest then leftmost spot it fits."""
+
+    def __init__(self, W=None, H=None):
+        W = W or TSET_CANVAS[0]
+        H = H or TSET_CANVAS[1]
+        scale, gap = TSET_DIGIT
+        self.top = TSET_MARGIN + 5 * scale + gap      # the first row's numbers live above it
+        self.avail_w = W - 2 * TSET_MARGIN
+        self.avail_h = H - TSET_MARGIN - self.top
+        self.sky = [0] * self.avail_w                 # the used height at each x, from `self.top`
+        self.boxes, self.area, self.canvas = [], 0, W * H
+
+    def _spots(self):
+        """Every x where the skyline steps — the only x worth trying."""
+        return [0] + [x for x in range(1, self.avail_w) if self.sky[x] != self.sky[x - 1]]
+
+    def place(self, cells, commit=True):
+        """The box this entry would take, or None if it will not fit or would break a cap."""
+        bw, bh = tset_slot_box(cells)
+        if bw > self.avail_w or bh > self.avail_h:
+            return None
+        if commit and (len(self.boxes) >= TSET_MAX_SLOTS
+                       or (self.area + bw * bh) / self.canvas > TSET_MAX_FILL):
+            return None
+        pw = bw + TSET_GUTTER_X                       # the gutter is carried on the right and below
+        best = None
+        for x in self._spots():
+            if x + bw > self.avail_w:
+                break
+            y = max(self.sky[x:x + pw])
+            if y + bh <= self.avail_h and (best is None or (y, x) < best):
+                best = (y, x)
+        if best is None:
+            return None
+        y, x = best
+        box = (TSET_MARGIN + x, self.top + y, bw, bh)
+        if commit:
+            hi = y + bh + TSET_GUTTER_Y
+            for xx in range(x, min(self.avail_w, x + pw)):
+                if self.sky[xx] < hi:
+                    self.sky[xx] = hi
+            self.area += bw * bh
+            self.boxes.append(box)
+        return box
+
+    def fill(self):
+        return self.area / self.canvas
+
+    def used(self):
+        """The height the content actually needs, margin included."""
+        return max((y + h for _, y, _, h in self.boxes), default=self.top) + TSET_MARGIN
+
+
+def tset_canvas_for(ids, entries):
+    """(W, H, boxes) — the smallest canvas this group packs onto, not the biggest.
+
+    ChatGPT caps what it returns at about 1.5 megapixels whatever canvas it is given, so half a blank
+    sheet is half the pixels thrown away: the twelve ground tiles on a 1536x1024 template came back
+    with a quarter of the detail they could have had. So every width from the widest down is tried and
+    the canvas is trimmed to the content; the smallest sensibly-shaped one wins, and a sheet that
+    really does need the full width (an 8x6 hall) simply keeps it."""
+    MAXW, MAXH, _ = TSET_CANVAS
+    sizes = [entries[i]["cells"] for i in ids]
+    best = None
+    for W in range(640, MAXW + 1, 64):
+        sheet = TsetSheet(W, MAXH)
+        boxes = [sheet.place(c, commit=True) for c in sizes]
+        if any(b is None for b in boxes):
+            continue
+        H = min(MAXH, sheet.used())
+        if not (0.6 <= W / H <= 2.0) and W != MAXW:
+            continue
+        if best is None or W * H < best[0] * best[1]:
+            best = (W, H, boxes)
+    if best is None:                                     # nothing shapely fits: the full sheet, as before
+        sheet = TsetSheet()
+        boxes = [sheet.place(c) for c in sizes]
+        if any(b is None for b in boxes):
+            return None
+        best = (MAXW, min(MAXH, sheet.used()), boxes)
+    return best
+
 
 def tileset_sheets(entries):
-    """{sheet: [ids]} in file order, each list small enough to lay out on one canvas."""
-    by_sheet = {}
+    """{pool: [ids]} in file order. Families are merged; a '- sheet:' line keeps its own pool."""
+    by_pool = {}
     for ident, e in entries.items():
-        by_sheet.setdefault(e["sheet"], []).append(ident)
-    return by_sheet
+        if e["raw"].get("sheet"):                     # the author named a sheet: leave it alone
+            pool = slug(e["raw"]["sheet"])
+        else:
+            pool = TSET_FAMILY.get(e["sheet"], "objects")
+        by_pool.setdefault(pool, []).append(ident)
+    # Within a pool, the whole tiles before the fringes, each in file order: that is what numbers a
+    # terrain sheet's ground tiles 1-12 and its fringes 13-24, so the prompt can say so in one line.
+    return {k: sorted(v, key=lambda i: (is_fringe(i), v.index(i))) for k, v in by_pool.items()}
 
 
 def tileset_pack(ids, entries):
-    """[[ids]] split so each group fits one canvas at exactly TSET_SLOT per cell."""
-    W, H, _ = TSET_CANVAS
-    groups, cur = [], []
-    for i in ids:
-        trial = cur + [i]
-        if pack_cells([entries[x]["cells"] for x in trial], W, H, TSET_SLOT) is None:
-            if not cur:
-                die(f"'{i}' is {entries[i]['cells'][0]}x{entries[i]['cells'][1]} tiles and does not fit "
-                    f"a {W}x{H} sheet on its own. Split the stamp or shrink it in tiles.md.")
-            groups.append(cur)
-            cur = [i]
-        else:
-            cur = trial
-    if cur:
+    """[[ids]] split into canvas-fuls: biggest first, then the single tiles filling the gaps.
+
+    Each group comes back in the order it was placed, which is the order `tileset_slots` replays."""
+    # Tallest first, then widest, then the order the author wrote them in. Height leads because that
+    # is what the skyline has to fit round; it also leaves a sheet of same-height tiles (a terrain
+    # sheet) in file order, so the ground tiles are numbered before their fringes.
+    cells = lambda i: entries[i]["cells"]
+    order = sorted(range(len(ids)), key=lambda n: (-cells(ids[n])[1], -cells(ids[n])[0], n))
+    big = [ids[n] for n in order if entries[ids[n]]["cells"] != (1, 1)]
+    small = [ids[n] for n in order if entries[ids[n]]["cells"] == (1, 1)]
+    groups = []
+    while big or small:
+        sheet, cur = TsetSheet(), []
+        for pool in (big, small):                     # the big things first, then fill round them
+            for i in list(pool):
+                if sheet.place(entries[i]["cells"]) is not None:
+                    cur.append(i)
+                    pool.remove(i)
+        if not cur:
+            i = (big or small)[0]
+            cw, chh = entries[i]["cells"]
+            W, H, _ = TSET_CANVAS
+            die(f"'{i}' is {cw}x{chh} tiles ({cw * TSET_SLOT}x{chh * TSET_SLOT} px at {TSET_SCALE}x) "
+                f"and does not fit a {W}x{H} sheet on its own. Split the stamp or shrink it in "
+                f"tiles.md.")
         groups.append(cur)
     return groups
 
 
 def tileset_slots(ids, entries):
-    """(W, H, label, boxes-as-slots) for one sheet."""
-    W, H, label = TSET_CANVAS
-    boxes = pack_cells([entries[i]["cells"] for i in ids], W, H, TSET_SLOT)
-    if boxes is None:
-        die(f"{len(ids)} slots do not fit a {W}x{H} sheet")
-    dy = (H - max(b[1] + b[3] for b in boxes) - SLOT_MARGIN) // 2
+    """(W, H, label, slots) for one sheet: the same skyline pack, trimmed, numbered in reading order."""
+    got = tset_canvas_for(ids, entries)
+    if got is None:
+        die(f"{len(ids)} slots do not fit a {TSET_CANVAS[0]}x{TSET_CANVAS[1]} sheet: "
+            + ", ".join(ids))
+    W, H, boxes = got
+    label = f"{'landscape' if W >= H else 'portrait'}, {W}x{H}"
+    placed = list(zip(ids, boxes))
+    placed.sort(key=lambda p: (p[1][1], p[1][0]))     # number them left to right, top to bottom
     slots = []
-    for n, (i, box) in enumerate(zip(ids, boxes), 1):
+    for n, (i, box) in enumerate(placed, 1):
         # The white border goes OUTSIDE the art, unlike the older field templates: a tile slot has to
         # be exactly 4x the tile (128 px) so the returned image can be cropped and read back on the
-        # 4x4 art-pixel grid with no resampling at all. pack_cells laid the art areas out; grow each
-        # box by the border thickness and keep the art area as the inner box.
-        inner = (box[0], box[1] + dy, box[2], box[3])
-        box = (inner[0] - SLOT_BORDER, inner[1] - SLOT_BORDER,
-               inner[2] + 2 * SLOT_BORDER, inner[3] + 2 * SLOT_BORDER)
+        # 4x4 art-pixel grid with no resampling at all.
+        inner = (box[0] + SLOT_BORDER, box[1] + SLOT_BORDER,
+                 box[2] - 2 * SLOT_BORDER, box[3] - 2 * SLOT_BORDER)
         e = entries[i]
         slots.append({"n": n, "id": i, "box": list(box), "inner": list(inner),
                       "cells": list(e["cells"]), "index": e["index"], "layer": e["layer"],
                       "frames": e["frames"], "opaque": e["opaque"],
+                      "kind": ("ground" if e["opaque"] else "fringe" if is_fringe(i) else "stamp"),
                       "target": [e["cells"][0] * TSET_TILE, e["cells"][1] * TSET_TILE]})
     return W, H, label, slots
 
 
+def num_ranges(nums):
+    """[1,2,3,7,9,10] -> '1-3, 7, 9-10' — how the prompt names a group of slots."""
+    out, nums = [], sorted(nums)
+    for n in nums:
+        if out and out[-1][1] == n - 1:
+            out[-1][1] = n
+        else:
+            out.append([n, n])
+    return ", ".join(str(a) if a == b else f"{a}-{b}" for a, b in out)
+
+
 FRINGE_RULE = (
-    "FRINGE TILES (the ids ending in _edge, _corner_out and _corner_in) are not whole tiles: each one "
-    "is a ragged scrap of its own terrain drawn over the empty background, which the game lays on top "
+    "These are the ids ending in _edge, _corner_out and _corner_in, and they are not whole tiles: "
+    "each one is a ragged scrap of its own terrain drawn over the empty background, which the game lays on top "
     "of the neighbouring ground so the boundary between two terrains is not a straight line. Draw "
     f"only the terrain, never the neighbour, and let the background show through the rest:\n"
     f"  - _edge: a band of the terrain along the NORTH edge of the slot, solid and full width at the "
@@ -3487,23 +3643,81 @@ FRINGE_RULE = (
 )
 
 
+KIND_TITLE = {"ground": "GROUND TILES", "fringe": "FRINGE TILES", "stamp": "STAMPS (objects)"}
+
+
+def ground_rule(on_magenta):
+    """What a ground slot is. On a mixed sheet the magenta must not show through one."""
+    return ("GROUND TILES are flat terrain seen from straight above, and each one is FILLED EDGE TO "
+            "EDGE with its material, right up to the inside of its white border: opaque, no frame, no "
+            "vignette, no empty corner"
+            + (", AND NO MAGENTA ANYWHERE INSIDE THE SLOT — the background colour must not show "
+               "through a ground tile at all, not even in a corner or as a tint along an edge. "
+               if on_magenta else ". ")
+            + "Each one is SEAMLESS on all four edges: the right edge continues into the left edge "
+              "and the bottom edge into the top, so a floor tiled with copies of it shows no seam. "
+              "Keep the detail even and small — no single large feature the eye can count across a "
+              "field, no object standing on the ground, no character, and no shadow cast by anything "
+              "outside the tile.")
+
+
+STAMP_RULE = (
+    "STAMPS are objects that stand on the ground: a house, a tree, a barrel. Each one is drawn to "
+    "fill its slot's width and STANDS ON THE SLOT'S BOTTOM EDGE — its base touches the bottom inside "
+    "edge of the border, centred left to right — and everything else in the slot is left as the flat "
+    "background, which the tool keys out. No ground under it (the map draws its own), no cast shadow "
+    "beyond a contact shadow no more than one tile high tucked under its south face. Every stamp on "
+    "this sheet is drawn to ONE COMMON SCALE: a tile is a stride, a person would be one tile wide and "
+    "about one and a half tiles tall, and a door is one tile wide and about 1.3 tiles tall, centred on "
+    "a tile column so it lines up with the grid."
+)
+
+
 def tileset_package_lines(setname, sheet, ids, entries, slots, style, label, opaque_sheet, attach):
     b = style["blocks"]
+    on_magenta = not opaque_sheet
+    by_kind = {}
+    for s in slots:
+        by_kind.setdefault(s["kind"], []).append(s)
     L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
-         f"Canvas: {label}, exactly the same size and proportions as the template.", "", b["map_header"], "",
+         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
+         f"PIXEL GRID — THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at {TSET_SCALE}x. "
+         f"Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block of identical colour, aligned to the "
+         f"slot: the blocks start at the slot's top-left inside corner and run in an even grid across "
+         f"and down it, so a {TSET_SLOT}-pixel slot is a {TSET_TILE}x{TSET_TILE} pixel-art tile blown "
+         f"up {TSET_SCALE} times. No block is half a colour, no edge falls between blocks, no detail "
+         f"is finer than one block, and no two objects on the sheet use different block sizes. This "
+         f"is pixel art at 4x, not a smooth drawing shrunk down.", "",
+         b["map_header"], "",
          "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
     L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
     L += ["", TEMPLATE_RULES, "",
           f"WHAT THIS SHEET IS: the '{sheet}' tile sheet for the '{setname}' tileset of a top-down "
           f"16-bit JRPG field map. Every slot is one tile or one multi-tile object, and in game each "
-          f"tile is exactly {TSET_TILE}x{TSET_TILE} pixels.", "",
-          f"PIXEL GRID — the most important rule on this sheet. Everything is drawn at {TSET_SCALE}x. "
-          f"Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block of identical colour, aligned to the "
-          f"slot: the blocks start at the slot's top-left inside corner and run in an even grid across "
-          f"and down it, so a {TSET_SLOT}-pixel slot is a {TSET_TILE}x{TSET_TILE} pixel-art tile blown "
-          f"up {TSET_SCALE} times. No block is half a colour, no edge falls between blocks, no detail "
-          f"is finer than one block, and no two objects on the sheet use different block sizes.", "",
-          "PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for every slot:", "",
+          f"tile is exactly {TSET_TILE}x{TSET_TILE} pixels, so a {TSET_SLOT}-pixel slot is one tile "
+          f"and a {2 * TSET_SLOT}x{3 * TSET_SLOT} slot is a 2x3-tile object.", "",
+          "THIS SHEET HOLDS " + " AND ".join(
+              f"{len(v)} {k} tile(s) in slot(s) {num_ranges([s['n'] for s in v])}"
+              for k, v in by_kind.items()) + ". The rules for each kind:", ""]
+    for kind in ("ground", "fringe", "stamp"):
+        if kind not in by_kind:
+            continue
+        nums = num_ranges([s["n"] for s in by_kind[kind]])
+        head = f"{KIND_TITLE[kind]} — SLOT(S) {nums}. "
+        L += [head + (ground_rule(on_magenta) if kind == "ground" else
+                      FRINGE_RULE if kind == "fringe" else STAMP_RULE), ""]
+    if on_magenta:
+        L += ["BACKGROUND: the flat magenta around and between the objects is empty space and is keyed "
+              "out by the tool. Leave it completely untouched right up to the edge of what you draw: "
+              "no magenta tint on an object, no soft halo, no gradient, no drop shadow lying on the "
+              "magenta."
+              + (" The ground slots listed above are the exception and the one thing to get right: "
+                 "they are painted over completely, so no magenta survives inside them."
+                 if "ground" in by_kind else ""), ""]
+    else:
+        L += ["BACKGROUND: the flat dark grey around the slots is the template and is thrown away. "
+              "Every slot on this sheet is painted over it edge to edge.", ""]
+    L += ["PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for every slot:", "",
           "- The ground is seen from straight above: a patch of grass, dirt, paving or water is a flat "
           "texture with no thickness and no side visible.",
           "- An object standing on the ground is seen from slightly in front of straight above: you see "
@@ -3513,59 +3727,65 @@ def tileset_package_lines(setname, sheet, ids, entries, slots, style, label, opa
           "- No perspective, no vanishing point, no horizon, no sky. Nothing gets smaller because it is "
           "further away: a thing the same size in the world is the same size in pixels wherever it sits.",
           "- One light direction for the whole sheet, from the upper left. Every object's shading and "
-          "every contact shadow agrees with it.", ""]
-    if opaque_sheet:
-        L += ["GROUND TILES: every slot is filled edge to edge with its texture, right up to the white "
-              "border, opaque, with no frame, no vignette, no empty corner and no background showing. "
-              "Each one is SEAMLESS on all four edges: the right edge continues into the left edge and "
-              "the bottom edge into the top, so a floor tiled with copies of it shows no seam. Keep the "
-              "detail even and small — no single large feature the eye can count across a field, no "
-              "object standing on the ground, no character, no shadow cast by anything outside the tile.", ""]
-    else:
-        L += ["BACKGROUND: the flat magenta between and around the objects is empty space and is keyed "
-              "out by the tool. Leave it completely untouched right up to the edge of what you draw: no "
-              "magenta tint on an object, no soft halo, no gradient, no drop shadow lying on the "
-              "magenta. Do not paint ground under an object — the map draws its own ground underneath.", ""]
-    if any(is_fringe(i) for i in ids):
-        L += [FRINGE_RULE, ""]
-    stamps = [i for i in ids if (entries[i]["w"], entries[i]["h"]) != (1, 1)]
-    if stamps:
-        L += ["MULTI-TILE OBJECTS: a slot taller or wider than one tile holds one object, drawn to fill "
-              "its slot's footprint and STANDING ON THE SLOT'S BOTTOM EDGE — its base touches the bottom "
-              "inside edge of the border, centred left to right. No ground under it and no cast shadow "
-              "beyond a contact shadow no more than one tile high tucked under its south face. A door is "
-              "one tile wide and about 1.3 tiles tall, centred on a tile column so it lines up with the "
-              "grid. Every slot on this sheet is drawn to ONE common scale: a tile is a stride, a person "
-              "would be one tile wide and one and a half tiles tall.", ""]
-    L += [f"SLOTS — {len(slots)} of them:"]
-    for s in slots:
-        e = entries[s["id"]]
-        cw, chh = e["cells"]
-        size = (f"{s['inner'][2]}x{s['inner'][3]} px, {cw}x{chh} tile"
-                + ("s" if cw * chh > 1 else ""))
-        what = []
-        if e["frames"] > 1:
-            what.append(f"{e['frames']} animation frames of the same tile side by side, left to right, "
-                        f"each one {e['w']}x{e['h']} tile"
-                        + ("s" if e["w"] * e["h"] > 1 else "")
-                        + ", the same subject with only the moving part changed, the motion looping "
-                          "from the last frame back to the first, and every frame obeying the rules "
-                          "below on its own")
-        if is_fringe(s["id"]):
-            what.append(f"drawn as the _{fringe_kind(s['id'])} fringe shape described above, in this "
-                        f"material")
-        elif e["opaque"]:
-            what.append("seen straight down from directly above, seamless on all four edges, opaque")
-        else:
-            what.append("standing on the slot's bottom edge, everything else left as background")
-        L.append(f"Slot {s['n']} ({s['id']}), {size}: {e['desc'].rstrip('.')}. " + ". ".join(
-            w[0].upper() + w[1:] for w in what) + ".")
+          "every contact shadow agrees with it."]
+    if "stamp" in by_kind:
+        L += ["- The slots are different sizes because the things in them are different sizes. Nothing "
+              "is scaled to fill a bigger slot: a barrel in a 1-tile slot and a barn in a 4x3 slot are "
+              "drawn at the same number of pixels to the foot."]
+    L += [""]
+    L += [f"SLOTS — {len(slots)} of them, grouped by kind:"]
+    for kind in ("ground", "fringe", "stamp"):
+        if kind not in by_kind:
+            continue
+        L += ["", f"{KIND_TITLE[kind]}:"]
+        for s in by_kind[kind]:
+            e = entries[s["id"]]
+            cw, chh = e["cells"]
+            size = (f"{s['inner'][2]}x{s['inner'][3]} px = {cw}x{chh} tile"
+                    + ("s" if cw * chh > 1 else ""))
+            what = []
+            if e["frames"] > 1:
+                what.append(f"{e['frames']} animation frames of the same tile side by side, left to "
+                            f"right, each one {e['w']}x{e['h']} tile"
+                            + ("s" if e["w"] * e["h"] > 1 else "")
+                            + ", the same subject with only the moving part changed, the motion "
+                              "looping from the last frame back to the first, and every frame obeying "
+                              "the rules above on its own")
+            if kind == "fringe":
+                what.append(f"drawn as the _{fringe_kind(s['id'])} fringe shape described above, in "
+                            f"this material")
+            elif kind == "ground":
+                what.append("seen straight down from directly above, seamless on all four edges, "
+                            "filled edge to edge, opaque")
+            else:
+                what.append("standing on the slot's bottom edge, everything else left as background")
+            L.append(f"Slot {s['n']} ({s['id']}), {size}: {e['desc'].rstrip('.')}. " + ". ".join(
+                w[0].upper() + w[1:] for w in what) + ".")
     L += ["", f"RENDERING: {b['map_rendering']}", "",
           f"AVOID: {b['map_negative']}, drawing outside a slot, moving or covering a slot number, a "
           f"border or frame inside a slot, pixels not aligned to the {TSET_SCALE}x{TSET_SCALE} block "
-          f"grid, anti-aliased or soft edges, a visible seam at a ground tile's edge, changing the "
-          f"size of the image"]
+          f"grid, anti-aliased or soft edges, a visible seam at a ground tile's edge, background "
+          f"colour showing inside a ground tile, changing the size of the image"]
     return "\n".join(L)
+
+
+def check_by_kind(slots):
+    """The 'afterwards' line for each kind of slot on this sheet — they are checked differently."""
+    nums = lambda k: num_ranges([s["n"] for s in slots if s["kind"] == k])
+    out, kinds = [], {s["kind"] for s in slots}
+    if "ground" in kinds:
+        out.append(f"- [ ] Each ground tile ({nums('ground')}) fills its slot right to the border with "
+                   f"no background colour showing through anywhere in it, and its left edge would meet "
+                   f"its right edge without a seam")
+    if "fringe" in kinds:
+        out.append(f"- [ ] Each fringe ({nums('fringe')}) is its own terrain only, ragged, at the "
+                   f"orientation asked for (north band / north-east corner / bitten south-west corner), "
+                   f"reaching the slot edges at full strength where it touches them, background "
+                   f"everywhere else")
+    if "stamp" in kinds:
+        out.append(f"- [ ] Each object ({nums('stamp')}) stands on its slot's bottom edge, with clean "
+                   f"background right up against it and no magenta tint on the object itself")
+    return out
 
 
 def build_tileset_sheet(setname, sheet, ids, entries=None, style=None):
@@ -3592,10 +3812,7 @@ def build_tileset_sheet(setname, sheet, ids, entries=None, style=None):
         f"- [ ] Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block on one grid — zoom in and check a "
         f"diagonal edge is a clean staircase of blocks, not a soft ramp",
         "- [ ] Nothing drawn in the gutters; the background between slots is still flat and untouched",
-        ("- [ ] Each tile fills its slot to the border, and its left edge would meet its right edge "
-         "without a seam" if opaque_sheet else
-         "- [ ] Each object stands on its slot's bottom edge, with clean magenta right up against it "
-         "and no magenta tint on the object itself"),
+        *check_by_kind(slots),
         "- [ ] One light direction, upper left, across the whole sheet",
         "- [ ] No text, labels, numbers of your own, swatches or signature", "",
         "If one slot fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot and "
@@ -3603,14 +3820,16 @@ def build_tileset_sheet(setname, sheet, ids, entries=None, style=None):
         makes=f"the {len(ids)} tile(s) into `{atlas}`")
     template, manifest, md = write_field_package(
         "tileset", name, label, W, H, bg, slots, prompt, attach, after,
-        out_file=atlas, status=status)
+        out_file=atlas, status=status, digit=TSET_DIGIT)
     data = json.loads(manifest.read_text())
     data.update({"set": setname, "sheet": sheet, "cut": cutfile, "opaque_sheet": opaque_sheet,
                  "tile": TSET_TILE, "scale": TSET_SCALE, "cols": ATLAS_COLS})
     manifest.write_text(json.dumps(data, indent=2) + "\n")
     for w in warn:
         print(f"warning: {w}", file=sys.stderr)
-    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} slots, {label}, "
+    kinds = sorted({s["kind"] for s in slots})
+    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} slots, {'+'.join(kinds)}, "
+          f"{100 * sum(s['box'][2] * s['box'][3] for s in slots) / (W * H):.0f}% of {label}, "
           f"{'opaque ground' if opaque_sheet else 'magenta key'})")
     return slots
 
@@ -3674,14 +3893,26 @@ A tile is **{tile}x{tile}**. On a ChatGPT sheet it is drawn at **{scale}x**, so 
 {scale}x{scale} block aligned to the slot; the cut takes the mode colour of each block, so nothing is
 averaged and the hard edges survive.
 
-## Sheets
+## Sheets — as few generations as possible
 
-Entries are grouped by an optional `- sheet:` line, and otherwise by this rule:
+A slot is fixed at 4x and cannot be shrunk, so the only way to ask the owner for fewer images is to
+put more on each one. Entries are therefore grouped into two pools, not one per category:
 
-- `ground` — `layer: ground`, not a fringe. Opaque, so the sheet's background is a neutral dark grey
-  and nothing is keyed out.
-- `fringes` — any id ending `_edge`, `_corner_out` or `_corner_in`. Magenta background.
-- `buildings`, `nature`, `props` — everything else, by keyword, magenta background.
+- `terrain` — every `layer: ground` entry **and its fringes**, on one sheet. They are the same
+  materials and have to share a palette, and a sheet has one background colour, so the background is
+  **magenta** and the ground slots are painted **edge to edge** over it: nothing of the background
+  survives inside a ground tile, and the cut keys the fringes only.
+- `objects` — buildings, nature and props together, biggest first, each sheet then filled up with
+  the single-tile stamps, so the barrels and fence posts stand in the space beside the guild hall.
+
+An explicit `- sheet:` line in `tiles.md` still wins and keeps its entries in a pool of their own.
+
+Packing is a **skyline**: each slot is dropped at the lowest, then leftmost, place it fits, with a
+20 px gutter (28 px vertically, which is where the slot number goes) and a 20 px margin. A sheet
+stops at **26 slots** or **85% of the canvas**, whichever comes first, and slots are numbered
+afterwards in reading order. The canvas is then **trimmed to the content**: ChatGPT returns about
+1.5 megapixels whatever it is given, so a half-empty 1536x1024 template throws half the detail away.
+1536x1024 is the largest a sheet gets.
 
 A sheet that has been generated is **frozen**: its slot boxes never change, so the image can always be
 recut. New entries go into a fresh `<sheet>_2` beside it.
@@ -3957,10 +4188,58 @@ def exact_inner(slot, sx, sy, w, h):
     return x0, y0, x1 - x0, y1 - y0
 
 
+def fill_ground_magenta(px, w, h):
+    """An opaque tile on a magenta sheet: any background the artist left showing is a hole. Fill it.
+
+    A sheet has one background colour, and the ground tiles now share theirs with the fringes, so a
+    corner left unpainted would go into the atlas as a magenta square. Nothing is keyed on a ground
+    tile — instead every pixel still carrying a magenta cast takes the colour of the nearest painted
+    pixel, growing in from the clean part. Returns (repaired, repaired away from the tile's edge):
+    a hole in the outermost ring is what a non-integer return does to a slot's border and is repaired
+    without a word, while one further in is the artist leaving the background showing."""
+    # Only the background colour itself counts, and then a blend that is more than half background:
+    # a ground tile may legitimately be any colour it likes, purples included, and a cast threshold
+    # as loose as the keying's would call a heather-coloured moor a hole.
+    def hole(x, y):
+        r, g, b = px[y][x * 4], px[y][x * 4 + 1], px[y][x * 4 + 2]
+        return ((r - 255) ** 2 + g * g + (b - 255) ** 2) ** 0.5 <= KEY_HARD
+
+    def blend(x, y):
+        return magenta_cast(px[y][x * 4], px[y][x * 4 + 1], px[y][x * 4 + 2]) >= 128
+
+    dirty = [[hole(x, y) for x in range(w)] for y in range(h)]
+    for y in range(h):                                   # the soft edge of a hole, but only there
+        for x in range(w):
+            if not dirty[y][x] and blend(x, y) and any(
+                    0 <= nx < w and 0 <= ny < h and dirty[ny][nx]
+                    for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))):
+                dirty[y][x] = True
+    n = sum(r.count(True) for r in dirty)
+    inner = sum(1 for y in range(1, h - 1) for x in range(1, w - 1) if dirty[y][x])
+    if not n or n == w * h:
+        return n, inner
+    front = [(x, y) for y in range(h) for x in range(w) if not dirty[y][x]]
+    while front:
+        nxt = []
+        for x, y in front:
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < w and 0 <= ny < h and dirty[ny][nx]:
+                    dirty[ny][nx] = False
+                    px[ny][nx * 4:nx * 4 + 3] = px[y][x * 4:x * 4 + 3]
+                    nxt.append((nx, ny))
+        front = nxt
+    return n, inner
+
+
 def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False):
-    """A returned tile sheet: snap to the art-pixel grid, key, harden, pack into the atlas."""
+    """A returned tile sheet: snap to the art-pixel grid, key, harden, pack into the atlas.
+
+    A sheet carries one background colour but its entries are not all of one kind: a terrain sheet
+    holds opaque ground tiles AND keyed fringes over the same magenta. So the keying is decided per
+    ENTRY, from its own `opaque` flag, never from the sheet."""
     setname = data["set"]
     entries = tileset_entries(setname)
+    keyed_bg = list(data.get("background") or MAGENTA) == list(MAGENTA)
     cut, lines = [], []
     for s in slots:
         x, y, bw, bh = exact_inner(s, sx, sy, w, h)
@@ -3972,6 +4251,14 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False):
             for r in px:
                 for i in range(3, len(r), 4):
                     r[i] = 255
+            if keyed_bg:                                 # ground on a magenta sheet: never keyed
+                holes, inner = fill_ground_magenta(px, tw, th)
+                if inner:
+                    LOUD.append(f"{s['id']} is an opaque ground tile but came back with {holes} "
+                                f"background-coloured pixel(s) in it ({100 * holes // (tw * th)}%); "
+                                f"they were filled from the nearest painted pixel. Ask for that slot "
+                                f"again, painted edge to edge, if it shows.")
+                    print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
         else:
             px = key_magenta(small, tw, th, ch)
             harden_alpha(px, tw, th)

@@ -1,0 +1,722 @@
+{
+  "template": "tileset_valley_terrain",
+  "kind": "tileset",
+  "canvas": [
+    832,
+    846
+  ],
+  "canvas_label": "portrait, 832x846",
+  "background": [
+    255,
+    0,
+    255
+  ],
+  "border": 3,
+  "out": "story/field/tilesets/valley/atlas.png",
+  "slots": [
+    {
+      "n": 1,
+      "id": "water",
+      "box": [
+        20,
+        44,
+        262,
+        134
+      ],
+      "inner": [
+        23,
+        47,
+        256,
+        128
+      ],
+      "cells": [
+        2,
+        1
+      ],
+      "index": 8,
+      "layer": "ground",
+      "frames": 2,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        64,
+        32
+      ]
+    },
+    {
+      "n": 2,
+      "id": "grass",
+      "box": [
+        302,
+        44,
+        134,
+        134
+      ],
+      "inner": [
+        305,
+        47,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 1,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 3,
+      "id": "grass_tuft",
+      "box": [
+        456,
+        44,
+        134,
+        134
+      ],
+      "inner": [
+        459,
+        47,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 2,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 4,
+      "id": "grass_flower",
+      "box": [
+        610,
+        44,
+        134,
+        134
+      ],
+      "inner": [
+        613,
+        47,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 3,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 5,
+      "id": "dirt",
+      "box": [
+        20,
+        206,
+        134,
+        134
+      ],
+      "inner": [
+        23,
+        209,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 4,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 6,
+      "id": "dirt_rut",
+      "box": [
+        174,
+        206,
+        134,
+        134
+      ],
+      "inner": [
+        177,
+        209,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 5,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 7,
+      "id": "paving",
+      "box": [
+        328,
+        206,
+        134,
+        134
+      ],
+      "inner": [
+        331,
+        209,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 6,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 8,
+      "id": "paving_worn",
+      "box": [
+        482,
+        206,
+        134,
+        134
+      ],
+      "inner": [
+        485,
+        209,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 7,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 9,
+      "id": "gravel",
+      "box": [
+        636,
+        206,
+        134,
+        134
+      ],
+      "inner": [
+        639,
+        209,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 10,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 10,
+      "id": "crop",
+      "box": [
+        20,
+        368,
+        134,
+        134
+      ],
+      "inner": [
+        23,
+        371,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 11,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 11,
+      "id": "mud",
+      "box": [
+        174,
+        368,
+        134,
+        134
+      ],
+      "inner": [
+        177,
+        371,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 12,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 12,
+      "id": "bridge_deck",
+      "box": [
+        328,
+        368,
+        134,
+        134
+      ],
+      "inner": [
+        331,
+        371,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 13,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": true,
+      "kind": "ground",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 13,
+      "id": "dirt_edge",
+      "box": [
+        482,
+        368,
+        134,
+        134
+      ],
+      "inner": [
+        485,
+        371,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 16,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 14,
+      "id": "dirt_corner_out",
+      "box": [
+        636,
+        368,
+        134,
+        134
+      ],
+      "inner": [
+        639,
+        371,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 17,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 15,
+      "id": "dirt_corner_in",
+      "box": [
+        20,
+        530,
+        134,
+        134
+      ],
+      "inner": [
+        23,
+        533,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 18,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 16,
+      "id": "paving_edge",
+      "box": [
+        174,
+        530,
+        134,
+        134
+      ],
+      "inner": [
+        177,
+        533,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 19,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 17,
+      "id": "paving_corner_out",
+      "box": [
+        328,
+        530,
+        134,
+        134
+      ],
+      "inner": [
+        331,
+        533,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 20,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 18,
+      "id": "paving_corner_in",
+      "box": [
+        482,
+        530,
+        134,
+        134
+      ],
+      "inner": [
+        485,
+        533,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 21,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 19,
+      "id": "water_edge",
+      "box": [
+        636,
+        530,
+        134,
+        134
+      ],
+      "inner": [
+        639,
+        533,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 22,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 20,
+      "id": "water_corner_out",
+      "box": [
+        20,
+        692,
+        134,
+        134
+      ],
+      "inner": [
+        23,
+        695,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 23,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 21,
+      "id": "water_corner_in",
+      "box": [
+        174,
+        692,
+        134,
+        134
+      ],
+      "inner": [
+        177,
+        695,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 24,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 22,
+      "id": "crop_edge",
+      "box": [
+        328,
+        692,
+        134,
+        134
+      ],
+      "inner": [
+        331,
+        695,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 25,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 23,
+      "id": "crop_corner_out",
+      "box": [
+        482,
+        692,
+        134,
+        134
+      ],
+      "inner": [
+        485,
+        695,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 26,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    },
+    {
+      "n": 24,
+      "id": "crop_corner_in",
+      "box": [
+        636,
+        692,
+        134,
+        134
+      ],
+      "inner": [
+        639,
+        695,
+        128,
+        128
+      ],
+      "cells": [
+        1,
+        1
+      ],
+      "index": 27,
+      "layer": "ground",
+      "frames": 1,
+      "opaque": false,
+      "kind": "fringe",
+      "target": [
+        32,
+        32
+      ]
+    }
+  ],
+  "prompt": "Create ONE image: the attached template with all 24 numbered slots filled in. Canvas: portrait, 832x846, exactly the same size and proportions as the template.\n\nPIXEL GRID \u2014 THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at 4x. Every art pixel is a 4x4 block of identical colour, aligned to the slot: the blocks start at the slot's top-left inside corner and run in an even grid across and down it, so a 128-pixel slot is a 32x32 pixel-art tile blown up 4 times. No block is half a colour, no edge falls between blocks, no detail is finer than one block, and no two objects on the sheet use different block sizes. This is pixel art at 4x, not a smooth drawing shrunk down.\n\n16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THIS SHEET IS: the 'terrain' tile sheet for the 'valley' tileset of a top-down 16-bit JRPG field map. Every slot is one tile or one multi-tile object, and in game each tile is exactly 32x32 pixels, so a 128-pixel slot is one tile and a 256x384 slot is a 2x3-tile object.\n\nTHIS SHEET HOLDS 12 ground tile(s) in slot(s) 1-12 AND 12 fringe tile(s) in slot(s) 13-24. The rules for each kind:\n\nGROUND TILES \u2014 SLOT(S) 1-12. GROUND TILES are flat terrain seen from straight above, and each one is FILLED EDGE TO EDGE with its material, right up to the inside of its white border: opaque, no frame, no vignette, no empty corner, AND NO MAGENTA ANYWHERE INSIDE THE SLOT \u2014 the background colour must not show through a ground tile at all, not even in a corner or as a tint along an edge. Each one is SEAMLESS on all four edges: the right edge continues into the left edge and the bottom edge into the top, so a floor tiled with copies of it shows no seam. Keep the detail even and small \u2014 no single large feature the eye can count across a field, no object standing on the ground, no character, and no shadow cast by anything outside the tile.\n\nFRINGE TILES \u2014 SLOT(S) 13-24. These are the ids ending in _edge, _corner_out and _corner_in, and they are not whole tiles: each one is a ragged scrap of its own terrain drawn over the empty background, which the game lays on top of the neighbouring ground so the boundary between two terrains is not a straight line. Draw only the terrain, never the neighbour, and let the background show through the rest:\n  - _edge: a band of the terrain along the NORTH edge of the slot, solid and full width at the very top, reaching about 10 of the tile's 32 pixels down at its deepest, with a ragged, organic, uneven southern boundary \u2014 clumps and gaps, never a straight line and never a repeating scallop. The bottom two thirds of the slot is background.\n  - _corner_out: the same terrain filling only the NORTH-EAST corner, reaching about 10 pixels in from the north edge and 10 pixels in from the east edge, a ragged quarter-round. Everything else is background.\n  - _corner_in: the exact inverse \u2014 the terrain fills the whole slot EXCEPT a ragged bite out of the SOUTH-WEST corner about 10 pixels deep from the south edge and 10 pixels in from the west edge. Only that bite is background.\nA slot's own description below gives the MATERIAL only \u2014 what the terrain is made of. Where it also mentions an edge or a corner, the three shapes above win: draw the shape described here, in that material.\nThe north / north-east / south-west wording is fixed: the game rotates each of these three by 90, 180 and 270 degrees to cover the other sides and corners, so all three must be drawn at the orientation described and the terrain must meet the slot's edges at full strength wherever it touches them.\n\nBACKGROUND: the flat magenta around and between the objects is empty space and is keyed out by the tool. Leave it completely untouched right up to the edge of what you draw: no magenta tint on an object, no soft halo, no gradient, no drop shadow lying on the magenta. The ground slots listed above are the exception and the one thing to get right: they are painted over completely, so no magenta survives inside them.\n\nPROJECTION \u2014 top-down oblique, the Phantasy Star IV field view, the same for every slot:\n\n- The ground is seen from straight above: a patch of grass, dirt, paving or water is a flat texture with no thickness and no side visible.\n- An object standing on the ground is seen from slightly in front of straight above: you see its top or roof AND its south-facing front, and nothing of its north, east or west sides.\n- Every vertical edge in the world \u2014 a wall corner, a tree trunk, a post \u2014 runs straight up the image. Nothing leans, nothing converges, nothing is foreshortened.\n- No perspective, no vanishing point, no horizon, no sky. Nothing gets smaller because it is further away: a thing the same size in the world is the same size in pixels wherever it sits.\n- One light direction for the whole sheet, from the upper left. Every object's shading and every contact shadow agrees with it.\n\nSLOTS \u2014 24 of them, grouped by kind:\n\nGROUND TILES:\nSlot 1 (water), 256x128 px = 2x1 tiles: shallow running stream water, two frames, the light on it moved between them. 2 animation frames of the same tile side by side, left to right, each one 1x1 tile, the same subject with only the moving part changed, the motion looping from the last frame back to the first, and every frame obeying the rules above on its own. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 2 (grass), 128x128 px = 1x1 tile: short river-valley turf seen from straight above, worn to the soil in places, no single blade readable. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 3 (grass_tuft), 128x128 px = 1x1 tile: the same turf with a few standing tufts of longer grass, scattered off any grid. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 4 (grass_flower), 128x128 px = 1x1 tile: the same turf with a handful of small pale field flowers. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 5 (dirt), 128x128 px = 1x1 tile: packed earth of a village lane, dry, a little gravel worked into it. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 6 (dirt_rut), 128x128 px = 1x1 tile: packed earth with two cart ruts worn down the length of it. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 7 (paving), 128x128 px = 1x1 tile: laid stone of the village square, blocks of uneven size, mortar dark between them. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 8 (paving_worn), 128x128 px = 1x1 tile: the same laid stone, hollowed and polished where the town walks over it. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 9 (gravel), 128x128 px = 1x1 tile: the grey grit of a working yard, raked flat and stained. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 10 (crop), 128x128 px = 1x1 tile: standing barley seen from above, the heads in rough drills. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 11 (mud), 128x128 px = 1x1 tile: churned wet ground of a cart yard, hoof and wheel marks standing in it. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\nSlot 12 (bridge_deck), 128x128 px = 1x1 tile: planks of a footbridge laid across the run of the stream, a rail board at each side. Seen straight down from directly above, seamless on all four edges, filled edge to edge, opaque.\n\nFRINGE TILES:\nSlot 13 (dirt_edge), 128x128 px = 1x1 tile: the fringe of a dirt lane: packed earth, dry and a little gravelly, over nothing else. Drawn as the _edge fringe shape described above, in this material.\nSlot 14 (dirt_corner_out), 128x128 px = 1x1 tile: the same packed earth of a dirt lane, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.\nSlot 15 (dirt_corner_in), 128x128 px = 1x1 tile: the same packed earth of a dirt lane, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.\nSlot 16 (paving_edge), 128x128 px = 1x1 tile: the fringe of laid stone: outer blocks half sunk and broken, over nothing else. Drawn as the _edge fringe shape described above, in this material.\nSlot 17 (paving_corner_out), 128x128 px = 1x1 tile: the same laid stone, its outer blocks broken, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.\nSlot 18 (paving_corner_in), 128x128 px = 1x1 tile: the same laid stone, its outer blocks broken, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.\nSlot 19 (water_edge), 128x128 px = 1x1 tile: the fringe of a stream bank: wet stones and mud where the water ends, over nothing else. Drawn as the _edge fringe shape described above, in this material.\nSlot 20 (water_corner_out), 128x128 px = 1x1 tile: the same wet stones and mud of a stream bank, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.\nSlot 21 (water_corner_in), 128x128 px = 1x1 tile: the same wet stones and mud of a stream bank, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.\nSlot 22 (crop_edge), 128x128 px = 1x1 tile: the fringe of a barley plot: the last heads where the drills stop, over nothing else. Drawn as the _edge fringe shape described above, in this material.\nSlot 23 (crop_corner_out), 128x128 px = 1x1 tile: the same standing barley of a worked plot, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.\nSlot 24 (crop_corner_in), 128x128 px = 1x1 tile: the same standing barley of a worked plot, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.\n\nRENDERING: Low resolution pixel art upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors. Checkerboard dithering only on large flat areas of ground, water and roof, never as noisy texture on small objects. Thin 1-pixel dark outlines around every object that stands on the ground. Muted earthy ground tones \u2014 grass, dirt, stone, timber \u2014 with saturated accents on roofs, doors, awnings, cloth and water. Flat shading with 2-3 tones per color and one consistent light direction across the whole map.\n\nAVOID: perspective, vanishing point, horizon, sky, isometric view, three-quarter view, side view, things shrinking with distance, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, high resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout, buildings in rows, repeated spacing, people, characters, animals, text, letters, numbers, labels, captions, watermark, signature, user interface, map legend, compass, frame, border, vignette, letterboxing, drawing outside a slot, moving or covering a slot number, a border or frame inside a slot, pixels not aligned to the 4x4 block grid, anti-aliased or soft edges, a visible seam at a ground tile's edge, background colour showing inside a ground tile, changing the size of the image",
+  "set": "valley",
+  "sheet": "terrain",
+  "cut": "story/field/tilesets/valley/cut/terrain.png",
+  "opaque_sheet": false,
+  "tile": 32,
+  "scale": 4,
+  "cols": 16
+}

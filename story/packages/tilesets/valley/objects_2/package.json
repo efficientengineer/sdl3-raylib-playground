@@ -1,0 +1,20 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "objects_2",
+  "ids": [
+    "ladder_house",
+    "house_e",
+    "house_c",
+    "barn",
+    "shed",
+    "stable"
+  ],
+  "title": "valley \u2014 objects_2 tile sheet (2 of 4)",
+  "makes": "6 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/objects_2.png"
+  ],
+  "dir": "story/packages/tilesets/valley/objects_2"
+}

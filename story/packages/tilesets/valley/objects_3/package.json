@@ -1,0 +1,24 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "objects_3",
+  "ids": [
+    "grain_shed",
+    "house_d",
+    "hut",
+    "tree",
+    "tree_2",
+    "tree_bare",
+    "orchard_tree",
+    "well",
+    "hedge",
+    "practice_post"
+  ],
+  "title": "valley \u2014 objects_3 tile sheet (3 of 4)",
+  "makes": "10 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/objects_3.png"
+  ],
+  "dir": "story/packages/tilesets/valley/objects_3"
+}

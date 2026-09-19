@@ -499,18 +499,29 @@ leave the background untouched, no text.
   tiles, index 0 empty), `atlas.json` and `cut/<sheet>.png`. The art pipeline never renames an entry,
   never changes a size or a solid row, and **never moves an index that is already written**; the one
   thing it writes back into `tiles.md` is a `- index:` line for an entry that has none.
-  `./story_prompt.py tileset <set>` groups the entries into sheets — by an optional `- sheet:` line,
-  else `ground` (opaque, neutral dark-grey background), `fringes`, `buildings`, `nature`, `props` (all
-  magenta) — and writes one package per sheet under `story/packages/tilesets/<set>/<sheet>/`, listed
-  **first** in the packages README. Slots are at **exactly 4x**: a tile is a 128-px slot, a 4x3 stamp a
-  512x384 one, the white 3-px border is drawn *outside* the art area, and the prompt's loudest rule is
-  that every art pixel must be a 4x4 block aligned to the slot. A drawn sheet is frozen; new ids go to
-  a fresh `<sheet>_2`.
+  `./story_prompt.py tileset <set>` groups the entries into **as few sheets as it can** and writes one
+  package per sheet under `story/packages/tilesets/<set>/<sheet>/`, listed **first** in the packages
+  README. Two pools, not one per category: `terrain` (every ground tile **and** its fringes — same
+  materials, one palette, so one **magenta** background with the ground slots painted *edge to edge*
+  over it and only the fringes keyed) and `objects` (buildings, nature and props together, biggest
+  first, each sheet then filled up with the single-tile stamps, so the barrels stand beside the guild
+  hall). A `- sheet:` line still wins. Packing is a **skyline** — lowest then leftmost — with 20 px
+  gutters, capped at **26 slots and 85% of the canvas**, numbered afterwards in reading order, and the
+  canvas is **trimmed to the content** (ChatGPT returns ~1.5 MP whatever it is given, so a half-empty
+  template throws half the detail away). This took valley from nine mostly-empty sheets to five at
+  64-81% full. Slots stay at **exactly 4x**: a tile is a 128-px slot, a 4x3 stamp a 512x384 one, the
+  white 3-px border is drawn *outside* the art area, and the prompt's loudest rule — its first
+  paragraph — is that every art pixel must be a 4x4 block aligned to the slot. The prompt lists the
+  slots grouped by kind (ground / fringe / stamp) with each one's size in tiles and the rules for that
+  kind restated. A drawn sheet is frozen; new ids go to a fresh `<sheet>_2`.
   `ingest` cuts the return by taking each art pixel's **mode colour** over its exact region in the
   returned image — never an average, and never a resize first, because the sheet comes back at
   about 1.5 MP whatever was asked for and a non-integer resize puts the blocks half a pixel out of
-  step. Magenta is keyed on anything that is not opaque ground, the alpha is **hard-thresholded at
-  0.5** (a tile is on or off; the engine alpha-tests), and each entry is packed into `atlas.png` at
+  step. Keying is decided **per entry, never per sheet** (a terrain sheet holds opaque ground and
+  keyed fringes over the same magenta): magenta is keyed on anything that is not opaque ground, and a
+  ground tile that comes back with background showing through has those pixels filled from the nearest
+  painted one — silently in the outermost ring, where it is only what a non-integer return does to a
+  slot edge, and loudly anywhere further in. The alpha is **hard-thresholded at 0.5** (a tile is on or off; the engine alpha-tests), and each entry is packed into `atlas.png` at
   its own index without disturbing a cell that belongs to anything else. Ground tiles get a **seam
   check** — the mean colour difference across the wrap, warned above 24 — with `--heal-seams` to
   cross-blend two pixels at the edges, and `--palette N` to quantise a whole sheet by median cut.

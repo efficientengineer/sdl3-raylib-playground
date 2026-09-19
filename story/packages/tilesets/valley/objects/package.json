@@ -1,0 +1,23 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "objects",
+  "ids": [
+    "guild_hall",
+    "house_a",
+    "house_b",
+    "fence_ew",
+    "fence_ns",
+    "fence_corner",
+    "wall_ew",
+    "wall_ns",
+    "wall_corner"
+  ],
+  "title": "valley \u2014 objects tile sheet (1 of 4)",
+  "makes": "9 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/objects.png"
+  ],
+  "dir": "story/packages/tilesets/valley/objects"
+}

@@ -1,0 +1,89 @@
+# ChatGPT package: valley — objects tile sheet (1 of 4)
+
+## What exists already
+
+- `story/field/tilesets/valley/atlas.png` — not started yet
+- `story/field/tilesets/valley/cut/objects.png` — not cut yet
+
+This sheet carries 9 of the tileset's entries: `guild_hall`, `house_a`, `house_b`, `fence_ew`, `fence_ns`, `fence_corner`, `wall_ew`, `wall_ns`, `wall_corner`
+
+## 1. Start a new chat and attach these files, in this order
+
+1. `story/packages/tilesets/valley/objects/template.png`
+2. `story/refs/style.png`
+
+## 2. Paste this prompt exactly
+
+````
+Create ONE image: the attached template with all 9 numbered slots filled in. Canvas: landscape, 1536x1000, exactly the same size and proportions as the template.
+
+PIXEL GRID — THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at 4x. Every art pixel is a 4x4 block of identical colour, aligned to the slot: the blocks start at the slot's top-left inside corner and run in an even grid across and down it, so a 128-pixel slot is a 32x32 pixel-art tile blown up 4 times. No block is half a colour, no edge falls between blocks, no detail is finer than one block, and no two objects on the sheet use different block sizes. This is pixel art at 4x, not a smooth drawing shrunk down.
+
+16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.
+
+ATTACHED REFERENCE IMAGES, in the order I attached them:
+Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
+Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+
+TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
+
+WHAT THIS SHEET IS: the 'objects' tile sheet for the 'valley' tileset of a top-down 16-bit JRPG field map. Every slot is one tile or one multi-tile object, and in game each tile is exactly 32x32 pixels, so a 128-pixel slot is one tile and a 256x384 slot is a 2x3-tile object.
+
+THIS SHEET HOLDS 9 stamp tile(s) in slot(s) 1-9. The rules for each kind:
+
+STAMPS (objects) — SLOT(S) 1-9. STAMPS are objects that stand on the ground: a house, a tree, a barrel. Each one is drawn to fill its slot's width and STANDS ON THE SLOT'S BOTTOM EDGE — its base touches the bottom inside edge of the border, centred left to right — and everything else in the slot is left as the flat background, which the tool keys out. No ground under it (the map draws its own), no cast shadow beyond a contact shadow no more than one tile high tucked under its south face. Every stamp on this sheet is drawn to ONE COMMON SCALE: a tile is a stride, a person would be one tile wide and about one and a half tiles tall, and a door is one tile wide and about 1.3 tiles tall, centred on a tile column so it lines up with the grid.
+
+BACKGROUND: the flat magenta around and between the objects is empty space and is keyed out by the tool. Leave it completely untouched right up to the edge of what you draw: no magenta tint on an object, no soft halo, no gradient, no drop shadow lying on the magenta.
+
+PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for every slot:
+
+- The ground is seen from straight above: a patch of grass, dirt, paving or water is a flat texture with no thickness and no side visible.
+- An object standing on the ground is seen from slightly in front of straight above: you see its top or roof AND its south-facing front, and nothing of its north, east or west sides.
+- Every vertical edge in the world — a wall corner, a tree trunk, a post — runs straight up the image. Nothing leans, nothing converges, nothing is foreshortened.
+- No perspective, no vanishing point, no horizon, no sky. Nothing gets smaller because it is further away: a thing the same size in the world is the same size in pixels wherever it sits.
+- One light direction for the whole sheet, from the upper left. Every object's shading and every contact shadow agrees with it.
+- The slots are different sizes because the things in them are different sizes. Nothing is scaled to fill a bigger slot: a barrel in a 1-tile slot and a barn in a 4x3 slot are drawn at the same number of pixels to the foot.
+
+SLOTS — 9 of them, grouped by kind:
+
+STAMPS (objects):
+Slot 1 (guild_hall), 1024x768 px = 8x6 tiles: the long hall of the carriers' guild, stone to the first floor and timber above, a wide double door at the middle of the south face and a bell cote at the east end. Standing on the slot's bottom edge, everything else left as background.
+Slot 2 (house_a), 384x384 px = 3x3 tiles: a small valley house, plastered walls on a stone footing, red pantile roof, one door and one shuttered window on the south face. Standing on the slot's bottom edge, everything else left as background.
+Slot 3 (house_b), 384x384 px = 3x3 tiles: a second small house, timbers showing in the plaster, the roof a shade darker. Standing on the slot's bottom edge, everything else left as background.
+Slot 4 (fence_ew), 128x128 px = 1x1 tile: three rails of a split fence running east and west, posts at both ends. Standing on the slot's bottom edge, everything else left as background.
+Slot 5 (fence_ns), 128x128 px = 1x1 tile: the same split fence running north and south, seen along its length. Standing on the slot's bottom edge, everything else left as background.
+Slot 6 (fence_corner), 128x128 px = 1x1 tile: the corner post of a split fence with a stub of rail each way. Standing on the slot's bottom edge, everything else left as background.
+Slot 7 (wall_ew), 128x128 px = 1x1 tile: a dry stone wall a little above waist height running east and west, capped with flat stones. Standing on the slot's bottom edge, everything else left as background.
+Slot 8 (wall_ns), 128x128 px = 1x1 tile: the same dry stone wall running north and south. Standing on the slot's bottom edge, everything else left as background.
+Slot 9 (wall_corner), 128x128 px = 1x1 tile: the corner of a dry stone wall, the cap stones turning. Standing on the slot's bottom edge, everything else left as background.
+
+RENDERING: Low resolution pixel art upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors. Checkerboard dithering only on large flat areas of ground, water and roof, never as noisy texture on small objects. Thin 1-pixel dark outlines around every object that stands on the ground. Muted earthy ground tones — grass, dirt, stone, timber — with saturated accents on roofs, doors, awnings, cloth and water. Flat shading with 2-3 tones per color and one consistent light direction across the whole map.
+
+AVOID: perspective, vanishing point, horizon, sky, isometric view, three-quarter view, side view, things shrinking with distance, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, high resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout, buildings in rows, repeated spacing, people, characters, animals, text, letters, numbers, labels, captions, watermark, signature, user interface, map legend, compass, frame, border, vignette, letterboxing, drawing outside a slot, moving or covering a slot number, a border or frame inside a slot, pixels not aligned to the 4x4 block grid, anti-aliased or soft edges, a visible seam at a ground tile's edge, background colour showing inside a ground tile, changing the size of the image
+````
+
+## 3. Afterwards
+
+- [ ] All 9 slots filled; every border and every number exactly where it was
+- [ ] Every art pixel is a 4x4 block on one grid — zoom in and check a diagonal edge is a clean staircase of blocks, not a soft ramp
+- [ ] Nothing drawn in the gutters; the background between slots is still flat and untouched
+- [ ] Each object (1-9) stands on its slot's bottom edge, with clean background right up against it and no magenta tint on the object itself
+- [ ] One light direction, upper left, across the whole sheet
+- [ ] No text, labels, numbers of your own, swatches or signature
+
+If one slot fails, reply in the same chat: "Redraw only slot 4 and keep every other slot and the whole template exactly as it is. <what was wrong>".
+
+Save ChatGPT's image into **this folder** as `returned.png` — the whole path is
+`story/packages/tilesets/valley/objects/returned.png`. A .jpg or .webp works too; the tool converts it.
+
+Then cut it up, from the repository root:
+
+```
+./story_prompt.py ingest story/packages/tilesets/valley/objects
+```
+
+That writes the 9 tile(s) into `story/field/tilesets/valley/atlas.png`. Running `./story_prompt.py ingest` with no path does every package in
+`story/packages/` that has a new image waiting. The returned file is never deleted, so a
+bad cut can always be redone after a fix.
+
+If the image needs another go, reply in the same chat and save the new one over `returned.png`.

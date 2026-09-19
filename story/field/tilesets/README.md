@@ -25,14 +25,26 @@ A tile is **32x32**. On a ChatGPT sheet it is drawn at **4x**, so one slot is
 4x4 block aligned to the slot; the cut takes the mode colour of each block, so nothing is
 averaged and the hard edges survive.
 
-## Sheets
+## Sheets — as few generations as possible
 
-Entries are grouped by an optional `- sheet:` line, and otherwise by this rule:
+A slot is fixed at 4x and cannot be shrunk, so the only way to ask the owner for fewer images is to
+put more on each one. Entries are therefore grouped into two pools, not one per category:
 
-- `ground` — `layer: ground`, not a fringe. Opaque, so the sheet's background is a neutral dark grey
-  and nothing is keyed out.
-- `fringes` — any id ending `_edge`, `_corner_out` or `_corner_in`. Magenta background.
-- `buildings`, `nature`, `props` — everything else, by keyword, magenta background.
+- `terrain` — every `layer: ground` entry **and its fringes**, on one sheet. They are the same
+  materials and have to share a palette, and a sheet has one background colour, so the background is
+  **magenta** and the ground slots are painted **edge to edge** over it: nothing of the background
+  survives inside a ground tile, and the cut keys the fringes only.
+- `objects` — buildings, nature and props together, biggest first, each sheet then filled up with
+  the single-tile stamps, so the barrels and fence posts stand in the space beside the guild hall.
+
+An explicit `- sheet:` line in `tiles.md` still wins and keeps its entries in a pool of their own.
+
+Packing is a **skyline**: each slot is dropped at the lowest, then leftmost, place it fits, with a
+20 px gutter (28 px vertically, which is where the slot number goes) and a 20 px margin. A sheet
+stops at **26 slots** or **85% of the canvas**, whichever comes first, and slots are numbered
+afterwards in reading order. The canvas is then **trimmed to the content**: ChatGPT returns about
+1.5 megapixels whatever it is given, so a half-empty 1536x1024 template throws half the detail away.
+1536x1024 is the largest a sheet gets.
 
 A sheet that has been generated is **frozen**: its slot boxes never change, so the image can always be
 recut. New entries go into a fresh `<sheet>_2` beside it.
