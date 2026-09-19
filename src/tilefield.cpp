@@ -426,7 +426,19 @@ struct TfNpc {
     int facing, wander, art, parity;
     char walker[24], text[48];
 };
-struct TfArt { char id[24]; GLuint tex; int w, h, fw, fh; };
+// A walker sheet. The old contract is a 4x4 grid (rows S W E N, columns stand, step-left, stand,
+// step-right) and is still what a sheet with no sidecar means. `story/field/walkers/<id>.json` may
+// describe another layout — the 3x3 the art pipeline is moving to, S/W/N rows with E mirrored:
+//   {"rows":["S","W","N"], "cols":["stand","a","b"], "frame":[128,192], "mirror_side":true}
+struct TfArt {
+    char id[24];
+    GLuint tex;
+    int w, h, fw, fh;
+    int nrows, ncols;
+    int row_of[4];              // facing S,W,E,N -> sheet row
+    bool flip[4];               // draw that row with flipped UVs (E from the W row)
+    int col_stand, col_a, col_b;
+};
 
 struct TfActor { short tx, ty, px, py; int facing; };
 
@@ -505,6 +517,8 @@ struct TileField {
     TfLight lights[TF_LIGHTS];
     int light_count;
     bool lantern;                             // the dev "lantern on the player" toggle
+    float drift, clouds;                      // weather as light levels: macro drift, cloud shadows
+    int weather_set;                          // the map said `clouds:`, so don't guess from the table
     bool one_tap;                             // measurement: nearest index instead of the 4-tap blend
     uint64_t draw_ns;                         // GPU time for the world, summed over the fps window
     float lantern_r;
@@ -517,11 +531,12 @@ struct TileField {
     bool gl_ready;
     GLuint prog, vao, vbo, fbo, fbo_tex, white;
     GLint u_res, u_tex, u_cmap, u_texsz, u_cmaph, u_rowa, u_rowb, u_levels, u_amb,
-          u_indexed, u_nl, u_lights, u_sc, u_taps;
+          u_indexed, u_nl, u_lights, u_sc, u_taps, u_drift, u_clouds, u_time, u_cam;
     TfVert *v;
     int vn;
     GLuint cur_tex;
     int cur_mode;                             // 0 = plain RGBA texture, 1 = palette index texture
+    bool ground_pass;                         // the quads being pushed are ground: they take the drift
 
     TfArt art[TF_ART];
     int art_count;
@@ -1267,7 +1282,69 @@ static int art_get(TileField *t, const char *id) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
     if (own) free(px); else stbi_image_free(px);
-    a->w = w; a->h = h; a->fw = w / 4; a->fh = h / 4;
+    a->w = w; a->h = h;
+
+    // Layout: the sidecar if there is one, else the 4x4 contract.
+    a->nrows = 4; a->ncols = 4;
+    a->fw = w / 4; a->fh = h / 4;
+    for (int i = 0; i < 4; i++) { a->row_of[i] = i; a->flip[i] = false; }
+    a->col_stand = 0; a->col_a = 1; a->col_b = 3;
+    char jrel[128];
+    snprintf(jrel, sizeof(jrel), "field/walkers/%s.json", id);
+    size_t jsz = 0;
+    char *js = (char *)tf_read(jrel, &jsz);
+    if (js) {
+        const char *js0 = js;
+        char rows[8][8] = {{0}}, cols[8][12] = {{0}};
+        int nr = 0, nc = 0, fw = 0, fh = 0;
+        const char *r = strstr(js, "\"rows\"");
+        if (r) for (const char *c = strchr(r, '['); c && *c && *c != ']' && nr < 8; c++)
+            if (*c == '"') { const char *e = strchr(c + 1, '"'); if (!e) break;
+                             int n2 = (int)(e - c - 1); if (n2 > 7) n2 = 7;
+                             memcpy(rows[nr], c + 1, (size_t)n2); rows[nr][n2] = 0; nr++; c = e; }
+        const char *cc = strstr(js, "\"cols\"");
+        if (cc) for (const char *c = strchr(cc, '['); c && *c && *c != ']' && nc < 8; c++)
+            if (*c == '"') { const char *e = strchr(c + 1, '"'); if (!e) break;
+                             int n2 = (int)(e - c - 1); if (n2 > 11) n2 = 11;
+                             memcpy(cols[nc], c + 1, (size_t)n2); cols[nc][n2] = 0; nc++; c = e; }
+        const char *fr = strstr(js, "\"frame\"");
+        if (fr) sscanf(strchr(fr, '[') ? strchr(fr, '[') + 1 : "", "%d , %d", &fw, &fh);
+        bool mirror = strstr(js, "\"mirror_side\"") && !strstr(js, "\"mirror_side\": false")
+                                                    && !strstr(js, "\"mirror_side\":false");
+        if (nr >= 1 && nc >= 1) {
+            a->nrows = nr; a->ncols = nc;
+            a->fw = fw > 0 ? fw : w / nc;
+            a->fh = fh > 0 ? fh : h / nr;
+            static const char *FACE_LETTER[4] = { "S", "W", "E", "N" };
+            for (int f = 0; f < 4; f++) {
+                a->row_of[f] = 0; a->flip[f] = false;
+                for (int i = 0; i < nr; i++) if (!SDL_strcasecmp(rows[i], FACE_LETTER[f])) { a->row_of[f] = i; goto got; }
+                if (mirror && f == 2)                                  // no E row: the W row, flipped
+                    for (int i = 0; i < nr; i++) if (!SDL_strcasecmp(rows[i], "W")) { a->row_of[f] = i; a->flip[f] = true; break; }
+            got: ;
+            }
+            a->col_stand = 0; a->col_a = nc > 1 ? 1 : 0; a->col_b = nc > 2 ? 2 : a->col_a;
+            for (int i = 0; i < nc; i++) {           // "a"/"b" or the tool's "step-A"/"step-B"
+                const char *cn = cols[i];
+                if (!SDL_strcasecmp(cn, "stand")) a->col_stand = i;
+                else if (!SDL_strcasecmp(cn, "a") || !SDL_strcasecmp(cn, "step-a") || !SDL_strcasecmp(cn, "step_a")) a->col_a = i;
+                else if (!SDL_strcasecmp(cn, "b") || !SDL_strcasecmp(cn, "step-b") || !SDL_strcasecmp(cn, "step_b")) a->col_b = i;
+            }
+            int sw = 0, sh2 = 0;                        // the sidecar's own idea of the sheet size
+            const char *sd = strstr(js0, "\"sheet\"");
+            if (sd && strchr(sd, '[')) sscanf(strchr(sd, '[') + 1, "%d , %d", &sw, &sh2);
+            if ((sw && sw != w) || (sh2 && sh2 != h))
+                SDL_Log("tilefield: walker \"%s\" sidecar says the sheet is %dx%d but the png is %dx%d "
+                        "— reading %d cols x %d rows of %dx%d from the top left", id, sw, sh2, w, h,
+                        nc, nr, a->fw, a->fh);
+            if (a->fw * nc > w || a->fh * nr > h)
+                SDL_Log("tilefield: walker \"%s\" sidecar says %dx%d frames of %dx%d but the sheet is %dx%d",
+                        id, nc, nr, a->fw, a->fh, w, h);
+            SDL_Log("tilefield: walker \"%s\" layout from %s.json — %d rows x %d cols, frame %dx%d%s",
+                    id, id, nr, nc, a->fw, a->fh, a->flip[2] ? ", E mirrored from W" : "");
+        }
+        SDL_free(js);
+    }
     return t->art_count++;
 }
 
@@ -1384,6 +1461,13 @@ static void parse_tmap(TileField *t, char *text) {
                 sscanf(val, "%15s %f", tb, &lv);
                 t->light_table = tf_table_by_name(t, tb);
                 t->ambient = lv < 0 ? 0 : lv > 1 ? 1 : lv;
+            } else if (!strcmp(key, "drift")) {
+                t->drift = (float)atof(val);                 // macro light drift over the ground, 0 = off
+                if (t->drift < 0) t->drift = 0;
+            } else if (!strcmp(key, "clouds")) {
+                t->clouds = (!strcmp(val, "off") || !strcmp(val, "no") || !strcmp(val, "0")) ? 0.0f
+                          : (float)(atof(val) > 0 ? atof(val) : 1.0);
+                t->weather_set = 1;
             } else if (!strcmp(key, "lamp")) {
                 // `lamp: x y radius level [flicker]` — a point light, in TILES. It lives in `## meta`
                 // rather than `## triggers` because `story_prompt.py tmap check` only knows the six
@@ -1504,6 +1588,9 @@ bool tf_load_map(TileField *t, const char *name) {
     t->light_count = 0;                                       // the map's own lamps and ambient
     t->light_table = TBL_DAY;
     t->ambient = 1.0f;
+    t->drift = 1.0f;                                          // weather defaults; `## meta` overrides
+    t->clouds = 1.0f;
+    t->weather_set = 0;
     t->mw = t->mh = 1;
     t->spawn_x = t->spawn_y = 0; t->spawn_f = 0;
     t->music[0] = 0;
@@ -1515,6 +1602,10 @@ bool tf_load_map(TileField *t, const char *name) {
     if (ok) SDL_free(text); else free(text);
     snprintf(t->map_name, sizeof(t->map_name), "%s", name);   // the file's `name:` is a label; the file is the truth
 
+    // Clouds are an outdoor thing: on by default under `day` and `dusk`, off otherwise, unless the map
+    // said `clouds:` itself. An interior lit by `night` or `stone` gets none.
+    if (!t->weather_set && t->light_table != TBL_DAY && t->light_table != TBL_DUSK) t->clouds = 0.0f;
+
     t->party = 2;                                             // the party the intro leaves us with
     tf_place_party(t, t->spawn_x, t->spawn_y, t->spawn_f);
     t->cam_x = t->cam_y = -100000;                            // snap the camera on the first frame
@@ -1523,6 +1614,7 @@ bool tf_load_map(TileField *t, const char *name) {
             t->act[0].tx, t->act[0].ty, FACE_NAME[t->spawn_f & 3],
             TBL_NAMES[t->light_table >= 0 && t->light_table < TBL_COUNT ? t->light_table : 0],
             t->ambient, t->light_count);
+    SDL_Log("tilefield: %s weather — drift %.2f, clouds %.2f", name, t->drift, t->clouds);
     return ok;
 }
 
@@ -1559,10 +1651,18 @@ static const char *TF_FS =
     "uniform sampler2D u_tex;\n"
     "uniform sampler2D u_cmap;\n"
     "uniform vec2 u_texsz;\n"
-    "uniform float u_cmaph, u_rowa, u_rowb, u_levels, u_amb;\n"
+    "uniform float u_cmaph, u_rowa, u_rowb, u_levels, u_amb, u_drift, u_clouds, u_time;\n"
+    "uniform vec2 u_cam;\n"
     "uniform int u_indexed, u_nl, u_taps;\n"
     "uniform vec4 u_lights[16];\n"
     "out vec4 o;\n"
+    "float dhash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
+    "float vnoise(vec2 p){\n"                           // value noise: cheap, and smooth enough for weather
+    "  vec2 i = floor(p), f = fract(p);\n"
+    "  f = f * f * (3.0 - 2.0 * f);\n"
+    "  float a = dhash(i), b = dhash(i + vec2(1.0, 0.0));\n"
+    "  float c = dhash(i + vec2(0.0, 1.0)), d = dhash(i + vec2(1.0, 1.0));\n"
+    "  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y); }\n"
     "vec4 look(float idx, float row){\n"
     "  vec4 c = texture(u_cmap, vec2((idx + 0.5) / 256.0, (row + 0.5) / u_cmaph));\n"
     "  return vec4(c.rgb * c.a, c.a); }\n"                 // premultiplied; index 0 is a straight zero
@@ -1587,6 +1687,21 @@ static const char *TF_FS =
     "  else lamp = v_lit.x;\n"
     "  float warm = v_lit.x < 0.0 ? clamp((lamp - u_amb) * 1.6, 0.0, 1.0) : v_lit.y;\n"
     "  float lv = max(u_amb, lamp);\n"
+    // Weather, as light LEVELS rather than colour: a slow macro drift over the ground so a big field
+    // is not one flat tone, and cloud shadows drifting across everything. Both are functions of the
+    // WORLD position, so they stay put as the camera moves, and both only move the colormap row —
+    // nothing here invents a colour (PALETTE.md).
+    "  vec2 wp = (v_world + u_cam) / 32.0;\n"                                  // world TILES
+    "  if (u_drift > 0.0 && v_lit.x < -1.5)\n"                                 // ground only
+    "    lv += (vnoise(wp / 12.0) * 2.0 - 1.0) * u_drift * (1.5 / (u_levels - 1.0));\n"
+    "  if (u_clouds > 0.0) {\n"
+    // Two octaves, because one octave of value noise is a field of soft blobs all the same size —
+    // the second breaks their edges up and is what makes it read as cloud rather than as stains. The
+    // thresholds are set from the measured coverage: about a third of the ground in shade at once.
+    "    vec2 cw = wp / 25.0 + vec2(u_time * 0.012, u_time * 0.004);\n"          // ~0.3 tiles/s
+    "    float c = vnoise(cw) * 0.68 + vnoise(cw * 2.7 + 11.3) * 0.32;\n"
+    "    lv -= smoothstep(0.42, 0.68, c) * u_clouds * (4.0 / (u_levels - 1.0)); }\n"
+    "  lv = clamp(lv, 0.0, 1.0);\n"
     "  float f = (1.0 - lv) * (u_levels - 1.0);\n"      // row 0 is FULL light; the last row is darkest
 
     "  float r0 = floor(f), fr = f - r0;\n"
@@ -1647,6 +1762,10 @@ static void tf_gl_init(TileField *t) {
     t->u_lights = glGetUniformLocation(t->prog, "u_lights");
     t->u_sc = glGetUniformLocation(t->prog, "u_sc");
     t->u_taps = glGetUniformLocation(t->prog, "u_taps");
+    t->u_cam = glGetUniformLocation(t->prog, "u_cam");
+    t->u_time = glGetUniformLocation(t->prog, "u_time");
+    t->u_clouds = glGetUniformLocation(t->prog, "u_clouds");
+    t->u_drift = glGetUniformLocation(t->prog, "u_drift");
 
     glGenVertexArrays(1, &t->vao);
     glGenBuffers(1, &t->vbo);
@@ -1767,12 +1886,14 @@ static void push_cell(TileField *t, int index, int cw, int ch, float x, float y,
     float x0 = dev(t, x), y0 = dev(t, y), x1 = dev(t, x + cw * TS), y1 = dev(t, y + ch * TS);
     if (t->pal_ok) {
         float rect[4] = { tx0, ty0, tx1, ty1 };
-        push_quad(t, x0, y0, x1 - x0, y1 - y0, tx0 / aw, ty0 / ah, tx1 / aw, ty1 / ah, rot, col, rect, -1.0f, 0.0f);
+        push_quad(t, x0, y0, x1 - x0, y1 - y0, tx0 / aw, ty0 / ah, tx1 / aw, ty1 / ah, rot, col, rect,
+                  t->ground_pass ? -2.0f : -1.0f, 0.0f);
         return;
     }
     float hu = 0.5f / aw, hv = 0.5f / ah;
     push_quad(t, x0, y0, x1 - x0, y1 - y0,
-              tx0 / aw + hu, ty0 / ah + hv, tx1 / aw - hu, ty1 / ah - hv, rot, col, nullptr, -1.0f, 0.0f);
+              tx0 / aw + hu, ty0 / ah + hv, tx1 / aw - hu, ty1 / ah - hv, rot, col, nullptr,
+              t->ground_pass ? -2.0f : -1.0f, 0.0f);
 }
 
 static void push_solid(TileField *t, float x, float y, float w, float h, unsigned int col) {
@@ -1785,7 +1906,10 @@ static void push_solid(TileField *t, float x, float y, float w, float h, unsigne
 
 #define ANIM_FPS 3.0f
 
+// `lit = -2` on a ground quad: per-fragment light AND the macro drift. Stamps pass -1, so a house
+// does not ripple with the field it stands in; walkers pass their own level.
 static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
+    t->ground_pass = true;
     tf_use(t, t->atlas, t->pal_ok ? 1 : 0);
     int frame = (int)(t->anim_t * ANIM_FPS);
     for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
@@ -1793,11 +1917,13 @@ static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
         int idx = d->index + (d->frames > 1 ? (frame % d->frames) : 0);
         push_cell(t, idx, 1, 1, (float)(x * TS - t->cam_x), (float)(y * TS - t->cam_y), 0, TF_WHITE);
     }
+    t->ground_pass = false;
 }
 
 // The neighbour test. A terrain with `fringe: n` overlays every ground cell of lower priority it
 // touches: four edges, four outer corners (diagonal only) and four inner corners (both flanks).
 static void draw_fringes(TileField *t, int x0, int y0, int x1, int y1) {
+    t->ground_pass = true;                                   // a fringe is ground: it drifts with it
     tf_use(t, t->atlas, t->pal_ok ? 1 : 0);
     const int cdx[4] = { 0, 1, 0, -1 }, cdy[4] = { -1, 0, 1, 0 };          // N E S W, matching rot 0..3
     for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
@@ -1829,6 +1955,7 @@ static void draw_fringes(TileField *t, int x0, int y0, int x1, int y1) {
             }
         }
     }
+    t->ground_pass = false;
 }
 
 // Stamps. `over` is how many of a stamp's TOP rows belong above the walkers, so a roof ridge or a
@@ -1860,27 +1987,37 @@ static void draw_walker(TileField *t, int art, float fx, float fy, int facing, i
     if (art < 0 || art >= t->art_count) return;
     TfArt *a = &t->art[art];
     tf_use(t, a->tex, t->pal_ok ? 1 : 0);
-    float u = (float)(col & 3) / 4.0f, v = (float)(facing & 3) / 4.0f;
+    int row = a->row_of[facing & 3];
+    bool flip = a->flip[facing & 3];                       // E drawn from the W row, mirrored
+    if (col < 0 || col >= a->ncols) col = a->col_stand;
+    float fw = (float)a->fw, fh = (float)a->fh;
+    float tx0 = (float)col * fw, ty0 = (float)row * fh;
+    float u0 = tx0 / (float)a->w, u1 = (tx0 + fw) / (float)a->w;
+    float v0 = ty0 / (float)a->h, v1 = (ty0 + fh) / (float)a->h;
+    if (flip) { float sw = u0; u0 = u1; u1 = sw; }
     float x0 = dev(t, fx - t->cam_x), y0 = dev(t, fy - 16.0f - t->cam_y);
     float x1 = dev(t, fx - t->cam_x + TS), y1 = dev(t, fy - 16.0f - t->cam_y + 48.0f);
     if (t->pal_ok) {
-        float fw = (float)a->fw, fh = (float)a->fh;
-        float tx0 = (float)(col & 3) * fw, ty0 = (float)(facing & 3) * fh;
         float rect[4] = { tx0, ty0, tx0 + fw, ty0 + fh };
-        push_quad(t, x0, y0, x1 - x0, y1 - y0, u, v, u + 0.25f, v + 0.25f, 0, tint, rect, lit, warm);
+        push_quad(t, x0, y0, x1 - x0, y1 - y0, u0, v0, u1, v1, 0, tint, rect, lit, warm);
         return;
     }
     float hu = 0.5f / (float)a->w, hv = 0.5f / (float)a->h;
+    float iu = flip ? -hu : hu;
     push_quad(t, x0, y0, x1 - x0, y1 - y0,
-              u + hu, v + hv, u + 0.25f - hu, v + 0.25f - hv, 0, tint, nullptr, lit, warm);
+              u0 + iu, v0 + hv, u1 - iu, v1 - hv, 0, tint, nullptr, lit, warm);
 }
 
 // The walk cycle. The sheet is stand, step-left, stand, step-right; a step shows two of those four, and
 // the two steps alternate, so walking two tiles plays 1,2,3,0 — the same alternating feet PS4 has.
 // `parity` flips on every step, `k` is how far through the step we are.
-static int walk_col(int parity, float k, bool moving) {
-    if (!moving) return 0;
-    return ((parity ? 2 : 0) + (k < 0.5f ? 1 : 2)) & 3;
+static int walk_col(const TfArt *a, int parity, float k, bool moving) {
+    if (!a) return 0;
+    if (!moving) return a->col_stand;
+    if (a->ncols >= 4) return ((parity ? 2 : 0) + (k < 0.5f ? 1 : 2)) & 3;   // the old 4-column sheet
+    // Three columns: a step shows the stepping frame and then the stand, and the two steps alternate
+    // feet — so two tiles of walking play a, stand, b, stand.
+    return (k < 0.5f) ? (parity ? a->col_b : a->col_a) : a->col_stand;
 }
 
 struct Drawable { float y; int art, facing, col; float x, sy; unsigned int tint; float lit, warm; };
@@ -1980,6 +2117,10 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
         glUniform1f(t->u_amb, t->ambient);
         glUniform1i(t->u_nl, nl);
         glUniform1i(t->u_taps, t->one_tap ? 1 : 0);
+        glUniform1f(t->u_drift, t->drift);
+        glUniform1f(t->u_clouds, t->clouds);
+        glUniform1f(t->u_time, t->anim_t);
+        glUniform2f(t->u_cam, (float)t->cam_x, (float)t->cam_y);
         if (nl) glUniform4fv(t->u_lights, nl, lights);
     }
     glActiveTexture(GL_TEXTURE0);
@@ -2017,10 +2158,10 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
         TfActor *a = &t->act[i];
         float fx = lerp(a->px * (float)TS, a->tx * (float)TS, k), fy = lerp(a->py * (float)TS, a->ty * (float)TS, k);
         bool mv = t->moving && (a->px != a->tx || a->py != a->ty);
-        int col = walk_col(t->step_parity, k, mv);
         // The ids are the walker FILE names, which are the story's names: story/field/walkers/falke.png.
         static const char *PARTY_ART[TF_PARTY] = { "falke", "ottilie", "party_c", "party_d" };
         int art = art_get(t, PARTY_ART[i]);
+        int col = walk_col(art >= 0 ? &t->art[art] : nullptr, t->step_parity, k, mv);
         dr[nd].y = fy; dr[nd].x = fx; dr[nd].sy = fy; dr[nd].art = art;
         dr[nd].facing = a->facing; dr[nd].col = col; dr[nd].tint = TF_WHITE;
         float lamp = tf_light_at(t, fx - t->cam_x + TS * 0.5f, fy - t->cam_y + TS * 0.5f, nl, lights);
@@ -2037,7 +2178,8 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
         if (fx < t->cam_x - TS * 2 || fx > t->cam_x + vw + TS * 2) continue;
         dr[nd].y = fy; dr[nd].x = fx; dr[nd].sy = fy; dr[nd].art = np->art;
         dr[nd].facing = np->facing;
-        dr[nd].col = walk_col(np->parity, nk, np->px != np->tx || np->py != np->ty);   // the same cycle
+        dr[nd].col = walk_col(np->art >= 0 ? &t->art[np->art] : nullptr, np->parity, nk,
+                              np->px != np->tx || np->py != np->ty);      // the same cycle
         dr[nd].tint = TF_WHITE;
         float lamp = tf_light_at(t, fx - t->cam_x + TS * 0.5f, fy - t->cam_y + TS * 0.5f, nl, lights);
         dr[nd].lit = t->pal_ok ? (lamp > t->ambient ? lamp : t->ambient) : -1.0f;
@@ -2572,6 +2714,11 @@ void tf_capture_to(TileField *t, const char *map, int scale, const char *out_pat
             t->ambient = lv < 0 ? 0 : lv > 1 ? 1 : lv;
         }
     }
+    const char *wt = SDL_getenv("TILE_WEATHER");        // "<drift>:<clouds>", for tuning from the Mac
+    if (wt && wt[0]) {
+        float d = 1, c = 1;
+        if (sscanf(wt, "%f:%f", &d, &c) >= 1) { t->drift = d < 0 ? 0 : d; t->clouds = c < 0 ? 0 : c; }
+    }
     const char *ln = SDL_getenv("TILE_LANTERN");
     if (ln && ln[0]) { t->lantern = true; t->lantern_r = (float)atof(ln); if (t->lantern_r < 1) t->lantern_r = 5; }
     snprintf(t->cap_out, sizeof(t->cap_out), "%s", out_path);
@@ -2623,6 +2770,20 @@ bool tf_dev_ui(TileField *t, char *out, int cap) {
         }
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
         ImGui::SliderFloat("ambient", &t->ambient, 0.0f, 1.0f, "%.2f");
+        bool cl = t->clouds > 0.0f, dr = t->drift > 0.0f;
+        if (ImGui::Checkbox("Clouds", &cl)) t->clouds = cl ? 1.0f : 0.0f;
+        if (t->clouds > 0.0f) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+            ImGui::SliderFloat("cloud str", &t->clouds, 0.05f, 3.0f, "%.2f");
+        }
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Drift", &dr)) t->drift = dr ? 1.0f : 0.0f;
+        if (t->drift > 0.0f) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+            ImGui::SliderFloat("drift str", &t->drift, 0.05f, 3.0f, "%.2f");
+        }
         bool one = t->one_tap;
         if (ImGui::Checkbox("1 tap (no blend)", &one)) { t->one_tap = one; t->draw_ns = 0; }
         ImGui::SameLine();
@@ -2655,6 +2816,8 @@ TileField *tf_create() {
     t->ambient = 1.0f;
     t->light_table = TBL_DAY;
     t->lantern_r = 5.0f;
+    t->drift = 1.0f;
+    t->clouds = 1.0f;
     return t;
 }
 
@@ -2673,6 +2836,7 @@ void tf_save(TileField *t, TfSave *s) {
     s->dbg_solid = t->dbg_solid; s->dbg_trig = t->dbg_trig; s->dbg_coord = t->dbg_coord; s->noclip = t->noclip;
     s->light_table = t->light_table; s->lantern = t->lantern ? 1 : 0;
     s->ambient = t->ambient; s->lantern_r = t->lantern_r;
+    s->drift = t->drift; s->clouds = t->clouds;
 }
 
 // Everything read back is validated: a map that no longer has that tile, or a tile that is now solid,
@@ -2691,6 +2855,8 @@ void tf_restore(TileField *t, const TfSave *s) {
     if (s->ambient >= 0.0f && s->ambient <= 1.0f) t->ambient = s->ambient;
     t->lantern = s->lantern != 0;
     t->lantern_r = (s->lantern_r >= 1.0f && s->lantern_r <= 32.0f) ? s->lantern_r : 5.0f;
+    if (s->drift >= 0.0f && s->drift <= 4.0f) t->drift = s->drift;
+    if (s->clouds >= 0.0f && s->clouds <= 4.0f) t->clouds = s->clouds;
     int lx = s->tx[0], ly = s->ty[0];
     if (lx < 0 || ly < 0 || lx >= t->mw || ly >= t->mh) { SDL_Log("tilefield: restored tile %d,%d is off %s", lx, ly, map); return; }
     tf_place_party(t, lx, ly, s->facing[0] & 3);

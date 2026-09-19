@@ -129,6 +129,13 @@ sheet size, frame size, how transparent it is — because a sheet that keyed not
 black rectangle and used to do it silently. Drawn one tile wide and one and a half tall, centred on the
 tile with its feet on the tile's bottom edge, whatever the sheet's resolution.
 
+**Layout is a sidecar, or the 4x4 default.** `story/field/walkers/<id>.json` may say
+`{"rows":["S","W","N"], "cols":["stand","a","b"], "frame":[128,192], "mirror_side":true}`: any row set,
+any column set, an explicit frame size, and `mirror_side` draws **E from the W row with flipped UVs**.
+With no sidecar the sheet is the old 4x4 (rows S W E N, columns stand, step-left, stand, step-right)
+and nothing changed. The three-column cycle shows the stepping frame then the stand, alternating `a`
+and `b` between steps, so two tiles of walking still play all of it.
+
 **The ids are the story's names.** `PARTY_ART` is `falke`, `ottilie`, `party_c`, `party_d`: the leader
 was asked for as `hero`, there is no `hero.png`, and the placeholder figure was therefore drawn over
 real art that was sitting on the phone the whole time. A renamed character is a renamed walker file.
@@ -198,6 +205,27 @@ Three changes make that permanent:
 After all three, with the indexed art: **APK 12 MB, assets 5.7 MB, `files/` 112 KB on a fresh
 install** (6.3 MB once `fast_reload.sh` has pushed the working copies of the art).
 
+## Weather: macro drift and cloud shadows (light LEVELS, not colour)
+
+Both are per-fragment offsets to the colormap row, computed from the WORLD position, so they stay put
+as the camera moves and carry over unchanged to any later renderer.
+
+- **Drift** — one octave of value noise, period **12 tiles**, shifts the level by up to **±1.5 rows**.
+  **Ground and fringes only** (they push `lit = -2`; stamps push `-1`), so a house does not ripple with
+  the field it stands in. Per map: `drift: <strength>` in `## meta`, default 1.0, 0 = off.
+- **Clouds** — two octaves, period **25 tiles**, scrolling about **0.3 tiles/s**, soft-thresholded
+  (`smoothstep(0.42, 0.68)`) and darkening by up to **4 rows**. Affects ground, stamps and walkers
+  alike. Per map: `clouds: on|off|<strength>`; with no line it is **on under `day` and `dusk`** and off
+  under any other table, so an interior gets none.
+- One octave of value noise is a field of same-sized blobs; the second octave is what makes it read as
+  cloud. The thresholds were set from a measurement, not by eye: against a `0:0` capture, about half
+  the ground is more than 5% darker, the darkest about 18%, median 7% — gentle sun and shade.
+- Walkers take the cloud per fragment rather than one value at the feet (unlike the lantern light).
+  A sprite is one tile and the cloud period is 25, so the variation across a body is under a fifth of a
+  row; keeping it in the shader avoids a second copy of the noise in C that could drift out of step.
+- Dev: **Clouds** and **Drift** checkboxes with strength sliders; both ride the reload blob. On the
+  Mac: `./capture.sh --tiles halm --weather <drift>:<clouds>` (env `TILE_WEATHER`).
+
 ## The dialogue box (`src/dialogue.h`), shared with the cutscene player
 
 One header, two users: `star_logic.cpp`'s cutscene box and this file's field message box.
@@ -216,6 +244,12 @@ One header, two users: `star_logic.cpp`'s cutscene box and this file's field mes
   lines at the current text size — the size the real lines actually need.
 - Panel reveal and mood change happen in `star_goto`, i.e. on a line's **first page only**, because
   turning a page never goes through it. The page index rides the reload blob (`STR9`).
+- **ImGui 1.92 binds its own sampler object over every texture's own filter settings.** Setting
+  `GL_LINEAR_MIPMAP_LINEAR` on a panel changed not one pixel until the draw was bracketed with a
+  callback that binds a mipmapping sampler and puts ImGui's back (`mip_on`/`mip_off` in
+  `star_logic.cpp`). Panels and portraits are full-resolution paintings minified into their boxes — a
+  480x771 portrait into about 200x304 — so they want mipmaps; the font atlas, which has no mip levels,
+  must keep ImGui's sampler, which is why the bracket is per image and not global.
 
 ## Deviations from TILES.md, and why
 

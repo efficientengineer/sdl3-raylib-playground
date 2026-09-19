@@ -15,6 +15,7 @@
 #endif
 
 #include "imgui.h"
+#include "imgui_impl_opengl3.h"   // for the render state: ImGui binds its own sampler over ours
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
@@ -269,11 +270,15 @@ static Tex tex_load(const char *file) {
     glBindTexture(GL_TEXTURE_2D, t.id);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);      // keep the pixels crisp
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t.w, t.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+    // Panels and portraits are full-resolution PAINTINGS shown small — a 550x850 portrait lands in a
+    // ~133x206 box, a 4x minification. Plain LINEAR takes four samples of sixteen and aliases; NEAREST
+    // magnification made the edges crawl. Mipmaps are what a downscaled painting wants.
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t.w, t.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
     stbi_image_free(px);
     return t;
 }
@@ -497,6 +502,33 @@ static void draw_typed(ImDrawList *dl, ImFont *font, float size, ImVec2 pos, flo
     }
 }
 
+// ImGui 1.92's GL backend binds its OWN sampler object (linear, no mipmap) for every draw, which
+// silently overrides whatever glTexParameteri a texture was given — which is why setting
+// GL_LINEAR_MIPMAP_LINEAR on a panel changed not one pixel. Panels and portraits are full-resolution
+// paintings minified into their boxes (a 480x771 portrait into ~200x304), so they want mipmaps: these
+// two callbacks bracket the images with a sampler that has them, and put ImGui's back afterwards.
+// Everything else in the draw list — the box, the text, the font atlas, which has no mip levels —
+// keeps ImGui's sampler untouched.
+static GLuint g_mip_sampler = 0;
+static void cb_sampler(const ImDrawList *, const ImDrawCmd *cmd) {
+    ImGui_ImplOpenGL3_RenderState *rs = (ImGui_ImplOpenGL3_RenderState *)ImGui::GetPlatformIO().Renderer_RenderState;
+    if (!rs || !rs->UseBindSampler) return;                    // a GL2-era path: texture params apply as they are
+    if (cmd->UserCallbackData) {
+        if (!g_mip_sampler) {
+            glGenSamplers(1, &g_mip_sampler);
+            glSamplerParameteri(g_mip_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glSamplerParameteri(g_mip_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glSamplerParameteri(g_mip_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glSamplerParameteri(g_mip_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+        glBindSampler(0, g_mip_sampler);
+    } else {
+        glBindSampler(0, rs->CurrentSampler);
+    }
+}
+static inline void mip_on(ImDrawList *dl)  { dl->AddCallback(cb_sampler, (void *)1); }
+static inline void mip_off(ImDrawList *dl) { dl->AddCallback(cb_sampler, (void *)0); }
+
 static void draw_box(ImDrawList *dl, ImVec2 a, ImVec2 b, float u) {        // the blue 16-bit dialogue box
     dl->AddRectFilled(a, b, IM_COL32(8, 8, 20, 255), u * 1.6f);
     dl->AddRectFilledMultiColor(ImVec2(a.x + u, a.y + u), ImVec2(b.x - u, b.y - u),
@@ -539,8 +571,10 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         float ia = (float)st->backdrop.w / (float)st->backdrop.h, dw = sw, dh = sh;
         if (ia > sw / sh) dh = sw / ia; else dw = sh * ia;
         ImVec2 p0(sx + (sw - dw) * 0.5f, sy + (sh - dh) * 0.5f);
+        mip_on(dl);
         dl->AddImage((ImTextureID)(intptr_t)st->backdrop.id, p0, ImVec2(p0.x + dw, p0.y + dh),
                      ImVec2(0, 0), ImVec2(1, 1), IM_COL32(80, 80, 92, 255));   // tint multiplies: dim, slightly cool
+        mip_off(dl);
     }
 
     // Panels, oldest first so newer ones overlap them.
@@ -554,7 +588,11 @@ static void draw_scene(Star *st, int w, int h, float dt) {
             ImVec2 p0(sx + sw * r->x / 100.0f + slide, sy + sh * r->y / 100.0f);
             ImVec2 p1(p0.x + sw * r->w / 100.0f, p0.y + sh * r->h / 100.0f);
             dl->AddRectFilled(ImVec2(p0.x + u * 2, p0.y + u * 2), ImVec2(p1.x + u * 2, p1.y + u * 2), with_alpha(IM_COL32(0, 0, 0, 170), a));
-            if (st->tex[i].id) dl->AddImage((ImTextureID)(intptr_t)st->tex[i].id, p0, p1, ImVec2(0, 0), ImVec2(1, 1), with_alpha(IM_COL32_WHITE, a));
+            if (st->tex[i].id) {
+                mip_on(dl);
+                dl->AddImage((ImTextureID)(intptr_t)st->tex[i].id, p0, p1, ImVec2(0, 0), ImVec2(1, 1), with_alpha(IM_COL32_WHITE, a));
+                mip_off(dl);
+            }
             else { dl->AddRectFilled(p0, p1, IM_COL32(24, 22, 36, 255)); dl->AddRect(p0, p1, IM_COL32_WHITE, 0, 0, u); }
             if (a < 1.0f) dl->AddRectFilled(p0, p1, with_alpha(IM_COL32(255, 255, 255, 190), 1.0f - a));   // arrival flash
         }
@@ -614,7 +652,9 @@ static void draw_scene(Star *st, int w, int h, float dt) {
             float fy = by0 + ((by1 - by0) - fh) * 0.5f;
             ImVec2 f0(fx + (1.0f - a) * fw * 0.4f * (right ? 1.0f : -1.0f), fy), f1(f0.x + fw, f0.y + fh);
             dl->AddRectFilled(f0, f1, with_alpha(IM_COL32(6, 8, 22, 255), a));
+            mip_on(dl);
             dl->AddImage((ImTextureID)(intptr_t)fa->id, f0, f1, ImVec2(0, 0), ImVec2(1, 1), with_alpha(IM_COL32_WHITE, a));
+            mip_off(dl);
             dl->AddRect(f0, f1, with_alpha(IM_COL32(225, 225, 235, 255), a), 0, 0, u * 0.7f);
             dl->AddRect(ImVec2(f0.x + u * 0.8f, f0.y + u * 0.8f), ImVec2(f1.x - u * 0.8f, f1.y - u * 0.8f),
                         with_alpha(IM_COL32(90, 100, 150, 255), a), 0, 0, u * 0.35f);

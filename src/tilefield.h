@@ -28,6 +28,7 @@ struct TfSave {
     // the lantern. A map's own `light:` line is re-read on load, so these are applied after it.
     int32_t light_table, lantern;
     float ambient, lantern_r;
+    float drift, clouds;         // weather, so a tuned sky survives a reload
 };
 
 TileField *tf_create();
