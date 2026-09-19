@@ -75,6 +75,10 @@ so a handle is never a common word and never a word that appears in the setting 
   beard words are rejected; see "Design direction" in `characters.md`.
 - `- ref:` — the character's reference image, made with `./story_prompt.py refsheet <Handle>`. Its
   middle panel becomes the in-game dialogue portrait, via `./story_prompt.py portraits`.
+- `- asymmetric: yes` (optional) — this character's design is not left-right symmetric (a sword on
+  one hip, an eyepatch, a single pauldron), so their walk sheet keeps **both** side rows: 12 frames,
+  rows S W E N, and the engine never mirrors them. Everybody else gets the 9-frame sheet with one
+  side row (`TILES.md`). Set it before generating the walk sheet, not after.
 - `- alias: Name[, Name...]` (optional) — **display names** for a character known on screen by
   something other than their handle. A dialogue speaker equal to an alias resolves to that character:
   they get that character's portrait, their left/right side of the dialogue box, and no "not in
@@ -176,12 +180,14 @@ tones with saturated accents on clothing and hair.
 ### field_rendering
 
 ```
-Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels
-on a single consistent pixel grid, drawn from the color palette attached last.
-Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise
-— shading is 2-3 flat steps of one color, and a large flat area is broken up
-by drawn detail or it stays flat. Thin 1-pixel outlines. Muted earthy base
-tones with saturated accents on clothing, cloth, roofs and water.
+Flat luminous colour, drawn from the palette image attached last. Big simple
+shapes read first; detail is sparse and deliberate, placed where it means
+something and absent everywhere else. Shading is 2 or 3 flat steps of one
+colour with one light direction from the upper left, and every shadow is a
+single cool blue-violet tone. Edges are soft-painted, not hard-aliased, and
+clean: no dithering anywhere, no checkerboard, no stipple, no noise, no
+gradient, no texture for its own sake. Warm greens and earths against that
+cool shadow, with saturated accents on roofs, cloth, water and flowers.
 ```
 
 ### dialogue_box
@@ -253,8 +259,9 @@ captions, speech bubbles, watermark, signature
 ### map_header
 
 ```
-16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star
-IV look.
+Top-down JRPG field art in the clean 16-bit manner: flat luminous fields of
+colour, big simple shapes, soft painted edges, sparse deliberate detail. Every
+shadow is a single cool blue-violet tone, never a gradient and never grey.
 ```
 
 ### map_rendering
@@ -308,7 +315,8 @@ description is used alone. Character references are set per character in
 
 - style: story/refs/style.png
 - style_note: Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
-- style_note_map: Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
+- style_map: story/sheets/tests/clean_style_test_v1.png
+- style_note_map: STYLE reference — this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.
 
 ## Shot menu
 

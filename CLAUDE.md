@@ -79,13 +79,16 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py names          # the {{TOKEN}} table, and every token used with no row in it
 ./story_prompt.py packages [--all]  # (re)build story/packages/ — the art tray, by chapter and map
 ./story_prompt.py ingest [folder]   # cut every returned.png waiting in story/packages/ (the owner's one command)
-./story_prompt.py tileset <set>  # THE FIELD ART PATH (D18): story/field/tilesets/<set>/tiles.md → one
-                                 # template sheet package per sheet; ingest packs them into atlas.png
+./story_prompt.py tileset <set>  # THE FIELD ART PATH (D18/D20): tiles.md → masks.png (generated) plus
+                                 # the swatch, decal and stamp sheet packages; ingest cuts them
 ./story_prompt.py tmap check <map>|--all    # validate a .tmap against its tileset, text ids and exits
-./story_prompt.py tmap preview <map>        # render it from the atlas → story/out/<map>.tmap.png
+./story_prompt.py tmap preview <map>        # render it the v2 way (dual-grid masks + swatches +
+                                            # hashed decals) → story/out/<map>.tmap.png
 ./story_prompt.py tiles <id>...  # (parked) field art: template sheet of square slots → story/field/tiles/
 ./story_prompt.py props <id>...  # field art: slots sized by each prop's footprint → story/field/props/
-./story_prompt.py walker <Name>  # field art: the 4x4 walk grid (S W E N) → story/field/walkers/
+./story_prompt.py walker <Name> [<Name>…]   # the 9-frame walk sheet (S/side/N x stand/A/B), up to 3
+                                 # characters a sheet → story/field/walkers/<id>.png + .json
+./story_prompt.py walker compact [<id>…]    # an old 16-frame sheet → 9 frames at 128x192
 ./story_prompt.py building <id>...  # field art: front wall + wall and roof samples → story/field/buildings/
 ./story_prompt.py screen <map> <zone>  # (parked) a top-down 16-bit map painted whole from
                                  # story/field/screens.md, plus its walkable mask → story/field/screens/<map>_<zone>.screen
@@ -509,8 +512,9 @@ leave the background untouched, no text.
   behind it — edges only, never the interior, so white headbands, flowers, plaster and water foam are
   safe. Skipping this put thin white lines through most of the valley atlas and made `grass` report a
   seam of 159. The cut then keys the magenta to alpha with a soft fringe, and writes 64x64 tiles,
-  props trimmed and scaled back to 64 px per cell, one **1024x1536 walker sheet** (16 frames of
-  **256x384**; rows S, W, E, N; columns stand, step-left, stand, step-right), and building faces
+  props trimmed and scaled back to 64 px per cell, one **384x576 walker sheet** (9 frames of
+  **128x192**; rows S, side, N; columns stand, step-A, step-B — the engine mirrors the side row),
+  and building faces
   resized to the contract sizes with any alpha dropped. A walker is **anchored**, not merely cut:
   ChatGPT draws each pose where it likes in its slot, so every frame is centred horizontally on its
   own silhouette and each direction takes **one** vertical offset, measured from its two stand frames
@@ -546,10 +550,17 @@ leave the background untouched, no text.
   painted block-outs and painted screens: *"Sega style, top down, using tile sheets, grid walking. No
   more screen navmesh."*). `TILES.md` is the contract; **Screens and the 3D/painted-view field are
   parked** — the code stays, nothing new is built on them.
+  **TILES2 (D20) replaced drawn transition tiles**: an entry in `tiles.md` is now a `- kind: terrain`
+  (one seamless **swatch** sampled in world space, its edges a **generated 1-bit mask** — no art), a
+  `- kind: decal` (a small cut-out the game hash-scatters over the ground, the variety that used to be
+  a `grass_tuft` tile), or a plain tile/stamp as before. Read **TILES.md, "Terrains, masks and
+  decals"** before touching any of it; `TILES2_PROPOSAL.md` is the research behind it. The invariant
+  that must never change: *a mask's boundary crosses each tile edge at that edge's midpoint*. Four
+  images a terrain became one, and `tmap preview` renders a map the v2 way on the Mac.
   A **tileset** is `story/field/tilesets/<set>/`: `tiles.md` (**the engine's file** — one `## <id>` per
-  tile or stamp with `- index:`, `- layer:`, `- solid:`, `- desc:`), `atlas.png` (16 columns of **128x128
-  cells**, index 0 empty), `atlas.json` (its `cell` field is the cell size — read it, don't assume)
-  and `cut/<sheet>.png`. The art pipeline never renames an entry,
+  entry), `atlas.png` (16 columns of **128x128 cells**, index 0 empty, indexed on the master palette),
+  `atlas.json` (its `cell` field is the cell size — read it, don't assume), `masks.png` + `masks.json`
+  (generated), `swatches/<terrain>.png`, `decals/<id>.png` and `cut/<sheet>.png`. The art pipeline never renames an entry,
   never changes a size or a solid row, and **never moves an index that is already written**; the one
   thing it writes back into `tiles.md` is a `- index:` line for an entry that has none.
   `./story_prompt.py tileset <set>` groups the entries into **as few sheets as it can** and writes one

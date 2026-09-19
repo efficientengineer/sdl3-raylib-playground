@@ -10,7 +10,7 @@
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/ch01/north_grass/props/template.png`
-2. `story/refs/style.png`
+2. `story/sheets/tests/clean_style_test_v1.png`
 3. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
@@ -21,7 +21,7 @@ Create ONE image: the attached template with all 2 numbered slots filled in. Can
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
-Image 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
+Image 2: STYLE reference. STYLE reference — this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.
 Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
@@ -36,7 +36,7 @@ SLOTS:
 Slot 1 (cave_mouth), 3 x 2 cells, 913x607 px in the template: A low dark opening in broken hillside rock, the lip shored with one fallen slab, a rope tied off round a boulder and hanging into it. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
 Slot 2 (slide_rubble), 3 x 2 cells, 913x607 px in the template: A fan of fresh hillside rubble spilled across a path, raw earth at its top edge, boulders and snapped roots piled at the bottom. Front three-quarter view from above, standing on the bottom edge of the slot, magenta on every other side.
 
-RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, drawn from the color palette attached last. Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise — shading is 2-3 flat steps of one color, and a large flat area is broken up by drawn detail or it stays flat. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing, cloth, roofs and water.
+RENDERING: Flat luminous colour, drawn from the palette image attached last. Big simple shapes read first; detail is sparse and deliberate, placed where it means something and absent everywhere else. Shading is 2 or 3 flat steps of one colour with one light direction from the upper left, and every shadow is a single cool blue-violet tone. Edges are soft-painted, not hard-aliased, and clean: no dithering anywhere, no checkerboard, no stipple, no noise, no gradient, no texture for its own sake. Warm greens and earths against that cool shadow, with saturated accents on roofs, cloth, water and flowers.
 
 AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a scene or background inside a slot, two objects in one slot, a soft blurred or glowing edge where an object meets the magenta, changing the size of the image
 ````

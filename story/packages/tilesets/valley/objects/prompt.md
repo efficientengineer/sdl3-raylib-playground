@@ -10,7 +10,7 @@ This sheet carries 9 of the tileset's entries: `guild_hall`, `house_a`, `house_b
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/tilesets/valley/objects/template.png`
-2. `story/refs/style.png`
+2. `story/sheets/tests/clean_style_test_v1.png`
 3. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
@@ -20,11 +20,11 @@ Create ONE image: the attached template with all 9 numbered slots filled in. Can
 
 PIXEL GRID — THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at 4x. Every art pixel is a 4x4 block of identical colour, aligned to the slot: the blocks start at the slot's top-left inside corner and run in an even grid across and down it, so a 128-pixel slot is a 32x32 pixel-art tile blown up 4 times. No block is half a colour, no edge falls between blocks, no detail is finer than one block, and no two objects on the sheet use different block sizes. This is pixel art at 4x, not a smooth drawing shrunk down.
 
-16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.
+Top-down JRPG field art in the clean 16-bit manner: flat luminous fields of colour, big simple shapes, soft painted edges, sparse deliberate detail. Every shadow is a single cool blue-violet tone, never a gradient and never grey.
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
-Image 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
+Image 2: STYLE reference. STYLE reference — this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.
 Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
@@ -49,9 +49,9 @@ PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for e
 SLOTS — 9 of them, grouped by kind:
 
 STAMPS (objects):
-Slot 1 (guild_hall), 1024x768 px = 8x6 tiles: the long hall of the carriers' guild, stone to the first floor and timber above, a wide double door at the middle of the south face and a bell cote at the east end. Standing on the slot's bottom edge, everything else left as background.
-Slot 2 (house_a), 384x384 px = 3x3 tiles: a small valley house, plastered walls on a stone footing, red pantile roof, one door and one shuttered window on the south face. Standing on the slot's bottom edge, everything else left as background.
-Slot 3 (house_b), 384x384 px = 3x3 tiles: a second small house, timbers showing in the plaster, the roof a shade darker. Standing on the slot's bottom edge, everything else left as background.
+Slot 1 (guild_hall), 1024x768 px = 8x6 tiles: the long hall of the carriers' guild, stone to the first floor and timber above, a wide double door at the middle of the south face and a bell cote at the east end. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 2 (house_a), 384x384 px = 3x3 tiles: a small valley house, plastered walls on a stone footing, red pantile roof, one door and one shuttered window on the south face. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 3 (house_b), 384x384 px = 3x3 tiles: a second small house, timbers showing in the plaster, the roof a shade darker. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
 Slot 4 (fence_ew), 128x128 px = 1x1 tile: three rails of a split fence running east and west, posts at both ends. Standing on the slot's bottom edge, everything else left as background.
 Slot 5 (fence_ns), 128x128 px = 1x1 tile: the same split fence running north and south, seen along its length. Standing on the slot's bottom edge, everything else left as background.
 Slot 6 (fence_corner), 128x128 px = 1x1 tile: the corner post of a split fence with a stub of rail each way. Standing on the slot's bottom edge, everything else left as background.

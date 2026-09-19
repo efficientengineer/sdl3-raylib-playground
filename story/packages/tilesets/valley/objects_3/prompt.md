@@ -10,7 +10,7 @@ This sheet carries 10 of the tileset's entries: `grain_shed`, `house_d`, `hut`, 
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/tilesets/valley/objects_3/template.png`
-2. `story/refs/style.png`
+2. `story/sheets/tests/clean_style_test_v1.png`
 3. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
@@ -20,11 +20,11 @@ Create ONE image: the attached template with all 10 numbered slots filled in. Ca
 
 PIXEL GRID — THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at 4x. Every art pixel is a 4x4 block of identical colour, aligned to the slot: the blocks start at the slot's top-left inside corner and run in an even grid across and down it, so a 128-pixel slot is a 32x32 pixel-art tile blown up 4 times. No block is half a colour, no edge falls between blocks, no detail is finer than one block, and no two objects on the sheet use different block sizes. This is pixel art at 4x, not a smooth drawing shrunk down.
 
-16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.
+Top-down JRPG field art in the clean 16-bit manner: flat luminous fields of colour, big simple shapes, soft painted edges, sparse deliberate detail. Every shadow is a single cool blue-violet tone, never a gradient and never grey.
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
-Image 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
+Image 2: STYLE reference. STYLE reference — this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.
 Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
@@ -49,14 +49,14 @@ PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for e
 SLOTS — 10 of them, grouped by kind:
 
 STAMPS (objects):
-Slot 1 (grain_shed), 512x384 px = 4x3 tiles: a grain store on stone staddles, the boards tight, one small hatch high in the wall. Standing on the slot's bottom edge, everything else left as background.
-Slot 2 (house_d), 512x384 px = 4x3 tiles: a house with an outside stair to an upper door and washing lines at the side. Standing on the slot's bottom edge, everything else left as background.
-Slot 3 (hut), 384x384 px = 3x3 tiles: the smallest house in the town, one room, turf growing on the roof edge. Standing on the slot's bottom edge, everything else left as background.
-Slot 4 (tree), 256x384 px = 2x3 tiles: a broad valley tree, dense crown seen from above and slightly in front, one trunk at the foot. Standing on the slot's bottom edge, everything else left as background.
-Slot 5 (tree_2), 256x384 px = 2x3 tiles: a second tree, narrower and darker than the first, so two together do not read as a pair. Standing on the slot's bottom edge, everything else left as background.
-Slot 6 (tree_bare), 256x384 px = 2x3 tiles: a dead tree, bare limbs, the bark off one side. Standing on the slot's bottom edge, everything else left as background.
-Slot 7 (orchard_tree), 256x384 px = 2x3 tiles: a low pruned fruit tree on a short trunk, the crown kept round. Standing on the slot's bottom edge, everything else left as background.
-Slot 8 (well), 256x256 px = 2x2 tiles: the capped village well, stone ring, two posts and a small roof, a new rope on the windlass. Standing on the slot's bottom edge, everything else left as background.
+Slot 1 (grain_shed), 512x384 px = 4x3 tiles: a grain store on stone staddles, the boards tight, one small hatch high in the wall. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 2 (house_d), 512x384 px = 4x3 tiles: a house with an outside stair to an upper door and washing lines at the side. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 3 (hut), 384x384 px = 3x3 tiles: the smallest house in the town, one room, turf growing on the roof edge. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 4 (tree), 256x384 px = 2x3 tiles: a broad valley tree, dense crown seen from above and slightly in front, one trunk at the foot. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 5 (tree_2), 256x384 px = 2x3 tiles: a second tree, narrower and darker than the first, so two together do not read as a pair. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 6 (tree_bare), 256x384 px = 2x3 tiles: a dead tree, bare limbs, the bark off one side. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 7 (orchard_tree), 256x384 px = 2x3 tiles: a low pruned fruit tree on a short trunk, the crown kept round. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 8 (well), 256x256 px = 2x2 tiles: the capped village well, stone ring, two posts and a small roof, a new rope on the windlass. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
 Slot 9 (hedge), 128x128 px = 1x1 tile: a thick clipped field hedge, dark and uneven along the top. Standing on the slot's bottom edge, everything else left as background.
 Slot 10 (practice_post), 128x128 px = 1x1 tile: a shoulder-high post driven into a yard and split down one side from use. Standing on the slot's bottom edge, everything else left as background.
 

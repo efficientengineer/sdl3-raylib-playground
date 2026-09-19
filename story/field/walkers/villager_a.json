@@ -1,0 +1,23 @@
+{
+  "id": "villager_a",
+  "rows": [
+    "S",
+    "side",
+    "N"
+  ],
+  "cols": [
+    "stand",
+    "step-A",
+    "step-B"
+  ],
+  "frame": [
+    128,
+    192
+  ],
+  "sheet": [
+    384,
+    576
+  ],
+  "mirror_side": true,
+  "note": "row 'side' is drawn facing WEST and MIRRORED for east. A sheet with rows S, W, E, N is a character whose design is not symmetric and is never mirrored."
+}

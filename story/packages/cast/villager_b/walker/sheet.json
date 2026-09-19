@@ -17,6 +17,7 @@
     {
       "n": 1,
       "id": "villager_b_s1",
+      "who": "villager_b",
       "row": 0,
       "col": 0,
       "facing": "S",
@@ -34,14 +35,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 2,
       "id": "villager_b_s2",
+      "who": "villager_b",
       "row": 0,
       "col": 1,
       "facing": "S",
@@ -59,14 +61,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 3,
       "id": "villager_b_s3",
+      "who": "villager_b",
       "row": 0,
       "col": 2,
       "facing": "S",
@@ -84,14 +87,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 4,
       "id": "villager_b_s4",
+      "who": "villager_b",
       "row": 0,
       "col": 3,
       "facing": "S",
@@ -109,14 +113,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 5,
       "id": "villager_b_w1",
+      "who": "villager_b",
       "row": 1,
       "col": 0,
       "facing": "W",
@@ -134,14 +139,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 6,
       "id": "villager_b_w2",
+      "who": "villager_b",
       "row": 1,
       "col": 1,
       "facing": "W",
@@ -159,14 +165,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 7,
       "id": "villager_b_w3",
+      "who": "villager_b",
       "row": 1,
       "col": 2,
       "facing": "W",
@@ -184,14 +191,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 8,
       "id": "villager_b_w4",
+      "who": "villager_b",
       "row": 1,
       "col": 3,
       "facing": "W",
@@ -209,14 +217,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 9,
       "id": "villager_b_e1",
+      "who": "villager_b",
       "row": 2,
       "col": 0,
       "facing": "E",
@@ -234,14 +243,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 10,
       "id": "villager_b_e2",
+      "who": "villager_b",
       "row": 2,
       "col": 1,
       "facing": "E",
@@ -259,14 +269,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 11,
       "id": "villager_b_e3",
+      "who": "villager_b",
       "row": 2,
       "col": 2,
       "facing": "E",
@@ -284,14 +295,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 12,
       "id": "villager_b_e4",
+      "who": "villager_b",
       "row": 2,
       "col": 3,
       "facing": "E",
@@ -309,14 +321,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 13,
       "id": "villager_b_n1",
+      "who": "villager_b",
       "row": 3,
       "col": 0,
       "facing": "N",
@@ -334,14 +347,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 14,
       "id": "villager_b_n2",
+      "who": "villager_b",
       "row": 3,
       "col": 1,
       "facing": "N",
@@ -359,14 +373,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 15,
       "id": "villager_b_n3",
+      "who": "villager_b",
       "row": 3,
       "col": 2,
       "facing": "N",
@@ -384,14 +399,15 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     },
     {
       "n": 16,
       "id": "villager_b_n4",
+      "who": "villager_b",
       "row": 3,
       "col": 3,
       "facing": "N",
@@ -409,11 +425,23 @@
         282
       ],
       "target": [
-        32,
-        48
+        128,
+        192
       ],
       "out": "story/field/walkers/villager_b.png"
     }
   ],
-  "prompt": "Create ONE image: the attached template with all 16 numbered slots filled in. Canvas: portrait, 1024x1536, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.\nImage 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THIS IS: a walking sprite sheet for villager_b in a 2.5D field map, 16 frames of one character, cut out against the flat magenta. The magenta is empty space, not a backdrop: it runs right up to the figure on every side. No ground, no shadow, no scenery, no props that are not part of the costume.\n\nTHE GRID, four rows of four frames, read left to right, top to bottom:\nRow 1 (slots 1-4), facing S: the character walks toward the camera, seen from the front.\nRow 2 (slots 5-8), facing W: walks to the viewer's left, seen in side view from their right side.\nRow 3 (slots 9-12), facing E: walks to the viewer's right, seen in side view from their left side. This is row 2 mirrored, and the costume details stay on the correct side of the body.\nRow 4 (slots 13-16), facing N: walks away from the camera, seen from behind.\n\nTHE COLUMNS, the same four poses in every row: column 1 standing still with both feet together; column 2 mid-stride with the left leg forward and the right arm forward; column 3 the same standing pose as column 1, identical to it; column 4 mid-stride with the right leg forward and the left arm forward. Frames 1 and 3 must match each other exactly, because the game plays them as 1, 2, 3, 4 in a loop.\n\nFRAMING, the same in all 16 frames: the character is drawn at the same size, upright and centred left to right, with the feet on the bottom edge of the frame and a small gap of magenta above the head. The head does not move up or down between frames, so the sheet does not bob when it is played. Each frame is 186x282 pixels here and is squeezed down to 32x48 in game, so keep the pixels large, the silhouette clear and the face simple: a few pixels of eye, no fine detail.\n\nCHARACTER: a broad older man in a rust-red coat with the sleeves rolled past the elbow, cropped grey hair, a grain sack over one shoulder\n\nCHARACTER DESIGN: 1990s Japanese anime and manga character design, like the cast of a 1993 sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes with simple highlights, small noses and pointed chins, big layered spiky hair with hard-edged shine bands, slim necks, clean readable silhouettes. Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes, oversized shoulder plates, headbands, sashes. Simple clean shapes and large flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones per color, no gradients.\n\nRENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, drawn from the color palette attached last. Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise \u2014 shading is 2-3 flat steps of one color, and a large flat area is broken up by drawn detail or it stays flat. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing, cloth, roofs and water.\n\nAVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or shadow under the feet, a different size or costume between frames, the head bobbing between frames, a background inside a frame, a soft blurred or glowing edge where the figure meets the magenta, changing the size of the image"
+  "prompt": "Create ONE image: the attached template with all 9 numbered slots filled in. Canvas: portrait, 1024x1536, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. STYLE reference \u2014 this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.\nImage 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THIS IS: walking sprite sheets for villager_b in a top-down field map, cut out against the flat magenta. The magenta is empty space, not a backdrop: it runs right up to the figure on every side. No ground, no shadow, no scenery, no props that are not part of the costume.\n\nSLOTS 1-9 ARE VILLAGER_B. a broad older man in a rust-red coat with the sleeves rolled past the elbow, cropped grey hair, a grain sack over one shoulder\n  Slots 1-3, facing S: walks toward the camera, seen from the front.\n  Slots 4-6, facing side: walks to the viewer's LEFT, seen in full side view from their right side. There is only one side row: the game mirrors it for the other direction, so draw the character so that mirroring it would still be right \u2014 nothing that belongs on one particular side of the body.\n  Slots 7-9, facing N: walks away from the camera, seen from behind.\n\nTHE THREE COLUMNS, the same in every row: column 1 is standing still with both feet together and arms at rest; column 2 is mid-stride with the LEFT leg forward and the right arm forward; column 3 is mid-stride with the RIGHT leg forward and the left arm forward. The game plays them 1, 2, 1, 3 in a loop, so column 1 has to read as the resting pose between the two strides.\n\nFRAMING, the same in every frame on the sheet: the character is drawn at the same size, upright and centred left to right, with the feet on the bottom edge of the frame and a small gap of magenta above the head. The head does not move up or down between frames, so the sheet does not bob when it is played. Each frame is 282x426 pixels here and is stored at 128x192, so keep the pixels large, the silhouette clear and the face simple: a few pixels of eye, no fine detail.\n\nCHARACTER DESIGN: 1990s Japanese anime and manga character design, like the cast of a 1993 sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes with simple highlights, small noses and pointed chins, big layered spiky hair with hard-edged shine bands, slim necks, clean readable silhouettes. Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes, oversized shoulder plates, headbands, sashes. Simple clean shapes and large flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones per color, no gradients.\n\nRENDERING: Flat luminous colour, drawn from the palette image attached last. Big simple shapes read first; detail is sparse and deliberate, placed where it means something and absent everywhere else. Shading is 2 or 3 flat steps of one colour with one light direction from the upper left, and every shadow is a single cool blue-violet tone. Edges are soft-painted, not hard-aliased, and clean: no dithering anywhere, no checkerboard, no stipple, no noise, no gradient, no texture for its own sake. Warm greens and earths against that cool shadow, with saturated accents on roofs, cloth, water and flowers.\n\nAVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or shadow under the feet, a different size or costume between frames, the head bobbing between frames, a background inside a frame, a soft blurred or glowing edge where the figure meets the magenta, changing the size of the image",
+  "who": [
+    {
+      "id": "villager_b",
+      "rows": [
+        "S",
+        "W",
+        "E",
+        "N"
+      ]
+    }
+  ],
+  "legacy": "pre-D20 4x4 sheet; the return in this folder is that layout"
 }

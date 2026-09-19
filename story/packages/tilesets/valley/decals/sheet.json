@@ -1,0 +1,460 @@
+{
+  "template": "decal_valley",
+  "kind": "decal",
+  "canvas": [
+    1536,
+    1024
+  ],
+  "canvas_label": "landscape, 1536x1024",
+  "background": [
+    255,
+    0,
+    255
+  ],
+  "border": 3,
+  "out": null,
+  "slots": [
+    {
+      "n": 1,
+      "id": "clover",
+      "kind": "decal",
+      "box": [
+        52,
+        53,
+        193,
+        193
+      ],
+      "inner": [
+        55,
+        56,
+        187,
+        187
+      ],
+      "target": [
+        64,
+        64
+      ],
+      "out": "story/field/tilesets/valley/decals/clover.png"
+    },
+    {
+      "n": 2,
+      "id": "crack",
+      "kind": "decal",
+      "box": [
+        293,
+        53,
+        193,
+        193
+      ],
+      "inner": [
+        296,
+        56,
+        187,
+        187
+      ],
+      "target": [
+        77,
+        77
+      ],
+      "out": "story/field/tilesets/valley/decals/crack.png"
+    },
+    {
+      "n": 3,
+      "id": "crack_moss",
+      "kind": "decal",
+      "box": [
+        535,
+        53,
+        193,
+        193
+      ],
+      "inner": [
+        538,
+        56,
+        187,
+        187
+      ],
+      "target": [
+        77,
+        77
+      ],
+      "out": "story/field/tilesets/valley/decals/crack_moss.png"
+    },
+    {
+      "n": 4,
+      "id": "daisy_patch",
+      "kind": "decal",
+      "box": [
+        777,
+        53,
+        193,
+        193
+      ],
+      "inner": [
+        780,
+        56,
+        187,
+        187
+      ],
+      "target": [
+        90,
+        90
+      ],
+      "out": "story/field/tilesets/valley/decals/daisy_patch.png"
+    },
+    {
+      "n": 5,
+      "id": "flower_red",
+      "kind": "decal",
+      "box": [
+        1019,
+        53,
+        193,
+        193
+      ],
+      "inner": [
+        1022,
+        56,
+        187,
+        187
+      ],
+      "target": [
+        51,
+        51
+      ],
+      "out": "story/field/tilesets/valley/decals/flower_red.png"
+    },
+    {
+      "n": 6,
+      "id": "flower_white",
+      "kind": "decal",
+      "box": [
+        1261,
+        53,
+        193,
+        193
+      ],
+      "inner": [
+        1264,
+        56,
+        187,
+        187
+      ],
+      "target": [
+        51,
+        51
+      ],
+      "out": "story/field/tilesets/valley/decals/flower_white.png"
+    },
+    {
+      "n": 7,
+      "id": "grass_sprout",
+      "kind": "decal",
+      "box": [
+        52,
+        294,
+        193,
+        193
+      ],
+      "inner": [
+        55,
+        297,
+        187,
+        187
+      ],
+      "target": [
+        45,
+        45
+      ],
+      "out": "story/field/tilesets/valley/decals/grass_sprout.png"
+    },
+    {
+      "n": 8,
+      "id": "leaf_fall",
+      "kind": "decal",
+      "box": [
+        293,
+        294,
+        193,
+        193
+      ],
+      "inner": [
+        296,
+        297,
+        187,
+        187
+      ],
+      "target": [
+        45,
+        45
+      ],
+      "out": "story/field/tilesets/valley/decals/leaf_fall.png"
+    },
+    {
+      "n": 9,
+      "id": "lily_pad",
+      "kind": "decal",
+      "box": [
+        535,
+        294,
+        193,
+        193
+      ],
+      "inner": [
+        538,
+        297,
+        187,
+        187
+      ],
+      "target": [
+        64,
+        64
+      ],
+      "out": "story/field/tilesets/valley/decals/lily_pad.png"
+    },
+    {
+      "n": 10,
+      "id": "mushroom",
+      "kind": "decal",
+      "box": [
+        777,
+        294,
+        193,
+        193
+      ],
+      "inner": [
+        780,
+        297,
+        187,
+        187
+      ],
+      "target": [
+        38,
+        38
+      ],
+      "out": "story/field/tilesets/valley/decals/mushroom.png"
+    },
+    {
+      "n": 11,
+      "id": "mushroom_pair",
+      "kind": "decal",
+      "box": [
+        1019,
+        294,
+        193,
+        193
+      ],
+      "inner": [
+        1022,
+        297,
+        187,
+        187
+      ],
+      "target": [
+        58,
+        58
+      ],
+      "out": "story/field/tilesets/valley/decals/mushroom_pair.png"
+    },
+    {
+      "n": 12,
+      "id": "pebble",
+      "kind": "decal",
+      "box": [
+        1261,
+        294,
+        193,
+        193
+      ],
+      "inner": [
+        1264,
+        297,
+        187,
+        187
+      ],
+      "target": [
+        45,
+        45
+      ],
+      "out": "story/field/tilesets/valley/decals/pebble.png"
+    },
+    {
+      "n": 13,
+      "id": "pebbles",
+      "kind": "decal",
+      "box": [
+        52,
+        536,
+        193,
+        193
+      ],
+      "inner": [
+        55,
+        539,
+        187,
+        187
+      ],
+      "target": [
+        77,
+        77
+      ],
+      "out": "story/field/tilesets/valley/decals/pebbles.png"
+    },
+    {
+      "n": 14,
+      "id": "reed",
+      "kind": "decal",
+      "box": [
+        293,
+        536,
+        193,
+        193
+      ],
+      "inner": [
+        296,
+        539,
+        187,
+        187
+      ],
+      "target": [
+        109,
+        109
+      ],
+      "out": "story/field/tilesets/valley/decals/reed.png"
+    },
+    {
+      "n": 15,
+      "id": "reed_clump",
+      "kind": "decal",
+      "box": [
+        535,
+        536,
+        193,
+        193
+      ],
+      "inner": [
+        538,
+        539,
+        187,
+        187
+      ],
+      "target": [
+        128,
+        128
+      ],
+      "out": "story/field/tilesets/valley/decals/reed_clump.png"
+    },
+    {
+      "n": 16,
+      "id": "stone_flat",
+      "kind": "decal",
+      "box": [
+        777,
+        536,
+        193,
+        193
+      ],
+      "inner": [
+        780,
+        539,
+        187,
+        187
+      ],
+      "target": [
+        90,
+        90
+      ],
+      "out": "story/field/tilesets/valley/decals/stone_flat.png"
+    },
+    {
+      "n": 17,
+      "id": "straw",
+      "kind": "decal",
+      "box": [
+        1019,
+        536,
+        193,
+        193
+      ],
+      "inner": [
+        1022,
+        539,
+        187,
+        187
+      ],
+      "target": [
+        70,
+        70
+      ],
+      "out": "story/field/tilesets/valley/decals/straw.png"
+    },
+    {
+      "n": 18,
+      "id": "tuft",
+      "kind": "decal",
+      "box": [
+        1261,
+        536,
+        193,
+        193
+      ],
+      "inner": [
+        1264,
+        539,
+        187,
+        187
+      ],
+      "target": [
+        70,
+        70
+      ],
+      "out": "story/field/tilesets/valley/decals/tuft.png"
+    },
+    {
+      "n": 19,
+      "id": "tuft_tall",
+      "kind": "decal",
+      "box": [
+        52,
+        778,
+        193,
+        193
+      ],
+      "inner": [
+        55,
+        781,
+        187,
+        187
+      ],
+      "target": [
+        102,
+        102
+      ],
+      "out": "story/field/tilesets/valley/decals/tuft_tall.png"
+    },
+    {
+      "n": 20,
+      "id": "twig",
+      "kind": "decal",
+      "box": [
+        293,
+        778,
+        193,
+        193
+      ],
+      "inner": [
+        296,
+        781,
+        187,
+        187
+      ],
+      "target": [
+        77,
+        77
+      ],
+      "out": "story/field/tilesets/valley/decals/twig.png"
+    }
+  ],
+  "prompt": "Create ONE image: the attached template with all 20 numbered slots filled in. Canvas: landscape, 1536x1024, exactly the same size and proportions as the template.\n\nTop-down JRPG field art in the clean 16-bit manner: flat luminous fields of colour, big simple shapes, soft painted edges, sparse deliberate detail. Every shadow is a single cool blue-violet tone, never a gradient and never grey.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. STYLE reference \u2014 this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.\nImage 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THESE ARE: small loose objects that the game scatters over its ground by the hundred \u2014 a tuft of grass here, three pebbles there. Each slot holds ONE object, drawn against the flat magenta and NOTHING else. The magenta is empty space, not a backdrop: it comes right up to the object on every side, and the edge where they meet is hard, not soft, blurred or glowing. There is NO ground under the object \u2014 no patch of grass, no earth, no stone, no dirt, no shadow, no base, no plate, no circle of darker colour. An object that is drawn standing on something is unusable, because the game puts it on a hundred different grounds. Each object fills most of its slot, seen from straight above as the ground is, with the same light from the upper left across the whole sheet.\n\nSLOTS:\nSlot 1 (clover), on grass, 187x187 px in the template: a small low patch of round clover leaves\nSlot 2 (crack), on paving, dirt, 187x187 px in the template: a thin dark crack running across the ground, branching once\nSlot 3 (crack_moss), on paving, 187x187 px in the template: a crack in laid stone with a thin line of moss grown along it\nSlot 4 (daisy_patch), on grass, 187x187 px in the template: a loose scatter of seven or eight tiny white daisies\nSlot 5 (flower_red), on grass, grass_dry, 187x187 px in the template: two small deep red field flowers on thin stems\nSlot 6 (flower_white), on grass, 187x187 px in the template: three or four small pale field flowers on thin stems\nSlot 7 (grass_sprout), on paving, dirt, gravel, 187x187 px in the template: a few blades of grass pushing up through a joint\nSlot 8 (leaf_fall), on grass, grass_dry, dirt, paving, 187x187 px in the template: two fallen leaves lying flat, dry and curled at one edge\nSlot 9 (lily_pad), on water, 187x187 px in the template: two flat round lily pads, one notched\nSlot 10 (mushroom), on grass, mud, 187x187 px in the template: one small pale mushroom with a domed cap\nSlot 11 (mushroom_pair), on grass, mud, 187x187 px in the template: two small pale mushrooms of different heights, close together\nSlot 12 (pebble), on dirt, gravel, mud, 187x187 px in the template: one small rounded grey stone\nSlot 13 (pebbles), on dirt, gravel, water, 187x187 px in the template: three or four small rounded stones lying close together\nSlot 14 (reed), on water, mud, 187x187 px in the template: three tall thin reeds standing straight up, a dark seed head on each\nSlot 15 (reed_clump), on water, mud, 187x187 px in the template: a clump of eight or nine reeds of different heights\nSlot 16 (stone_flat), on grass, dirt, gravel, 187x187 px in the template: one flat weathered stone half sunk into the ground\nSlot 17 (straw), on dirt, gravel, crop, 187x187 px in the template: a small scatter of loose straw stems lying flat, dropped from a cart\nSlot 18 (tuft), on grass, grass_dry, 187x187 px in the template: a standing tuft of longer grass, three or four blades leaning one way\nSlot 19 (tuft_tall), on grass, grass_dry, 187x187 px in the template: a taller clump of coarse grass, a hand's height, leaning one way\nSlot 20 (twig), on grass, dirt, gravel, 187x187 px in the template: a short bare twig lying flat with one fork in it\n\nRENDERING: Flat luminous colour, drawn from the palette image attached last. Big simple shapes read first; detail is sparse and deliberate, placed where it means something and absent everywhere else. Shading is 2 or 3 flat steps of one colour with one light direction from the upper left, and every shadow is a single cool blue-violet tone. Edges are soft-painted, not hard-aliased, and clean: no dithering anywhere, no checkerboard, no stipple, no noise, no gradient, no texture for its own sake. Warm greens and earths against that cool shadow, with saturated accents on roofs, cloth, water and flowers.\n\nAVOID: perspective, vanishing point, horizon, sky, isometric view, three-quarter view, side view, things shrinking with distance, smooth gradients, anti-aliasing, blur, soft shading, dithering, checkerboard texture, stippling, painterly, 3D render, photorealistic, high resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout, buildings in rows, repeated spacing, people, characters, animals, text, letters, numbers, labels, captions, watermark, signature, user interface, map legend, compass, frame, border, vignette, letterboxing, ground or a patch of earth under an object, a shadow, a base plate, a frame, a soft blurred or glowing edge against the magenta, two objects in one slot, drawing outside a slot, moving or covering a slot number, changing the size of the image",
+  "set": "valley"
+}

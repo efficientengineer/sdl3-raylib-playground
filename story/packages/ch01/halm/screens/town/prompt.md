@@ -33,7 +33,7 @@ Style blocks used from `story/STYLE.md`: map_header, map_rendering, map_negative
 ````
 Paint one complete top-down map for a 16-bit JRPG: the whole place the player walks around in, as one finished picture. This is a field map, not a comic page and not a scene — no panels, no borders, no frame, one single image filling the canvas edge to edge.
 
-16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.
+Top-down JRPG field art in the clean 16-bit manner: flat luminous fields of colour, big simple shapes, soft painted edges, sparse deliberate detail. Every shadow is a single cool blue-violet tone, never a gradient and never grey.
 
 THE PROJECTION, and it is the most important instruction here: the classic top-down oblique those games are drawn in. The ground is seen from straight above, flat, as if the map were laid on a table. Buildings and objects show their roof and their front — their south — face only, and every vertical edge runs straight up the screen. There is NO perspective, NO vanishing point, NO horizon and no sky. Nothing gets smaller further up the picture: one uniform scale from edge to edge, the same size at the top as at the bottom. Nothing leans, nothing is foreshortened, no side or three-quarter faces on anything.
 

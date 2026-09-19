@@ -20,7 +20,10 @@
   the numbered slots, and cutting needs no border detection because the boxes are in the package JSON.
   ./story_prompt.py tiles  grass dirt water    story/out/tiles_....template.png + .chatgpt.md + .sheet.json
   ./story_prompt.py props  well cart sign      slots sized by each prop's footprint in map cells
-  ./story_prompt.py walker Bron                the 4x4 walk grid (rows S W E N), the ref sheet attached
+  ./story_prompt.py walker Bron [more names]   the 9-frame walk sheet (rows S, side, N; columns stand,
+                                               step-A, step-B) at 128x192; up to 3 characters a sheet
+  ./story_prompt.py walker compact [<id>...]   an old 16-frame sheet -> the 9-frame one, and the dE
+                                               between its E row and a mirror of its W row
   ./story_prompt.py building house_a           three slots a building: the front wall, a wall sample, a
                                                roof sample -> story/field/buildings/<id>_{front,side,roof}.png
   ./story_prompt.py screen halm square         (parked, see the tile field below) ChatGPT paints a map screen
@@ -29,7 +32,10 @@
                                                story/field/screens/<map>_<zone>.screen for the engine
   ./story_prompt.py view   halm square         paint the engine's block-out of one camera zone (the older path):
                                                story/field/views/<map>_<zone>.png -> ..._paint.png
-  Tile field (TILES.md, D18) — THE FIELD: 32x32 tiles, an atlas, grid walking.
+  Tile field (TILES.md, D18/D20) — THE FIELD: 32x32 tiles, an atlas, grid walking. Under TILES2 a
+  terrain is one seamless SWATCH and its edges are GENERATED 1-bit masks, not art; a DECAL is a
+  cut-out the game hash-scatters over the ground. `tileset` writes masks.png and the swatch, decal
+  and stamp packages; `tmap preview` renders a map that way on the Mac.
   ./story_prompt.py tileset valley             read story/field/tilesets/valley/tiles.md, assign any missing
                                                atlas index, and write one template sheet package per sheet
                                                under story/packages/tilesets/valley/<sheet>/ (slots at 4x:
@@ -138,6 +144,9 @@ SHEET_MAX_PANELS = 8
 SHAPE_ASPECT = {"wide": 2.0, "tall": 0.5, "square": 1.0, "slit": 4.0}   # width / height
 SCENE_KINDS = ("panels", "narration", "talk")  # order = CsKind enum in the game
 PORTRAIT_TRIM = 0.022         # fraction of the panel's short side shaved off, to lose the white border
+PORTRAIT_H = 288              # a portrait ships this tall, aspect kept (tools/sizes/REPORT.md: the
+                              # dialogue box draws it about 206 px tall on the phone and 275 at
+                              # 1440p, so a ~850-px source was four times the size it is ever shown)
 ROW_CAPACITY = 4.0            # max summed aspect per row
 ROW_MIN_ASPECT = 2.0          # a lone small panel does not get a giant row
 BLACK_MAX = 40                # a pixel is background if max(r,g,b) <= this
@@ -1431,8 +1440,17 @@ def portrait_from_ref(key, c):
     x0, y0, x1, y1 = x0 + t, y0 + t, x1 - t, y1 - t
     PORTRAITS.mkdir(exist_ok=True)
     out = PORTRAITS / f"{key}.png"
-    ship_png(out, x1 - x0, y1 - y0, ch, [rows[y][x0 * ch:x1 * ch] for y in range(y0, y1)])
-    return True, f"wrote {out.relative_to(ROOT.parent)}  {x1-x0}x{y1-y0}  (ships as portrait_{key}.png)"
+    cw, chh = x1 - x0, y1 - y0
+    px = [rows[y][x0 * ch:x1 * ch] for y in range(y0, y1)]
+    nw, nh = cw, chh
+    if chh > PORTRAIT_H:                      # area-average down to the size it is actually drawn at
+        nh = PORTRAIT_H
+        nw = max(1, round(cw * PORTRAIT_H / chh))
+        px = resample(px, cw, chh, ch, nw, nh)
+    ship_png(out, nw, nh, ch, px)
+    return True, (f"wrote {out.relative_to(ROOT.parent)}  {nw}x{nh}"
+                  + (f"  (from {cw}x{chh})" if (nw, nh) != (cw, chh) else "")
+                  + f"  (ships as portrait_{key}.png)")
 
 
 def cmd_portraits(args):
@@ -1849,12 +1867,24 @@ ATLAS_CELL = 128                      # ...but the atlas keeps the art at the 4x
                                       # more. --snap32 still writes the old 32-px atlas beside it.
 EXTRUDE_PX = 2                        # opaque colour bled outward under the transparent edge, so
                                       # linear filtering never pulls black or magenta into a sprite
-WALK_W, WALK_H = 32, 48               # one walker frame as designed (the sheet's 4x4 grid)
-WALK_OUT_W, WALK_OUT_H = 256, 384     # ...and as cut: the art is kept, not reduced to the design
-WALK_FOOT = 8                         # the lowest opaque row sits this far above the frame's bottom
-WALK_FACINGS = ("S", "W", "E", "N")   # row order
-WALK_STEPS = ("stand", "step-left", "stand", "step-right")   # column order
+WALK_W, WALK_H = 32, 48               # one walker frame in LOGICAL px (one tile wide, 1.5 tall)
+WALK_OUT_W, WALK_OUT_H = 128, 192     # ...and as stored: 4x logical, which the size study
+                                      # (tools/sizes/REPORT.md) measured as exactly the phone's
+                                      # display size at 1440p. 256x384 was twice that in each axis.
+WALK_FOOT = 4                         # the lowest opaque row sits this far above the frame's bottom
+# The 9-frame layout (owner, 2026-09-19): rows S, side, N x columns stand, step-A, step-B. The engine
+# MIRRORS the side row for the other direction, so 16 frames became 9 and the four duplicate stand
+# frames went away. A character whose design is not symmetric (a sword on one hip, an eyepatch) takes
+# `- asymmetric: yes` in characters.md and keeps both side rows: 12 frames, 4 rows.
+WALK_ROWS = ("S", "side", "N")
+WALK_ROWS_ASYM = ("S", "W", "E", "N")
+WALK_STEPS = ("stand", "step-A", "step-B")                   # column order
+WALK_FACINGS = ("S", "W", "E", "N")   # the old 4x4 row order, still read by `walker compact`
+WALK_OLD_STEPS = ("stand", "step-left", "stand", "step-right")
 WALK_MIN_SCALE = 4                    # frames drawn at least 4x up so ChatGPT has pixels to work with
+WALK_MAX_PER_SHEET = 3                # characters on one walk sheet. The frames would fit six, but
+                                      # each needs its reference sheet attached and past three
+                                      # attachments ChatGPT starts blending the designs.
 TILE_KINDS = ("ground", "wall")
 
 MAGENTA, BLACK, WHITE = (255, 0, 255), (0, 0, 0), (255, 255, 255)
@@ -2054,25 +2084,6 @@ def layout_cells(sizes, ids):
     return best
 
 
-def layout_walker():
-    """The 4x4 frame grid: the largest whole-number upscale of a 32x48 frame that fits a canvas."""
-    gutter = SLOT_GUTTER
-    best = None
-    for W, H, label in TEMPLATE_CANVASES:
-        s = min((W - 2 * SLOT_MARGIN - 3 * gutter) // (4 * WALK_W),
-                (H - 2 * SLOT_MARGIN - 3 * gutter) // (4 * WALK_H))
-        if s >= WALK_MIN_SCALE and (best is None or s > best[3]):
-            best = (W, H, label, s)
-    if best is None:
-        die(f"a 4x4 grid of {WALK_W}x{WALK_H} frames at {WALK_MIN_SCALE}x does not fit any template canvas")
-    W, H, label, s = best
-    fw, fh = WALK_W * s, WALK_H * s
-    gw, gh = 4 * fw + 3 * gutter, 4 * fh + 3 * gutter
-    ox, oy = (W - gw) // 2, (H - gh) // 2
-    boxes = [(ox + c * (fw + gutter), oy + r * (fh + gutter), fw, fh) for r in range(4) for c in range(4)]
-    return W, H, label, s, boxes
-
-
 def inner_box(box):
     x, y, w, h = box
     t = SLOT_BORDER
@@ -2095,10 +2106,12 @@ def field_attachments(style, template, ref, warn):
     """[(path, note)] in attach order: the template, the style reference, then a character sheet."""
     out = [(template, "TEMPLATE. Redraw this exact image with every numbered slot filled in and "
                       "everything else left untouched. It is the canvas, not a reference.")]
-    sp = existing(style["refs"].get("style"))
+    # The field's style reference is OUR OWN approved test sheet, not the third-party screenshot the
+    # cutscene path uses: the owner picked that look (flat luminous colour, big simple shapes, soft
+    # painted edges, sparse detail, cool blue-violet shadows) off a sheet we generated, so the safest
+    # thing to hand the generator is the sheet it already agreed to.
+    sp = existing(style["refs"].get("style_map")) or existing(style["refs"].get("style"))
     if sp:
-        # Field art has its own note (`style_note_map`): the cutscene one asks the generator to copy
-        # the reference's dithering, and D19's conversion is flat-tone, no dither, one palette.
         out.append((sp, "STYLE reference. " + (style["refs"].get("style_note_map")
                                                or style["refs"].get("style_note", ""))))
     else:
@@ -2311,100 +2324,202 @@ def cmd_props(args):
     report_field(kind_rows("prop", slots, package_label(name)), warn, md, template, f"{len(ids)} props, {label}")
 
 
-def cmd_walker(args):
-    names = [a for a in args if not a.startswith("--")]
-    if len(names) != 1:
-        die("usage: walker <Name>   (a character from characters.md, or an id from story/field/walkers.md)")
-    style, cast, warn = load_style(), load_cast(), []
-    written = names[0]
-    ident = re.sub(r"[^a-z0-9_]", "", written.lower())
-    handle = resolve_name(written, cast)
-    ref = None
-    if handle:
-        c = cast[handle]
-        look, who = c["look"], c["name"]
-        rp = existing(c.get("ref"))
-        if not rp:
-            die(f"{c['name']} has no reference sheet at {c.get('ref')}, so a walk sheet would not match the "
-                f"portrait. Generate it first: ./story_prompt.py refsheet {c['name']}")
-        ref = (rp, f"CHARACTER reference for {c['name']}. The walker is this character: keep the face, hair, "
-                   f"outfit, and colors identical to this image in every frame. Use it for the design only; "
-                   f"ignore its background and its three-panel layout.")
-    else:
-        others = field_entries(FIELD_DOCS["walker"], "walker")
-        if ident not in others:
-            die(f"'{written}' is neither a name in characters.md (a handle or an '- alias:') nor an id in "
-                f"story/field/walkers.md. A story name that has moved on (see story/v3/NAMES.md) belongs on "
-                f"an '- alias:' line of its existing entry, not on a renamed heading; a one-off NPC belongs "
-                f"in story/field/walkers.md.")
-        look, who = field_look(others[ident], ident, "story/field/walkers.md"), ident
-        if not look:
-            die(f"story/field/walkers.md: '## {ident}' has no '- look:' line")
-        check_description(look, ident, "story/field/walkers.md")
-        warn.append(f"{ident} has no reference sheet; the look line carries the design alone")
+def layout_walker(blocks):
+    """The frame grid for `blocks` = [rows per character]. Three columns a character, side by side.
 
-    W, H, label, s, boxes = layout_walker()
-    slots = []
-    for n, box in enumerate(boxes, 1):
-        r, c_ = (n - 1) // 4, (n - 1) % 4
-        slots.append({"n": n, "id": f"{ident}_{WALK_FACINGS[r].lower()}{c_ + 1}", "row": r, "col": c_,
-                      "facing": WALK_FACINGS[r], "step": WALK_STEPS[c_], "box": list(box),
-                      "inner": list(inner_box(box)), "target": [WALK_W, WALK_H],
-                      "out": str((FIELD_DIRS["walker"] / f"{ident}.png").relative_to(ROOT.parent))})
-    name = f"walker_{ident}"
+    Nine frames instead of sixteen (owner, 2026-09-19) and a frame stored at 128x192 instead of
+    256x384 (tools/sizes/REPORT.md) means a walk sheet is 384x576 — small enough that several
+    characters fit one generation. They are laid out SIDE BY SIDE, each character its own block of
+    three columns, because stacking them runs out of canvas height at two."""
+    gutter, gap = 20, 40                  # across; the numbers sit in the gap ABOVE a slot, so the
+    gy = DIGIT_SCALE * 5 + DIGIT_GAP      # vertical gutter has to clear a digit's height
+    cols_total = 3 * len(blocks)
+    rows_max = max(blocks)
+    best = None
+    for W, H, label in TEMPLATE_CANVASES:
+        sw = ((W - 2 * SLOT_MARGIN - (cols_total - len(blocks)) * gutter - (len(blocks) - 1) * gap)
+              // (cols_total * WALK_W))
+        sh = (H - 2 * SLOT_MARGIN - (rows_max - 1) * gy) // (rows_max * WALK_H)
+        s = min(sw, sh)
+        if s >= WALK_MIN_SCALE and (best is None or s > best[3]):
+            best = (W, H, label, s)
+    if best is None:
+        die(f"{len(blocks)} character(s) of up to {rows_max} rows x 3 frames at {WALK_MIN_SCALE}x do "
+            f"not fit any template canvas. Ask for fewer characters on one sheet.")
+    W, H, label, s = best
+    fw, fh = WALK_W * s, WALK_H * s
+    gw = cols_total * fw + (cols_total - len(blocks)) * gutter + (len(blocks) - 1) * gap
+    gh = rows_max * fh + (rows_max - 1) * gy
+    ox, oy = (W - gw) // 2, (H - gh) // 2
+    boxes, x = [], ox
+    for n in blocks:
+        for r in range(n):
+            for c in range(3):
+                boxes.append((x + c * (fw + gutter), oy + r * (fh + gy), fw, fh))
+        x += 3 * fw + 2 * gutter + gap
+    # the slots of one character are numbered down its own block, which is the order cmd_walker
+    # builds them in: rows outer, columns inner.
+    return W, H, label, s, boxes
+
+
+def walker_ident(written):
+    return re.sub(r"[^a-z0-9_]", "", written.lower())
+
+
+def walker_meta_path(ident):
+    return FIELD_DIRS["walker"] / f"{ident}.json"
+
+
+def write_walker_meta(ident, rows, cols=None):
+    """The sheet's own layout, beside the sheet. The engine reads this, not a hard-coded 4."""
+    p = walker_meta_path(ident)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({
+        "id": ident, "rows": list(rows), "cols": list(cols or WALK_STEPS),
+        "frame": [WALK_OUT_W, WALK_OUT_H],
+        "sheet": [WALK_OUT_W * len(cols or WALK_STEPS), WALK_OUT_H * len(rows)],
+        "mirror_side": "side" in rows,
+        "note": "row 'side' is drawn facing WEST and MIRRORED for east. A sheet with rows "
+                "S, W, E, N is a character whose design is not symmetric and is never mirrored.",
+    }, indent=2) + "\n")
+    return p
+
+
+def cmd_walker(args):
+    if args and args[0] == "compact":
+        return cmd_walker_compact(args[1:])
+    names = [a for a in args if not a.startswith("--")]
+    if not names:
+        die("usage: walker <Name> [<Name> ...]   (characters from characters.md, or ids from "
+            "story/field/walkers.md)\n       walker compact <name> [...]   (an old 4x4 sheet -> 9 frames)")
+    if len(names) > WALK_MAX_PER_SHEET:
+        die(f"{len(names)} characters on one sheet. The cap is {WALK_MAX_PER_SHEET}: each one needs "
+            f"its reference sheet attached, and past three attachments ChatGPT starts blending the "
+            f"designs. Split them into two packages.")
+    style, cast, warn = load_style(), load_cast(), []
+    who = []
+    for written in names:
+        ident = walker_ident(written)
+        handle = resolve_name(written, cast)
+        if handle:
+            c = cast[handle]
+            rp = existing(c.get("ref"))
+            if not rp:
+                die(f"{c['name']} has no reference sheet at {c.get('ref')}, so a walk sheet would not "
+                    f"match the portrait. Generate it first: ./story_prompt.py refsheet {c['name']}")
+            asym = str(c.get("asymmetric", "")).lower().startswith("y")
+            who.append({"ident": ident, "name": c["name"], "look": c["look"],
+                        "ref": (rp, f"CHARACTER reference for {c['name']}. The walker is this "
+                                    f"character: keep the face, hair, outfit and colours identical to "
+                                    f"this image in every frame. Use it for the design only; ignore "
+                                    f"its background and its three-panel layout."),
+                        "rows": WALK_ROWS_ASYM if asym else WALK_ROWS})
+        else:
+            others = field_entries(FIELD_DOCS["walker"], "walker")
+            if ident not in others:
+                die(f"'{written}' is neither a name in characters.md (a handle or an '- alias:') nor "
+                    f"an id in story/field/walkers.md. A story name that has moved on (see "
+                    f"story/v3/NAMES.md) belongs on an '- alias:' line of its existing entry, not on "
+                    f"a renamed heading; a one-off NPC belongs in story/field/walkers.md.")
+            look = field_look(others[ident], ident, "story/field/walkers.md")
+            if not look:
+                die(f"story/field/walkers.md: '## {ident}' has no '- look:' line")
+            check_description(look, ident, "story/field/walkers.md")
+            warn.append(f"{ident} has no reference sheet; the look line carries the design alone")
+            who.append({"ident": ident, "name": ident, "look": look, "ref": None, "rows": WALK_ROWS})
+
+    W, H, label, s, boxes = layout_walker([len(c["rows"]) for c in who])
+    slots, n = [], 0
+    for c in who:
+        for r, facing in enumerate(c["rows"]):
+            for k, step in enumerate(WALK_STEPS):
+                box = boxes[n]
+                n += 1
+                slots.append({"n": n, "id": f"{c['ident']}_{facing.lower()}{k + 1}",
+                              "who": c["ident"], "row": r, "col": k, "facing": facing, "step": step,
+                              "box": list(box), "inner": list(inner_box(box)),
+                              "target": [WALK_OUT_W, WALK_OUT_H],
+                              "out": str((FIELD_DIRS["walker"] / f"{c['ident']}.png")
+                                         .relative_to(ROOT.parent))})
+    name = "walker_" + "_".join(c["ident"] for c in who)
     b = style["blocks"]
-    attach = field_attachments(style, pkg_path(name, "template.png"), ref, warn)
+    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
+    for c in who:                                        # every character's sheet, before the palette
+        if c["ref"]:
+            attach.insert(len(attach) - 1, c["ref"])
     fw, fh = slots[0]["inner"][2], slots[0]["inner"][3]
-    L = [f"Create ONE image: the attached template with all 16 numbered slots filled in. "
+    subject = who[0]["name"] if len(who) == 1 else f"{len(who)} characters"
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
          f"Canvas: {label}, the same size as the template.", b["header"], "",
          "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += [f"Image {i}: {note}" for i, (_, note) in enumerate(attach, 1)]
     L += ["", TEMPLATE_RULES, "",
-          f"WHAT THIS IS: a walking sprite sheet for {who} in a 2.5D field map, 16 frames of one "
-          f"character, cut out against the flat magenta. The magenta is empty space, not a backdrop: it "
-          f"runs right up to the figure on every side. No ground, no shadow, no scenery, no props that "
-          f"are not part of the costume.", "",
-          "THE GRID, four rows of four frames, read left to right, top to bottom:",
-          f"Row 1 (slots 1-4), facing S: the character walks toward the camera, seen from the front.",
-          f"Row 2 (slots 5-8), facing W: walks to the viewer's left, seen in side view from their right side.",
-          f"Row 3 (slots 9-12), facing E: walks to the viewer's right, seen in side view from their left side. "
-          f"This is row 2 mirrored, and the costume details stay on the correct side of the body.",
-          f"Row 4 (slots 13-16), facing N: walks away from the camera, seen from behind.", "",
-          "THE COLUMNS, the same four poses in every row: column 1 standing still with both feet "
-          "together; column 2 mid-stride with the left leg forward and the right arm forward; column 3 "
-          "the same standing pose as column 1, identical to it; column 4 mid-stride with the right leg "
-          "forward and the left arm forward. Frames 1 and 3 must match each other exactly, because the "
-          "game plays them as 1, 2, 3, 4 in a loop.", "",
-          f"FRAMING, the same in all 16 frames: the character is drawn at the same size, upright and "
-          f"centred left to right, with the feet on the bottom edge of the frame and a small gap of "
-          f"magenta above the head. The head does not move up or down between frames, so the sheet does "
-          f"not bob when it is played. Each frame is {fw}x{fh} pixels here and is squeezed down to "
-          f"{WALK_W}x{WALK_H} in game, so keep the pixels large, the silhouette clear and the face simple: "
-          f"a few pixels of eye, no fine detail.", "",
-          f"CHARACTER: {look}", ""]
-    if ref:
-        L += ["The character must match the attached reference sheet exactly: same face, hair, outfit, "
-              "colors and marks, in all sixteen frames.", ""]
+          f"WHAT THIS IS: walking sprite sheets for {subject} in a top-down field map, cut out "
+          f"against the flat magenta. The magenta is empty space, not a backdrop: it runs right up "
+          f"to the figure on every side. No ground, no shadow, no scenery, no props that are not "
+          f"part of the costume.", ""]
+    at = 1
+    for c in who:
+        rows = c["rows"]
+        first, last = at, at + 3 * len(rows) - 1
+        L.append(f"SLOTS {first}-{last} ARE {c['name'].upper()}. {c['look']}")
+        for r, facing in enumerate(rows):
+            lo = at + r * 3
+            if facing == "S":
+                what = "walks toward the camera, seen from the front"
+            elif facing == "N":
+                what = "walks away from the camera, seen from behind"
+            elif facing == "side":
+                what = ("walks to the viewer's LEFT, seen in full side view from their right side. "
+                        "There is only one side row: the game mirrors it for the other direction, so "
+                        "draw the character so that mirroring it would still be right — nothing that "
+                        "belongs on one particular side of the body")
+            else:
+                what = (f"walks to the viewer's {'left' if facing == 'W' else 'right'}, seen in full "
+                        f"side view")
+            L.append(f"  Slots {lo}-{lo + 2}, facing {facing}: {what}.")
+        at = last + 1
+        L.append("")
+    L += ["THE THREE COLUMNS, the same in every row: column 1 is standing still with both feet "
+          "together and arms at rest; column 2 is mid-stride with the LEFT leg forward and the right "
+          "arm forward; column 3 is mid-stride with the RIGHT leg forward and the left arm forward. "
+          "The game plays them 1, 2, 1, 3 in a loop, so column 1 has to read as the resting pose "
+          "between the two strides.", "",
+          f"FRAMING, the same in every frame on the sheet: the character is drawn at the same size, "
+          f"upright and centred left to right, with the feet on the bottom edge of the frame and a "
+          f"small gap of magenta above the head. The head does not move up or down between frames, "
+          f"so the sheet does not bob when it is played. Each frame is {fw}x{fh} pixels here and is "
+          f"stored at {WALK_OUT_W}x{WALK_OUT_H}, so keep the pixels large, the silhouette clear and "
+          f"the face simple: a few pixels of eye, no fine detail.", ""]
+    if any(c["ref"] for c in who):
+        L += ["Each character must match their own attached reference sheet exactly: same face, hair, "
+              "outfit, colours and marks, in every one of their frames. Two characters on this sheet "
+              "must not borrow each other's clothes or hair.", ""]
     L += [f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {field_rendering(b)}", "",
-          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
-          f"shadow under the feet, a different size or costume between frames, the head bobbing between "
-          f"frames, a background inside a frame, a soft blurred or glowing edge where the figure meets "
-          f"the magenta, changing the size of the image"]
-    prompt = "\n".join(L)
-    out_file = str((FIELD_DIRS["walker"] / f"{ident}.png").relative_to(ROOT.parent))
+          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground "
+          f"or shadow under the feet, a different size or costume between frames, the head bobbing "
+          f"between frames, a background inside a frame, a soft blurred or glowing edge where the "
+          f"figure meets the magenta, changing the size of the image"]
+    outs = [str((FIELD_DIRS["walker"] / f"{c['ident']}.png").relative_to(ROOT.parent)) for c in who]
+    after = field_after(manifest_path(name), [
+        f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
+        "- [ ] Columns stand, step-A, step-B; column 1 is the resting pose in every row",
+        "- [ ] The head sits at the same height in every frame of a character",
+        "- [ ] Feet on the bottom edge, magenta right up to the figure, no shadow and no ground",
+        "- [ ] Hair, outfit, colours and marks match each character's own reference sheet", "",
+        "If one row fails, reply in the same chat: \"Redraw only slots 4 to 6 and keep every other "
+        "slot and the whole template exactly as it is. <what was wrong>\"."],
+        makes=", ".join(f"`{o}`" for o in outs))
     template, manifest, md = write_field_package(
-        "walker", name, label, W, H, MAGENTA, slots, prompt, attach, field_after(manifest_path(name), [
-            "- [ ] All 16 slots filled, every border and number still exactly where it was",
-            "- [ ] Rows in the order S, W, E, N; columns stand, step-left, stand, step-right",
-            "- [ ] Slots 1 and 3 of each row are the same pose; the head sits at the same height in all 16",
-            "- [ ] Feet on the bottom edge, magenta right up to the figure, no shadow and no ground",
-            "- [ ] Hair, outfit, colors and marks match the reference sheet in every frame", "",
-            "If one row fails, reply in the same chat: \"Redraw only slots 5 to 8 and keep every other slot "
-            "and the whole template exactly as it is. <what was wrong>\"."],
-            makes=f"`{out_file}`, the 4x4 walk sheet"),
-        out_file=out_file, status=field_status("walker", slots, out_file))
-    report_field([{"id": ident, "kind": "walker", "target": f"{WALK_OUT_W * 4}x{WALK_OUT_H * 4}", "package": package_label(name)}],
-                 warn, md, template, f"16 frames at {s}x, {label}")
+        "walker", name, label, W, H, MAGENTA, slots, "\n".join(L), attach, after,
+        out_file=outs[0], status=field_status("walker", slots, outs[0]))
+    data = json.loads(manifest.read_text())
+    data["who"] = [{"id": c["ident"], "rows": list(c["rows"])} for c in who]
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    report_field([{"id": c["ident"], "kind": "walker",
+                   "target": f"{WALK_OUT_W * 3}x{WALK_OUT_H * len(c['rows'])}",
+                   "package": package_label(name)} for c in who],
+                 warn, md, template, f"{len(slots)} frames at {s}x, {label}")
 
 
 def cmd_building(args):
@@ -3435,58 +3550,176 @@ def shift_frame(px, w, h, dx, dy):
 
 
 def cut_walker(data, slots, rows, w, h, ch, sx, sy, fringe=0):
-    """A returned walk sheet: one localised frame per slot, keyed soft, extruded, and ANCHORED.
+    """A returned walk sheet: one localised frame per slot, keyed, ANCHORED, and one sheet a character.
 
-    Two things had to change here. The art is no longer reduced — a frame is WALK_OUT_W x WALK_OUT_H,
-    the size ChatGPT actually drew it at, because squeezing it down to the 32x48 design turned careful
-    work into mush. And every frame is placed rather than merely cut: ChatGPT draws each pose where it
-    likes inside its slot, so the character slid sideways and bobbed as the cycle played. Each frame is
-    centred horizontally on its own silhouette, and each DIRECTION takes one vertical offset, measured
-    from its two stand frames, so the steps may still lift a foot without the whole body hopping."""
+    Every frame is placed rather than merely cut: ChatGPT draws each pose where it likes inside its
+    slot, so without this the character slid sideways and bobbed as the cycle played. Each frame is
+    centred horizontally on its own silhouette, and each ROW takes one vertical offset measured from
+    its stand frame, so a step may lift a foot without the whole body hopping."""
     FIELD_DIRS["walker"].mkdir(parents=True, exist_ok=True)
     OW, OH = WALK_OUT_W, WALK_OUT_H
+    ncol = max(s["col"] for s in slots) + 1               # 3 now; 4 on a sheet drawn before D20
+    if data.get("who"):
+        who = {c["id"]: c["rows"] for c in data["who"]}
+    else:                                                 # one character, rows named by their facing
+        ident = slots[0].get("who") or Path(slots[0]["out"]).stem
+        rows_named, seen = [], set()
+        for s in sorted(slots, key=lambda s: s["row"]):
+            if s["row"] not in seen:
+                seen.add(s["row"])
+                rows_named.append(s["facing"])
+        who = {ident: rows_named}
     frames, boxes = {}, {}
     for s in slots:
         x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
         art = crop(rows, ch, x, y, bw, bh)
         if (bw, bh) != (OW, OH):
-            art = resample(art, bw, bh, ch, OW, OH)
+            art = resample(art, bw, bh, ch, OW, OH)      # area-average down: the size study's rule
         px = key_magenta(art, OW, OH, ch, fringe)
         scrub_border(px, OW, OH, 4, True, EXTRUDE_PX * 2)
-        frames[(s["row"], s["col"])] = px
-        boxes[(s["row"], s["col"])] = body_bounds(px, OW, OH)
+        ident = s.get("who") or Path(s["out"]).stem
+        frames[(ident, s["row"], s["col"])] = px
+        boxes[(ident, s["row"], s["col"])] = body_bounds(px, OW, OH)
 
+    if ncol == 4:
+        # A sheet drawn before D20: four columns (stand, step-left, stand, step-right) and four rows
+        # (S W E N). Columns 1 and 3 were asked for as the same pose and the E row is the W row
+        # mirrored, so the shipping layout is taken straight out of it — cols 0, 1, 3 and rows S, W,
+        # N — rather than writing a 16-frame sheet nothing reads any more. `walker compact` reports
+        # how true the mirror actually is; this only picks the frames.
+        pick_c, pick_r = (0, 1, 3), (0, 1, 3)
+        new_frames, new_boxes, new_who = {}, {}, {}
+        for ident, rownames in who.items():
+            keep = [r for r in pick_r if r < len(rownames)]
+            new_who[ident] = [("side" if rownames[r] == "W" else rownames[r]) for r in keep]
+            for nr, r in enumerate(keep):
+                for nc, c in enumerate(pick_c):
+                    if (ident, r, c) in frames:
+                        new_frames[(ident, nr, nc)] = frames[(ident, r, c)]
+                        new_boxes[(ident, nr, nc)] = boxes[(ident, r, c)]
+        frames, boxes, who, ncol = new_frames, new_boxes, new_who, 3
+        print(f"  a pre-D20 4x4 sheet: taking columns 1, 2, 4 and rows S, W, N as the 9-frame layout")
+
+    pal, pidx = master_palette(), PalIndex(master_palette())
     report = []
-    for r in range(4):
-        stand = [boxes[(r, c)] for c in (0, 2) if boxes.get((r, c))]
-        if stand:
-            low = max(b[1] + b[3] for b in stand)             # the lowest opaque row of the stands
-            dy = (OH - WALK_FOOT) - low
-        else:
-            dy = 0
-        for c in range(4):
-            b = boxes.get((r, c))
-            if not b:
-                report.append(f"{WALK_FACINGS[r]} frame {c} is empty")
-                continue
-            dx = (OW - b[2]) // 2 - b[0]
-            frames[(r, c)] = shift_frame(frames[(r, c)], OW, OH, dx, dy)
-            nb = body_bounds(frames[(r, c)], OW, OH)
-            report.append(f"    {WALK_FACINGS[r]} {c}: bbox {b[2]}x{b[3]} at {b[0]},{b[1]} "
-                          f"-> {nb[0]},{nb[1]} (dx {dx:+d}, dy {dy:+d})")
-
-    sheet = [bytearray(OW * 4 * 4) for _ in range(OH * 4)]
-    for (r, c), px in frames.items():
-        ox, oy = c * OW, r * OH
-        for k in range(OH):
-            sheet[oy + k][ox * 4:(ox + OW) * 4] = px[k]
-    out = ROOT.parent / data["out"]
-    ship_png(out, OW * 4, OH * 4, 4, sheet)
-    print(f"  16 frames of {OW}x{OH} -> {out.relative_to(ROOT.parent)}  {OW * 4}x{OH * 4} "
-          f"(rows {', '.join(WALK_FACINGS)})"
-          f"{check_alpha(sheet, OW * 4, OH * 4, out)}")
+    for ident, rownames in who.items():
+        for r in range(len(rownames)):
+            stand = boxes.get((ident, r, 0))
+            dy = (OH - WALK_FOOT) - (stand[1] + stand[3]) if stand else 0
+            for c in range(ncol):
+                b = boxes.get((ident, r, c))
+                if not b:
+                    report.append(f"    {ident} {rownames[r]} frame {c} is empty")
+                    continue
+                dx = (OW - b[2]) // 2 - b[0]
+                frames[(ident, r, c)] = shift_frame(frames[(ident, r, c)], OW, OH, dx, dy)
+                nb = body_bounds(frames[(ident, r, c)], OW, OH)
+                step = WALK_STEPS[c] if c < len(WALK_STEPS) else WALK_OLD_STEPS[c]
+                report.append(f"    {ident} {rownames[r]} {step}: bbox {b[2]}x{b[3]} at "
+                              f"{b[0]},{b[1]} -> {nb[0]},{nb[1]} (dx {dx:+d}, dy {dy:+d})")
+        SW, SH = OW * ncol, OH * len(rownames)
+        sheet = [bytearray(SW * 4) for _ in range(SH)]
+        for r in range(len(rownames)):
+            for c in range(ncol):
+                px = frames.get((ident, r, c))
+                if not px:
+                    continue
+                for k in range(OH):
+                    sheet[r * OH + k][c * OW * 4:(c + 1) * OW * 4] = px[k]
+        out = FIELD_DIRS["walker"] / f"{ident}.png"
+        ship_png(out, SW, SH, 4, sheet, pal, pidx)
+        meta = write_walker_meta(ident, rownames, WALK_STEPS[:ncol])
+        print(f"  {len(rownames) * ncol} frames of {OW}x{OH} -> {out.relative_to(ROOT.parent)}  "
+              f"{SW}x{SH} (rows {', '.join(rownames)}; {meta.name})"
+              f"{check_alpha(sheet, SW, SH, out)}")
     for l in report:
         print(l)
+
+
+def cmd_walker_compact(args):
+    """`walker compact <id>...` — an old 16-frame sheet becomes the 9-frame one, at 128x192.
+
+    Three things happen and each is checked. The four duplicate stand frames go (columns 1 and 3 of
+    the old sheet were asked for as identical). The E row goes, because the engine mirrors the W row
+    — and this REPORTS the Oklab dE between E and mirror(W) before it does, so a design that is not
+    actually symmetric is caught rather than quietly flipped. And every frame is area-averaged down
+    to 128x192, which the size study measured as the phone's own display size."""
+    ids = [walker_ident(a) for a in args if not a.startswith("--")]
+    force = "--force" in args
+    if not ids:
+        ids = sorted(p.stem for p in FIELD_DIRS["walker"].glob("*.png"))
+        if not ids:
+            die("usage: walker compact <id> [<id>...]   (converts story/field/walkers/<id>.png)")
+    pal, pidx = master_palette(), PalIndex(master_palette())
+    rows_out = []
+    for ident in ids:
+        src = FIELD_DIRS["walker"] / f"{ident}.png"
+        if not src.exists():
+            die(f"{src.relative_to(ROOT.parent)} not found")
+        w, h, ch, px = read_png(src)
+        if w == len(WALK_STEPS) * WALK_OUT_W and not force:      # already the 9- (or 12-) frame sheet
+            meta = walker_meta_path(ident)
+            rows_named = WALK_ROWS if h == len(WALK_ROWS) * WALK_OUT_H else WALK_ROWS_ASYM
+            print(f"skip  {ident}: already {w}x{h}, rows {', '.join(rows_named)}"
+                  + ("" if meta.exists() else "  (wrote its .json)"))
+            if not meta.exists():
+                write_walker_meta(ident, rows_named)
+            continue
+        if w % 4 or h % 4:
+            die(f"{src.name} is {w}x{h}, which is not the 4x4 grid this converts from")
+        fw, fh = w // 4, h // 4
+        SHEETS.mkdir(exist_ok=True)
+        keep = SHEETS / f"walker16-{ident}.png"           # the 16-frame sheet is archived, not lost
+        if not keep.exists():
+            keep.write_bytes(src.read_bytes())
+        grab = lambda r, c: crop(px, ch, c * fw, r * fh, fw, fh)
+        # How far is the E row from a mirror of the W row? Measured both ways round the gait, because
+        # a mirrored stride is the OTHER column: a generator that drew the east row independently
+        # usually picked the opposite phase, and that is not a reason to call the design asymmetric.
+        def mirror_score(pairs):
+            de_sum, de_n, shape = 0.0, 0, 0
+            for ca, cb in pairs:
+                a, b = grab(1, ca), grab(2, cb)
+                for y in range(0, fh, 3):
+                    for x in range(0, fw, 3):
+                        i, j = x * ch, (fw - 1 - x) * ch
+                        oa = ch != 4 or a[y][i + 3] >= 128
+                        ob = ch != 4 or b[y][j + 3] >= 128
+                        if not oa or not ob:
+                            shape += 1 if oa != ob else 0
+                            continue
+                        p1 = _to_oklab(a[y][i], a[y][i + 1], a[y][i + 2])
+                        p2 = _to_oklab(b[y][j], b[y][j + 1], b[y][j + 2])
+                        de_sum += ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2
+                                   + (p1[2] - p2[2]) ** 2) ** 0.5
+                        de_n += 1
+            n = de_n + shape
+            return de_sum / max(1, de_n), 100.0 * shape / max(1, n)
+        same = mirror_score(((0, 0), (1, 1), (3, 3)))
+        swap = mirror_score(((0, 0), (1, 3), (3, 1)))
+        (mirror_de, shape_pct), phase = (same, "same phase") if same[0] <= swap[0] else \
+                                        (swap, "strides swapped")
+        OW, OH = WALK_OUT_W, WALK_OUT_H
+        sheet = [bytearray(OW * 3 * 4) for _ in range(OH * 3)]
+        for r_out, r_in in enumerate((0, 1, 3)):                  # S, side (the old W row), N
+            for c_out, c_in in enumerate((0, 1, 3)):              # stand, step-A, step-B
+                f = to_rgba(grab(r_in, c_in), fw, fh, ch)
+                f = resample(f, fw, fh, 4, OW, OH)
+                for y in range(OH):
+                    sheet[r_out * OH + y][c_out * OW * 4:(c_out + 1) * OW * 4] = f[y]
+        ship_png(src, OW * 3, OH * 3, 4, sheet, pal, pidx)
+        write_walker_meta(ident, WALK_ROWS)
+        verdict = ("E is a clean mirror of W" if mirror_de < 0.045 and shape_pct < 12 else
+                   "E is NOT a mirror of W — this design is asymmetric, so it wants "
+                   "'- asymmetric: yes' in characters.md and a 12-frame sheet")
+        print(f"ok    {ident}: {w}x{h} (16 frames of {fw}x{fh}) -> {OW * 3}x{OH * 3} "
+              f"(9 frames of {OW}x{OH}); mirror dE {mirror_de:.4f}, silhouette "
+              f"{shape_pct:.0f}% off ({phase}) — {verdict}"
+              f"  [kept {keep.relative_to(ROOT.parent)}]")
+        rows_out.append({"id": ident, "kind": "walker", "target": f"{OW * 3}x{OH * 3}",
+                         "package": "compacted"})
+    if rows_out:
+        write_field_manifest(rows_out)
 
 
 def cmd_cut(args):
@@ -3509,14 +3742,14 @@ def cmd_cut(args):
         if not image.exists():
             die(f"{image} not found")
         return cut_view(data, image, "--nearest" in args)
-    if kind not in FIELD_KINDS + ("tileset",):
+    if kind not in FIELD_KINDS + ("tileset", "swatch", "decal"):
         die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
     if not image.exists():
         die(f"{image} not found")
     slots, (tw, th) = data["slots"], data["canvas"]
-    expect = 16 if kind == "walker" else len(slots)
-    if len(slots) != expect:
-        die(f"{pos[0]} has {len(slots)} slots, expected {expect}; nothing written")
+    if kind == "walker" and len(slots) % 3 and len(slots) != 16:
+        die(f"{pos[0]} has {len(slots)} slots; a walk sheet is 3 columns x 3 or 4 rows a character "
+            f"(or the 4x4 grid of a sheet drawn before D20). Nothing written.")
     w, h, ch, rows = read_png(image)
     sx, sy = w / tw, h / th
     if abs((w / h) / (tw / th) - 1) > 0.06:
@@ -3538,6 +3771,10 @@ def cmd_cut(args):
 
     if kind == "tileset":                                 # a tile sheet: snap, key, pack into the atlas
         return cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette, heal, snap)
+    if kind == "swatch":                                  # D20: flatten, make it wrap, palettise
+        return cut_swatches(data, slots, rows, w, h, ch, sx, sy)
+    if kind == "decal":                                   # D20: key, trim to the object, palettise
+        return cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe)
     if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
         FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
         for s in slots:
@@ -3748,6 +3985,23 @@ def tileset_entries(name):
         e = {"id": ident, "desc": desc, "layer": layer, "index": idx, "w": w, "h": h,
              "frames": frames, "solid": (kv.get("solid") or "no").strip(),
              "sheet": kv.get("sheet"), "raw": kv}
+        # TILES2 (D20): an entry is a terrain (a swatch and a computed edge), a decal (a scattered
+        # cut-out) or a plain atlas tile/stamp. Anything with no '- kind:' is a tile, which is what
+        # every entry written before D20 is.
+        e["kind"] = (kv.get("kind") or ("terrain" if kv.get("terrain", "").lower().startswith("y")
+                                        else "decal" if kv.get("decal", "").lower().startswith("y")
+                                        else "tile")).strip().lower()
+        if e["kind"] not in TERRAIN_KINDS:
+            die(f"{path.name}: '## {ident}' has '- kind: {e['kind']}'; "
+                f"use one of: {', '.join(TERRAIN_KINDS)}")
+        e["pass"] = parse_passmask(kv.get("pass"), ident, path.name)
+        e["tag"] = (kv.get("tag") or "").strip().lower() or None
+        e["over_rows"] = int(kv["over"]) if re.fullmatch(r"\d+", (kv.get("over") or "").strip()) else 0
+        e["flip"] = "h" in (kv.get("flip") or "").lower()
+        if e["kind"] == "terrain":
+            parse_terrain(ident, kv, e, path.name)
+        elif e["kind"] == "decal":
+            parse_decal(ident, kv, e, path.name)
         e["opaque"] = e["layer"] == "ground" and not is_fringe(ident)
         e["cells"] = (w * frames, h)                 # what it occupies in the atlas and on the sheet
         e["foot"] = (w, h)                           # what it occupies on a map: frames are alternatives
@@ -3786,8 +4040,9 @@ def assign_indices(name, entries):
             used[c] = e["id"]
     fresh = []
     for e in entries.values():                       # in file order, so a fresh file reads in order
-        if e["index"] is not None:
-            continue
+        if e["index"] is not None or e["kind"] != "tile":
+            continue                                 # a terrain is a swatch and a decal a cut-out:
+                                                     # neither has ever been in the atlas (D20)
         w, h = e["cells"]
         idx = 1
         while True:
@@ -3934,6 +4189,8 @@ def tileset_sheets(entries):
     """{pool: [ids]} in file order. Families are merged; a '- sheet:' line keeps its own pool."""
     by_pool = {}
     for ident, e in entries.items():
+        if e["kind"] != "tile":                       # terrains and decals have sheets of their own
+            continue
         if e["raw"].get("sheet"):                     # the author named a sheet: leave it alone
             pool = slug(e["raw"]["sheet"])
         else:
@@ -4231,6 +4488,21 @@ def tileset_plan(setname, entries=None):
     entries = entries or tileset_entries(setname)
     here = PACKAGES / "tilesets" / setname
     plan = []
+    terr, decs = set_terrains(entries), set_decals(entries)
+    if terr:                                              # D20: one sheet for every terrain's swatch
+        plan.append((here / "swatches",
+                     {"kind": "swatch", "set": setname, "ids": terr,
+                      "title": f"{setname} — the ground swatches ({len(terr)} terrains)",
+                      "makes": f"{len(terr)} seamless swatch(es) and the generated masks",
+                      "outputs": [str(swatch_path(setname, t).relative_to(ROOT.parent)) for t in terr]},
+                     [setname, "--swatches"]))
+    if decs:                                              # ...and one for the whole biome's decals
+        plan.append((here / "decals",
+                     {"kind": "decal", "set": setname, "ids": decs,
+                      "title": f"{setname} — the decals ({len(decs)} cut-outs)",
+                      "makes": f"{len(decs)} decal sprite(s)",
+                      "outputs": [str(decal_path(setname, i).relative_to(ROOT.parent)) for i in decs]},
+                     [setname, "--decals"]))
     for sheet, ids in tileset_sheets(entries).items():
         done = frozen_packages(here, sheet, "tileset", ids)
         taken = set()
@@ -4398,10 +4670,12 @@ def write_tilesets_readme():
 
 def cmd_tileset(args):
     pos = []
-    sheet, it = None, iter(args)
+    sheet, what, it = None, None, iter(args)
     for a in it:
         if a == "--sheet":
             sheet = next(it, None)
+        elif a in ("--swatches", "--decals"):
+            what = a[2:]
         elif not a.startswith("--"):
             pos.append(a)
     if not pos:
@@ -4410,9 +4684,16 @@ def cmd_tileset(args):
     setname = slug(pos[0])
     entries = tileset_entries(setname)
     fresh = assign_indices(setname, entries)
+    if what == "swatches":                           # called by `packages` as a builder
+        return build_swatch_sheet(setname, set_terrains(entries), entries)
+    if what == "decals":
+        return build_decal_sheet(setname, set_decals(entries), entries)
     if sheet:                                        # one sheet, called by `packages` as a builder
         return build_tileset_sheet(setname, sheet, pos[1:], entries)
     write_tilesets_readme()
+    if set_terrains(entries):                        # the masks are generated, never drawn: do it now
+        mp, n = write_masks(setname, [entries[t]["edge_style"] for t in set_terrains(entries)])
+        print(f"wrote {mp.relative_to(ROOT.parent)}  ({n} masks, generated from the edge styles)")
     for ident, idx, w, h, fr in fresh:
         print(f"assigned index {idx} to '{ident}'" + (f" ({w}x{h})" if w * h > 1 else "")
               + (f" x{fr} frames" if fr > 1 else ""))
@@ -4427,6 +4708,535 @@ def cmd_tileset(args):
     print(f"\n{len(plan)} sheet(s) for tileset '{setname}', {len(entries)} entries, "
           f"atlas {atlas_path(setname).relative_to(ROOT.parent)}")
     print(f"convention: {(TILESETS / 'README.md').relative_to(ROOT.parent)}")
+
+
+# ───────────────────── TILES2 (D20): terrains, masks, swatches, decals ─────────────────────
+#
+# TILES2_PROPOSAL.md is the research; TILES.md, "Terrains, masks and decals", is the contract.
+# The short version: drawn transition tiles are gone. A terrain is ONE seamless swatch sampled in
+# world space, and the boundary between two terrains is a 1-bit mask the TOOL computes — never art.
+# Every mask boundary crosses a tile edge at that edge's midpoint, perpendicular, which is the whole
+# reason any shape meets any other shape in any rotation with no break.
+
+TSET_MASKS = "masks.png"
+TSET_MASKS_JSON = "masks.json"
+TSET_SWATCHES = "swatches"            # <set>/swatches/<terrain>.png
+MASK_PX = ATLAS_CELL                  # a mask is one display tile at the atlas's own cell size
+MASK_VARIANTS = 3                     # per (shape, style); hash(i, j, terrain) picks one
+MASK_SHAPES = ("corner", "edge", "diag", "inv", "full")
+EDGE_STYLES = {                       # amp/freq of two octaves of value noise displacing the boundary
+    "ragged": (0.105, 5.5, 0.045, 13.0),      # grass, dirt, crop, mud
+    "smooth": (0.022, 3.0, 0.010, 7.0),       # paving, plank, any laid floor
+    "bank":   (0.060, 3.5, 0.022, 9.0),       # water: a hard Phantasy Star bank, not a soft shore
+}
+MASK_WINDOW = 0.16                    # the displacement is windowed to zero this close to the border,
+                                      # so the pinned midpoints survive whatever the noise does
+SWATCH_MIN, SWATCH_MAX = 2, 4         # tiles a side
+DECAL_MIN_SLOT = 96                   # a decal slot smaller than this is not worth asking for
+TERRAIN_KINDS = ("terrain", "decal", "tile")
+
+
+def h32(*v):
+    """FNV-1a. The engine computes the same hash for the same (i, j, terrain), so the tool's preview
+    and the phone scatter identically — keep the constants if this is ever ported."""
+    n = 2166136261
+    for x in v:
+        n = ((n ^ (int(x) & 0xffffffff)) * 16777619) & 0xffffffff
+    return n
+
+
+def vnoise(x, y, seed):
+    """Value noise on the unit lattice, smoothstepped. Range about -1..1."""
+    xi, yi = math.floor(x), math.floor(y)
+    tx, ty = x - xi, y - yi
+    tx = tx * tx * (3 - 2 * tx)
+    ty = ty * ty * (3 - 2 * ty)
+    r = lambda a, b: (h32(a, b, seed) & 0xffff) / 65535.0 * 2 - 1
+    a = r(xi, yi) * (1 - tx) + r(xi + 1, yi) * tx
+    b = r(xi, yi + 1) * (1 - tx) + r(xi + 1, yi + 1) * tx
+    return a * (1 - ty) + b * ty
+
+
+def mask_sdf(shape, x, y):
+    """Signed distance over the unit display tile, positive inside the terrain.
+
+    Radius 0.5 is not taste. It is what puts every boundary through the midpoint of the tile edge it
+    crosses, which is the invariant that lets any shape meet any other shape, in any rotation, in any
+    variant, with no break. Change it and the set stops composing."""
+    if shape == "full":
+        return 1.0
+    if shape == "edge":
+        return 0.5 - y                                             # terrain in the north half
+    if shape == "corner":
+        return 0.5 - math.hypot(x, y)                              # quarter disc at NW
+    if shape == "diag":                                            # two quarter discs TOUCHING at the
+        return max(0.5 - math.hypot(x, y),                         # centre: the saddle is drawn
+                   0.5 - math.hypot(x - 1, y - 1))                 # connected, by convention
+    if shape == "inv":
+        return math.hypot(x - 1, y - 1) - 0.5                      # all but a bite at SE
+    die(f"unknown mask shape '{shape}'")
+
+
+def bake_mask(shape, style, variant, px=MASK_PX):
+    """One mask as rows of 0/1. Rotation is not baked: the engine swizzles the UV."""
+    a1, f1, a2, f2 = EDGE_STYLES[style]
+    seed = h32(MASK_SHAPES.index(shape), sorted(EDGE_STYLES).index(style), variant)
+    rows = []
+    for py in range(px):
+        y = (py + 0.5) / px
+        line = bytearray(px)
+        for x_ in range(px):
+            x = (x_ + 0.5) / px
+            d = mask_sdf(shape, x, y)
+            if shape != "full":
+                win = min(1.0, min(x, y, 1 - x, 1 - y) / MASK_WINDOW)
+                d += win * (a1 * vnoise(x * f1, y * f1, seed)
+                            + a2 * vnoise(x * f2, y * f2, seed + 7))
+            line[x_] = 1 if d > 0 else 0
+        rows.append(line)
+    return rows
+
+
+def bits_rot(b):
+    """One clockwise 90-degree step of the corner bit word (1 NW, 2 NE, 4 SE, 8 SW)."""
+    return ((b << 1) | (b >> 3)) & 15
+
+
+def dual_grid_cases():
+    """{corner bits: (shape, rotation)} for all 16 patterns, built from four canonical ones.
+
+    The 16 corner masks fall into exactly six classes under rotation — empty, corner (4), edge (4),
+    diag (2), inv (4), full — and every class is already closed under reflection, which is the
+    research finding that says mirroring buys nothing for transitions (TILES2_PROPOSAL §3.1)."""
+    cases = {0: None, 15: ("full", 0)}
+    for shape, b in (("corner", 1), ("edge", 3), ("diag", 5), ("inv", 11)):
+        c = b
+        for r in range(4):
+            cases.setdefault(c, (shape, r))
+            c = bits_rot(c)
+    if len(cases) != 16:
+        die(f"the dual-grid case table came out with {len(cases)} entries, not 16")
+    return cases
+
+
+DUAL_CASES = dual_grid_cases()
+_MASK_CACHE = {}
+
+
+def tile_mask(shape, style, variant, rot=0):
+    """A baked mask, rotated clockwise `rot` quarter turns. Cached; the preview asks for these a lot."""
+    key = (shape, style, variant, rot)
+    if key not in _MASK_CACHE:
+        m = bake_mask(shape, style, variant)
+        for _ in range(rot):
+            n = len(m)
+            m = [bytearray(m[n - 1 - x][y] for x in range(n)) for y in range(n)]
+        _MASK_CACHE[key] = m
+    return _MASK_CACHE[key]
+
+
+def write_masks(setname, styles=None):
+    """<set>/masks.png + masks.json — every mask the set's terrains can need.
+
+    An indexed PNG like everything else the game ships: index 1 (black) outside the terrain, index 2
+    (white) inside, so `palette check` covers it and the engine reads one byte a pixel."""
+    styles = sorted(set(styles or EDGE_STYLES))
+    for s in styles:
+        if s not in EDGE_STYLES:
+            die(f"unknown edge_style '{s}'; use one of {', '.join(sorted(EDGE_STYLES))}")
+    cols = len(MASK_SHAPES) * MASK_VARIANTS
+    W, H = cols * MASK_PX, len(styles) * MASK_PX
+    idx = [bytearray(W) for _ in range(H)]
+    slots = []
+    for r, style in enumerate(styles):
+        for si, shape in enumerate(MASK_SHAPES):
+            for v in range(MASK_VARIANTS):
+                c = si * MASK_VARIANTS + v
+                m = tile_mask(shape, style, v)
+                for y in range(MASK_PX):
+                    row, src = idx[r * MASK_PX + y], m[y]
+                    for x in range(MASK_PX):
+                        row[c * MASK_PX + x] = PAL_WHITE if src[x] else PAL_BLACK
+                slots.append({"style": style, "shape": shape, "variant": v,
+                              "x": c * MASK_PX, "y": r * MASK_PX})
+    d = tileset_dir(setname)
+    d.mkdir(parents=True, exist_ok=True)
+    write_indexed_png(d / TSET_MASKS, W, H, idx, master_palette())
+    (d / TSET_MASKS_JSON).write_text(json.dumps({
+        "set": setname, "cell": MASK_PX, "width": W, "height": H,
+        "styles": styles, "shapes": list(MASK_SHAPES), "variants": MASK_VARIANTS,
+        "inside": PAL_WHITE, "outside": PAL_BLACK,
+        "note": "1-bit masks, GENERATED — never art. A display tile's four corners are four world "
+                "cells; bits 1 NW, 2 NE, 4 SE, 8 SW pick a shape and a clockwise rotation from "
+                "'cases'. Rotation is a UV swizzle, so no mask is stored twice. "
+                f"variant = hash(i, j, terrain) % {MASK_VARIANTS}. Every boundary crosses a tile "
+                "edge at that edge's midpoint, which is what makes any two shapes meet cleanly.",
+        "cases": {str(b): (list(c) if c else None) for b, c in sorted(DUAL_CASES.items())},
+        "slots": slots,
+    }, indent=2) + "\n")
+    return d / TSET_MASKS, len(slots)
+
+
+# ── the new tiles.md keys ──
+
+def parse_terrain(ident, kv, e, where):
+    """`- kind: terrain`: a swatch, a priority, an edge style, optionally a border band."""
+    e["priority"] = int(kv.get("priority", kv.get("fringe", 0)))          # `fringe:` was the old name
+    style = (kv.get("edge_style") or "ragged").strip().lower()
+    if style == "shore":
+        style = "bank"                                                   # the proposal's older word
+    if style not in EDGE_STYLES:
+        die(f"{where}: '## {ident}' has '- edge_style: {style}'; "
+            f"use one of {', '.join(sorted(EDGE_STYLES))}")
+    e["edge_style"] = style
+    sw = (kv.get("swatch") or "3x3").strip()
+    w, h = parse_wh(sw, f"{where} '{ident}' swatch")
+    if not (SWATCH_MIN <= w <= SWATCH_MAX and SWATCH_MIN <= h <= SWATCH_MAX):
+        die(f"{where}: '## {ident}' has '- swatch: {sw}'; each side is {SWATCH_MIN}..{SWATCH_MAX} tiles")
+    e["swatch"] = (w, h)
+    e["border"] = None
+    if kv.get("border"):
+        f = kv["border"].split()
+        if len(f) != 2:
+            die(f"{where}: '## {ident}' has '- border: {kv['border']}'; "
+                f"write 'border: <terrain-or-colour> <width in tiles>'")
+        try:
+            e["border"] = (f[0], float(f[1]))
+        except ValueError:
+            die(f"{where}: '## {ident}' border width '{f[1]}' is not a number")
+    e["drift"] = float(kv.get("drift", 0.0))
+    e["cycle"] = (kv.get("cycle") or "").strip() or None
+    return e
+
+
+def parse_decal(ident, kv, e, where):
+    """`- kind: decal`: what it may sit on, and how the hash scatter is shaped."""
+    on = [s.strip() for s in (kv.get("on") or "").split(",") if s.strip()]
+    if not on:
+        die(f"{where}: '## {ident}' is a decal with no '- on: <terrain>[, ...]' line")
+    e["on"] = on
+    e["density"] = float(kv.get("density", 0.4))
+    e["cluster"] = float(kv.get("cluster", 4))
+    e["sizes"] = [float(v) for v in (kv.get("sizes") or "0.8 1.0 1.25").split()]
+    e["flip"] = "h" in (kv.get("flip") or "").lower()
+    e["edge_bias"] = {}
+    for part in (kv.get("edge_bias") or "").split(","):
+        f = part.split()
+        if len(f) == 2:
+            try:
+                e["edge_bias"][f[0]] = float(f[1])
+            except ValueError:
+                die(f"{where}: '## {ident}' has edge_bias '{part.strip()}', not '<terrain> <factor>'")
+        elif part.strip():
+            die(f"{where}: '## {ident}' has edge_bias '{part.strip()}', not '<terrain> <factor>'")
+    e["tiles"] = float(kv.get("size_tiles", 0.75))
+    return e
+
+
+def parse_passmask(text, ident, where):
+    """`- pass: NESW` — the sides of a tile that may be walked THROUGH, as the open letters.
+
+    A counter you talk across, a ledge you drop off one way, a wall you walk along: `- solid:` says
+    whether the tile blocks at all, this says which of its four sides do."""
+    text = (text or "").strip().upper()
+    if not text or text in ("ALL", "NESW"):
+        return "NESW"
+    if text in ("NONE", "-"):
+        return ""
+    if not re.fullmatch(r"[NESW]+", text) or len(set(text)) != len(text):
+        die(f"{where}: '## {ident}' has '- pass: {text}'; write the open sides as letters from "
+            f"N, E, S, W (each at most once), or 'none'")
+    return "".join(c for c in "NESW" if c in text)
+
+
+def set_terrains(entries):
+    """The set's terrains in draw order: priority low first, then by name. Ties never overlay."""
+    t = [i for i, e in entries.items() if e.get("kind") == "terrain"]
+    return sorted(t, key=lambda i: (entries[i]["priority"], i))
+
+
+def set_decals(entries):
+    return sorted(i for i, e in entries.items() if e.get("kind") == "decal")
+
+
+def swatch_path(setname, terrain):
+    return tileset_dir(setname) / TSET_SWATCHES / f"{terrain}.png"
+
+
+# ── the swatch sheet: one slot per terrain, and nothing else on it ──
+
+SWATCH_RULE = (
+    "WHAT THESE ARE: ground textures, one per slot, each one a piece cut from the middle of an "
+    "endless field of that material. Each slot is filled edge to edge, right up to its white border, "
+    "and is SEAMLESS on all four edges: the right edge continues into the left and the bottom into "
+    "the top, so a whole map tiled with copies of it shows no join and no landmark. "
+    "Draw them FLAT. No border of any kind, no frame, no vignette, no darker or lighter side, no "
+    "light falling across the slot, no shadow of anything outside it, no grass creeping in at an "
+    "edge, no object, no path, no water's edge, no single feature a player could point at and "
+    "remember. Calm and low in contrast: 3 or 4 flat tones of the material, close together, with "
+    "the detail even across the whole slot. This texture will have flowers, stones and tufts "
+    "scattered over it by the game, so it must be quiet enough to sit underneath them."
+)
+
+
+def build_swatch_sheet(setname, terrains, entries=None, style=None):
+    """One package: every terrain's seamless swatch on one sheet."""
+    entries = entries or tileset_entries(setname)
+    style, warn = style or load_style(), []
+    missing = [t for t in terrains if t not in entries]
+    if missing:
+        die(f"{tileset_doc(setname).name}: no entry for {', '.join(missing)}")
+    sizes = [entries[t]["swatch"] for t in terrains]
+    W, H, label, u, boxes = layout_cells(sizes, list(terrains))
+    slots = []
+    for n, (t, box) in enumerate(zip(terrains, boxes), 1):
+        e = entries[t]
+        slots.append({"n": n, "id": t, "kind": "swatch", "box": list(box),
+                      "inner": list(inner_box(box)), "tiles": list(e["swatch"]),
+                      "target": [e["swatch"][0] * ATLAS_CELL, e["swatch"][1] * ATLAS_CELL],
+                      "edge_style": e["edge_style"],
+                      "out": str(swatch_path(setname, t).relative_to(ROOT.parent))})
+    name = f"swatch_{setname}"
+    b = style["blocks"]
+    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
+         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
+         b["map_header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "", SWATCH_RULE, "", "SLOTS:"]
+    for s in slots:
+        e = entries[s["id"]]
+        L.append(f"Slot {s['n']} ({s['id']}), {s['tiles'][0]}x{s['tiles'][1]} tiles of ground, "
+                 f"{s['inner'][2]}x{s['inner'][3]} px in the template: {e['desc']}")
+    L += ["", f"RENDERING: {field_rendering(b)}", "",
+          f"AVOID: {b['map_negative']}, a border or frame inside a slot, a lit or shaded side, a "
+          f"vignette, a visible seam at a slot edge, one big feature in the middle of a slot, an "
+          f"object, a path, a shoreline, a character, a shadow, noisy high-contrast texture, "
+          f"drawing outside a slot, moving or covering a slot number, changing the size of the image"]
+    after = field_after(pkg_path(name, "sheet.json"), [
+        f"- [ ] All {len(slots)} slots filled to the border, every number still where it was",
+        "- [ ] Each slot is FLAT: no lit side, no vignette, no border, no shadow",
+        "- [ ] Calm and even: nothing in a slot the eye goes to first",
+        "- [ ] Nothing that reads as an edge of the material — no grass rim, no shoreline, no path",
+        "- [ ] Tiling test: the top edge of a slot would meet its bottom edge with no join", "",
+        "If one slot fails, reply in the same chat: \"Redraw only slot 2 and keep every other slot "
+        "and the whole template exactly as it is. <what was wrong>\"."],
+        makes=f"the {len(slots)} seamless swatch(es) listed above")
+    status = [f"- `{s['out']}` — " + ("**exists**" if (ROOT.parent / s["out"]).exists() else "missing")
+              for s in slots]
+    template, manifest, md = write_field_package(
+        "swatch", name, label, W, H, TSET_GREY, slots, "\n".join(L), attach, after, status=status)
+    data = json.loads(manifest.read_text())
+    data.update({"set": setname, "cell": ATLAS_CELL})
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} terrain swatch(es), {label})")
+    return slots
+
+
+def cut_swatches(data, slots, rows, w, h, ch, sx, sy):
+    """Cut, flatten the drawing's own lighting, make it wrap, palettise. The order matters.
+
+    A swatch is the one piece of art in the game that is sampled in WORLD space, so its only job is
+    to tile: the flattening and the seam healing are not polish, they are what make it usable at
+    all. Both happen in full colour, and the palette step is last, as everywhere else."""
+    setname = data["set"]
+    out_dir = tileset_dir(setname) / TSET_SWATCHES
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pal, pidx = master_palette(), PalIndex(master_palette())
+    lines = []
+    for s in slots:
+        x, y, bw, bh = exact_inner(s, sx, sy, w, h)
+        tw, th = s["target"]
+        px = to_rgba(resample(crop(rows, ch, x, y, bw, bh), bw, bh, ch, tw, th), tw, th, 4)
+        scrub_border(px, tw, th, 4, False, max(1, EXTRUDE_PX * 2))
+        flat = flatten_lighting(px, tw, th)
+        make_seamless(px, tw, th)
+        calm, contrast = swatch_is_calm(px, tw, th)
+        hz, vt = seam_error(px, tw, th)
+        out = swatch_path(setname, s["id"])
+        ship_png(out, tw, th, 4, px, pal, pidx)
+        note = f"  wrap h{hz:.0f}/v{vt:.0f}, contrast {contrast:.3f}, flattened {flat:.3f}"
+        if not calm:
+            LOUD.append(f"{s['id']}'s swatch is busy (contrast {contrast:.3f}): it will fight the "
+                        f"decals and show its own repeat. Ask for that slot again, calmer — three "
+                        f"or four flat tones, close together, nothing the eye goes to.")
+            print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+            note += "  <-- BUSY"
+        lines.append(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  "
+                     f"{tw}x{th} ({s['tiles'][0]}x{s['tiles'][1]} tiles){note}")
+    for l in lines:
+        print(l)
+    mp, n = write_masks(setname, [e["edge_style"] for e in tileset_entries(setname).values()
+                                  if e.get("kind") == "terrain"])
+    print(f"  -> {mp.relative_to(ROOT.parent)}  ({n} masks, generated — no art)")
+
+
+def flatten_lighting(px, w, h, strength=0.9):
+    """Subtract the drawing's own low-frequency lighting, so the swatch can tile.
+
+    A swatch with a bright side or a grassy rim bands wherever it repeats; the model draws one
+    whatever the prompt says. This is a wrapped box blur's deviation from the image mean, taken out
+    at `strength`. The blur MUST wrap: a clamped one leaves a bright rim, and the seam roll then puts
+    that rim through the middle of the tile, where it reads as a pale cross at every repeat."""
+    r = max(8, w // 6)
+    acc = [[0, 0, 0]]
+    sums = [[[0, 0, 0] for _ in range(w + 1)] for _ in range(h + 1)]
+    for y in range(h):
+        run = [0, 0, 0]
+        for x in range(w):
+            i = x * 4
+            for k in range(3):
+                run[k] += px[y][i + k]
+                sums[y + 1][x + 1][k] = sums[y][x + 1][k] + run[k]
+    tot = [sums[h][w][k] / (w * h) for k in range(3)]
+
+    def box(x0, y0, x1, y1, k):                       # inclusive-exclusive, already clamped
+        return sums[y1][x1][k] - sums[y0][x1][k] - sums[y1][x0][k] + sums[y0][x0][k]
+
+    def wrapped(cx, cy, k):                           # sum over a wrapped window, as up to 4 boxes
+        total, n = 0.0, 0
+        for y0, y1 in _wrap_spans(cy - r, cy + r + 1, h):
+            for x0, x1 in _wrap_spans(cx - r, cx + r + 1, w):
+                total += box(x0, y0, x1, y1, k)
+                n += (x1 - x0) * (y1 - y0)
+        return total / max(1, n)
+
+    moved = 0.0
+    for y in range(h):
+        for x in range(w):
+            i = x * 4
+            for k in range(3):
+                m = wrapped(x, y, k)
+                v = px[y][i + k] - strength * (m - tot[k])
+                moved += abs(strength * (m - tot[k]))
+                px[y][i + k] = 0 if v < 0 else (255 if v > 255 else int(v))
+    return moved / (w * h * 3 * 255)
+
+
+def _wrap_spans(lo, hi, n):
+    """[lo, hi) on a ring of n, as up to two half-open spans inside [0, n)."""
+    if hi - lo >= n:
+        return [(0, n)]
+    lo %= n
+    hi = lo + (hi - lo)
+    return [(lo, n), (0, hi - n)] if hi > n else [(lo, hi)]
+
+
+def swatch_is_calm(px, w, h, limit=0.115):
+    """(calm, contrast). Contrast is the mean |L - mean L| in Oklab, which is what the eye reads."""
+    n, s, vals = 0, 0.0, []
+    step = max(1, w // 160)
+    for y in range(0, h, step):
+        for x in range(0, w, step):
+            i = x * 4
+            L = _to_oklab(px[y][i], px[y][i + 1], px[y][i + 2])[0]
+            vals.append(L)
+            s += L
+            n += 1
+    m = s / max(1, n)
+    c = sum(abs(v - m) for v in vals) / max(1, n)
+    return c <= limit, c
+
+
+# ── the decal sheet: ~20 cut-outs of nothing but the object ──
+
+DECAL_RULE = (
+    "WHAT THESE ARE: small loose objects that the game scatters over its ground by the hundred — "
+    "a tuft of grass here, three pebbles there. Each slot holds ONE object, drawn against the flat "
+    "magenta and NOTHING else. The magenta is empty space, not a backdrop: it comes right up to the "
+    "object on every side, and the edge where they meet is hard, not soft, blurred or glowing. "
+    "There is NO ground under the object — no patch of grass, no earth, no stone, no dirt, no "
+    "shadow, no base, no plate, no circle of darker colour. An object that is drawn standing on "
+    "something is unusable, because the game puts it on a hundred different grounds. "
+    "Each object fills most of its slot, seen from straight above as the ground is, with the same "
+    "light from the upper left across the whole sheet."
+)
+
+
+def build_decal_sheet(setname, ids, entries=None, style=None):
+    """One package: a biome's decals, ~20 slots on magenta."""
+    entries = entries or tileset_entries(setname)
+    style, warn = style or load_style(), []
+    missing = [i for i in ids if i not in entries]
+    if missing:
+        die(f"{tileset_doc(setname).name}: no entry for {', '.join(missing)}")
+    sizes = [(1, 1)] * len(ids)
+    W, H, label, u, boxes = layout_cells(sizes, list(ids))
+    slots = []
+    for n, (i, box) in enumerate(zip(ids, boxes), 1):
+        e = entries[i]
+        t = max(16, int(round(e["tiles"] * ATLAS_CELL)))
+        slots.append({"n": n, "id": i, "kind": "decal", "box": list(box),
+                      "inner": list(inner_box(box)), "target": [t, t],
+                      "out": str((decal_path(setname, i)).relative_to(ROOT.parent))})
+    name = f"decal_{setname}"
+    b = style["blocks"]
+    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
+         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
+         b["map_header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "", DECAL_RULE, "", "SLOTS:"]
+    for s in slots:
+        e = entries[s["id"]]
+        L.append(f"Slot {s['n']} ({s['id']}), on {', '.join(e['on'])}, "
+                 f"{s['inner'][2]}x{s['inner'][3]} px in the template: {e['desc']}")
+    L += ["", f"RENDERING: {field_rendering(b)}", "",
+          f"AVOID: {b['map_negative']}, ground or a patch of earth under an object, a shadow, a "
+          f"base plate, a frame, a soft blurred or glowing edge against the magenta, two objects in "
+          f"one slot, drawing outside a slot, moving or covering a slot number, changing the size "
+          f"of the image"]
+    after = field_after(pkg_path(name, "sheet.json"), [
+        f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
+        "- [ ] NOTHING under any object: no ground, no patch, no shadow, no base",
+        "- [ ] The magenta comes right up to every object, with a hard edge",
+        "- [ ] One object a slot, seen from straight above, lit from the upper left", "",
+        "If one decal fails, reply in the same chat: \"Redraw only slot 7 and keep every other slot "
+        "and the whole template exactly as it is. <what was wrong>\"."],
+        makes=f"the {len(slots)} decal sprite(s) listed above")
+    status = [f"- `{s['out']}` — " + ("**exists**" if (ROOT.parent / s["out"]).exists() else "missing")
+              for s in slots]
+    template, manifest, md = write_field_package(
+        "decal", name, label, W, H, MAGENTA, slots, "\n".join(L), attach, after, status=status)
+    data = json.loads(manifest.read_text())
+    data.update({"set": setname})
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} decals, {label})")
+    return slots
+
+
+def decal_path(setname, ident):
+    return tileset_dir(setname) / "decals" / f"{ident}.png"
+
+
+def cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe=0):
+    """Key the magenta, trim to the object, scale to the decal's size in tiles, palettise."""
+    setname = data["set"]
+    pal, pidx = master_palette(), PalIndex(master_palette())
+    for s in slots:
+        x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+        px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
+        scrub_border(px, bw, bh, 4, True, max(2, int(round(2 * sx))))
+        bounds = opaque_bounds(px, bw, bh)
+        if not bounds:
+            print(f"  slot {s['n']} {s['id']}: nothing but background in the slot; not written",
+                  file=sys.stderr)
+            continue
+        cx, cy, cw, chh = bounds
+        px = crop(px, 4, cx, cy, cw, chh)
+        k = s["target"][0] / max(bw, bh)
+        nw, nh = max(2, round(cw * k)), max(2, round(chh * k))
+        px = resample(px, cw, chh, 4, nw, nh)
+        out = ROOT.parent / s["out"]
+        ship_png(out, nw, nh, 4, px, pal, pidx)
+        print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> trimmed {cw}x{chh} -> "
+              f"{out.relative_to(ROOT.parent)}  {nw}x{nh}{check_alpha(px, nw, nh, out)}")
 
 
 # ── cutting a returned tile sheet ──
@@ -5065,13 +5875,18 @@ def parse_tmap(mp):
         legend[ch] = rest[0]
     grid = lambda key: [l.rstrip("\n") for l in secs.get(key, "").splitlines()
                         if l.strip() and not l.lstrip().startswith("#")]
-    trig = []
-    for l in secs.get("triggers", "").splitlines():
-        l = strip_comment(l).strip()
-        if l and not l.startswith("#"):
-            trig.append(l.split())
+    lines_of = lambda key: [strip_comment(l).strip().split()
+                            for l in secs.get(key, "").splitlines()
+                            if strip_comment(l).strip() and not l.lstrip().startswith("#")]
+    trig = lines_of("triggers")
     return {"path": path, "meta": meta, "metas": metas, "legend": legend, "ground": grid("ground"),
-            "objects": grid("objects"), "triggers": trig}
+            "objects": grid("objects"), "triggers": trig,
+            # TILES2 (D20). Both are optional and both are LINE LISTS, never grids: a grid of the
+            # same width as the map is a thing an author has to keep aligned, and neither of these
+            # is dense enough to be worth that. `## decals` places one by hand where the scatter
+            # cannot be trusted to (the flowers on a grave); `## flips` names the top-left cell of
+            # a stamp placement that is drawn mirrored. A map with neither reads exactly as before.
+            "decals": lines_of("decals"), "flips": lines_of("flips")}
 
 
 def tmap_todo():
@@ -5191,6 +6006,119 @@ def check_map_light(m, name, w, h):
     return err
 
 
+def check_map_decals(m, name, w, h, entries):
+    """`## decals` (x y id [flip]) and `## flips` (x y) — the two optional D20 sections."""
+    err = []
+    for f in m.get("decals", []):
+        if len(f) < 3:
+            err.append(f"{name}: '## decals' line '{' '.join(f)}' is not 'x y <id> [flip]'")
+            continue
+        try:
+            x, y = int(f[0]), int(f[1])
+        except ValueError:
+            err.append(f"{name}: '## decals' line '{' '.join(f)}' has a non-numeric cell")
+            continue
+        if not (0 <= x < w and 0 <= y < h):
+            err.append(f"{name}: decal '{f[2]}' at {x},{y} is outside the {w}x{h} map")
+        e = entries.get(f[2])
+        if not e:
+            err.append(f"{name}: '## decals' names '{f[2]}', which has no entry in "
+                       f"{tileset_doc(slug(m['meta'].get('tileset', ''))).name}")
+        elif e["kind"] != "decal":
+            err.append(f"{name}: '## decals' names '{f[2]}', which is a {e['kind']}, not a decal")
+        if len(f) > 3 and f[3] != "flip":
+            err.append(f"{name}: '## decals' line '{' '.join(f)}' — the only word after the id is 'flip'")
+    objs = m.get("objects") or []
+    for f in m.get("flips", []):
+        if len(f) != 2:
+            err.append(f"{name}: '## flips' line '{' '.join(f)}' is not 'x y' (a stamp's top-left cell)")
+            continue
+        try:
+            x, y = int(f[0]), int(f[1])
+        except ValueError:
+            err.append(f"{name}: '## flips' line '{' '.join(f)}' has a non-numeric cell")
+            continue
+        if not (0 <= x < w and 0 <= y < h) or y >= len(objs) or x >= len(objs[y]):
+            err.append(f"{name}: '## flips' names {x},{y}, which is outside the {w}x{h} map")
+            continue
+        ch = objs[y][x]
+        ident = m["legend"].get(ch)
+        if ch in (".", "+", " ") or not ident:
+            err.append(f"{name}: '## flips' names {x},{y}, where '## objects' has no stamp")
+            continue
+        e = entries.get(ident)
+        if e and not e.get("flip"):
+            err.append(f"{name}: '## flips' mirrors '{ident}' at {x},{y}, and that entry has no "
+                       f"'- flip: h' line. A building must never be mirrored: every roof and wall "
+                       f"face in the set is lit from the upper left, so a mirrored one is lit from "
+                       f"the wrong side. Mirror nature, not architecture.")
+    return err
+
+
+def stamp_fill_warnings(m, name, entries, setname):
+    """Warn when a solid stamp's art leaves too much of a solid tile see-through (owner's rule).
+
+    A solid tile a player can see grass through looks walkable and is not, which is the single most
+    annoying thing a tile map can do. Only checked where the art exists: a placeholder is exempt."""
+    warn, seen = [], set()
+    objs = m.get("objects") or []
+    atlas = atlas_path(setname)
+    if not atlas.exists():
+        return warn
+    try:
+        aw, ah, ach, arows = read_png(atlas)
+    except SystemExit:
+        return warn
+    cell = ATLAS_CELL
+    for y, row in enumerate(objs):
+        for x, ch in enumerate(row):
+            ident = m["legend"].get(ch)
+            e = entries.get(ident or "")
+            if not e or e["kind"] != "tile" or ident in seen or e["solid"] == "no":
+                continue
+            seen.add(ident)
+            rows_solid = tile_solid_rows(e)
+            over = e.get("over_rows", 0)
+            worst = (0.0, None)
+            for r in range(e["h"]):
+                if r < over:                                  # an `over` row is meant to be see-through
+                    continue
+                for c in range(e["w"]):
+                    if not rows_solid[r][c]:
+                        continue
+                    n = e["index"] + ATLAS_COLS * r + c
+                    ax, ay = (n % ATLAS_COLS) * cell, (n // ATLAS_COLS) * cell
+                    if ay + cell > ah or ax + cell > aw or ach != 4:
+                        continue
+                    clear = sum(1 for yy in range(ay, ay + cell)
+                                for xx in range(ax, ax + cell) if arows[yy][xx * 4 + 3] < 128)
+                    pct = 100 * clear / (cell * cell)
+                    if pct > worst[0]:
+                        worst = (pct, (c, r))
+            if worst[0] > 15:                                 # one line an entry, its worst tile
+                c, r = worst[1]
+                warn.append(f"{name}: '{ident}' is solid but its art leaves tile {c},{r} "
+                            f"{worst[0]:.0f}% transparent — the player sees ground inside a tile "
+                            f"they cannot walk on. Redraw that slot filling the footprint, or make "
+                            f"the stamp smaller in tiles.")
+    return warn
+
+
+def tile_solid_rows(e):
+    """[[bool]] per tile of a stamp, from `- solid: yes|no|##/.#`."""
+    v = (e["solid"] or "no").strip()
+    if v in ("yes", "true"):
+        return [[True] * e["w"] for _ in range(e["h"])]
+    if v in ("no", "false", ""):
+        return [[False] * e["w"] for _ in range(e["h"])]
+    rows = [r.strip() for r in v.split("/")]
+    out = []
+    for r in range(e["h"]):
+        line = rows[r] if r < len(rows) else ""
+        out.append([(c < len(line) and line[c] == "#") for c in range(e["w"])])
+    return out
+
+
 def check_tmap(mp):
     """(errors, warnings) for one .tmap against its tileset."""
     m, err, warn = parse_tmap(mp), [], []
@@ -5240,6 +6168,8 @@ def check_tmap(mp):
     else:
         walkable(int(sp[0]), int(sp[1]), "spawn")
     err += check_map_light(m, name, w, h)
+    err += check_map_decals(m, name, w, h, entries)
+    warn += stamp_fill_warnings(m, name, entries, setname)
     text_ids = set(load_field_text())
     todo = tmap_todo()
     for t in m["triggers"]:
@@ -5286,70 +6216,240 @@ def placeholder_rgb(name):
     return (90 + (v & 63), 90 + ((v >> 6) & 63), 90 + ((v >> 12) & 63))
 
 
+PREVIEW_TILE = 32                     # the preview draws a tile this big; the maps are 48x36
+
+
+TERRAIN_STANDIN = {                   # a readable flat colour until the swatch is drawn
+    "grass": (104, 132, 78), "grass_dry": (150, 148, 96), "crop": (128, 140, 70),
+    "mud": (86, 72, 58), "dirt": (150, 126, 94), "gravel": (146, 142, 134),
+    "paving": (150, 148, 142), "bridge_deck": (134, 104, 70), "plank": (134, 104, 70),
+    "water": (70, 104, 140), "sand": (204, 184, 140), "snow": (220, 224, 232),
+}
+
+
+def terrain_colour(e):
+    """A flat stand-in for a terrain with no swatch yet.
+
+    Named where the name is one we use, hashed otherwise — a preview whose dirt is bright purple
+    tells you nothing about whether the map reads."""
+    if e["id"] in TERRAIN_STANDIN:
+        return TERRAIN_STANDIN[e["id"]]
+    for k, v in TERRAIN_STANDIN.items():
+        if k in e["id"]:
+            return v
+    return placeholder_rgb(e["id"])
+
+
+def load_swatch(setname, e, px):
+    """(w, h, rows RGBA) of a terrain's swatch, scaled to `px` per tile. A flat colour if unpainted."""
+    p = swatch_path(setname, e["id"])
+    tw, th = e["swatch"]
+    W, H = tw * px, th * px
+    if p.exists():
+        w, h, ch, rows = read_png(p)
+        rows = to_rgba(rows, w, h, ch)
+        if (w, h) != (W, H):
+            rows = resize_box(rows, w, h, 4, W, H)
+        return W, H, rows
+    c = bytes(terrain_colour(e)) + b"\xff"
+    return W, H, [bytearray(c * W) for _ in range(H)]
+
+
 def preview_tmap(mp):
+    """Render a map the way the engine will (D20): dual-grid masks over world-space swatches.
+
+    This exists so a map can be judged on the Mac before the engine lands, and so the masks can be
+    judged at all — they are generated, so nobody ever sees them until something draws them. Terrains
+    with no swatch yet come out as flat palette colours, which is still the right SHAPE."""
     m = parse_tmap(mp)
     setname = slug(m["meta"].get("tileset", ""))
     entries = tileset_entries(setname)
     w, h = (int(x) for x in m["meta"]["size"].split()[:2])
-    W, H = w * TSET_TILE, h * TSET_TILE
+    T = PREVIEW_TILE
+    W, H = w * T, h * T
     img = [bytearray(b"\x20\x20\x28\xff" * W) for _ in range(H)]
+
+    # ── the ground: one pass per terrain, low priority first, through the dual grid ──
+    terrains = set_terrains(entries)
+    tidx = {t: n for n, t in enumerate(terrains)}
+    ground = [[None] * w for _ in range(h)]
+    for y, line in enumerate(m["ground"][:h]):
+        for x, c in enumerate(line[:w]):
+            ident = m["legend"].get(c)
+            if ident in tidx:
+                ground[y][x] = ident
+    base = terrains[0] if terrains else None
+    at = lambda x, y: (ground[y][x] if 0 <= x < w and 0 <= y < h else base) or base
+    sw = {t: load_swatch(setname, entries[t], T) for t in terrains}
+    masks = {}
+    for n, t in enumerate(terrains):
+        e = entries[t]
+        style = e["edge_style"]
+        sww, swh, swpx = sw[t]
+        if n == 0:                                             # the lowest terrain floods the map
+            for py in range(H):
+                src = swpx[py % swh]
+                row = img[py]
+                for px in range(W):
+                    o, so = px * 4, (px % sww) * 4
+                    row[o:o + 4] = src[so:so + 4]
+            continue
+        for j in range(h + 1):
+            for i in range(w + 1):
+                b = 0                                          # 1 NW, 2 NE, 4 SE, 8 SW
+                if at(i - 1, j - 1) == t: b |= 1
+                if at(i, j - 1) == t: b |= 2
+                if at(i, j) == t: b |= 4
+                if at(i - 1, j) == t: b |= 8
+                case = DUAL_CASES[b]
+                if case is None:
+                    continue
+                shape, rot = case
+                v = h32(i, j, tidx[t]) % MASK_VARIANTS
+                key = (shape, style, v, rot)
+                if key not in masks:
+                    mk = tile_mask(shape, style, v, rot)
+                    n_ = len(mk)
+                    masks[key] = [bytearray(mk[y * n_ // T][x * n_ // T] for x in range(T))
+                                  for y in range(T)]
+                mk = masks[key]
+                ox, oy = i * T - T // 2, j * T - T // 2
+                for py in range(T):
+                    cy = oy + py
+                    if not (0 <= cy < H):
+                        continue
+                    mrow, row, src = mk[py], img[cy], swpx[cy % swh]
+                    for px in range(T):
+                        cx = ox + px
+                        if 0 <= cx < W and mrow[px]:
+                            o, so = cx * 4, (cx % sww) * 4
+                            row[o:o + 4] = src[so:so + 4]
+
+    # ── the decals: the same hash scatter the engine will run, so the density is judged here ──
+    decals = [entries[i] for i in set_decals(entries)]
+    art = {}
+    for e in decals:
+        p = decal_path(setname, e["id"])
+        if p.exists():
+            dw, dh, dch, dpx = read_png(p)
+            art[e["id"]] = (dw, dh, to_rgba(dpx, dw, dh, dch))
+    placed = 0
+    for y in range(h):
+        for x in range(w):
+            t = at(x, y)
+            here = [e for e in decals if t in e["on"]]
+            if not here:
+                continue
+            touch = {at(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))}
+            for e in here:
+                bias = max([e["edge_bias"].get(n, 1.0) for n in touch] or [1.0])
+                field = 0.5 + 0.5 * vnoise(x / e["cluster"], y / e["cluster"],
+                                           h32(zlib.crc32(e["id"].encode())))
+                want = e["density"] * bias * field
+                hh = h32(x, y, zlib.crc32(e["id"].encode()))
+                if (hh & 0xffff) / 65535.0 > want:
+                    continue
+                size = e["sizes"][(hh >> 17) % len(e["sizes"])]
+                px_ = int(e["tiles"] * size * T)
+                if e["id"] not in art:                       # no art yet: a dot, so density reads
+                    r = max(1, px_ // 3)
+                    cx, cy = x * T + (hh >> 5) % T, y * T + (hh >> 11) % T
+                    for yy in range(-r, r + 1):
+                        for xx in range(-r, r + 1):
+                            if xx * xx + yy * yy > r * r:
+                                continue
+                            ax, ay = cx + xx, cy + yy
+                            if 0 <= ax < W and 0 <= ay < H:
+                                o = ax * 4
+                                img[ay][o:o + 3] = bytes(max(0, v - 28) for v in img[ay][o:o + 3])
+                    placed += 1
+                    continue
+                dw, dh, dpx = art[e["id"]]
+                nw, nh = max(1, round(px_ * dw / max(dw, dh))), max(1, round(px_ * dh / max(dw, dh)))
+                sc = resize_box(dpx, dw, dh, 4, nw, nh)
+                flip = e["flip"] and (hh >> 3) & 1
+                ox, oy = x * T + (hh >> 5) % max(1, T - nw // 2), y * T + (hh >> 11) % max(1, T - nh // 2)
+                for yy in range(nh):
+                    ay = oy + yy
+                    if not (0 <= ay < H):
+                        continue
+                    for xx in range(nw):
+                        ax = ox + xx
+                        sx_ = (nw - 1 - xx) if flip else xx
+                        if 0 <= ax < W and sc[yy][sx_ * 4 + 3] >= 128:
+                            img[ay][ax * 4:ax * 4 + 4] = sc[yy][sx_ * 4:sx_ * 4 + 4]
+                placed += 1
+
+    # ── the stamps: straight out of the atlas, exactly as before ──
     atlas, arows = None, 0
     if atlas_path(setname).exists():
         aw, ah, ach, apx = read_png(atlas_path(setname))
         apx = to_rgba(apx, aw, ah, ach)
-        if aw != ATLAS_COLS * TSET_TILE:               # the shipped atlas is at ATLAS_CELL; the
-            k = ATLAS_COLS * TSET_TILE                 # preview is a map at 32 px a cell
+        if aw != ATLAS_COLS * T:
+            k = ATLAS_COLS * T
             ah = max(1, round(ah * k / aw))
             apx, aw = resize_box(apx, aw, len(apx), 4, k, ah), k
         atlas, arows = apx, ah
+    flips = {(int(f[0]), int(f[1])) for f in m.get("flips", []) if len(f) == 2}
 
-    def blit(index, cw, chh, px, py):
-        if px + cw * TSET_TILE > W or py + chh * TSET_TILE > H:
-            return True                              # a stamp hanging off the map: check reports it
+    def blit(index, cw, chh, px, py, mirror=False):
+        if px + cw * T > W or py + chh * T > H:
+            return True
         for r in range(chh):
             for c in range(cw):
-                cell = index + ATLAS_COLS * r + c
-                ax, ay = (cell % ATLAS_COLS) * TSET_TILE, (cell // ATLAS_COLS) * TSET_TILE
-                if atlas is None or ay + TSET_TILE > arows:
+                cell = index + ATLAS_COLS * r + (cw - 1 - c if mirror else c)
+                ax, ay = (cell % ATLAS_COLS) * T, (cell // ATLAS_COLS) * T
+                if atlas is None or ay + T > arows:
                     return False
-                for y in range(TSET_TILE):
-                    src, dst = atlas[ay + y], img[py + r * TSET_TILE + y]
-                    if not any(src[(ax + x) * 4 + 3] for x in range(TSET_TILE)):
-                        continue
-                    for x in range(TSET_TILE):
-                        if src[(ax + x) * 4 + 3]:
-                            o = (px + c * TSET_TILE + x) * 4
-                            dst[o:o + 4] = src[(ax + x) * 4:(ax + x) * 4 + 4]
+                for y in range(T):
+                    src, dst = atlas[ay + y], img[py + r * T + y]
+                    for x in range(T):
+                        sx_ = (T - 1 - x) if mirror else x
+                        if src[(ax + sx_) * 4 + 3] >= 128:
+                            o = (px + c * T + x) * 4
+                            dst[o:o + 4] = src[(ax + sx_) * 4:(ax + sx_) * 4 + 4]
         return True
 
     def flat(name, px, py, cw, chh):
         rgb = bytes(placeholder_rgb(name)) + b"\xff"
-        cw = min(cw, (W - px) // TSET_TILE)
-        chh = min(chh, (H - py) // TSET_TILE)
-        for y in range(chh * TSET_TILE):
+        cw = min(cw, (W - px) // T)
+        chh = min(chh, (H - py) // T)
+        for y in range(chh * T):
             row = img[py + y]
-            for x in range(cw * TSET_TILE):
-                edge = x < 1 or y < 1 or x >= cw * TSET_TILE - 1 or y >= chh * TSET_TILE - 1
+            for x in range(cw * T):
+                edge = x < 1 or y < 1 or x >= cw * T - 1 or y >= chh * T - 1
                 row[(px + x) * 4:(px + x) * 4 + 4] = b"\x18\x18\x18\xff" if edge else rgb
 
     miss = set()
-    for layer in ("ground", "objects"):
-        for y, line in enumerate(m[layer][:h]):
-            for x, c in enumerate(line[:w]):
-                if layer == "objects" and c in (".", "+", " "):
-                    continue
-                e = entries.get(m["legend"].get(c, ""))
-                if not e:
-                    continue
-                cw, chh = e["foot"]
-                if not blit(e["index"], cw, chh, x * TSET_TILE, y * TSET_TILE):
-                    flat(e["id"], x * TSET_TILE, y * TSET_TILE, cw, chh)
-                    miss.add(e["id"])
+    for y, line in enumerate(m["objects"][:h]):
+        for x, c in enumerate(line[:w]):
+            if c in (".", "+", " "):
+                continue
+            e = entries.get(m["legend"].get(c, ""))
+            if not e or e["kind"] != "tile":
+                continue
+            cw, chh = e["foot"]
+            if not blit(e["index"], cw, chh, x * T, y * T, (x, y) in flips):
+                flat(e["id"], x * T, y * T, cw, chh)
+                miss.add(e["id"])
+    # an authored decal beats the scatter, so it is drawn last
+    for f in m.get("decals", []):
+        if len(f) >= 3 and f[2] in art:
+            dw, dh, dpx = art[f[2]]
+            x, y = int(f[0]) * T, int(f[1]) * T
+            for yy in range(min(dh, H - y)):
+                for xx in range(min(dw, W - x)):
+                    sx_ = (dw - 1 - xx) if len(f) > 3 else xx
+                    if dpx[yy][sx_ * 4 + 3] >= 128:
+                        img[y + yy][(x + xx) * 4:(x + xx) * 4 + 4] = dpx[yy][sx_ * 4:sx_ * 4 + 4]
+
     OUT.mkdir(exist_ok=True)
     out = OUT / f"{slug(mp)}.tmap.png"
     write_png(out, W, H, 4, img)
-    print(f"{m['path'].name}: {w}x{h} tiles -> {out.relative_to(ROOT.parent)}  {W}x{H}"
-          + (f"  ({len(miss)} tile(s) still flat placeholders: {', '.join(sorted(miss))})" if miss else ""))
+    painted = sum(1 for t in terrains if swatch_path(setname, t).exists())
+    print(f"{m['path'].name}: {w}x{h} tiles -> {out.relative_to(ROOT.parent)}  {W}x{H}   "
+          f"{len(terrains)} terrain(s) ({painted} with a swatch), {placed} decal(s) scattered"
+          + (f", {len(miss)} stamp(s) still flat placeholders: {', '.join(sorted(miss))}" if miss else ""))
 
 
 def all_tmaps():
@@ -6706,10 +7806,23 @@ every package in `story/packages/` that has a new image waiting.
 
 
 def write_package(d, meta, builder, args):
-    """Build one package into its folder, then drop the machine index and the return note."""
+    """Build one package into its folder, then drop the machine index and the return note.
+
+    A folder that already holds a returned image is FROZEN: its `template.png` and `sheet.json` are
+    put back exactly as they were after the rebuild, so the image the owner generated can always be
+    cut again. Only the prose — prompt.md, RETURN_HERE.md — is refreshed. Without this, a change to a
+    template's layout (the walk sheet going from 16 frames to 9) would silently invalidate every
+    image already sitting in the tray."""
     d.mkdir(parents=True, exist_ok=True)
+    frozen = {}
+    if pkg_returned(d):
+        for f in ("template.png", "sheet.json"):
+            if (d / f).exists():
+                frozen[f] = (d / f).read_bytes()
     with in_package(d, meta.get("title")):
         ok, msg = run_quiet(builder, args)
+    for f, blob in frozen.items():
+        (d / f).write_bytes(blob)
     if not ok:
         return False, msg or "no package written"
     (d / PKG_META).write_text(json.dumps({**meta, "dir": str(d.relative_to(ROOT.parent))}, indent=2) + "\n")
@@ -6744,6 +7857,8 @@ def cmd_packages(args):
             failures.append((f"tileset {setname}", squash(str(exc.code))))
             continue
         write_tilesets_readme()
+        if set_terrains(tset):                       # generated, and regenerated whenever this runs
+            write_masks(setname, [tset[t]["edge_style"] for t in set_terrains(tset)])
         for d, meta, bargs in plan:
             add(d, meta, cmd_tileset, bargs, group="tileset", tileset=setname)
         write_atlas_json(setname, tset)
@@ -6955,19 +8070,25 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     # ── the tilesets, first on the page: this is the field now (TILES.md, D18) ──
     tsets = [r for r in index if r["group"] == "tileset"]
     L += ["## 1. Tilesets — the tile field", "",
-          "The field is tile sheets and grid walking (`TILES.md`). One sheet is one generation: the",
-          "template is drawn at 4x, so a 32x32 tile is a 128-px slot and every art pixel is a 4x4 block.",
-          "`ingest` snaps the return back onto that grid, keys the magenta on anything that is not opaque",
-          "ground, and packs each tile into its set's `atlas.png` at the index `tiles.md` gives it —",
-          "never disturbing a cell that belongs to another entry. A sheet that has been generated is",
-          "frozen; new tiles go into a fresh `<sheet>_2` beside it.", "",
-          "The fringe convention (which the engine rotates) is written out in",
-          "`story/field/tilesets/README.md`.", "",
-          "| set | sheet | tiles | folder | status | after downloading |",
+          "The field is tile sheets and grid walking (`TILES.md`). **Start with the two sheets at the",
+          "top of this table.** Under TILES2 (D20) a terrain is ONE seamless **swatch** and its edges",
+          "are computed, so the swatch sheet is the whole ground of the world in one generation; the",
+          "**decal** sheet is the variety scattered over it — tufts, flowers, pebbles, reeds — and",
+          "between them they replace every transition tile that used to have to match its neighbours.",
+          "The stamp sheets after them are unchanged: drawn at 4x, a 32x32 tile in a 128-px slot,",
+          "packed into the set's `atlas.png` at the index `tiles.md` gives it. A sheet that has been",
+          "generated is frozen; new ids go into a fresh `<sheet>_2` beside it.", "",
+          "The masks are **generated by the tool** into `<set>/masks.png` — there is nothing to draw",
+          "and nothing to review. The conventions are in `story/field/tilesets/README.md` and the",
+          "contract is `TILES.md`.", "",
+          "| set | sheet | slots | folder | status | after downloading |",
           "| --- | --- | --- | --- | --- | --- |"]
-    for r in tsets:
+    order = {"swatch": 0, "decal": 1, "tileset": 2}
+    for r in sorted(tsets, key=lambda r: (order.get(r["meta"].get("kind"), 3), r["dir"])):
         m = r["meta"]
-        L.append(f"| `{r['tileset']}` | `{m['sheet']}` | {len(m['ids'])} | "
+        what = m.get("sheet") or {"swatch": "swatches (the ground)",
+                                  "decal": "decals (the variety)"}.get(m.get("kind"), m.get("kind"))
+        L.append(f"| `{r['tileset']}` | `{what}` | {len(m['ids'])} | "
                  f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | {state(r)} | {cmd(r['dir'])} |")
     if not tsets:
         L.append("| — | | | | no `story/field/tilesets/<set>/tiles.md` yet | |")
@@ -6980,9 +8101,19 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
             seen.add(r["dir"])
             short.append((r, what))
     todo_first = lambda rs: sorted(rs, key=lambda r: pkg_state(r["dir"], r["meta"])[0] == "done")
-    for r in todo_first(rows("tileset")):
-        step(r, f"the `{r['meta']['sheet']}` sheet of the `{r['tileset']}` tileset — "
-                f"{len(r['meta']['ids'])} tile(s) into that set's atlas, which is what the map is made of")
+    for r in todo_first(sorted(rows("tileset"),
+                               key=lambda r: order.get(r["meta"].get("kind"), 3))):
+        m = r["meta"]
+        if m.get("kind") == "swatch":
+            step(r, f"the `{r['tileset']}` ground swatches — {len(m['ids'])} terrains in one image, "
+                    f"and every edge between them is computed from it. This is the whole ground of "
+                    f"the world.")
+        elif m.get("kind") == "decal":
+            step(r, f"the `{r['tileset']}` decals — {len(m['ids'])} cut-outs the game scatters over "
+                    f"the ground, which is what stops it looking like a sheet of one colour")
+        else:
+            step(r, f"the `{m['sheet']}` sheet of the `{r['tileset']}` tileset — "
+                    f"{len(m['ids'])} tile(s) into that set's atlas, which the map is built from")
     for r in todo_first(rows("refsheet")):       # what is left to do first, then the ones already cut
         step(r, f"{r['who']}'s reference sheet — the portrait, the walker and every panel come from it")
     for r in todo_first([x for x in rows("walker") if not x.get("blocked") and x["meta"].get("handle") in cast]):
@@ -8063,7 +9194,7 @@ def ingest_one(d, meta, returned, extra=()):
         ok, msg = run_quiet(cmd_screen_cut, [str(d / "sheet.json"), str(d),
                                              *[a for a in extra if a == "--debug"]])
         return ok, (SCREEN_SUMMARY[0] if ok and SCREEN_SUMMARY else msg)
-    if kind in FIELD_KINDS or kind in ("view", "tileset"):
+    if kind in FIELD_KINDS or kind in ("view", "tileset", "swatch", "decal"):
         return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]

@@ -1,0 +1,29 @@
+{
+  "kind": "swatch",
+  "set": "valley",
+  "ids": [
+    "grass",
+    "grass_dry",
+    "crop",
+    "mud",
+    "dirt",
+    "gravel",
+    "paving",
+    "bridge_deck",
+    "water"
+  ],
+  "title": "valley \u2014 the ground swatches (9 terrains)",
+  "makes": "9 seamless swatch(es) and the generated masks",
+  "outputs": [
+    "story/field/tilesets/valley/swatches/grass.png",
+    "story/field/tilesets/valley/swatches/grass_dry.png",
+    "story/field/tilesets/valley/swatches/crop.png",
+    "story/field/tilesets/valley/swatches/mud.png",
+    "story/field/tilesets/valley/swatches/dirt.png",
+    "story/field/tilesets/valley/swatches/gravel.png",
+    "story/field/tilesets/valley/swatches/paving.png",
+    "story/field/tilesets/valley/swatches/bridge_deck.png",
+    "story/field/tilesets/valley/swatches/water.png"
+  ],
+  "dir": "story/packages/tilesets/valley/swatches"
+}

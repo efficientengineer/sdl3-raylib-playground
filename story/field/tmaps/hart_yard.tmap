@@ -8,12 +8,9 @@ light: day 1.0
 lamp: 11 17 5.0 0.85 flicker
 ## legend
 . grass
-, grass_tuft
-' grass_flower
+; grass_dry
 d dirt
-D dirt_rut
 p paving
-P paving_worn
 ~ water
 g gravel
 c crop
@@ -57,26 +54,26 @@ k grain_sack
 j stump
 l gate_post
 ## ground
-,.....................''
-,....,,.................
-,.gggggggggggggggggggg..
-..gggggggggggggggggggg,,
-..gggggggggggggggggggg.,
+........................
+........................
 ..gggggggggggggggggggg..
 ..gggggggggggggggggggg..
-..gggggddddddggggggggg''
+..gggggggggggggggggggg..
+..gggggggggggggggggggg..
+..gggggggggggggggggggg..
+..gggggddddddggggggggg..
 ..gggggddddddggggggggg..
 ..ggggggggdddggggggggg..
-..ggggggggdDdggggggggg..
-..ggggggggdDdggggggggg..
-..ggggggggdddggggggggg..
-..ggggggggDDdggggggggg..
 ..ggggggggdddggggggggg..
 ..ggggggggdddggggggggg..
-..ggggggggdddggggggggg.,
-..ggggggggDDDggggggggg.,
-..''...,,.dDD....,.....,
-.''',,,.,,ddd...,,.....,
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..........ddd...........
+..........ddd...........
 ## objects
 ........................
 .xwwwwwwwwwwwwwwwwwwwwx.

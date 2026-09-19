@@ -62,14 +62,14 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | `well` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 62x122 |
 | `yard_wall` | prop | 192x128 | `story/packages/ch01/halm/props` | yes, 186x97 |
 
-## Walkers — alpha, 4 rows (S, W, E, N) x 4 columns of 256x384 frames
+## Walkers — alpha, 4 rows (S, W, E, N) x 4 columns of 128x192 frames
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `falke` | walker | 1024x1536 | `story/packages/cast/falke/walker` | yes, 1024x1536 |
-| `ottilie` | walker | 1024x1536 | `story/packages/cast/ottilie/walker` | yes, 1024x1536 |
-| `villager_a` | walker | 1024x1536 | `story/packages/cast/villager_a/walker` | yes, 1024x1536 |
-| `villager_b` | walker | 1024x1536 | `story/packages/cast/villager_b/walker` | yes, 1024x1536 |
+| `falke` | walker | 384x576 | `walker_falke` | yes, 384x576 |
+| `ottilie` | walker | 384x576 | `story/packages/cast/ottilie/walker` | yes, 384x576 |
+| `villager_a` | walker | 512x768 | `story/packages/cast/villager_a/walker` | yes, 384x576 |
+| `villager_b` | walker | 512x768 | `story/packages/cast/villager_b/walker` | yes, 384x576 |
 
 ## Buildings — opaque faces on map geometry: front stretched once across the front wall, side and roof seamless
 

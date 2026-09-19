@@ -10,7 +10,7 @@ This sheet carries 12 of the tileset's entries: `handcart`, `woodpile`, `haystac
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/tilesets/valley/objects_4/template.png`
-2. `story/refs/style.png`
+2. `story/sheets/tests/clean_style_test_v1.png`
 3. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
@@ -20,11 +20,11 @@ Create ONE image: the attached template with all 12 numbered slots filled in. Ca
 
 PIXEL GRID — THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at 4x. Every art pixel is a 4x4 block of identical colour, aligned to the slot: the blocks start at the slot's top-left inside corner and run in an even grid across and down it, so a 128-pixel slot is a 32x32 pixel-art tile blown up 4 times. No block is half a colour, no edge falls between blocks, no detail is finer than one block, and no two objects on the sheet use different block sizes. This is pixel art at 4x, not a smooth drawing shrunk down.
 
-16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.
+Top-down JRPG field art in the clean 16-bit manner: flat luminous fields of colour, big simple shapes, soft painted edges, sparse deliberate detail. Every shadow is a single cool blue-violet tone, never a gradient and never grey.
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
-Image 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
+Image 2: STYLE reference. STYLE reference — this is our own approved art, so match it closely: the flat luminous colour, the big simple shapes, the soft painted edges, the sparse deliberate detail and the single cool blue-violet shadow tone. Its colours come from the palette image attached last. Do not copy its layout, its objects or its composition, and do not copy any dithering or stipple.
 Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
@@ -49,10 +49,10 @@ PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for e
 SLOTS — 12 of them, grouped by kind:
 
 STAMPS (objects):
-Slot 1 (handcart), 256x256 px = 2x2 tiles: a two-wheeled handcart standing empty with its shafts down. Standing on the slot's bottom edge, everything else left as background.
-Slot 2 (woodpile), 256x256 px = 2x2 tiles: split logs stacked end-on against a yard wall. Standing on the slot's bottom edge, everything else left as background.
-Slot 3 (haystack), 256x256 px = 2x2 tiles: a small hayrick, roped over the top. Standing on the slot's bottom edge, everything else left as background.
-Slot 4 (market_stall), 256x256 px = 2x2 tiles: a trestle under a striped awning, nothing laid out on it. Standing on the slot's bottom edge, everything else left as background.
+Slot 1 (handcart), 256x256 px = 2x2 tiles: a two-wheeled handcart standing empty with its shafts down. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 2 (woodpile), 256x256 px = 2x2 tiles: split logs stacked end-on against a yard wall. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 3 (haystack), 256x256 px = 2x2 tiles: a small hayrick, roped over the top. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
+Slot 4 (market_stall), 256x256 px = 2x2 tiles: a trestle under a striped awning, nothing laid out on it. Its art fills its footprint edge to edge: walls to the left and right edges of its tiles and the front wall down to the bottom edge, with no ground, grass or shadow inside the footprint. Standing on the slot's bottom edge, everything else left as background.
 Slot 5 (barrel), 128x128 px = 1x1 tile: a water barrel with iron hoops, the lid off and the water standing in it. Standing on the slot's bottom edge, everything else left as background.
 Slot 6 (crate), 128x128 px = 1x1 tile: a nailed wooden crate with a batten across the face. Standing on the slot's bottom edge, everything else left as background.
 Slot 7 (boulder), 128x128 px = 1x1 tile: a single grey field stone too big to shift, moss on its north side. Standing on the slot's bottom edge, everything else left as background.
