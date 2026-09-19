@@ -181,3 +181,13 @@ is the block-out. Each fixed camera zone can be captured from the game, painted 
 block-out renders to depth only, so sprites layer per pixel without hand-made masks. Zones without a
 painting keep the live 3D; ortho or perspective per zone. Navmesh, zones, triggers and all authored
 maps are unchanged. To reverse: delete the paintings; the 3D is still there.
+
+## D16. ChatGPT paints the screen; the game is fitted to the painting
+Owner (2026-09-18), hours after D15: block-outs still mean we build the place first. "I want ChatGPT to
+basically generate the map." Adopted: a field screen is one painting plus two binary masks requested in
+the same chat (walkable = green/black; foreground = white/black), because the owner's hand test showed
+a three-colour mask fails (an invented yellow class, line art left in) while the painting itself was
+excellent. The tool derives the navmesh (screen-space convex polygons), occluder cut-outs with base
+lines for y-sorting, exits at frame edges, and a walker scale by screen y. The 3D field (D14) and
+painted block-outs (D15) stay available where exact layout matters (the Stair). To reverse: maps
+without a `.screen` file fall back to 3D automatically.
