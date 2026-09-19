@@ -191,3 +191,14 @@ excellent. The tool derives the navmesh (screen-space convex polygons), occluder
 lines for y-sorting, exits at frame edges, and a walker scale by screen y. The 3D field (D14) and
 painted block-outs (D15) stay available where exact layout matters (the Stair). To reverse: maps
 without a `.screen` file fall back to 3D automatically.
+
+## D17. The field is 2D top-down, Phantasy Star IV style
+Owner (2026-09-19): "I'm over trying to do this like FF8. Why don't we just go with the original 2D
+like Phantasy Star 4." After a day of 2.5D (D14), painted block-outs (D15) and angled painted screens
+(D16), the angled view's cost was all in occlusion: ChatGPT cannot paint ground hidden behind objects,
+and foreground masks merge into blobs. Top-down removes the problem: nothing is walked behind. Kept from
+D16: ChatGPT paints the whole map; one walkable mask gives the navmesh; exits at frame edges; the
+screen-map engine, the tray app's multi-step packages, `ingest`. Dropped: foreground mask, base map,
+depth scaling. Added: a stated walker height per map, 4-direction facing, a trailing party member, an
+optional "overhead" overlay for arch tops and bridge decks, door notches. The 3D field, sweeps,
+captures and painted block-outs are parked in the code, not deleted. To reverse: they still load.
