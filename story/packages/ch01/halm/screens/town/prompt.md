@@ -10,7 +10,7 @@ for the map and the mask in one message — the mask must be traced from the fin
 - `story/field/screens/halm_town_walk.png` — missing
 - `story/field/screens/halm_town.screen` — missing
 
-Style blocks used from `story/STYLE.md`: header, rendering, negative (`negative` minus its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, `character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: this is a top-down field map, not a manga page.
+Style blocks used from `story/STYLE.md`: map_header, map_rendering, map_negative (`negative` minus its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, `character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: this is a top-down field map, not a manga page.
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -33,8 +33,7 @@ Style blocks used from `story/STYLE.md`: header, rendering, negative (`negative`
 ````
 Paint one complete top-down map for a 16-bit JRPG: the whole place the player walks around in, as one finished picture. This is a field map, not a comic page and not a scene — no panels, no borders, no frame, one single image filling the canvas edge to edge.
 
-16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.
-(That is the game's look, locked in STYLE.md. It says cutscene because the panels came first; this is a field map drawn in the same look, not a cutscene panel.)
+16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star IV look.
 
 THE PROJECTION, and it is the most important instruction here: the classic top-down oblique those games are drawn in. The ground is seen from straight above, flat, as if the map were laid on a table. Buildings and objects show their roof and their front — their south — face only, and every vertical edge runs straight up the screen. There is NO perspective, NO vanishing point, NO horizon and no sky. Nothing gets smaller further up the picture: one uniform scale from edge to edge, the same size at the top as at the bottom. Nothing leans, nothing is foreshortened, no side or three-quarter faces on anything.
 
@@ -53,11 +52,11 @@ HOW THE PLACE IS SHAPED — people grew this, they did not lay it out. It spread
 
 NO PEOPLE, no characters, no animals: the game draws those on top as moving sprites, and a painted one would stand still forever. No text, no letters, no numbers, no writing on signs or boards, no labels, no watermark, no user interface, no map legend, no compass, no frame, no border, no vignette and no letterboxing.
 
-RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
+RENDERING: Low resolution pixel art upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors. Checkerboard dithering only on large flat areas of ground, water and roof, never as noisy texture on small objects. Thin 1-pixel dark outlines around every object that stands on the ground. Muted earthy ground tones — grass, dirt, stone, timber — with saturated accents on roofs, doors, awnings, cloth and water. Flat shading with 2-3 tones per color and one consistent light direction across the whole map.
 
 SIZE: one landscape image, 1536x1024, painted edge to edge, the map filling the whole frame like a piece cut out of a larger world.
 
-AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, text, letters, captions, speech bubbles, watermark, signature, perspective, a vanishing point, a horizon, sky, isometric or three-quarter views, side views, things shrinking with distance, a grid layout, buildings in rows, empty unpainted areas, people or animals, text or writing of any kind, a user interface, a border or a vignette
+AVOID: perspective, vanishing point, horizon, sky, isometric view, three-quarter view, side view, things shrinking with distance, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, high resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout, buildings in rows, repeated spacing, people, characters, animals, text, letters, numbers, labels, captions, watermark, signature, user interface, map legend, compass, frame, border, vignette, letterboxing, empty unpainted areas, writing of any kind on signs or boards
 ````
 
 Save it in **this folder** as `returned.png` (the whole path is `story/packages/ch01/halm/screens/town/returned.png`). A .jpg or .webp works too; the tool converts it.

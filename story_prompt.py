@@ -3268,9 +3268,7 @@ If nothing on this map is walked underneath, the whole image is black, and that 
 # `character_design`, `dialogue_box` and the sheet blocks are all about a manga page — panels,
 # borders, crops, people acting — and a field map is none of those, so they are deliberately left out
 # and the package says so.
-SCREEN_BLOCKS = ("header", "rendering", "negative")
-SCREEN_DROP_NEG = ("even panel grid", "panels filling the whole frame", "centered full-figure composition",
-                   "deep perspective")   # panel-sheet complaints that a map prompt has its own words for
+SCREEN_BLOCKS = ("map_header", "map_rendering", "map_negative")
 
 
 def screen_key(mp, zone):
@@ -3369,17 +3367,18 @@ def screen_attachments(style, mp, warn):
 def screen_paint_prompt(e, style, warn):
     """Prompt A: the map itself, in the top-down oblique a 16-bit JRPG town is drawn in."""
     b = style["blocks"]
+    missing = [k for k in SCREEN_BLOCKS if k not in b]
+    if missing:
+        die(f"STYLE.md: a map prompt needs the locked block(s) {', '.join(missing)}. They are the "
+            f"field-map half of the style: the panel blocks talk about skin, hair and skies, which a "
+            f"map has none of.")
     w, h = e["size"]
     P = e["walker"]
     D = int(round(P * DOOR_FACTOR))
-    neg = ", ".join(p for p in (x.strip() for x in b["negative"].split(","))
-                    if p and not any(d in p for d in SCREEN_DROP_NEG))
     L = ["Paint one complete top-down map for a 16-bit JRPG: the whole place the player walks around "
          "in, as one finished picture. This is a field map, not a comic page and not a scene — no "
          "panels, no borders, no frame, one single image filling the canvas edge to edge.", "",
-         b["header"],
-         "(That is the game's look, locked in STYLE.md. It says cutscene because the panels came "
-         "first; this is a field map drawn in the same look, not a cutscene panel.)", "",
+         b["map_header"], "",
          "THE PROJECTION, and it is the most important instruction here: the classic top-down oblique "
          "those games are drawn in. The ground is seen from straight above, flat, as if the map were "
          "laid on a table. Buildings and objects show their roof and their front — their south — face "
@@ -3417,13 +3416,10 @@ def screen_paint_prompt(e, style, warn):
           "painted one would stand still forever. No text, no letters, no numbers, no writing on signs "
           "or boards, no labels, no watermark, no user interface, no map legend, no compass, no frame, "
           "no border, no vignette and no letterboxing.", "",
-          f"RENDERING: {b['rendering']}", "",
+          f"RENDERING: {b['map_rendering']}", "",
           f"SIZE: one landscape image, {w}x{h}, painted edge to edge, the map filling the whole frame "
           f"like a piece cut out of a larger world.", "",
-          f"AVOID: {neg}, perspective, a vanishing point, a horizon, sky, isometric or three-quarter "
-          f"views, side views, things shrinking with distance, a grid layout, buildings in rows, empty "
-          f"unpainted areas, people or animals, text or writing of any kind, a user interface, a "
-          f"border or a vignette"]
+          f"AVOID: {b['map_negative']}, empty unpainted areas, writing of any kind on signs or boards"]
     return "\n".join(L)
 
 

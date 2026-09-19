@@ -239,6 +239,38 @@ frame, deep perspective, centered full-figure composition, text, letters,
 captions, speech bubbles, watermark, signature
 ```
 
+### map_header
+
+```
+16-bit Sega Genesis era pixel art, early 1990s JRPG field map, Phantasy Star
+IV look.
+```
+
+### map_rendering
+
+```
+Low resolution pixel art upscaled with nearest-neighbor, crisp visible pixels
+on a single consistent pixel grid, limited palette of about 32 colors.
+Checkerboard dithering only on large flat areas of ground, water and roof,
+never as noisy texture on small objects. Thin 1-pixel dark outlines around
+every object that stands on the ground. Muted earthy ground tones — grass,
+dirt, stone, timber — with saturated accents on roofs, doors, awnings, cloth
+and water. Flat shading with 2-3 tones per color and one consistent light
+direction across the whole map.
+```
+
+### map_negative
+
+```
+perspective, vanishing point, horizon, sky, isometric view, three-quarter
+view, side view, things shrinking with distance, smooth gradients,
+anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, high
+resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout,
+buildings in rows, repeated spacing, people, characters, animals, text,
+letters, numbers, labels, captions, watermark, signature, user interface,
+map legend, compass, frame, border, vignette, letterboxing
+```
+
 ## Panel shapes
 
 - wide: a wide horizontal panel
