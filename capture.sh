@@ -6,21 +6,34 @@
 #
 # The window flashes up for a moment; that is the renderer doing its one frame.
 #
-# The tile field (TILES.md) has its own mode, and it captures the WHOLE map rather than one view,
-# which is how a .tmap is read as a town without a phone screenshot:
+# The tile field (TILES.md) has its own mode: the player's own 640x360 view rendered at the phone's
+# resolution (scale 3 = 1920x1080), party included, written to build_desktop/tiles_<map>.png.
 #
-#   ./capture.sh --tiles halm        -> build_desktop/tiles_halm.png
+#   ./capture.sh --tiles hart_yard              -> one view, 1920x1080, with Falke and Ottilie
+#   ./capture.sh --tiles halm --whole           -> the WHOLE map, how a .tmap is read as a town
+#   ./capture.sh --tiles halm --no-walkers      -> nobody in it
+#   ./capture.sh --tiles halm 2                 -> a different scale (1..4)
 #
 set -e
 
 if [ "$1" = "--tiles" ]; then
     MAP=${2:-halm}
+    shift 2 || true
+    WHOLE=0; NOWALK=0; SCALE=3
+    for a in "$@"; do
+        case "$a" in
+            --whole) WHOLE=1 ;;
+            --no-walkers) NOWALK=1 ;;
+            [0-9]*) SCALE="$a" ;;
+        esac
+    done
     ROOT="$(cd "$(dirname "$0")" && pwd)"
     OUT="$ROOT/build_desktop/tiles_${MAP}.png"
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
     cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -2
     cd "$ROOT"
-    TILE_CAPTURE="$MAP:1:$OUT" "$ROOT/build_desktop/quest_glory" || true
+    TILE_CAPTURE_WHOLE="$WHOLE" TILE_CAPTURE_NO_WALKERS="$NOWALK" \
+        TILE_CAPTURE="$MAP:$SCALE:$OUT" "$ROOT/build_desktop/quest_glory" || true
     if [ -f "$OUT" ]; then
         echo "wrote $OUT"
         /usr/bin/sips -g pixelWidth -g pixelHeight "$OUT" 2>/dev/null | tail -2

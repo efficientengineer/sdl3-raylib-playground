@@ -43,9 +43,11 @@ bool tf_dev_ui(TileField *t, char *out, int cap);
 
 void tf_message(TileField *t, const char *text);     // show a line in the field dialogue box
 
-// Desktop capture: load `map` and write the WHOLE map to `out_path` as one PNG, so a map can be
-// read as a town without touching the phone. No camera, no letterbox — every tile, every layer.
-void tf_capture_to(TileField *t, const char *map, int scale, const char *out_path);
+// Desktop capture, so the field can be looked at without a phone screenshot. `whole` writes the whole
+// map at one device pixel per logical pixel (how a .tmap is read as a town); otherwise it is the
+// player's own 640x360 view at `scale` device pixels per logical pixel — 3 is the phone's 1920x1080 —
+// centred on the party, with the walkers drawn unless `walkers` is false.
+void tf_capture_to(TileField *t, const char *map, int scale, const char *out_path, bool walkers, bool whole);
 bool tf_capture_done(TileField *t);
 
 void tf_save(TileField *t, TfSave *s);

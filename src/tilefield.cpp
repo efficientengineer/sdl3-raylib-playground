@@ -1,6 +1,8 @@
 // tilefield.cpp — the field, Sega style. TILES.md is the contract; src/TILEFIELD_NOTES.md says what
-// this actually does. 32x32 tiles, one atlas per tileset, grid walking, a 640x360-class FBO handed to
-// ImGui as one nearest-filtered image. Nothing here is 3D and nothing here is a navmesh.
+// this actually does. The world is 32 LOGICAL px to the tile with a 640x360-class view and grid
+// walking; the art is 4x that (128-px atlas cells, 256x384 walker frames) and is drawn into an FBO the
+// size of the drawable, linear-filtered, so nothing is thrown away on the way to the screen.
+// Nothing here is 3D and nothing here is a navmesh.
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <string.h>
@@ -21,7 +23,9 @@
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"
 
-#define TS       32              // tile size in pixels; the whole file assumes it
+#define TS       32              // tile size in LOGICAL pixels; the world, the camera and collision
+                                 // are all in these. Art is 4x that (see `cell` below) and drawn at
+                                 // the screen's own resolution.
 #define VH       360             // internal height, always
 #define VW_MIN   640             // TILES.md's 640x360
 #define VW_MAX   1024            // filled out to the phone's 20:9 rather than pillar-boxed
@@ -371,10 +375,10 @@ struct TfNpc {
     short hx, hy;                     // home tile, for wander
     short tx, ty, px, py;             // tile and the tile stepped from
     float t, wait;
-    int facing, wander, art;
+    int facing, wander, art, parity;
     char walker[24], text[48];
 };
-struct TfArt { char id[24]; GLuint tex; int w, h; };
+struct TfArt { char id[24]; GLuint tex; int w, h, fw, fh; };
 
 struct TfActor { short tx, ty, px, py; int facing; };
 
@@ -386,7 +390,7 @@ struct TileField {
     TfTile tiles[TF_TILES];
     int tile_count;
     GLuint atlas;
-    int atlas_w, atlas_h;
+    int atlas_w, atlas_h, cell;      // cell = atlas pixels per tile (32 placeholder-only, 128 art)
 
     // map
     char map_name[32], music[16];
@@ -412,7 +416,8 @@ struct TileField {
     int want_dir, last_axis;
 
     // camera / view
-    int cam_x, cam_y, vw;
+    int cam_x, cam_y, vw, fbo_w, fbo_h;
+    float sc;                                 // device pixels per logical pixel (~3.0 on the phone)
     float anim_t;
 
     // input
@@ -443,7 +448,7 @@ struct TileField {
     // capture
     GLuint cap_fbo, cap_tex;
     int cap_w, cap_h, cap_req, cap_scale;
-    bool cap_ok;
+    bool cap_ok, cap_walkers, cap_whole, hide_walkers;
     char cap_out[300];
 
     // dev
@@ -466,6 +471,35 @@ static const char *FALLBACK_TMAP =
     "............\n............\n............\n............\n............\n";
 
 // ───────────────────────── tileset ─────────────────────────
+
+// GL_MAX_TEXTURE_SIZE, read once the context exists. 0 means "not asked yet"; every driver this ships
+// on reports at least 4096, but an atlas that is one pixel over the limit uploads as nothing at all,
+// which on a phone looks like a black map and no error.
+static int tf_max_tex = 0;
+static void tf_probe_limits() {
+    if (tf_max_tex) return;
+    GLint m = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m);
+    tf_max_tex = m > 0 ? (int)m : 2048;
+    SDL_Log("tilefield: GL_MAX_TEXTURE_SIZE %d", tf_max_tex);
+}
+
+// Box-average an RGBA image to half size, in place of the original buffer (which it frees).
+static unsigned char *tf_halve(unsigned char *px, int *w, int *h) {
+    int nw = *w / 2, nh = *h / 2;
+    if (nw < 1 || nh < 1) { free(px); return nullptr; }
+    unsigned char *out = (unsigned char *)malloc((size_t)nw * nh * 4);
+    if (!out) { free(px); return nullptr; }
+    for (int y = 0; y < nh; y++) for (int x = 0; x < nw; x++) {
+        for (int c = 0; c < 4; c++) {
+            const unsigned char *s = px + ((size_t)(y * 2) * *w + x * 2) * 4 + c;
+            out[((size_t)y * nw + x) * 4 + c] = (unsigned char)((s[0] + s[4] + s[*w * 4] + s[*w * 4 + 4]) / 4);
+        }
+    }
+    free(px);
+    *w = nw; *h = nh;
+    return out;
+}
 
 static int tile_by_name(TileField *t, const char *name) {
     for (int i = 0; i < t->tile_count; i++) if (!strcmp(t->tiles[i].name, name)) return i;
@@ -497,11 +531,11 @@ static void parse_solid(TfTile *d, const char *val) {
     }
 }
 
-static void gen_into_atlas(TileField *t, TfTile *d, unsigned char *px, int aw) {
-    int cx = (d->index % ATLAS_COLS) * TS, cy = (d->index / ATLAS_COLS) * TS;
-    int frames = d->frames > 1 ? d->frames : 1;
-    for (int fr = 0; fr < frames; fr++) {
-        Pen n = { px, aw, cx + fr * d->w * TS, cy, d->w * TS, d->h * TS };
+// One frame of a placeholder, always drawn at 32 px to the tile: the generators are written in those
+// numbers and nothing is gained by teaching them a second scale.
+static void gen_stub_frame(Pen *pen, TfTile *d, int fr) {
+    {
+        Pen n = *pen;
         const char *nm = d->name;
         uint32_t seed = name_seed(nm);
         if (strstr(nm, "_edge") || strstr(nm, "_corner")) {
@@ -551,6 +585,29 @@ static void gen_into_atlas(TileField *t, TfTile *d, unsigned char *px, int aw) {
             gen_small(&n, nm, seed);
         }
     }
+}
+
+// The placeholder, nearest-upscaled into the atlas's own cell size, so a 128-px atlas with half its
+// cells still empty is a normal working state and the generated cells simply look like big pixels.
+static void gen_into_atlas(TileField *t, TfTile *d, unsigned char *px, int aw) {
+    int cell = t->cell;
+    int frames = d->frames > 1 ? d->frames : 1;
+    int sw = d->w * TS, sh = d->h * TS;
+    unsigned char *scratch = (unsigned char *)calloc((size_t)sw * sh * 4, 1);
+    if (!scratch) return;
+    for (int fr = 0; fr < frames; fr++) {
+        memset(scratch, 0, (size_t)sw * sh * 4);
+        Pen n = { scratch, sw, 0, 0, sw, sh };
+        gen_stub_frame(&n, d, fr);
+        int cx = (d->index % ATLAS_COLS) * cell + fr * d->w * cell, cy = (d->index / ATLAS_COLS) * cell;
+        int k = cell / TS < 1 ? 1 : cell / TS;
+        for (int y = 0; y < sh * k; y++) for (int x = 0; x < sw * k; x++) {
+            const unsigned char *s = scratch + ((size_t)(y / k) * sw + (x / k)) * 4;
+            unsigned char *o = px + ((size_t)(cy + y) * aw + (cx + x)) * 4;
+            o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = s[3];
+        }
+    }
+    free(scratch);
 }
 
 static bool load_tileset(TileField *t, const char *set) {
@@ -622,7 +679,20 @@ static bool load_tileset(TileField *t, const char *set) {
         int r = e->index / ATLAS_COLS + e->h;
         if (r > rows) rows = r;
     }
-    int aw = ATLAS_COLS * TS, ah = rows * TS;
+    // `cell` is how many atlas pixels one tile is drawn at: 128 for the art contract, 32 when there is
+    // no atlas.json at all, which is the placeholder-only path and still works exactly as it did.
+    t->cell = 32;
+    snprintf(rel, sizeof(rel), "field/tilesets/%s/atlas.json", set);
+    sz = 0;
+    char *meta = (char *)tf_read(rel, &sz);
+    if (meta) {
+        const char *k = strstr(meta, "\"cell\"");
+        int c = 0;
+        if (k && sscanf(k + 6, " : %d", &c) == 1 && c >= 8 && c <= 512) t->cell = c;
+        SDL_free(meta);
+    }
+    int cell = t->cell;
+    int aw = ATLAS_COLS * cell, ah = rows * cell;
     unsigned char *px = (unsigned char *)calloc((size_t)aw * ah * 4, 1);
     if (!px) return false;
 
@@ -635,6 +705,8 @@ static bool load_tileset(TileField *t, const char *set) {
         unsigned char *img = stbi_load_from_memory((const unsigned char *)data, (int)sz, &iw, &ih, &ic, 4);
         SDL_free(data);
         if (img) {
+            if (iw != aw) SDL_Log("tilefield: atlas.png is %d wide, the tiles.md + cell %d want %d — pasted from the left",
+                                  iw, cell, aw);
             for (int y = 0; y < ih && y < ah; y++)
                 memcpy(px + (size_t)y * aw * 4, img + (size_t)y * iw * 4, (size_t)(iw < aw ? iw : aw) * 4);
             stbi_image_free(img);
@@ -647,27 +719,38 @@ static bool load_tileset(TileField *t, const char *set) {
     int stubs = 0;
     for (int i = 0; i < t->tile_count; i++) {
         TfTile *e = &t->tiles[i];
-        int cx = (e->index % ATLAS_COLS) * TS, cy = (e->index / ATLAS_COLS) * TS;
+        int cx = (e->index % ATLAS_COLS) * cell, cy = (e->index / ATLAS_COLS) * cell;
         bool empty = true;
         if (have) {
-            for (int y = cy; y < cy + e->h * TS && empty; y++)
-                for (int x = cx; x < cx + e->w * TS && empty; x++)
+            for (int y = cy; y < cy + e->h * cell && empty; y++)
+                for (int x = cx; x < cx + e->w * cell && empty; x++)
                     if (x < aw && y < ah && px[((size_t)y * aw + x) * 4 + 3]) empty = false;
         }
         if (!empty) continue;
         gen_into_atlas(t, e, px, aw);
         stubs++;
     }
-    SDL_Log("tilefield: tileset %s — %d tiles, %d placeholders, atlas %dx%d%s",
-            set, t->tile_count, stubs, aw, ah, have ? "" : " (no atlas.png)");
+    SDL_Log("tilefield: tileset %s — %d tiles, %d placeholders, cell %d, atlas %dx%d (%.1f MB)%s",
+            set, t->tile_count, stubs, cell, aw, ah, (double)aw * ah * 4 / (1024 * 1024), have ? "" : " (no atlas.png)");
+
+    while (tf_max_tex > 0 && (aw > tf_max_tex || ah > tf_max_tex)) {          // never silently fail to upload
+        SDL_Log("tilefield: atlas %dx%d is over GL_MAX_TEXTURE_SIZE %d — HALVING; the art will be soft",
+                aw, ah, tf_max_tex);
+        px = tf_halve(px, &aw, &ah);
+        t->cell = cell = cell / 2;
+        if (!px) return false;
+    }
 
     if (t->atlas) glDeleteTextures(1, &t->atlas);
     glGenTextures(1, &t->atlas);
     glBindTexture(GL_TEXTURE_2D, t->atlas);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, aw, ah, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // Linear both ways: the art is 4x the logical grid, so every tile is MINIFIED about 0.75x and
+    // nearest would alias it into mush. No mipmaps — at 0.75x they buy nothing and the first mip
+    // level averages across cell borders, which is exactly the bleeding the UV inset exists to stop.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     t->atlas_w = aw; t->atlas_h = ah;
@@ -688,27 +771,44 @@ static int art_get(TileField *t, const char *id) {
     void *data = tf_read(rel, &sz);
     unsigned char *px = nullptr;
     int w = TS * 4, h = 48 * 4;
+    const char *why = "no file";
     if (data) {
         int iw = 0, ih = 0, ic = 0;
         px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &iw, &ih, &ic, 4);
         SDL_free(data);
-        if (px && (iw != TS * 4 || ih != 48 * 4)) {
-            SDL_Log("tilefield: walker %s is %dx%d, wanted %dx%d — using the placeholder", id, iw, ih, TS * 4, 48 * 4);
+        if (!px) why = "unreadable png";
+        // Any 4x4 grid is legal: the frame is sheet/4 whatever the sheet's size (128x192 and the
+        // 384x576 hi-res contract both land here). Only a size that cannot be a 4x4 grid is rejected.
+        else if (iw < 4 || ih < 4 || (iw & 3) || (ih & 3)) {
+            why = "not a 4x4 grid";
+            SDL_Log("tilefield: walker \"%s\" is %dx%d, which is not four frames by four — using the placeholder", id, iw, ih);
             stbi_image_free(px); px = nullptr;
-        }
+        } else { w = iw; h = ih; why = "file"; }
     }
     bool own = false;
     if (!px) { px = (unsigned char *)malloc((size_t)w * h * 4); own = true; gen_walker_sheet(px, w, h, id); }
+    tf_probe_limits();
+    while (tf_max_tex > 0 && (w > tf_max_tex || h > tf_max_tex)) {
+        SDL_Log("tilefield: walker \"%s\" sheet %dx%d is over GL_MAX_TEXTURE_SIZE %d — halving", id, w, h, tf_max_tex);
+        unsigned char *copy = px;
+        if (!own) { copy = (unsigned char *)malloc((size_t)w * h * 4); memcpy(copy, px, (size_t)w * h * 4); stbi_image_free(px); own = true; }
+        px = tf_halve(copy, &w, &h);
+        if (!px) return -1;
+    }
+    int clear = 0;
+    for (size_t i = 3; i < (size_t)w * h * 4; i += 4) if (px[i] < 128) clear++;
+    SDL_Log("tilefield: walker \"%s\" — %s, sheet %dx%d, frame %dx%d, %d%% transparent%s",
+            id, why, w, h, w / 4, h / 4, clear * 100 / (w * h), clear ? "" : "  <-- NO TRANSPARENCY");
     glGenTextures(1, &a->tex);
     glBindTexture(GL_TEXTURE_2D, a->tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);        // 256x384 frames drawn at
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);        // ~96x144: minified, so linear
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     if (own) free(px); else stbi_image_free(px);
-    a->w = w; a->h = h;
+    a->w = w; a->h = h; a->fw = w / 4; a->fh = h / 4;
     return t->art_count++;
 }
 
@@ -956,6 +1056,7 @@ static GLuint tf_shader(GLenum type, const char *src) {
 // Built on the first frame and again after every hot reload; the old .so's GL objects leak, which is
 // accepted here as it is in field.cpp (CLAUDE.md: never dlclose on Android).
 static void tf_gl_init(TileField *t) {
+    tf_probe_limits();
     GLuint vs = tf_shader(GL_VERTEX_SHADER, TF_VS), fs = tf_shader(GL_FRAGMENT_SHADER, TF_FS);
     t->prog = glCreateProgram();
     glAttachShader(t->prog, vs); glAttachShader(t->prog, fs);
@@ -979,20 +1080,30 @@ static void tf_gl_init(TileField *t) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glGenTextures(1, &t->fbo_tex);
+    glGenFramebuffers(1, &t->fbo);
+    t->fbo_w = t->fbo_h = 0;
+    glBindTexture(GL_TEXTURE_2D, 0);
+    t->gl_ready = true;
+}
+
+// The view's FBO, in DEVICE pixels: logical 640x360-class times the view scale. Reallocated only when
+// that size changes (a rotation, or a different screen), so the normal frame allocates nothing.
+static void tf_fbo_size(TileField *t, int w, int h) {
+    if (t->fbo_w == w && t->fbo_h == h) return;
     glBindTexture(GL_TEXTURE_2D, t->fbo_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VW_MAX, VH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);       // nearest upscale: pixel art
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);       // nearest all the way out
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glGenFramebuffers(1, &t->fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t->fbo_tex, 0);
     GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (st != GL_FRAMEBUFFER_COMPLETE) SDL_Log("tilefield: FBO incomplete 0x%x", st);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    t->gl_ready = true;
+    t->fbo_w = w; t->fbo_h = h;
+    SDL_Log("tilefield: view FBO %dx%d device px", w, h);
 }
 
 // ───────────────────────── the batch ─────────────────────────
@@ -1035,16 +1146,27 @@ static void push_quad(TileField *t, float x, float y, float w, float h,
 #define TF_WHITE 0xFFFFFFFFu
 
 // One atlas cell (or a w x h block starting at `index`) at screen pixel x,y.
+// Logical pixel to device pixel, rounded. Every quad's edges go through this, so two ground tiles that
+// share a logical edge share the same device edge exactly: no crack, no overlap, whatever the scale.
+static float dev(TileField *t, float logical) { return floorf(logical * t->sc + 0.5f); }
+
+// One atlas cell (or a cw x ch block starting at `index`) at LOGICAL pixel x,y. The UVs are inset by
+// half a texel on every side: with linear filtering a UV sitting exactly on a cell boundary blends in
+// the neighbouring cell, which reads as a seam of the wrong tile along every edge.
 static void push_cell(TileField *t, int index, int cw, int ch, float x, float y, int rot, unsigned int col) {
     float aw = (float)t->atlas_w, ah = (float)t->atlas_h;
-    float u0 = (float)((index % ATLAS_COLS) * TS) / aw, v0 = (float)((index / ATLAS_COLS) * TS) / ah;
-    push_quad(t, x, y, (float)(cw * TS), (float)(ch * TS),
-              u0, v0, u0 + cw * TS / aw, v0 + ch * TS / ah, rot, col);
+    int cell = t->cell;
+    float hu = 0.5f / aw, hv = 0.5f / ah;
+    float u0 = (float)((index % ATLAS_COLS) * cell) / aw, v0 = (float)((index / ATLAS_COLS) * cell) / ah;
+    float x0 = dev(t, x), y0 = dev(t, y), x1 = dev(t, x + cw * TS), y1 = dev(t, y + ch * TS);
+    push_quad(t, x0, y0, x1 - x0, y1 - y0,
+              u0 + hu, v0 + hv, u0 + cw * cell / aw - hu, v0 + ch * cell / ah - hv, rot, col);
 }
 
 static void push_solid(TileField *t, float x, float y, float w, float h, unsigned int col) {
     tf_use(t, t->white);
-    push_quad(t, x, y, w, h, 0.05f, 0.05f, 0.95f, 0.95f, 0, col);
+    float x0 = dev(t, x), y0 = dev(t, y);
+    push_quad(t, x0, y0, dev(t, x + w) - x0, dev(t, y + h) - y0, 0.05f, 0.05f, 0.95f, 0.95f, 0, col);
 }
 
 // ───────────────────────── render ─────────────────────────
@@ -1107,20 +1229,35 @@ static void draw_stamps(TileField *t, int x0, int y0, int x1, int y1, bool over_
         if (p->x >= x1 || p->y >= y1 || p->x + d->w <= x0 || p->y + d->h <= y0) continue;
         int split = d->layer == LY_OVER ? d->h : d->over;                  // whole stamp over, or its top rows
         int r0 = over_pass ? 0 : split, r1 = over_pass ? split : d->h;
-        for (int r = r0; r < r1; r++)
-            push_cell(t, d->index + r * ATLAS_COLS, d->w, 1,
-                      (float)(p->x * TS - t->cam_x), (float)((p->y + r) * TS - t->cam_y), 0, TF_WHITE);
+        if (r1 <= r0) continue;
+        // ONE quad for the whole contiguous block of rows: a row-per-quad stamp shows a hairline seam
+        // between its rows once the art is filtered, and a house is one picture, not a stack of strips.
+        push_cell(t, d->index + r0 * ATLAS_COLS, d->w, r1 - r0,
+                  (float)(p->x * TS - t->cam_x), (float)((p->y + r0) * TS - t->cam_y), 0, TF_WHITE);
     }
 }
 
-// Feet on the tile, head over the tile above: a 32x48 sprite sits 16 px higher than its cell.
+// One tile wide, one and a half tall, feet on the tile's bottom edge and centred on it — whatever the
+// sheet's own resolution is. The frame is sheet/4 by sheet/4, so 128x192 and 1024x1536 both land here
+// and only the sharpness differs.
 static void draw_walker(TileField *t, int art, float fx, float fy, int facing, int col, unsigned int tint) {
     if (art < 0 || art >= t->art_count) return;
     TfArt *a = &t->art[art];
     tf_use(t, a->tex);
+    float hu = 0.5f / (float)a->w, hv = 0.5f / (float)a->h;
     float u = (float)(col & 3) / 4.0f, v = (float)(facing & 3) / 4.0f;
-    push_quad(t, fx - t->cam_x, fy - 16.0f - t->cam_y, (float)TS, 48.0f,
-              u, v, u + 0.25f, v + 0.25f, 0, tint);
+    float x0 = dev(t, fx - t->cam_x), y0 = dev(t, fy - 16.0f - t->cam_y);
+    float x1 = dev(t, fx - t->cam_x + TS), y1 = dev(t, fy - 16.0f - t->cam_y + 48.0f);
+    push_quad(t, x0, y0, x1 - x0, y1 - y0,
+              u + hu, v + hv, u + 0.25f - hu, v + 0.25f - hv, 0, tint);
+}
+
+// The walk cycle. The sheet is stand, step-left, stand, step-right; a step shows two of those four, and
+// the two steps alternate, so walking two tiles plays 1,2,3,0 — the same alternating feet PS4 has.
+// `parity` flips on every step, `k` is how far through the step we are.
+static int walk_col(int parity, float k, bool moving) {
+    if (!moving) return 0;
+    return ((parity ? 2 : 0) + (k < 0.5f ? 1 : 2)) & 3;
 }
 
 struct Drawable { float y; int art, facing, col; float x, sy; unsigned int tint; };
@@ -1132,9 +1269,13 @@ static int drawable_cmp(const void *a, const void *b) {
 
 static float lerp(float a, float b, float k) { return a + (b - a) * k; }
 
-static void tf_render(TileField *t, int vw, int vh) {
+// `vw`,`vh` are the LOGICAL view; `sc` device pixels per logical pixel. Nothing in the world changes
+// with sc — it is only how big the quads and their textures come out on this screen.
+static void tf_render(TileField *t, int vw, int vh, float sc) {
+    t->sc = sc;
+    int dw = (int)(vw * sc + 0.5f), dh = (int)(vh * sc + 0.5f);
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
-    glViewport(0, 0, vw, vh);
+    glViewport(0, 0, dw, dh);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
@@ -1142,7 +1283,7 @@ static void tf_render(TileField *t, int vw, int vh) {
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(t->prog);
-    glUniform2f(t->u_res, (float)vw, (float)vh);
+    glUniform2f(t->u_res, (float)dw, (float)dh);        // the batch is built in device pixels
     glUniform1i(t->u_tex, 0);
     glActiveTexture(GL_TEXTURE0);
     t->vn = 0; t->cur_tex = 0;
@@ -1174,12 +1315,14 @@ static void tf_render(TileField *t, int vw, int vh) {
     int nd = 0;
     float k = t->moving ? t->move_t / t->step_len : 1.0f;
     if (k > 1) k = 1;
+    if (!t->hide_walkers) {                    // a capture can ask for the town with nobody in it
     for (int i = 0; i < t->party && nd < (int)(sizeof(dr) / sizeof(dr[0])); i++) {
         TfActor *a = &t->act[i];
         float fx = lerp(a->px * (float)TS, a->tx * (float)TS, k), fy = lerp(a->py * (float)TS, a->ty * (float)TS, k);
         bool mv = t->moving && (a->px != a->tx || a->py != a->ty);
-        int col = mv ? (t->step_parity ? 1 : 3) : 0;
-        static const char *PARTY_ART[TF_PARTY] = { "hero", "ottilie", "party_c", "party_d" };
+        int col = walk_col(t->step_parity, k, mv);
+        // The ids are the walker FILE names, which are the story's names: story/field/walkers/falke.png.
+        static const char *PARTY_ART[TF_PARTY] = { "falke", "ottilie", "party_c", "party_d" };
         int art = art_get(t, PARTY_ART[i]);
         dr[nd].y = fy; dr[nd].x = fx; dr[nd].sy = fy; dr[nd].art = art;
         dr[nd].facing = a->facing; dr[nd].col = col; dr[nd].tint = TF_WHITE;
@@ -1191,12 +1334,14 @@ static void tf_render(TileField *t, int vw, int vh) {
         float fx = lerp(np->px * (float)TS, np->tx * (float)TS, nk), fy = lerp(np->py * (float)TS, np->ty * (float)TS, nk);
         if (fx < t->cam_x - TS * 2 || fx > t->cam_x + vw + TS * 2) continue;
         dr[nd].y = fy; dr[nd].x = fx; dr[nd].sy = fy; dr[nd].art = np->art;
-        dr[nd].facing = np->facing; dr[nd].col = (np->px != np->tx || np->py != np->ty) ? ((int)(np->t * 8) & 1 ? 1 : 3) : 0;
+        dr[nd].facing = np->facing;
+        dr[nd].col = walk_col(np->parity, nk, np->px != np->tx || np->py != np->ty);   // the same cycle
         dr[nd].tint = TF_WHITE;
         nd++;
     }
     qsort(dr, (size_t)nd, sizeof(dr[0]), drawable_cmp);
     for (int i = 0; i < nd; i++) draw_walker(t, dr[i].art, dr[i].x, dr[i].sy, dr[i].facing, dr[i].col, dr[i].tint);
+    }
 
     draw_stamps(t, x0, y0, x1, y1, true);
 
@@ -1373,6 +1518,7 @@ static void npc_step(TileField *t, float dt) {
         np->px = np->tx; np->py = np->ty;
         np->tx = (short)nx; np->ty = (short)ny;
         np->t = 0;
+        np->parity ^= 1;                                  // alternate feet, exactly as the party does
         t->solid[ny][nx] = 1;
     }
 }
@@ -1566,14 +1712,27 @@ void tf_tick(TileField *t, int w, int h, float dt, bool ui_blocked, TfEvent *ev)
     t->cam_x = mapw <= vw ? (mapw - vw) / 2 : (cx < 0 ? 0 : cx > mapw - vw ? mapw - vw : cx);
     t->cam_y = maph <= VH ? (maph - VH) / 2 : (cy < 0 ? 0 : cy > maph - VH ? maph - VH : cy);
 
-    tf_render(t, vw, VH);
-
+    // The view is rendered at the SCREEN's own resolution: the logical world is still 640x360-class and
+    // 32 px to the tile, but every quad comes out `sc` times bigger and its texture is sampled at that
+    // size, so 128-px tiles and 256x384 walker frames arrive as themselves and nothing is thrown away.
     float sc = fminf((float)w / vw, (float)h / VH);
-    float dw = vw * sc, dh = VH * sc, ox = (w - dw) * 0.5f, oy = (h - dh) * 0.5f;
+    int dwi = (int)(vw * sc + 0.5f), dhi = (int)(VH * sc + 0.5f);
+    tf_fbo_size(t, dwi, dhi);
+    tf_render(t, vw, VH, sc);
+
+    float dw = (float)dwi, dh = (float)dhi, ox = (w - dw) * 0.5f, oy = (h - dh) * 0.5f;
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
     dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
     dl->AddImage((ImTextureID)(intptr_t)t->fbo_tex, ImVec2(ox, oy), ImVec2(ox + dw, oy + dh),
-                 ImVec2(0.0f, 1.0f), ImVec2((float)vw / VW_MAX, 0.0f));      // GL's origin is bottom-left
+                 ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));                    // GL's origin is bottom-left
+    {   // Fill rate, in the log rather than guessed at: the view is ~2.6 Mpx a frame at 3x.
+        static int frames = 0; static float secs = 0;
+        secs += dt;
+        if (++frames >= 600) {
+            SDL_Log("tilefield: %d frames in %.1fs — %.1f fps, %dx%d device px", frames, secs, frames / secs, dwi, dhi);
+            frames = 0; secs = 0;
+        }
+    }
     draw_touch_ui(t, w, h);
     draw_msg_box(t, w, h);
     if (t->dbg_coord) {
@@ -1588,9 +1747,34 @@ void tf_tick(TileField *t, int w, int h, float dt, bool ui_blocked, TfEvent *ev)
 // The whole map in one PNG, so the town can be read on the Mac without a phone screenshot.
 
 static void tf_do_capture(TileField *t) {
-    int cw = t->mw * TS, ch = t->mh * TS;      // one internal pixel per pixel; no scaling to go wrong
-    if (cw > 4096) cw = 4096;
-    if (ch > 4096) ch = 4096;
+    tf_probe_limits();
+    // Two shapes: the whole map at one device pixel per logical pixel (how a .tmap is read as a town),
+    // or the player's own 640x360 view at the capture scale — 3 gives 1920x1080, which is what the
+    // phone draws, so the art can be judged at the size it will actually be seen.
+    int lw, lh, sc = t->cap_scale < 1 ? 1 : t->cap_scale;
+    if (t->cap_whole) { lw = t->mw * TS; lh = t->mh * TS; sc = 1; }
+    else { lw = VW_MIN; lh = VH; }
+    int cw = lw * sc, ch = lh * sc;
+    while (tf_max_tex > 0 && (cw > tf_max_tex || ch > tf_max_tex) && sc > 1) { sc--; cw = lw * sc; ch = lh * sc; }
+    if (cw > 4096) { lw = 4096 / sc; cw = lw * sc; }
+    if (ch > 4096) { lh = 4096 / sc; ch = lh * sc; }
+    t->hide_walkers = !t->cap_walkers;
+    // At spawn the whole party stands on one tile, so a capture would show one sprite. Trail them out
+    // behind the leader for the picture only: the point of the shot is to see everyone's art.
+    if (t->cap_walkers) {
+        for (int i = 1; i < t->party; i++) {
+            int bx = t->act[i - 1].tx - DX[t->act[0].facing & 3], by = t->act[i - 1].ty - DY[t->act[0].facing & 3];
+            if (bx < 0 || by < 0 || bx >= t->mw || by >= t->mh) break;
+            t->act[i].tx = t->act[i].px = (short)bx; t->act[i].ty = t->act[i].py = (short)by;
+        }
+    }
+    if (t->cap_whole) { t->cam_x = t->cam_y = 0; }
+    else {                                                   // centre on the leader, clamped like the game
+        int mapw = t->mw * TS, maph = t->mh * TS;
+        int cx = t->act[0].tx * TS + TS / 2 - lw / 2, cy = t->act[0].ty * TS + TS / 2 - lh / 2;
+        t->cam_x = mapw <= lw ? (mapw - lw) / 2 : (cx < 0 ? 0 : cx > mapw - lw ? mapw - lw : cx);
+        t->cam_y = maph <= lh ? (maph - lh) / 2 : (cy < 0 ? 0 : cy > maph - lh ? maph - lh : cy);
+    }
     if (t->cap_w != cw || t->cap_h != ch) {
         if (t->cap_tex) { glDeleteTextures(1, &t->cap_tex); glDeleteFramebuffers(1, &t->cap_fbo); }
         glGenTextures(1, &t->cap_tex);
@@ -1605,12 +1789,10 @@ static void tf_do_capture(TileField *t) {
         t->cap_w = cw; t->cap_h = ch;
     }
     GLuint keep = t->fbo;
-    int kx = t->cam_x, ky = t->cam_y;
     t->fbo = t->cap_fbo;
-    t->cam_x = t->cam_y = 0;
-    tf_render(t, cw, ch);
+    tf_render(t, lw, lh, (float)sc);
     t->fbo = keep;
-    t->cam_x = kx; t->cam_y = ky;
+    t->hide_walkers = false;
 
     unsigned char *px = (unsigned char *)malloc((size_t)cw * ch * 4);
     unsigned char *row = (unsigned char *)malloc((size_t)cw * 4);
@@ -1624,16 +1806,19 @@ static void tf_do_capture(TileField *t) {
         memcpy(px + (size_t)(ch - 1 - y) * cw * 4, row, (size_t)cw * 4);
     }
     int ok = stbi_write_png(t->cap_out, cw, ch, 4, px, cw * 4);
-    SDL_Log("tilefield: capture %s %dx%d %s", t->cap_out, cw, ch, ok ? "written" : "FAILED");
+    SDL_Log("tilefield: capture %s %dx%d (%s, %s walkers) %s", t->cap_out, cw, ch,
+            t->cap_whole ? "whole map" : "one view", t->cap_walkers ? "with" : "no", ok ? "written" : "FAILED");
     free(px); free(row);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     t->cap_ok = true;
 }
 
-void tf_capture_to(TileField *t, const char *map, int scale, const char *out_path) {
+void tf_capture_to(TileField *t, const char *map, int scale, const char *out_path, bool walkers, bool whole) {
     if (!t->gl_ready) tf_gl_init(t);
     tf_load_map(t, map);
     t->cap_scale = scale < 1 ? 1 : scale > 4 ? 4 : scale;
+    t->cap_walkers = walkers;
+    t->cap_whole = whole;
     snprintf(t->cap_out, sizeof(t->cap_out), "%s", out_path);
     t->cap_req = 3;                                                // let the tileset settle a frame or two
 }

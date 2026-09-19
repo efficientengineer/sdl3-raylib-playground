@@ -9,8 +9,26 @@ is built on it: `SCR_FIELD` is the tile field, and the old one is one Dev button
 
 ## What works
 
-- **640x360-class internal view**, nearest upscale, camera snapped to whole pixels, centred on the
-  leader and clamped to the map; a map smaller than the view is centred, so it letterboxes.
+- **640x360-class logical view rendered at the screen's own resolution.** The world is 32 logical px to
+  the tile and the camera is centred on the leader, snapped to whole logical pixels and clamped to the
+  map (a map smaller than the view is centred, so it letterboxes) — none of that changed. What changed
+  (2026-09-19, owner: *"I don't want the cutter to reduce resolution"*) is that there is no low-res
+  buffer any more: `sc = min(w/vw, h/360)` device pixels per logical pixel, the FBO is the view times
+  `sc` (2400x1080 on the phone), and every quad is emitted in **device** pixels with its edges rounded
+  through one `dev()` helper, so two tiles that share a logical edge share a device edge exactly and
+  there are no cracks. `u_res` is the device size; the geometry is otherwise untouched.
+- **Linear filtering, and the two things that keeps honest.** Atlas cells are 128 px and walker frames
+  256x384, drawn at about 0.75x, so both textures are `GL_LINEAR` min and mag — nearest at a non-integer
+  ratio is what made the old 32-px art mush. No mipmaps: at 0.75x they buy nothing and mip level 1
+  averages across cell borders. Every UV is inset **half a texel**, which is what stops a linear tap at
+  a cell boundary from pulling in the neighbouring tile, and a stamp draws its contiguous rows as **one
+  quad** (object rows one, `over` rows one) rather than a quad per row, so it has no internal seams.
+- **`atlas.json`'s `"cell"`** is the atlas pixels per tile: 128 for the art, 32 when the file is absent,
+  which is the placeholder-only path. Placeholders are still generated at 32 px and nearest-upscaled
+  into the cell, so half an art atlas and half stubs still works. `GL_MAX_TEXTURE_SIZE` is logged at
+  init and an atlas or walker sheet over it is halved (loudly) rather than silently failing to upload.
+- **120 fps on the phone** at 2400x1080 with the 24 MB atlas — the fill rate is a non-issue; the log
+  line `tilefield: 600 frames in ...` says so every ten seconds.
 - **Layers, in this order**: ground → fringe overlays → object stamps → everyone who walks, sorted by
   the row their feet are on → the `over` rows of stamps. One atlas texture, one dynamic VBO, one
   draw call per texture change (ground, fringes and stamps are all the atlas, so it is about four
@@ -40,8 +58,14 @@ is built on it: `SCR_FIELD` is the tile field, and the old one is one Dev button
   dropped rather than stranding you in a wall).
 - **`map.flag`** works for tmaps exactly as it does for the old field: write a map name into
   `files/map.flag` and the phone goes there with no taps.
-- **Desktop capture**: `./capture.sh --tiles halm` renders the **whole map** to
-  `build_desktop/tiles_halm.png` with no phone involved. That is how a `.tmap` is read as a town.
+- **Desktop capture**: `./capture.sh --tiles hart_yard` renders the player's own view at the phone's
+  resolution — **1920x1080**, the party included and trailed out behind the leader so everyone's art is
+  visible — to `build_desktop/tiles_<map>.png`, with no phone involved. `--whole` is the old whole-map
+  shot (one device pixel per logical pixel), which is how a `.tmap` is read as a town; `--no-walkers`
+  empties it; a bare number is the scale. The env behind them is `TILE_CAPTURE`, `TILE_CAPTURE_WHOLE`
+  and `TILE_CAPTURE_NO_WALKERS`.
+- **`map.flag` now works from the title too**: a fresh start after a force-stop enters the field and
+  goes to the named map, so the phone can be driven to a map from the Mac with no taps at all.
 
 ## Formats, as implemented
 
@@ -86,22 +110,37 @@ tiny built-in one rather than crashing.
 
 ### Walkers
 
-`story/field/walkers/<id>.png`, 128x192, four rows S W E N by four columns (stand, step, stand,
-step). Anything else logs and falls back to a procedural figure whose colour comes from the id's
-hash, so the leader, the follower and every NPC are already different people with no files at all.
-Feet on the tile, head over the tile above.
+`story/field/walkers/<id>.png`, a 4x4 grid: rows S W E N, columns stand, step-left, stand, step-right.
+The contract size is **1024x1536** (frames of 256x384); the engine reads the frame as **sheet/4 by
+sheet/4 whatever the sheet is**, so 128x192 still works and only looks softer, and only a size that
+cannot be a 4x4 grid is rejected. Every walker logs one line at load — id, whether the file was found,
+sheet size, frame size, how transparent it is — because a sheet that keyed nothing out renders as a
+black rectangle and used to do it silently. Drawn one tile wide and one and a half tall, centred on the
+tile with its feet on the tile's bottom edge, whatever the sheet's resolution.
+
+**The ids are the story's names.** `PARTY_ART` is `falke`, `ottilie`, `party_c`, `party_d`: the leader
+was asked for as `hero`, there is no `hero.png`, and the placeholder figure was therefore drawn over
+real art that was sitting on the phone the whole time. A renamed character is a renamed walker file.
+
+**The walk cycle** is `walk_col(parity, k, moving)`: standing still is column 0, and a step shows two
+columns — 1 then 2 on one step, 3 then 0 on the next, `parity` flipping per step. Two tiles of walking
+therefore play all four frames and the feet alternate, PS4 style. Before this a step showed only column
+1 or only column 3, so half of every sheet was never seen. Followers and NPCs run the same function;
+NPCs carry their own `parity`.
 
 ## Deviations from TILES.md, and why
 
-1. **The view fills the width.** TILES.md says 640x360. The FBO is 1024x360 and the used width is the
-   phone's aspect at a fixed 360 height, clamped to 640..1024 — the same trick `field.cpp` uses, so a
-   20:9 phone is not pillar-boxed. On a 16:9 screen it is exactly 640x360.
+1. **The view fills the width.** TILES.md says 640x360. The LOGICAL view is the phone's aspect at a
+   fixed 360 height, clamped to 640..1024 wide — the same trick `field.cpp` uses, so a 20:9 phone is not
+   pillar-boxed. On a 16:9 screen it is exactly 640x360. The FBO behind it is that times the device
+   scale.
 2. **`- over: n` instead of a separate `layer: over` entry per row** (above).
 3. **`- fringe:` is a priority number**, not a yes/no (above). Twelve cases from three tiles, as
    TILES.md asks, but two terrains can now meet without either fringing the other.
 4. **`- solid:` rows are slash separated** on one line (above).
-5. **The capture is the whole map, not a view.** A 640x360 shot of a 48x36 town says nothing about
-   whether it reads as a town, which is what the capture is for.
+5. **The capture has two shapes.** The default is the player's view at 1920x1080, which is how the art
+   is judged at the size it will be seen; `--whole` is the whole map, which is how the town's shape is
+   judged. A 640x360 shot of a 48x36 town answers neither question on its own.
 6. **Party of four in the save, two in play.** `TF_PARTY` is 4 and the snake is written for four; the
    maps start with the two the intro leaves us with.
 

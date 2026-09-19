@@ -869,7 +869,9 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             char m[64] = "halm", out[256] = "capture.png";
             int sc = 1;
             sscanf(st->cap_spec, "%63[^:]:%d:%255s", m, &sc, out);
-            tf_capture_to(st->tf, m, sc, out);
+            const char *nw = SDL_getenv("TILE_CAPTURE_NO_WALKERS");
+            const char *wh = SDL_getenv("TILE_CAPTURE_WHOLE");
+            tf_capture_to(st->tf, m, sc, out, !(nw && nw[0] == '1'), wh && wh[0] == '1');
             st->cap_state = 1;
         } else if (tf_capture_done(st->tf)) st->cap_state = 2;
     } else if (st->cap_spec[0] && st->cap_state < 2) {
@@ -885,6 +887,22 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             field_capture_to(st->field, m, z, sc, out);
             st->cap_state = 1;
         } else if (field_capture_done(st->field)) st->cap_state = 2;
+    }
+
+    // map.flag is the field's remote control, and from the title it means "go there": a fresh start
+    // after a crash or a force-stop can be put back in the field from the Mac with no taps at all.
+    if (st->screen != SCR_FIELD) {
+        static float poll = 0;
+        poll += dt;
+        if (poll > 0.5f) {
+            poll = 0;
+            const char *pref = SDL_GetPrefPath("com.playground", "questglory");
+            char path[600];
+            snprintf(path, sizeof(path), "%smap.flag", pref ? pref : "");
+            size_t sz = 0;
+            void *d = SDL_LoadFile(path, &sz);
+            if (d) { SDL_free(d); if (sz) { SDL_Log("tilefield: map.flag from the title — entering the field"); enter_field(st); } }
+        }
     }
 
     switch (st->screen) {
