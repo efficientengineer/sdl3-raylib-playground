@@ -22,30 +22,64 @@ static const CsPanel CS_0110_the_board_PANELS[] = {
     { "0110_the_board_p6_eyes_slit.png", 1, {20.0f, 51.0f, 60.0f, 23.0f}, {4.0f, 40.0f, 92.0f, 17.6f} },
 };
 static const CsLine CS_0110_the_board_LINES[] = {
-    { "Clerk", "You made the bell. The rule is that you sign before the bell, and Stolz signed for the coast escort an hour before it and left at noon.", 1, CS_TENSE, nullptr, CS_LEFT },
+    { "Clerk", "You made the bell. The rule is that you sign before the bell, and Stolz signed for the coast escort an hour before it and left at noon.", 1, CS_TENSE, "portrait_guildclerk.png", CS_LEFT },
     { "Falke", "An hour before? I went over the grain-yard wall for that bell! What's the last sheet, then?", 2, CS_TENSE, "portrait_bron.png", CS_RIGHT },
-    { "Clerk", "The water run out to the stair. Hart carried it in himself this morning. Thirty coin, two days out, two days back, and it leaves at dawn.", 3, CS_WONDER, nullptr, CS_LEFT },
+    { "Clerk", "The water run out to the stair. Hart carried it in himself this morning. Thirty coin, two days out, two days back, and it leaves at dawn.", 3, CS_WONDER, "portrait_guildclerk.png", CS_LEFT },
     { "Falke", "Hart posted it? So where's the carters' convoy that takes the jar every year?", 4, CS_WONDER, "portrait_bron.png", CS_RIGHT },
-    { "Clerk", "There is no convoy. Every carter in the valley has walked west to the lord's city for eighty coin a week. This is not a guild job and it needs no guarantor  -  Hart is paying the thirty coin out of his own pocket.", 5, CS_DREAD, nullptr, CS_LEFT },
+    { "Clerk", "There is no convoy. Every carter in the valley has walked west to the lord's city for eighty coin a week. This is not a guild job and it needs no guarantor  -  Hart is paying the thirty coin out of his own pocket.", 5, CS_DREAD, "portrait_guildclerk.png", CS_LEFT },
     { "Falke", "Out of his own  -  and a man who walks that road alone dies! The last hunter who walked it alone died on it eleven years ago, and he was my father. I'll take it!", 6, CS_CONFRONT, "portrait_bron.png", CS_RIGHT },
+};
+
+static const CsPanel CS_0120_youre_not_ready_PANELS[] = {
+    { "0120_youre_not_ready_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 66.1f}, {3.0f, 2.0f, 80.0f, 50.9f} },
+    { "0120_youre_not_ready_p2_low_angle_menace.png", 0, {73.0f, 1.0f, 22.0f, 73.7f}, {61.0f, 10.0f, 36.0f, 60.3f} },
+    { "0120_youre_not_ready_p3_object_insert.png", 0, {82.0f, 47.9f, 17.0f, 26.1f}, {69.0f, 60.3f, 30.0f, 23.0f} },
+    { "0120_youre_not_ready_p4_profile_flat.png", 1, {6.0f, 40.0f, 17.0f, 26.4f}, {6.0f, 40.0f, 30.0f, 23.3f} },
+    { "0120_youre_not_ready_p5_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 62.1f}, {61.0f, 10.0f, 36.0f, 50.8f} },
+    { "0120_youre_not_ready_p6_high_angle_down.png", 1, {4.0f, 5.0f, 52.0f, 31.3f}, {3.0f, 2.0f, 80.0f, 24.1f} },
+};
+static const CsLine CS_0120_youre_not_ready_LINES[] = {
+    { "Falke", "You put the water run on the board this morning and you never said a word to me!", 1, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Hart", "Taking it back down before dark. Forget you saw it.", 2, CS_TENSE, "portrait_hart.png", CS_RIGHT },
+    { "Falke", "It goes out tomorrow or it doesn't go at all, and there's no convoy left to put it on! Who else is going to walk it  -  you, on that knee?", 3, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Hart", "Your father and I walked that water out together for twenty years. Twentieth year the road broke my knee. Next year he walked it on his own and didn't come back. Eleven years ago. Not putting you on it.", 4, CS_SORROW, "portrait_hart.png", CS_RIGHT },
+    { "Falke", "You haven't even told me I'm not ready yet. You're saving it.", 5, CS_SORROW, "portrait_bron.png", CS_LEFT },
+    { "Hart", "I'm saving it. Hold the ladder.", 6, CS_HOPE, "portrait_hart.png", CS_RIGHT },
 };
 
 static const CsLine CS_0130_he_signs_LINES[] = {
     { "Ottilie", "Sign it, Hart. Four days, not two  -  two west and two back  -  and I am the one who patches whoever goes.", 0, CS_TENSE, "portrait_lyra.png", CS_LEFT },
-    { "Hart", "Jar on the stone shelf under the bottom step. Straight back.", 0, CS_TENSE, nullptr, CS_RIGHT },
+    { "Hart", "Jar on the stone shelf under the bottom step. Straight back.", 0, CS_TENSE, "portrait_hart.png", CS_RIGHT },
     { "Falke", "What's at the step? I've never been out that far.", 0, CS_TENSE, "portrait_bron.png", CS_LEFT },
-    { "Hart", "A staircase the ancients built. A woman lives under it and takes the jar once a year. Don't touch the stone. Don't go past her shelf.", 0, CS_WONDER, nullptr, CS_RIGHT },
+    { "Hart", "A staircase the ancients built. A woman lives under it and takes the jar once a year. Don't touch the stone. Don't go past her shelf.", 0, CS_WONDER, "portrait_hart.png", CS_RIGHT },
     { "Falke", "A woman lives under it? Ottilie  -  you've walked that road twice. Come with me?", 0, CS_WONDER, "portrait_bron.png", CS_LEFT },
     { "Ottilie", "Yes! And he has never once asked me to come anywhere until today.", 0, CS_HOPE, "portrait_lyra.png", CS_LEFT },
 };
 
 static const CsLine CS_0140_the_sword_LINES[] = {
-    { "Hart", "Take your father's sword. Six coin.", 0, CS_HOPE, nullptr, CS_LEFT },
+    { "Hart", "Take your father's sword. Six coin.", 0, CS_HOPE, "portrait_hart.png", CS_LEFT },
     { "Falke", "Six coin? You're selling me my own father's sword!", 0, CS_HOPE, "portrait_bron.png", CS_RIGHT },
-    { "Hart", "Kept it eleven years. I want paying for the keeping.", 0, CS_HOPE, nullptr, CS_LEFT },
+    { "Hart", "Kept it eleven years. I want paying for the keeping.", 0, CS_HOPE, "portrait_hart.png", CS_LEFT },
     { "Falke", "There's a notch in the blade. How did he put a notch in it?", 0, CS_TENSE, "portrait_bron.png", CS_RIGHT },
-    { "Hart", "Sheets, north of the river. One drops on you and you're held until somebody cuts you out. He'd wade into them instead of walking round. Twenty years I was there to cut him out. Year he walked alone there was no one. Notch stays.", 0, CS_SORROW, nullptr, CS_LEFT },
+    { "Hart", "Sheets, north of the river. One drops on you and you're held until somebody cuts you out. He'd wade into them instead of walking round. Twenty years I was there to cut him out. Year he walked alone there was no one. Notch stays.", 0, CS_SORROW, "portrait_hart.png", CS_LEFT },
     { "Ottilie", "Pay him, Falke. He will stand there all night at six coin an hour.", 0, CS_HOPE, "portrait_lyra.png", CS_LEFT },
+};
+
+static const CsPanel CS_0150_the_road_west_PANELS[] = {
+    { "0150_the_road_west_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 49.5f}, {3.0f, 2.0f, 80.0f, 38.0f} },
+    { "0150_the_road_west_p2_full_body_reveal.png", 0, {73.0f, 3.0f, 22.0f, 69.3f}, {61.0f, 10.0f, 36.0f, 56.7f} },
+    { "0150_the_road_west_p3_portrait_inset.png", 0, {82.0f, 48.6f, 17.0f, 25.4f}, {69.0f, 56.7f, 30.0f, 22.4f} },
+    { "0150_the_road_west_p4_over_shoulder.png", 1, {4.0f, 5.0f, 52.0f, 34.6f}, {3.0f, 2.0f, 80.0f, 26.6f} },
+    { "0150_the_road_west_p5_eyes_slit.png", 1, {20.0f, 52.0f, 60.0f, 20.4f}, {4.0f, 40.0f, 92.0f, 15.6f} },
+    { "0150_the_road_west_p6_low_angle_menace.png", 1, {73.0f, 3.0f, 22.0f, 71.0f}, {61.0f, 10.0f, 36.0f, 58.1f} },
+};
+static const CsLine CS_0150_the_road_west_LINES[] = {
+    { "Falke", "Where'd you get that coat?", 1, CS_TENSE, "portrait_bron.png", CS_LEFT },
+    { "Stolz", "Did you honestly think he'd sign for you? The lord of the western city is paying hunters  -  eighty coin a week. I sold the coast escort on to another hunter and signed with him the same morning.", 2, CS_TENSE, "portrait_stolz.png", CS_RIGHT },
+    { "Ottilie", "Paying you to do what, exactly?", 3, CS_TENSE, "portrait_lyra.png", CS_LEFT },
+    { "Stolz", "To walk west with him! He wants rain on his city every year for the rest of his life, and he's going to the mountain to ask the ancients for it.", 4, CS_WONDER, "portrait_stolz.png", CS_RIGHT },
+    { "Falke", "Ask them? People have asked the ancients for a thousand years and they've never answered anyone!", 5, CS_WONDER, "portrait_bron.png", CS_LEFT },
+    { "Stolz", "He's got someone who can make them answer. You're carrying a sealed jar of water and I'm riding in a cart. Enjoy the walk!", 6, CS_DREAD, "portrait_stolz.png", CS_RIGHT },
 };
 
 static const CsLine CS_0160_the_fire_LINES[] = {
@@ -57,10 +91,28 @@ static const CsLine CS_0160_the_fire_LINES[] = {
     { "Ottilie", "Hart used to stand at the gate and count. Sleep.", 0, CS_SORROW, "portrait_lyra.png", CS_RIGHT },
 };
 
+static const CsPanel CS_0170_the_jar_PANELS[] = {
+    { "0170_the_jar_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 37.9f}, {3.0f, 2.0f, 80.0f, 29.1f} },
+    { "0170_the_jar_p2_full_body_reveal.png", 0, {73.0f, 3.0f, 22.0f, 48.3f}, {61.0f, 10.0f, 36.0f, 39.5f} },
+    { "0170_the_jar_p3_object_insert.png", 1, {6.0f, 40.0f, 17.0f, 29.7f}, {6.0f, 40.0f, 30.0f, 26.2f} },
+    { "0170_the_jar_p4_eyes_slit.png", 1, {20.0f, 52.0f, 60.0f, 19.7f}, {4.0f, 40.0f, 92.0f, 15.1f} },
+    { "0170_the_jar_p5_two_shot.png", 1, {4.0f, 5.0f, 52.0f, 34.5f}, {3.0f, 2.0f, 80.0f, 26.6f} },
+};
+static const CsLine CS_0170_the_jar_LINES[] = {
+    { "Shrine Woman", "The hunter who used to bring it stayed a whole day with her, every time. Twenty years of that, and then one year a carter came instead.", 1, CS_WONDER, "portrait_shrinewoman.png", CS_LEFT },
+    { "Falke", "A whole day? That's where the extra day went  -  he was never late, he was here!", 2, CS_WONDER, "portrait_bron.png", CS_RIGHT },
+    { "Ottilie", "Falke. Eleven receipts, one a year, and Hart paid every one of them. Last year's jar is still sealed, so she has been gone a year and the carter never noticed.", 3, CS_DREAD, "portrait_lyra.png", CS_LEFT },
+    { "Falke", "Twenty years he sat with her and he never once said her name to me!", 4, CS_SORROW, "portrait_bron.png", CS_RIGHT },
+    { "Ottilie", "She knew him longer than you did. And Hart has paid to keep this going for eleven years without telling either of us.", 5, CS_SORROW, "portrait_lyra.png", CS_LEFT },
+};
+
 static const CsScene CS_INTRO[] = {
     { "0110_the_board", "The Board", false, CS_PANELS, nullptr, CS_0110_the_board_PANELS, 6, CS_0110_the_board_LINES, 6 },
-    { "0130_he_signs", "He Signs", false, CS_TALK, nullptr, nullptr, 0, CS_0130_he_signs_LINES, 6 },
+    { "0120_youre_not_ready", "You're Not Ready", false, CS_PANELS, nullptr, CS_0120_youre_not_ready_PANELS, 6, CS_0120_youre_not_ready_LINES, 6 },
+    { "0130_he_signs", "He Signs", false, CS_TALK, "0120_youre_not_ready_p1_establishing_wide.png", nullptr, 0, CS_0130_he_signs_LINES, 6 },
     { "0140_the_sword", "The Sword", false, CS_TALK, nullptr, nullptr, 0, CS_0140_the_sword_LINES, 6 },
+    { "0150_the_road_west", "The Road West", false, CS_PANELS, nullptr, CS_0150_the_road_west_PANELS, 6, CS_0150_the_road_west_LINES, 6 },
     { "0160_the_fire", "The Fire", false, CS_TALK, nullptr, nullptr, 0, CS_0160_the_fire_LINES, 6 },
+    { "0170_the_jar", "The Jar", false, CS_PANELS, nullptr, CS_0170_the_jar_PANELS, 5, CS_0170_the_jar_LINES, 5 },
 };
 static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);
