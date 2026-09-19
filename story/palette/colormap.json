@@ -2,10 +2,12 @@
   "palette": "master.hex",
   "version": 1,
   "width": 256,
-  "height": 192,
+  "height": 256,
   "levels": 32,
-  "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest MASTER palette index, so the engine may use the colormap directly as colour.",
+  "channels": "RGBA",
+  "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest MASTER palette index, so the engine may use the colormap directly as colour. Column 0 is the transparent index: RGBA (0,0,0,0) in every row, so the engine needs no patch on load. Every other column is opaque.",
   "floor": 0.15,
+  "point_light_table": "lamp",
   "tables": [
     {
       "table": "day",
@@ -23,18 +25,29 @@
       "levels": 32
     },
     {
-      "table": "flash",
+      "table": "lamp",
       "row0": 96,
       "levels": 32
     },
     {
-      "table": "poison",
+      "table": "lantern",
       "row0": 128,
+      "levels": 32,
+      "alias_of": "lamp"
+    },
+    {
+      "table": "flash",
+      "row0": 160,
+      "levels": 32
+    },
+    {
+      "table": "poison",
+      "row0": 192,
       "levels": 32
     },
     {
       "table": "stone",
-      "row0": 160,
+      "row0": 224,
       "levels": 32
     }
   ]

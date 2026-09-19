@@ -437,8 +437,14 @@ palettes: **`story/palette/master.hex`** for everything that can share the field
 atlas, walkers, props, tiles, building faces, portraits), and **`story/panels/<scene>.hex`** for one
 cutscene scene's panels, built from that scene's own art at slice time because panels are never lit.
 The point is not disk: it is one look across every ChatGPT generation, and lighting, time of day and
-effects done as **palette tables** (`story/palette/colormap.png`, six tables x 32 light levels) rather
-than as redrawn art.
+effects done as **palette tables** (`story/palette/colormap.png`, RGBA, eight tables x 32 light levels:
+`day dusk night lamp lantern flash poison stone`, row offsets in `colormap.json` — read them, never
+assume) rather than as redrawn art. Column 0 is transparent in every row. `lamp` (and its alias
+`lantern`) is the **point-light** table: a lantern pool is looked up there, so it stays warm inside a
+blue night. Night and lamp tint by **adding** a cast in Oklab and taking chroma out, never by rotating
+hue — rotating a red roof toward blue runs it through magenta, which is how the first night table
+turned Halm pink. A map's `light: <table> <level>` and its `lamp: x y radius level [flicker]` meta
+lines are validated by `tmap check` against this file.
 
 - **Conversion is the last step of every cutter**, after the keying, the seam healing and the tone
   match: exact nearest in Oklab, **no dithering ever**, alpha **hard** at 0.5 (under it is index 0).

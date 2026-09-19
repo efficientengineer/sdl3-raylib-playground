@@ -20,7 +20,7 @@ Create ONE image: the attached template with all 1 numbered slots filled in. Can
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
-Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+Image 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
 Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
@@ -32,7 +32,7 @@ A ground tile is seen straight down from directly above. A wall tile is seen lev
 SLOTS:
 Slot 1 (stair_stone), wall tile, 913x913 px in the template: Enormous pale grey cut blocks in even courses with hairline joints, unweathered, no moss and no crack anywhere in them. Seen level from the front, the face of a step in the ground, seamless on all four edges.
 
-RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
+RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, drawn from the color palette attached last. Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise — shading is 2-3 flat steps of one color, and a large flat area is broken up by drawn detail or it stays flat. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing, cloth, roofs and water.
 
 AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, a border or frame inside a slot, a visible seam at a tile edge, one big feature in the middle of a tile, objects or characters, changing the size of the image
 ````

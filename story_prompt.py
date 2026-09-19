@@ -2081,13 +2081,26 @@ def inner_box(box):
 
 # ── the package ──
 
+def field_rendering(blocks):
+    """The rendering block for field art: `field_rendering` if STYLE.md has one, else `rendering`.
+
+    They differ in one sentence. The cutscene block asks for checkerboard dithering in skies, walls
+    and shadows, which was right when a panel was an RGB image of its own; under D19 every field
+    image is one 256-colour palette and flat cel tones, and a dithered wall becomes two colours
+    fighting on a tile that then repeats across a map. The panel blocks are untouched."""
+    return blocks.get("field_rendering") or blocks["rendering"]
+
+
 def field_attachments(style, template, ref, warn):
     """[(path, note)] in attach order: the template, the style reference, then a character sheet."""
     out = [(template, "TEMPLATE. Redraw this exact image with every numbered slot filled in and "
                       "everything else left untouched. It is the canvas, not a reference.")]
     sp = existing(style["refs"].get("style"))
     if sp:
-        out.append((sp, "STYLE reference. " + style["refs"].get("style_note", "")))
+        # Field art has its own note (`style_note_map`): the cutscene one asks the generator to copy
+        # the reference's dithering, and D19's conversion is flat-tone, no dither, one palette.
+        out.append((sp, "STYLE reference. " + (style["refs"].get("style_note_map")
+                                               or style["refs"].get("style_note", ""))))
     else:
         warn.append(f"no style reference at {style['refs'].get('style')}; the prompt text carries the style alone")
     if ref:
@@ -2212,7 +2225,7 @@ def cmd_tiles(args):
                "seen level from the front, the face of a step in the ground"
         L.append(f"Slot {s['n']} ({s['id']}), {e['kind']} tile, {s['inner'][2]}x{s['inner'][3]} px in the "
                  f"template: {e['desc'].rstrip('.')}. {view.capitalize()}, seamless on all four edges.")
-    L += ["", f"RENDERING: {b['rendering']}", "",
+    L += ["", f"RENDERING: {field_rendering(b)}", "",
           f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, a border or "
           f"frame inside a slot, a visible seam at a tile edge, one big feature in the middle of a tile, "
           f"objects or characters, changing the size of the image"]
@@ -2278,7 +2291,7 @@ def cmd_props(args):
         L.append(f"Slot {s['n']} ({s['id']}), {cw} x {chh} cells, {s['inner'][2]}x{s['inner'][3]} px in the "
                  f"template: {entries[s['id']]['desc'].rstrip('.')}. Front three-quarter view from above, "
                  f"standing on the bottom edge of the slot, magenta on every other side.")
-    L += ["", f"RENDERING: {b['rendering']}", "",
+    L += ["", f"RENDERING: {field_rendering(b)}", "",
           f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
           f"grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a "
           f"scene or background inside a slot, two objects in one slot, a soft blurred or glowing edge "
@@ -2372,7 +2385,7 @@ def cmd_walker(args):
     if ref:
         L += ["The character must match the attached reference sheet exactly: same face, hair, outfit, "
               "colors and marks, in all sixteen frames.", ""]
-    L += [f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {b['rendering']}", "",
+    L += [f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {field_rendering(b)}", "",
           f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
           f"shadow under the feet, a different size or costume between frames, the head bobbing between "
           f"frames, a background inside a frame, a soft blurred or glowing edge where the figure meets "
@@ -2468,7 +2481,7 @@ def cmd_building(args):
             what = e.get("roof") or e["desc"]
             L.append(f"Slot {s['n']} ({s['id']} roof), {px}: a seamless sample of this building's roof "
                      f"seen straight down from above: {what.rstrip('.')}.")
-    L += ["", f"RENDERING: {b['rendering']}", "",
+    L += ["", f"RENDERING: {field_rendering(b)}", "",
           f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, sky or "
           f"ground or scenery in a slot, a three-quarter or perspective view of a building, a roof "
           f"drawn over a front wall, a door or window in a side or roof slot, a visible seam in a side "
@@ -5011,7 +5024,10 @@ def write_cut_sheet(setname, sheet, cut):
 
 # ── tmaps ──
 
-TRIGGER_KINDS = {"exit": 4, "door": 4, "message": 1, "npc": 3, "zone": 1, "trap": 1}
+TRIGGER_KINDS = {"exit": 4, "door": 4, "message": 1, "npc": 3, "zone": 1, "trap": 1, "light": 2}
+# 'light <radius> <level> [flicker]' is a point light as a trigger box; the same thing written as a
+# 'lamp: x y radius level [flicker]' meta line is what the maps actually use. Both are checked, and
+# both are looked up in the colormap's point-light table (`lamp`), not in the map's ambient table.
 
 
 def tmap_path(mp):
@@ -5030,12 +5046,14 @@ def parse_tmap(mp):
     for need in ("meta", "legend", "ground"):
         if need not in secs:
             die(f"{path.name}: no '## {need}' section (see TILES.md, 'Maps')")
-    meta = {}
+    meta, metas = {}, {}
     for l in secs["meta"].splitlines():
         l = strip_comment(l)
         if ":" in l:
             k, v = l.split(":", 1)
-            meta[k.strip().lower()] = v.strip()
+            k, v = k.strip().lower(), v.strip()
+            meta[k] = v
+            metas.setdefault(k, []).append(v)       # 'lamp:' is written once per point light
     legend = {}
     for l in secs["legend"].splitlines():
         l = strip_comment(l)
@@ -5052,7 +5070,7 @@ def parse_tmap(mp):
         l = strip_comment(l).strip()
         if l and not l.startswith("#"):
             trig.append(l.split())
-    return {"path": path, "meta": meta, "legend": legend, "ground": grid("ground"),
+    return {"path": path, "meta": meta, "metas": metas, "legend": legend, "ground": grid("ground"),
             "objects": grid("objects"), "triggers": trig}
 
 
@@ -5121,6 +5139,58 @@ def tmap_solid_grid(m, entries, err):
     return w, h, solid, tops
 
 
+def colormap_table_names():
+    """The tables story/palette/colormap.json holds, so a map's `light:` can be checked against them."""
+    if not COLORMAP_JSON.exists():
+        return []
+    try:
+        return [t["table"] for t in json.loads(COLORMAP_JSON.read_text()).get("tables", [])]
+    except (ValueError, KeyError):
+        return []
+
+
+def check_map_light(m, name, w, h):
+    """`light: <table> <level>` and every `lamp: x y radius level [flicker]` in a map's '## meta'.
+
+    The engine (src/TILEFIELD_NOTES.md, "Light, as implemented") reads these; the tool used to ignore
+    any meta key it did not know, so a table name with a typo or a lamp standing outside the map went
+    to the phone and showed up as a black screen or nothing at all. Light is a map's *ambient plus its
+    point lights*, both looked up in `story/palette/colormap.png`, so this is the one place that can
+    tell the two files are still talking about the same tables."""
+    err, tables = [], colormap_table_names()
+    lit = (m["meta"].get("light") or "").split()
+    if lit:
+        if lit[0] not in tables and tables:
+            err.append(f"{name}: 'light: {' '.join(lit)}' names table '{lit[0]}', which "
+                       f"{COLORMAP_JSON.relative_to(ROOT.parent)} does not hold "
+                       f"({', '.join(tables)}). Rebuild it, or fix the line.")
+        try:
+            lv = float(lit[1]) if len(lit) > 1 else 1.0
+            if not 0.0 <= lv <= 1.0:
+                err.append(f"{name}: 'light:' level {lv} is outside 0..1 (1.0 is full light)")
+        except ValueError:
+            err.append(f"{name}: 'light: {' '.join(lit)}' — the level is not a number")
+    for raw in m.get("metas", {}).get("lamp", []):
+        f = raw.split()
+        if len(f) < 4:
+            err.append(f"{name}: 'lamp: {raw}' is not 'x y radius level [flicker]'")
+            continue
+        try:
+            x, y, r, lv = (float(v) for v in f[:4])
+        except ValueError:
+            err.append(f"{name}: 'lamp: {raw}' has a non-numeric field")
+            continue
+        if not (0 <= x < w and 0 <= y < h):
+            err.append(f"{name}: lamp at {f[0]},{f[1]} is outside the {w}x{h} map")
+        if r <= 0:
+            err.append(f"{name}: lamp at {f[0]},{f[1]} has radius {r}; it would light nothing")
+        if not 0.0 <= lv <= 1.0:
+            err.append(f"{name}: lamp at {f[0]},{f[1]} has level {lv}, outside 0..1")
+        if len(f) > 4 and f[4] != "flicker":
+            err.append(f"{name}: 'lamp: {raw}' — the only word after the level is 'flicker'")
+    return err
+
+
 def check_tmap(mp):
     """(errors, warnings) for one .tmap against its tileset."""
     m, err, warn = parse_tmap(mp), [], []
@@ -5169,6 +5239,7 @@ def check_tmap(mp):
         err.append(f"{name}: '## meta' has no 'spawn: x y [facing]' line")
     else:
         walkable(int(sp[0]), int(sp[1]), "spawn")
+    err += check_map_light(m, name, w, h)
     text_ids = set(load_field_text())
     todo = tmap_todo()
     for t in m["triggers"]:
@@ -7596,23 +7667,46 @@ def write_swatch(path, pal, spans, cell=24):
 
 # ── the colormap: light, time of day and effects, as table rows ──
 
-COLORMAP_TABLES = ("day", "dusk", "night", "flash", "poison", "stone")
+COLORMAP_TABLES = ("day", "dusk", "night", "lamp", "lantern", "flash", "poison", "stone")
 SHADE_FLOOR = 0.15                    # a colour that started above this lightness never falls below it
+AMBIENT_SHADOW_HUE = 285.0            # where a colour drifts as the ambient darkens. NOT the ramps'
+                                      # 295: 295 is violet enough to read as magenta once a whole
+                                      # screen is at level 24, which is exactly what the first night
+                                      # render looked like — a pink village.
+NIGHT_CHROMA = 0.35                   # what a colour keeps of its own chroma at night
+NIGHT_TINT = (-0.004, -0.042)         # the moonlight itself, added in Oklab coordinates
+LAMP_TINT = (0.005, 0.022)            # firelight, added the same way: red-yellow, not a rotation
 
 
 def shade_colour(lab, s, table):
     """One palette colour at light level s (1.0 full light, 0.0 darkest), in the named table."""
     L0, a, b = lab
-    C, H = math.hypot(a, b), math.atan2(b, a)
+    C0, H0 = math.hypot(a, b), math.atan2(b, a)
+    C, H = C0, H0
     L = L0 * s
-    C *= 0.30 + 0.70 * s
-    H = _lerp_ang(H, math.radians(SHADOW_HUE), 0.30 * (1 - s))
+    if table not in ("night", "lamp", "lantern"):        # those two set their own direction outright
+        C *= 0.30 + 0.70 * s
+        H = _lerp_ang(H, math.radians(AMBIENT_SHADOW_HUE), 0.22 * (1 - s))
     if table == "night":
-        L *= 0.80
-        H = _lerp_ang(H, math.radians(265), 0.45)
-        C = C * 0.55 + 0.022
-        a, b = C * math.cos(H), C * math.sin(H)
-        a, b = a - 0.004, b - 0.030
+        # Moonlight, not a magenta filter, and NOT a hue rotation. Rotating every hue toward blue is
+        # what made the first two night tables pink: the short way round from a red roof or an orange
+        # jerkin to blue runs straight through magenta, so the warmest things on screen came out the
+        # loudest colour on screen. What night actually does is take the colour out and lay a blue
+        # over what is left — so chroma drops to a third, each colour keeps its own direction, and
+        # one flat blue-violet cast is added in Oklab coordinates. Greens land as dark teal-blue,
+        # reds as dark maroon, neutrals as blue, and skin stays a face.
+        L = L0 * s * 0.78
+        C = C0 * NIGHT_CHROMA
+        a, b = C * math.cos(H0) + NIGHT_TINT[0], C * math.sin(H0) + NIGHT_TINT[1]
+    elif table in ("lamp", "lantern"):
+        # The pool under a lantern or a fire. The engine looks a point light up in this table and
+        # mixes it in by how far the light is above ambient, so level 0 has to be full-strength warm
+        # light — brighter and warmer than day, never bluer — and the dim end is the edge of the pool.
+        # Warm by ADDITION, for the same reason night is blue by addition: rotating a blue roof tile
+        # toward orange takes it through magenta and a purple water trough is not firelight.
+        L = L0 * (0.12 + 0.88 * s) + 0.05 * s
+        C = C0 * 1.10 * (0.45 + 0.55 * s)
+        a, b = C * math.cos(H0) + LAMP_TINT[0] * s, C * math.sin(H0) + LAMP_TINT[1] * s
     elif table == "dusk":
         H = _lerp_ang(H, math.radians(55), 0.32 * (1 - s) + 0.12)
         C = C * 1.05 + 0.018 * (1 - s)
@@ -7662,21 +7756,28 @@ def cmd_palette_colormap(args):
     tables = build_colormap(pal)
     rows, meta = [], []
     for table, trows in tables:
-        meta.append({"table": table, "row0": len(rows), "levels": LEVELS})
+        meta.append({"table": table, "row0": len(rows), "levels": LEVELS,
+                     **({"alias_of": "lamp"} if table == "lantern" else {})})
         for r in trows:
+            # RGBA, and column 0 is transparent in EVERY row. Index 0 is the transparent index, so a
+            # colormap that wrote it as opaque black handed the engine a black texel to blend at
+            # every sprite edge; it was patching that on load. There is nothing to patch now.
             line = bytearray()
             for i in range(PAL_SIZE):
-                line += bytes(pal[r[i]])
+                line += bytes(pal[r[i]]) + bytes((0 if i == PAL_TRANSPARENT else 255,))
             rows.append(line)
     PALETTE_DIR.mkdir(parents=True, exist_ok=True)
-    write_png(COLORMAP_PNG, PAL_SIZE, len(rows), 3, rows)
+    write_png(COLORMAP_PNG, PAL_SIZE, len(rows), 4, rows)
     COLORMAP_JSON.write_text(json.dumps({
         "palette": "master.hex", "version": PALETTE_VERSION,
-        "width": PAL_SIZE, "height": len(rows), "levels": LEVELS,
+        "width": PAL_SIZE, "height": len(rows), "levels": LEVELS, "channels": "RGBA",
         "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. "
                 "Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest "
-                "MASTER palette index, so the engine may use the colormap directly as colour.",
+                "MASTER palette index, so the engine may use the colormap directly as colour. "
+                "Column 0 is the transparent index: RGBA (0,0,0,0) in every row, so the engine needs "
+                "no patch on load. Every other column is opaque.",
         "floor": SHADE_FLOOR,
+        "point_light_table": "lamp",
         "tables": meta,
     }, indent=2) + "\n")
     print(f"wrote {COLORMAP_PNG.relative_to(ROOT.parent)}  {PAL_SIZE}x{len(rows)} "

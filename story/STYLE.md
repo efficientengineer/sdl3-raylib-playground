@@ -173,6 +173,17 @@ texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base
 tones with saturated accents on clothing and hair.
 ```
 
+### field_rendering
+
+```
+Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels
+on a single consistent pixel grid, drawn from the color palette attached last.
+Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise
+— shading is 2-3 flat steps of one color, and a large flat area is broken up
+by drawn detail or it stays flat. Thin 1-pixel outlines. Muted earthy base
+tones with saturated accents on clothing, cloth, roofs and water.
+```
+
 ### dialogue_box
 
 ```
@@ -250,9 +261,10 @@ IV look.
 
 ```
 Low resolution pixel art upscaled with nearest-neighbor, crisp visible pixels
-on a single consistent pixel grid, limited palette of about 32 colors.
-Checkerboard dithering only on large flat areas of ground, water and roof,
-never as noisy texture on small objects. Thin 1-pixel dark outlines around
+on a single consistent pixel grid, drawn from the attached color palette.
+Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise
+— a large area of ground, water or roof is broken up by drawn detail, by a
+band of a neighboring tone, or it stays flat. Thin 1-pixel dark outlines around
 every object that stands on the ground. Muted earthy ground tones — grass,
 dirt, stone, timber — with saturated accents on roofs, doors, awnings, cloth
 and water. Flat shading with 2-3 tones per color and one consistent light
@@ -264,7 +276,8 @@ direction across the whole map.
 ```
 perspective, vanishing point, horizon, sky, isometric view, three-quarter
 view, side view, things shrinking with distance, smooth gradients,
-anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, high
+anti-aliasing, blur, soft shading, dithering, checkerboard texture, stippling,
+painterly, 3D render, photorealistic, high
 resolution detail, lens flare, glow effects, mixed pixel sizes, grid layout,
 buildings in rows, repeated spacing, people, characters, animals, text,
 letters, numbers, labels, captions, watermark, signature, user interface,
@@ -295,6 +308,7 @@ description is used alone. Character references are set per character in
 
 - style: story/refs/style.png
 - style_note: Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+- style_note_map: Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
 
 ## Shot menu
 

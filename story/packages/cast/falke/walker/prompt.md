@@ -19,7 +19,7 @@ Create ONE image: the attached template with all 16 numbered slots filled in. Ca
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
-Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+Image 2: STYLE reference. Match this image's pixel art rendering, outline weight and flat cel shading. Its colors come from the palette image attached last, not from this one, and its tones are FLAT: do not copy any dithering, checkerboard or stipple you see here. Do not copy its characters, setting, or composition.
 Image 3: CHARACTER reference for Bron. The walker is this character: keep the face, hair, outfit, and colors identical to this image in every frame. Use it for the design only; ignore its background and its three-panel layout.
 Image 4: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
@@ -43,7 +43,7 @@ The character must match the attached reference sheet exactly: same face, hair, 
 
 CHARACTER DESIGN: 1990s Japanese anime and manga character design, like the cast of a 1993 sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes with simple highlights, small noses and pointed chins, big layered spiky hair with hard-edged shine bands, slim necks, clean readable silhouettes. Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes, oversized shoulder plates, headbands, sashes. Simple clean shapes and large flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones per color, no gradients.
 
-RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
+RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, drawn from the color palette attached last. Flat tones only: no dithering anywhere, no checkerboard, no stipple, no noise — shading is 2-3 flat steps of one color, and a large flat area is broken up by drawn detail or it stays flat. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing, cloth, roofs and water.
 
 AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or shadow under the feet, a different size or costume between frames, the head bobbing between frames, a background inside a frame, a soft blurred or glowing edge where the figure meets the magenta, changing the size of the image
 ````
