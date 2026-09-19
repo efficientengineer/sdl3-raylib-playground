@@ -18,7 +18,7 @@ HASH="$(basename "$(dirname "$CXX_DIR")")"
 OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
 # Every translation unit of libgame_logic.so. CMakeLists.txt's game_logic target must match.
-GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/field.cpp"
+GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/field.cpp $SCRIPT_DIR/src/tilefield.cpp"
 
 IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
 SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"
@@ -85,7 +85,7 @@ done
 
 # Field maps and art (FIELD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
 # The game looks in files/field/<kind>/<id>.png first, then the APK assets, then its placeholder.
-for d in maps tiles props walkers edges buildings views screens; do
+for d in maps tmaps tiles props walkers edges buildings views screens; do
     [ -d "$SCRIPT_DIR/story/field/$d" ] || continue
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/$d"
     HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
@@ -93,17 +93,36 @@ for d in maps tiles props walkers edges buildings views screens; do
         [ -f "$f" ] || continue
         # authoring scripts stay off the phone; screens carry .screen and .triggers text files
         case "$f" in *_debug.png) continue;; esac          # the ingest's own check image, not art
-        case "$f" in *.png|*.map|*.screen|*.triggers) ;; *) continue;; esac
+        case "$f" in *.png|*.map|*.tmap|*.screen|*.triggers) ;; *) continue;; esac
         n="$(basename "$f")"
         sz="$(stat -f %z "$f")"
         # Text files are tiny and are regenerated in place: a `.screen` can change completely and
         # keep its byte count, which the size check below cannot see. Always push those.
         always=""
-        case "$f" in *.screen|*.triggers|*.map) always=1;; esac
+        case "$f" in *.screen|*.triggers|*.map|*.tmap) always=1;; esac
         if [ -n "$always" ] || ! echo "$HAVE_F" | grep -qx "$n $sz"; then
             echo "  field $d/$n"
             "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
             "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/$d/$n && rm /data/local/tmp/$n"
+        fi
+    done
+done
+
+# Tilesets (TILES.md) are a folder each, not a flat dir: atlas.png and tiles.md per set. tiles.md is
+# small and is rewritten in place, so it always goes; the atlas only when its size changed.
+for d in "$SCRIPT_DIR"/story/field/tilesets/*/; do
+    [ -d "$d" ] || continue
+    set_name="$(basename "$d")"
+    "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/tilesets/$set_name"
+    HAVE_T="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets/$set_name && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
+    for f in "$d"atlas.png "$d"tiles.md; do
+        [ -f "$f" ] || continue
+        n="$(basename "$f")"
+        sz="$(stat -f %z "$f")"
+        if [ "$n" = "tiles.md" ] || ! echo "$HAVE_T" | grep -qx "$n $sz"; then
+            echo "  tileset $set_name/$n"
+            "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
+            "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/tilesets/$set_name/$n && rm /data/local/tmp/$n"
         fi
     done
 done

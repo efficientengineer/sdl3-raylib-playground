@@ -23,6 +23,7 @@
 #include "game_api.h"
 #include "cutscene_data.h"
 #include "field.h"
+#include "tilefield.h"
 
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"   // host.cpp uses the same pref path for reload.flag and the .so
@@ -344,7 +345,9 @@ struct Star {
     int fade_to_scene;            // scene to cut to once faded out (-1 = none, CS_INTRO_COUNT = the field)
     bool to_field;                // this scene was started from the field, so it returns there when it ends
     bool from_field;              // set for the one fade that carries us from the field into that scene
-    Field *field;                 // the walkable world; created on the first field frame
+    Field *field;                 // the parked 2.5D/painted world, still reachable from the Dev panel
+    TileField *tf;                // the tile field (TILES.md): what SCR_FIELD is by default
+    bool old_field;               // Dev: "Old 3D field" sends SCR_FIELD back to field.cpp
     bool panel_on[MAX_PANELS];
     float panel_t[MAX_PANELS];
     int panel_z[MAX_PANELS], z_next;
@@ -359,6 +362,7 @@ struct Star {
     float dpi_scale;
     float title_t;
     char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
+    int cap_tiles;                // 1 = TILE_CAPTURE=<map>:<scale>:<out.png> instead: the tile field
     int cap_state;                // 0 idle, 1 asked, 2 done -> quit
 };
 
@@ -656,7 +660,8 @@ static int scene_by_id(const char *id) {
 }
 
 static void enter_field(Star *st) {
-    if (!st->field) st->field = field_create();
+    if (st->old_field) { if (!st->field) st->field = field_create(); }
+    else if (!st->tf) st->tf = tf_create();
     star_free_textures(st);                       // the page art goes; the field has its own
     st->screen = SCR_FIELD;
     st->to_field = false;
@@ -664,25 +669,33 @@ static void enter_field(Star *st) {
     mus_start(CS_WONDER);
 }
 
+// A field asked for a cutscene. If it is not in the playlist yet, say so in the field's own box
+// rather than fading to a blank scene.
+static void field_scene(Star *st, const char *id, TileField *tf) {
+    int idx = scene_by_id(id);
+    if (idx >= 0 && CS_INTRO[idx].line_count > 0) { st->fade_to_scene = idx; st->from_field = true; return; }
+    char msg[160];
+    snprintf(msg, sizeof(msg), "(scene \"%s\" is not in the playlist yet)", id);
+    if (tf) tf_message(tf, msg);
+    else if (st->field) field_message(st->field, msg);
+}
+
 static void draw_field(Star *st, int w, int h, float dt) {
-    if (!st->field) st->field = field_create();
-    FieldEvent ev;
-    field_tick(st->field, w, h, dt, dev.open, &ev);
-    if (ev.kind == FE_SCENE) {
-        int idx = scene_by_id(ev.arg);
-        if (idx >= 0 && CS_INTRO[idx].line_count > 0) { st->fade_to_scene = idx; st->from_field = true; }
-        else {                                    // the scene isn't written (or isn't in the playlist) yet
-            char msg[160];
-            snprintf(msg, sizeof(msg), "(scene \"%s\" is not in the playlist yet)", ev.arg);
-            field_message(st->field, msg);
-        }
-    } else if (ev.kind == FE_ZONE) {
-        char msg[128];
-        snprintf(msg, sizeof(msg), "encounter %s", ev.arg);   // battle is the next stream, not this one
-        dev_send(msg);
+    if (st->old_field) {                                  // the parked 2.5D field, on a Dev button
+        if (!st->field) st->field = field_create();
+        FieldEvent ev;
+        field_tick(st->field, w, h, dt, dev.open, &ev);
+        if (ev.kind == FE_SCENE) field_scene(st, ev.arg, nullptr);
+        else if (ev.kind == FE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
+        char warn[192];
+        if (field_take_warning(st->field, warn, sizeof(warn))) dev_send(warn);
+        return;
     }
-    char warn[192];
-    if (field_take_warning(st->field, warn, sizeof(warn))) dev_send(warn);   // framing watchdog
+    if (!st->tf) st->tf = tf_create();
+    TfEvent ev;
+    tf_tick(st->tf, w, h, dt, dev.open, &ev);
+    if (ev.kind == TFE_SCENE) field_scene(st, ev.arg, st->tf);
+    else if (ev.kind == TFE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
 }
 
 // Small dev overlay: a corner button opening the phone <-> dev message log plus scene test controls.
@@ -716,6 +729,13 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     if (ImGui::Button("Title")) { st->screen = SCR_TITLE; st->title_t = 0; dev.open = false; }
     ImGui::SameLine();
     if (ImGui::Button("Field")) { st->fade_to_scene = -1; st->fade = 0.0f; enter_field(st); dev.open = false; }
+    ImGui::SameLine();
+    if (ImGui::Button(st->old_field ? "Tile field" : "Old 3D field")) {   // the parked field.cpp world
+        st->old_field = !st->old_field;
+        st->fade_to_scene = -1; st->fade = 0.0f;
+        enter_field(st);
+        dev.open = false;
+    }
     static const char *mood_names[CS_MOOD_COUNT] = {"wonder", "dread", "tense", "confront", "sorrow", "hope"};
     ImGui::SameLine();
     ImGui::TextDisabled("  mood:");
@@ -727,10 +747,10 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
         if (cur) ImGui::PopStyleColor();
     }
     ImGui::Separator();
-    if (st->screen == SCR_FIELD && st->field) {              // coordinates, nav view and the live camera
-        char zone_line[224];
-        if (field_dev_ui(st->field, zone_line, sizeof(zone_line))) dev_send(zone_line);
-        ImGui::Separator();
+    if (st->screen == SCR_FIELD) {
+        char line[224];
+        if (!st->old_field && st->tf) { if (tf_dev_ui(st->tf, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
+        else if (st->old_field && st->field) { if (field_dev_ui(st->field, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
     }
     float input_h = ImGui::GetFrameHeightWithSpacing() + 4 * k;
     ImGui::BeginChild("##msgs", ImVec2(0, -input_h));
@@ -756,6 +776,8 @@ static void *game_create(float dpi_scale) {
     // Desktop capture: no window interaction, no phone. Android never sets this, so it is inert there.
     const char *spec = SDL_getenv("FIELD_CAPTURE");
     if (spec) snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec);
+    spec = SDL_getenv("TILE_CAPTURE");                 // <map>:<scale>:<out.png>, the whole map in one PNG
+    if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_tiles = 1; }
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
@@ -772,6 +794,7 @@ static void game_destroy(void *state) {
     Star *st = (Star *)state;
     star_free_textures(st);
     if (st->field) { field_destroy(st->field); st->field = nullptr; }
+    if (st->tf) { tf_destroy(st->tf); st->tf = nullptr; }
     if (au_stream) { SDL_DestroyAudioStream(au_stream); au_stream = nullptr; }
     free(st);
 }
@@ -782,8 +805,11 @@ static int game_wants_quit(void *state) { return ((Star *)state)->cap_state == 2
 // Hot reload keeps your place: screen, scene and line survive, so a dialogue or music edit can be
 // judged on the exact line you were looking at, and the field keeps the map, the spot on the navmesh
 // and whatever camera the owner was tuning. Everything else is rebuilt from those few numbers.
-struct ReloadBlob { uint32_t magic; int32_t screen, scene, line, to_field, has_field; FieldSave field; };
-#define RELOAD_MAGIC 0x37525453u   // 'STR7' — bumped again as the field's save layout grew (screens)
+struct ReloadBlob {
+    uint32_t magic; int32_t screen, scene, line, to_field, has_field; FieldSave field;
+    int32_t has_tf, old_field; TfSave tf;
+};
+#define RELOAD_MAGIC 0x38525453u   // 'STR8' — bumped as the tile field joined the blob
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
@@ -793,6 +819,8 @@ static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     b.screen = st->screen; b.scene = st->scene; b.line = st->line;
     b.to_field = st->to_field ? 1 : 0;
     if (st->field) { b.has_field = 1; field_save(st->field, &b.field); }
+    if (st->tf) { b.has_tf = 1; tf_save(st->tf, &b.tf); }
+    b.old_field = st->old_field ? 1 : 0;
     if (buf && buf_size >= sizeof(b)) memcpy(buf, &b, sizeof(b));
     return sizeof(b);
 }
@@ -804,15 +832,20 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     memcpy(&b, buf, sizeof(b));
     if (b.magic != RELOAD_MAGIC) return;               // blob from the old game or an older layout: title
     st->fade = 0.0f;
-    bool want_field = (b.screen == SCR_FIELD) || (b.to_field && b.has_field);
-    if (b.has_field && want_field) {                   // field_restore validates every field it reads
+    st->old_field = b.old_field != 0;
+    bool want_field = (b.screen == SCR_FIELD) || b.to_field;
+    if (b.has_tf && want_field) {                      // tf_restore validates every field it reads
+        if (!st->tf) st->tf = tf_create();
+        tf_restore(st->tf, &b.tf);
+    }
+    if (b.has_field && want_field && st->old_field) {
         if (!st->field) st->field = field_create();
         field_restore(st->field, &b.field);
     }
     if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_INTRO_COUNT && CS_INTRO[b.scene].line_count > 0) {
         int line = b.line < 0 ? 0 : b.line >= CS_INTRO[b.scene].line_count ? CS_INTRO[b.scene].line_count - 1 : b.line;
         star_goto(st, b.scene, line, true);
-        st->to_field = (b.to_field && st->field);
+        st->to_field = (b.to_field && (st->tf || st->field));
     } else if (b.screen == SCR_END) {
         st->screen = SCR_END;
     } else if (b.screen == SCR_FIELD) {
@@ -827,8 +860,21 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     float dt = ImGui::GetIO().DeltaTime;
     if (dt > 0.1f) dt = 0.1f;
 
-    if (st->cap_spec[0] && st->cap_state < 2) {
+    if (st->cap_spec[0] && st->cap_tiles && st->cap_state < 2) {
+        if (!st->tf) st->tf = tf_create();
+        st->screen = SCR_FIELD;
+        st->fade = 0.0f;
+        st->fade_to_scene = -1;
+        if (st->cap_state == 0) {
+            char m[64] = "halm", out[256] = "capture.png";
+            int sc = 1;
+            sscanf(st->cap_spec, "%63[^:]:%d:%255s", m, &sc, out);
+            tf_capture_to(st->tf, m, sc, out);
+            st->cap_state = 1;
+        } else if (tf_capture_done(st->tf)) st->cap_state = 2;
+    } else if (st->cap_spec[0] && st->cap_state < 2) {
         if (!st->field) st->field = field_create();
+        st->old_field = true;
         st->screen = SCR_FIELD;
         st->fade = 0.0f;
         st->fade_to_scene = -1;

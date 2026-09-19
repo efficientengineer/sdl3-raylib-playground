@@ -60,3 +60,11 @@ Six posts, all split at the same height, and that height is your shoulder. The s
 Hand me the short nails and don't start. Whatever you came up here to ask, the answer is the same as it was at the bell.
 - name: {{MENTOR}}
 - what: {{MENTOR}} on his roof, before the You're Not Ready clip, npc at 10 9 on hart_yard
+
+## west_road.culvert
+[west_road.culvert: TODO]
+- what: the washed-out culvert where the road pinches to one cart's width, the message trigger at 13 7 on west_road
+
+## west_road.west_end
+[west_road.west_end: TODO]
+- what: the west end of the road, where the map stops and the bridge is not built yet, the message trigger at 0 8 on west_road

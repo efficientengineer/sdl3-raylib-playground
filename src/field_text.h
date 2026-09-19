@@ -14,5 +14,7 @@ static const FieldText FIELD_TEXT[] = {
     { "halm.well", "Capped, roped, and the rope is new. One sealed jar of this water goes west to the stair every year, and the town has never been told what it is for.", "" },
     { "hart_yard.hart", "Hand me the short nails and don't start. Whatever you came up here to ask, the answer is the same as it was at the bell.", "Hart" },
     { "hart_yard.practice_posts", "Six posts, all split at the same height, and that height is your shoulder. The sixth one has been moved since yesterday.", "" },
+    { "west_road.culvert", "[west_road.culvert: TODO]", "" },
+    { "west_road.west_end", "[west_road.west_end: TODO]", "" },
 };
-#define FIELD_TEXT_COUNT 8
+#define FIELD_TEXT_COUNT 10

@@ -1,0 +1,102 @@
+## meta
+name: hart_yard
+tileset: valley
+size: 24 20
+spawn: 11 17 N
+music: wonder
+## legend
+. grass
+, grass_tuft
+' grass_flower
+d dirt
+D dirt_rut
+p paving
+P paving_worn
+~ water
+g gravel
+c crop
+m mud
+b bridge_deck
+T tree
+t tree_2
+Y tree_bare
+O orchard_tree
+H house_a
+J house_b
+K house_c
+L house_d
+M house_e
+S shed
+B barn
+G grain_shed
+A stable
+U hut
+R ladder_house
+W well
+C handcart
+Q guild_hall
+V market_stall
+X haystack
+Z woodpile
+f fence_ew
+F fence_ns
+n fence_corner
+w wall_ew
+N wall_ns
+x wall_corner
+h hedge
+i practice_post
+r barrel
+e crate
+o boulder
+s signpost
+u trough
+k grain_sack
+j stump
+l gate_post
+## ground
+.........,..............
+............,...........
+..gggggggggggggggggggg..
+..gggggggggggggggggggg..
+..gggggggggggggggggggg..
+..gggggggggggggggggggg..
+..gggggggggggggggggggg..
+..gggggddddddggggggggg..
+..gggggddddddggggggggg..
+..ggggggggdddggggggggg..
+.,ggggggggdddggggggggg..
+..ggggggggdddggggggggg.,
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+..ggggggggdddggggggggg..
+,.ggggggggdddggggggggg..
+..ggggggggdddggggggggg,.
+......,...ddd...........
+.........,ddd...........
+## objects
+........................
+.xwwwwwwwwwwwwwwwwwwwwx.
+.N....................N.
+.N.R+++H++..........Z+N.
+.N.+++++++..........++N.
+.N.+++++++............N.
+.N.++++......r........N.
+.N....................N.
+.N...............i....N.
+.N..u..........i...i..N.
+.N....................N.
+.N...T+.............i.N.
+.N...++...............N.
+.N...++............i..N.
+.N...............i....N.
+.N.o....j.............N.
+.N....................N.
+.N....................N.
+.xwwwwwwwl...lwwwwwwwwx.
+........................
+## triggers
+14 7 8 9 message hart_yard.practice_posts
+8 8 1 1 npc hart S hart_yard.hart
+10 19 3 1 exit halm 31 2 S

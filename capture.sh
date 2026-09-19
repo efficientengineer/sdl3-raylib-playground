@@ -5,7 +5,30 @@
 #   ./capture.sh halm square 2
 #
 # The window flashes up for a moment; that is the renderer doing its one frame.
+#
+# The tile field (TILES.md) has its own mode, and it captures the WHOLE map rather than one view,
+# which is how a .tmap is read as a town without a phone screenshot:
+#
+#   ./capture.sh --tiles halm        -> build_desktop/tiles_halm.png
+#
 set -e
+
+if [ "$1" = "--tiles" ]; then
+    MAP=${2:-halm}
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    OUT="$ROOT/build_desktop/tiles_${MAP}.png"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -2
+    cd "$ROOT"
+    TILE_CAPTURE="$MAP:1:$OUT" "$ROOT/build_desktop/quest_glory" || true
+    if [ -f "$OUT" ]; then
+        echo "wrote $OUT"
+        /usr/bin/sips -g pixelWidth -g pixelHeight "$OUT" 2>/dev/null | tail -2
+        exit 0
+    fi
+    echo "ERROR: no capture written to $OUT" >&2
+    exit 1
+fi
 
 MAP=${1:-halm}
 ZONE=${2:-base}

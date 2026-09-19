@@ -47,18 +47,18 @@ A slot's own description below gives the MATERIAL only — what the terrain is m
 The north / north-east / south-west wording is fixed: the game rotates each of these three by 90, 180 and 270 degrees to cover the other sides and corners, so all three must be drawn at the orientation described and the terrain must meet the slot's edges at full strength wherever it touches them.
 
 SLOTS — 12 of them:
-Slot 1 (dirt_edge), 128x128 px, 1x1 tile: the northern edge of a dirt lane meeting turf, ragged, the grass creeping in over the soil. Drawn as the _edge fringe shape described above, in this material.
-Slot 2 (dirt_corner_out), 128x128 px, 1x1 tile: a dirt lane's outer corner in the top-right of the tile, the rest empty. Drawn as the _corner_out fringe shape described above, in this material.
-Slot 3 (dirt_corner_in), 128x128 px, 1x1 tile: a dirt lane filling the top-right of the tile, its inner corner rounded. Drawn as the _corner_in fringe shape described above, in this material.
-Slot 4 (paving_edge), 128x128 px, 1x1 tile: the northern edge of laid stone meeting soil, the outer blocks half sunk and broken. Drawn as the _edge fringe shape described above, in this material.
-Slot 5 (paving_corner_out), 128x128 px, 1x1 tile: laid stone filling only the top-right corner of the tile, the rest empty. Drawn as the _corner_out fringe shape described above, in this material.
-Slot 6 (paving_corner_in), 128x128 px, 1x1 tile: laid stone filling the top-right of the tile with its inner corner rounded. Drawn as the _corner_in fringe shape described above, in this material.
-Slot 7 (water_edge), 128x128 px, 1x1 tile: a stream bank along the north of the tile, wet stones and mud where the water ends. Drawn as the _edge fringe shape described above, in this material.
-Slot 8 (water_corner_out), 128x128 px, 1x1 tile: a stream bank filling only the top-right corner of the tile. Drawn as the _corner_out fringe shape described above, in this material.
-Slot 9 (water_corner_in), 128x128 px, 1x1 tile: a stream bank filling the top-right of the tile with its inner corner rounded. Drawn as the _corner_in fringe shape described above, in this material.
-Slot 10 (crop_edge), 128x128 px, 1x1 tile: the northern edge of a barley plot where the drills stop. Drawn as the _edge fringe shape described above, in this material.
-Slot 11 (crop_corner_out), 128x128 px, 1x1 tile: barley filling only the top-right corner of the tile. Drawn as the _corner_out fringe shape described above, in this material.
-Slot 12 (crop_corner_in), 128x128 px, 1x1 tile: barley filling the top-right of the tile with its inner corner rounded. Drawn as the _corner_in fringe shape described above, in this material.
+Slot 1 (dirt_edge), 128x128 px, 1x1 tile: the fringe of a dirt lane: packed earth, dry and a little gravelly, over nothing else. Drawn as the _edge fringe shape described above, in this material.
+Slot 2 (dirt_corner_out), 128x128 px, 1x1 tile: the same packed earth of a dirt lane, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.
+Slot 3 (dirt_corner_in), 128x128 px, 1x1 tile: the same packed earth of a dirt lane, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.
+Slot 4 (paving_edge), 128x128 px, 1x1 tile: the fringe of laid stone: outer blocks half sunk and broken, over nothing else. Drawn as the _edge fringe shape described above, in this material.
+Slot 5 (paving_corner_out), 128x128 px, 1x1 tile: the same laid stone, its outer blocks broken, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.
+Slot 6 (paving_corner_in), 128x128 px, 1x1 tile: the same laid stone, its outer blocks broken, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.
+Slot 7 (water_edge), 128x128 px, 1x1 tile: the fringe of a stream bank: wet stones and mud where the water ends, over nothing else. Drawn as the _edge fringe shape described above, in this material.
+Slot 8 (water_corner_out), 128x128 px, 1x1 tile: the same wet stones and mud of a stream bank, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.
+Slot 9 (water_corner_in), 128x128 px, 1x1 tile: the same wet stones and mud of a stream bank, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.
+Slot 10 (crop_edge), 128x128 px, 1x1 tile: the fringe of a barley plot: the last heads where the drills stop, over nothing else. Drawn as the _edge fringe shape described above, in this material.
+Slot 11 (crop_corner_out), 128x128 px, 1x1 tile: the same standing barley of a worked plot, nothing else in the tile. Drawn as the _corner_out fringe shape described above, in this material.
+Slot 12 (crop_corner_in), 128x128 px, 1x1 tile: the same standing barley of a worked plot, nothing else in the tile. Drawn as the _corner_in fringe shape described above, in this material.
 
 RENDERING: Low resolution pixel art upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors. Checkerboard dithering only on large flat areas of ground, water and roof, never as noisy texture on small objects. Thin 1-pixel dark outlines around every object that stands on the ground. Muted earthy ground tones — grass, dirt, stone, timber — with saturated accents on roofs, doors, awnings, cloth and water. Flat shading with 2-3 tones per color and one consistent light direction across the whole map.
 
