@@ -358,6 +358,8 @@ struct Star {
     float face_t;
     float dpi_scale;
     float title_t;
+    char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
+    int cap_state;                // 0 idle, 1 asked, 2 done -> quit
 };
 
 static void star_free_textures(Star *st) {
@@ -751,6 +753,9 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
 
 static void *game_create(float dpi_scale) {
     Star *st = (Star *)calloc(1, sizeof(Star));
+    // Desktop capture: no window interaction, no phone. Android never sets this, so it is inert there.
+    const char *spec = SDL_getenv("FIELD_CAPTURE");
+    if (spec) snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec);
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
@@ -772,7 +777,7 @@ static void game_destroy(void *state) {
 }
 
 static void game_on_save_event(void *) {}
-static int game_wants_quit(void *) { return 0; }
+static int game_wants_quit(void *state) { return ((Star *)state)->cap_state == 2; }
 
 // Hot reload keeps your place: screen, scene and line survive, so a dialogue or music edit can be
 // judged on the exact line you were looking at, and the field keeps the map, the spot on the navmesh
@@ -822,6 +827,20 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     float dt = ImGui::GetIO().DeltaTime;
     if (dt > 0.1f) dt = 0.1f;
 
+    if (st->cap_spec[0] && st->cap_state < 2) {
+        if (!st->field) st->field = field_create();
+        st->screen = SCR_FIELD;
+        st->fade = 0.0f;
+        st->fade_to_scene = -1;
+        if (st->cap_state == 0) {
+            char m[64] = "halm", z[64] = "base", out[256] = "capture.png";
+            int sc = 2;
+            sscanf(st->cap_spec, "%63[^:]:%63[^:]:%d:%255s", m, z, &sc, out);
+            field_capture_to(st->field, m, z, sc, out);
+            st->cap_state = 1;
+        } else if (field_capture_done(st->field)) st->cap_state = 2;
+    }
+
     switch (st->screen) {
     case SCR_TITLE: draw_title(st, w, h, dt); break;
     case SCR_INTRO: draw_scene(st, w, h, dt); break;
@@ -852,6 +871,24 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     }
     if (st->fade > 0.0f)
         ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), with_alpha(IM_COL32(0, 0, 0, 255), st->fade));
+
+    // A pending capture.flag pulls the game to the field: the field consumes the flag itself, so
+    // this only has to get us onto the right screen. Same idea as reload.flag.
+    static float cap_poll = 0.0f;
+    cap_poll += dt;
+    if (cap_poll > 0.5f) {
+        cap_poll = 0.0f;
+        if (st->screen != SCR_FIELD) {
+            char path[600];
+            snprintf(path, sizeof(path), "%scapture.flag", pref_path());
+            SDL_IOStream *fp = SDL_IOFromFile(path, "rb");
+            if (fp) {
+                Sint64 sz = SDL_GetIOSize(fp);
+                SDL_CloseIO(fp);
+                if (sz > 0) { st->fade_to_scene = -1; st->fade = 0.0f; enter_field(st); }
+            }
+        }
+    }
 
     draw_dev(st, w, h, dt, dpi_scale);
     au_update();

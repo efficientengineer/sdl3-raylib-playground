@@ -17,3 +17,5 @@ __pycache__/
 story/refs/style.*
 android/app/src/main/assets/cutscenes/
 story/packages/**/returned.*
+build_desktop/
+imgui.ini

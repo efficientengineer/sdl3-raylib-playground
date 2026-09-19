@@ -107,6 +107,7 @@ if [ "$1" = "--pull-views" ]; then
     mkdir -p "$SCRIPT_DIR/story/field/views"
     NAMES="$("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/views 2>/dev/null" | tr -d '\r')"
     for n in $NAMES; do
+        case "$n" in *_depth.png) continue;; esac     # depth stays on the phone: reference, not art
         "$ADB" -s "$DEVICE" shell "run-as $PKG cat files/field/views/$n" > "$SCRIPT_DIR/story/field/views/$n"
         echo "  pulled views/$n"
     done

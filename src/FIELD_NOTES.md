@@ -275,8 +275,25 @@ and the framing maths all work with either.
 
 ### Capture
 
-**Dev → Capture view 2x** (or **1x**), or a `capture` trigger in `## triggers`
-(`x z w d capture 2`), writes two files into the phone's `files/field/views/`:
+Three ways to fire one, all equivalent:
+
+- **Dev → Capture view 2x** (or **1x**);
+- a `capture` trigger in `## triggers` (`x z w d capture 2`);
+- **`capture.flag`** in the pref dir, polled 2.5x a second and truncated once consumed, exactly the way
+  `reload.flag` works — so a capture can be driven from the Mac with no taps at all:
+
+  ```bash
+  printf 'square 2x' > /tmp/capture.flag
+  adb push /tmp/capture.flag /data/local/tmp/capture.flag
+  adb shell "run-as com.playground.sdlraylib cp /data/local/tmp/capture.flag files/capture.flag"
+  ```
+
+  Contents are optional and order-free: a **zone id** and `1x`/`2x` (default 2x, current zone). Naming a
+  zone moves the player to that zone's centre on the navmesh first, so the right shot becomes active,
+  and the capture waits six frames for the camera to settle. A non-empty `capture.flag` also pulls the
+  game out of the title or a cutscene and into the field, so the whole thing is scriptable.
+
+Each capture writes two files into the phone's `files/field/views/`:
 
 | file | what |
 |---|---|
@@ -284,13 +301,46 @@ and the framing maths all work with either.
 | `<map>_<zone>_depth.png` | linear distance from the camera, /40 world units, greyscale — reference and debug only |
 
 The capture renders the zone's shot **exactly as authored** (framing blend forced to 0), so the
-painting is made for the written camera. It is taken at the live internal resolution × the scale:
-with **fill width** on (the default) that is the screen's aspect at 360 high — 1600×720 at 2x on a
-2400×1080 phone. Turn fill width **off** before capturing for a strict 1280×720. Either is fine: the
-painting is fitted at draw time (see below), but a painting matches best when it was captured on the
-same setting it will be shown at.
+painting is made for the written camera. It is always a clean **640×360 × scale** — 1280×720 at 2x —
+whatever the live `fill width` setting is, so the painter always gets 16:9. That costs nothing at
+display time because **a painted zone adopts its painting's aspect**: the internal viewport is resized
+to match, the painting fills it exactly, and the existing FBO→screen fit centres the result on a wider
+phone. So a 16:9 painting shows with side bars on a 20:9 screen, like FF8 on a widescreen TV.
 
-`./fast_reload.sh --pull-views` copies everything in `files/field/views/` into `story/field/views/`.
+A capture never contains walkers: the player, the NPCs and the examine mark are skipped, because the
+painting is a **backdrop** and they are drawn live on top of it.
+
+`./fast_reload.sh --pull-views` copies the colour views into `story/field/views/`. **The depth PNGs are
+not pulled** — they stay on the phone as reference; they are debug output, not art.
+
+### Capturing on the Mac, with no phone at all
+
+```bash
+./capture.sh halm square 2      # -> story/field/views/halm_square.png at 1280x720
+```
+
+`capture.sh` configures and builds the desktop targets into `build_desktop/` (SDL3 comes from the same
+FetchContent as the Android build), then runs the real host once with
+
+```
+FIELD_CAPTURE=<map>:<zone>:<scale>:<absolute output path>
+```
+
+The game lib reads that env var in `game_create`; on the first tick it loads the map, places the camera
+at that zone **as authored**, renders the capture exactly as the Dev button does, writes the colour and
+`_depth` PNGs and sets `wants_quit`. A window flashes up for a moment; that is the renderer doing its
+frame. Android never sets the variable, so it is inert there and **no deploy or host change is needed**.
+
+Two things make this work on desktop GL:
+
+- the inline shaders carry **no `#version` line**; `make_shader` prepends
+  `#version 300 es` + the `precision` qualifiers under `__ANDROID__` and `#version 330 core` otherwise.
+  Nothing else in them differs between the two dialects.
+- `field_read` falls back to `story/<rel>` after the pref path and the APK assets, so a desktop run from
+  the repo root finds `story/field/maps/...` and the art without a staging step.
+
+The Mac and phone captures of the same zone are identical to the eye, which is the point: the painter
+works from one and the phone shows the painting back.
 
 ### Painted mode
 

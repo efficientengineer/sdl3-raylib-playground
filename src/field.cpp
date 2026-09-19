@@ -547,7 +547,11 @@ static void *field_read(const char *rel, size_t *size) {
     char path[768];
     snprintf(path, sizeof(path), "%s%s", pref_path(), rel);
     void *d = SDL_LoadFile(path, size);
-    if (!d) d = SDL_LoadFile(rel, size);
+    if (!d) d = SDL_LoadFile(rel, size);                 // APK assets on Android
+    if (!d) {                                            // desktop: the repo, run from its root
+        snprintf(path, sizeof(path), "story/%s", rel);
+        d = SDL_LoadFile(path, size);
+    }
     return d;
 }
 
@@ -717,7 +721,9 @@ struct Field {
     float splat_dither;
     FTex splat_tex;
     FTex zone_paint[F_ZONES];            // the painted backdrop for each zone, when one exists
-    int capture_req;                     // 1 or 2 = capture this frame at that scale
+    int capture_req, cap_delay, cap_done, cap_active; // 1 or 2 = capture at that scale, after N settling frames
+    float cap_poll;
+    char cap_out[512];                   // explicit output path (desktop capture); empty = the pref dir
     GLuint cap_fbo, cap_tex, cap_depth; int cap_w, cap_h;
     int floor_first, floor_count;        // every non-water ground quad, drawn in one splat pass
     short spawn_x, spawn_y; int spawn_f;
@@ -1035,7 +1041,13 @@ static int profile_get(Field *f, const char *spec) {
 static void prof_pt(FProfile *p, Field *f, float x, float y, const char *tile, float sc) {
     if (p->n >= F_PROF_PTS) return;
     p->x[p->n] = x; p->y[p->n] = y; p->scale[p->n] = sc > 0.01f ? sc : 1.0f;
-    p->art[p->n] = art_get(f, "tiles", tile);
+    // A building's faces live under story/field/buildings/, everything else under tiles/. The
+    // `_front`/`_side`/`_roof` suffixes are exactly the art contract's building-face names.
+    size_t len = strlen(tile);
+    bool face = (len > 6 && !strcmp(tile + len - 6, "_front")) ||
+                (len > 5 && !strcmp(tile + len - 5, "_side")) ||
+                (len > 5 && !strcmp(tile + len - 5, "_roof"));
+    p->art[p->n] = art_get(f, face ? "buildings" : "tiles", tile);
     p->n++;
 }
 
@@ -1976,7 +1988,6 @@ static void build_world(Field *f) {
 // ───────────────────────── GL setup ─────────────────────────
 
 static const char *VS =
-    "#version 300 es\n"
     "layout(location=0) in vec3 a_pos;\n"
     "layout(location=1) in vec2 a_uv;\n"
     "layout(location=2) in vec4 a_col;\n"
@@ -1987,8 +1998,6 @@ static const char *VS =
 // themselves where they sit between the camera and the player. Screen-door, not alpha: no blending,
 // no sorting, the depth test stays intact, and it reads as pixel art.
 static const char *FS =
-    "#version 300 es\n"
-    "precision mediump float;\n"
     "in vec2 v_uv; in vec4 v_col;\n"
     "uniform sampler2D u_tex; uniform float u_alpha;\n"
     "uniform vec4 u_see;    // xy = player screen px, z = player window depth, w = radius px (0 = off)\n"
@@ -2016,7 +2025,6 @@ static const char *FS =
 // Ground: one splat texture (bilinear, once over the whole map) weighting four tile textures that
 // each repeat in world space. Per-cell tile ids made every cell boundary read; this does not.
 static const char *SVS =
-    "#version 300 es\n"
     "layout(location=0) in vec3 a_pos;\n"
     "layout(location=1) in vec2 a_uv;\n"
     "layout(location=2) in vec4 a_col;\n"
@@ -2024,8 +2032,6 @@ static const char *SVS =
     "out vec2 v_uv; out vec4 v_col;\n"
     "void main(){ v_uv = a_uv; v_col = a_col; gl_Position = u_mvp * vec4(a_pos,1.0); }\n";
 static const char *SFS =
-    "#version 300 es\n"
-    "precision mediump float;\n"
     "in vec2 v_uv; in vec4 v_col;\n"
     "uniform sampler2D u_splat, u_l0, u_l1, u_l2, u_l3;\n"
     "uniform vec4 u_scale;   // tiles per cell for each layer\n"
@@ -2061,13 +2067,29 @@ static const char *SFS =
     "  o = vec4(c * v_col.rgb, 1.0);\n"
     "}\n";
 
+// One shader source, two dialects: the bodies below are written without a #version line and
+// `make_shader` prepends the right one. ES needs the precision qualifiers, desktop core must not
+// have `es` in the version. Nothing else in these shaders differs between the two.
+#ifdef __ANDROID__
+static const char *GLSL_PREFIX = "#version 300 es\nprecision mediump float;\nprecision mediump int;\n";
+#else
+static const char *GLSL_PREFIX = "#version 330 core\n";
+#endif
+
 static GLuint make_shader(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
-    glShaderSource(s, 1, &src, nullptr);
+    const char *parts[2] = {GLSL_PREFIX, src};
+    glShaderSource(s, 2, parts, nullptr);
     glCompileShader(s);
     GLint ok = 0;
     glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-    if (!ok) { char log[1024]; glGetShaderInfoLog(s, sizeof(log), nullptr, log); SDL_Log("field shader: %s", log); }
+    if (!ok) {
+        char log[2048] = "";
+        GLsizei len = 0;
+        glGetShaderInfoLog(s, sizeof(log) - 1, &len, log);
+        SDL_Log("field shader FAILED (%s, log %d bytes): %s", type == GL_VERTEX_SHADER ? "vert" : "frag", (int)len, log);
+        SDL_Log("field shader source begins: %.180s", src);
+    }
     return s;
 }
 
@@ -2703,6 +2725,7 @@ static void field_draw_world(Field *f, int vw, int vh, bool painted, int depthmo
         glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
         set_attribs();
         for (int i = 0; i < dn; i++) {
+            if (f->cap_active && i >= prop_dn) break;   // a capture is a backdrop: no walkers in it
             if (painted && i == prop_dn) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);   // walkers are drawn
             glUniform1f(f->u_occl, draws[i].occl ? 1.0f : 0.0f);   // the player and its mark never cut
             glBindTexture(GL_TEXTURE_2D, f->art[draws[i].art].tex.id);
@@ -2776,7 +2799,8 @@ static void field_draw_world(Field *f, int vw, int vh, bool painted, int depthmo
 // Writes the zone's view to files/field/views/<map>_<zone>.png plus a linear-depth reference, at
 // `scale` times the live internal resolution. That PNG is what gets painted over.
 static void field_capture(Field *f, int vw, int vh, int scale) {
-    int cw = vw * scale, ch = vh * scale;
+    (void)vw; (void)vh;
+    int cw = 640 * scale, ch = 360 * scale;      // always a clean 16:9, whatever the live view is
     if (f->cap_w != cw || f->cap_h != ch) {
         if (f->cap_tex) { glDeleteTextures(1, &f->cap_tex); glDeleteRenderbuffers(1, &f->cap_depth); glDeleteFramebuffers(1, &f->cap_fbo); }
         glGenTextures(1, &f->cap_tex);
@@ -2810,6 +2834,7 @@ static void field_capture(Field *f, int vw, int vh, int scale) {
     unsigned char *px = (unsigned char *)malloc((size_t)cw * ch * 4);
     unsigned char *row = (unsigned char *)malloc((size_t)cw * 4);
     if (!px || !row) { free(px); free(row); memcpy(f->mvp, saved, sizeof(saved)); return; }
+    f->cap_active = 1;
     for (int pass = 0; pass < 2; pass++) {
         glBindFramebuffer(GL_FRAMEBUFFER, f->cap_fbo);
         glViewport(0, 0, cw, ch);
@@ -2821,12 +2846,19 @@ static void field_capture(Field *f, int vw, int vh, int scale) {
             memcpy(px + (size_t)y * cw * 4, px + (size_t)(ch - 1 - y) * cw * 4, (size_t)cw * 4);
             memcpy(px + (size_t)(ch - 1 - y) * cw * 4, row, (size_t)cw * 4);
         }
-        snprintf(path, sizeof(path), "%sfield/views/%s_%s%s.png", pref_path(), f->map_name, z->id, pass ? "_depth" : "");
+        if (f->cap_out[0]) {
+            if (pass) {
+                snprintf(path, sizeof(path), "%s", f->cap_out);
+                char *dot = strrchr(path, '.');
+                if (dot) snprintf(dot, sizeof(path) - (dot - path), "_depth.png");
+            } else snprintf(path, sizeof(path), "%s", f->cap_out);
+        } else snprintf(path, sizeof(path), "%sfield/views/%s_%s%s.png", pref_path(), f->map_name, z->id, pass ? "_depth" : "");
         int ok = stbi_write_png(path, cw, ch, 4, px, cw * 4);
         SDL_Log("field: capture %s %dx%d %s", path, cw, ch, ok ? "written" : "FAILED");
     }
     free(px);
     free(row);
+    f->cap_active = 0;
     memcpy(f->mvp, saved, sizeof(saved));
 }
 
@@ -2840,7 +2872,11 @@ static void field_render(Field *f, int win_w, int win_h, int vw, int vh) {
     glBindFramebuffer(GL_FRAMEBUFFER, f->fbo);
     glViewport(0, 0, vw, vh);
     field_draw_world(f, vw, vh, painted, 0);
-    if (f->capture_req) { field_capture(f, vw, vh, f->capture_req); f->capture_req = 0; }
+    if (f->capture_req && f->cap_delay <= 0) {
+        field_capture(f, vw, vh, f->capture_req);
+        f->capture_req = 0;
+        f->cap_done = 1;
+    }
 
     // Hand the GL state back the way ImGui's backend expects to find it.
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2975,6 +3011,52 @@ static void field_say(Field *f, const char *who, const char *id) {
     f->msg_t = 0;
 }
 
+// A capture can be driven without touching the phone: write <pref>capture.flag with an optional zone
+// id and an optional 1x/2x, exactly the way reload.flag works. The field truncates it once consumed.
+static void field_poll_capture(Field *f, float dt) {
+    f->cap_poll += dt;
+    if (f->cap_poll < 0.4f) return;
+    f->cap_poll = 0.0f;
+    char path[600];
+    snprintf(path, sizeof(path), "%scapture.flag", pref_path());
+    size_t sz = 0;
+    char *text = (char *)SDL_LoadFile(path, &sz);
+    if (!text) return;
+    if (sz == 0) { SDL_free(text); return; }
+    char body[128];
+    snprintf(body, sizeof(body), "%.*s", (int)(sz < sizeof(body) - 1 ? sz : sizeof(body) - 1), text);
+    SDL_free(text);
+    SDL_IOStream *tr = SDL_IOFromFile(path, "wb");            // consume it
+    if (tr) SDL_CloseIO(tr);
+
+    int scale = 2;
+    char want[32] = "";
+    char *tok[4];
+    char work[128];
+    snprintf(work, sizeof(work), "%s", body);
+    for (char *c = work; *c; c++) if (*c == '\r' || *c == '\n') *c = ' ';
+    int n = split_toks(work, tok, 4);
+    for (int i = 0; i < n; i++) {
+        if (!strcmp(tok[i], "1x")) scale = 1;
+        else if (!strcmp(tok[i], "2x")) scale = 2;
+        else snprintf(want, sizeof(want), "%s", tok[i]);
+    }
+    if (want[0]) {                                            // move to that zone so it becomes active
+        int zi = -1;
+        for (int i = 0; i < f->zone_count; i++) if (!strcmp(f->zones[i].id, want)) { zi = i; break; }
+        if (zi < 0) { SDL_Log("field: capture.flag names zone \"%s\", which this map does not have", want); return; }
+        CamZone *z = &f->zones[zi];
+        float cx = z->x + z->w * 0.5f, cz = z->z + z->d * 0.5f;
+        int pi = mesh_find(f, cx, cz);
+        if (pi < 0) pi = mesh_nearest(f, cx, cz);
+        if (pi >= 0) field_place(f, poly_contains(&f->polys[pi], cx, cz, 1e-3f) ? cx : f->polys[pi].cx,
+                                 poly_contains(&f->polys[pi], cx, cz, 1e-3f) ? cz : f->polys[pi].cz, f->facing);
+    }
+    f->capture_req = scale;
+    f->cap_delay = 6;                                         // let the camera settle before the shot
+    SDL_Log("field: capture requested (%dx) %s", scale, want[0] ? want : "current zone");
+}
+
 static void fire(FieldEvent *ev, int kind, const char *arg) {
     if (ev->kind != FE_NONE) return;
     ev->kind = kind;
@@ -2988,6 +3070,8 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
     f->water_t += dt;
     f->msg_t += dt;
 
+    field_poll_capture(f, dt);
+    if (f->cap_delay > 0) f->cap_delay--;
     field_input(f, w, h, ui_blocked, dt);
 
     // Movement. Screen-space stick mapped through the camera basis, then resolved on the navmesh.
@@ -3025,7 +3109,11 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
     if (f->poly >= 0 && f->poly < f->poly_count) f->py = poly_height(&f->polys[f->poly], f->px, f->pz);
 
     int vw = f->fill_width ? (int)(FBO_H * (float)w / (float)h + 0.5f) : 640;
-    if (vw < 640) vw = 640;
+    if (f->zone_idx >= 0 && f->zone_idx < f->zone_count && f->zone_paint[f->zone_idx].id) {
+        FTex *pt = &f->zone_paint[f->zone_idx];               // a painted zone takes the painting's aspect
+        vw = (int)((float)FBO_H * pt->w / (float)pt->h + 0.5f);
+    }
+    if (vw < 320) vw = 320;
     if (vw > FBO_W) vw = FBO_W;
     cam_update(f, dt, (float)vw / (float)FBO_H);
     // See-through: open the dithered circle only while something really stands between the camera
@@ -3202,6 +3290,25 @@ bool field_dev_ui(Field *f, char *out, int cap) {
     }
     return printed;
 }
+
+void field_capture_to(Field *f, const char *map, const char *zone, int scale, const char *out_path) {
+    if (strcmp(f->map_name, map) || !f->tile_count) field_load_map(f, map);
+    int zi = -1;
+    for (int i = 0; i < f->zone_count; i++) if (!strcmp(f->zones[i].id, zone)) { zi = i; break; }
+    if (zi < 0) { SDL_Log("field: map %s has no zone \"%s\"", map, zone); f->cap_done = 1; return; }
+    CamZone *z = &f->zones[zi];
+    float cx = z->x + z->w * 0.5f, cz = z->z + z->d * 0.5f;
+    int pi = mesh_find(f, cx, cz);
+    if (pi < 0) pi = mesh_nearest(f, cx, cz);
+    if (pi >= 0 && !poly_contains(&f->polys[pi], cx, cz, 1e-3f)) { cx = f->polys[pi].cx; cz = f->polys[pi].cz; }
+    field_place(f, cx, cz, f->spawn_f);
+    snprintf(f->cap_out, sizeof(f->cap_out), "%s", out_path);
+    f->capture_req = scale < 1 ? 1 : scale;
+    f->cap_delay = 6;
+    f->cap_done = 0;
+}
+
+bool field_capture_done(Field *f) { return f && f->cap_done != 0; }
 
 void field_save(Field *f, FieldSave *s) {
     memset(s, 0, sizeof(*s));

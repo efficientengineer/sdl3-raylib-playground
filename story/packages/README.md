@@ -107,6 +107,12 @@ Shared props, drawn with another map so one id is never drawn twice: `cart` (wit
 | [`ch01/halm/props`](ch01/halm/props/prompt.md) | `story/field/props/barrel.png`, `story/field/props/cart.png`, `story/field/props/fence.png`, `story/field/props/scale_bench.png`, `story/field/props/sign.png`, `story/field/props/tree_a.png`, `story/field/props/tree_b.png`, `story/field/props/well.png`, `story/field/props/yard_wall.png` | done | `ingest ch01/halm/props` |
 | [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) | `grain_shed`, `guild_hall`, `house_a`, `house_b`, `ladder_house` — front, side and roof each | to generate | `ingest ch01/halm/buildings` |
 
+**Painted views** — the block-out the engine captured, repainted as a finished background and laid back over it. Nothing in the picture may move.
+
+| zone | folder | status | after downloading |
+| --- | --- | --- | --- |
+| `square` | [`ch01/halm/views/square`](ch01/halm/views/square/prompt.md) | to generate | `ingest ch01/halm/views/square` |
+
 ### ch01 — hart_yard
 
 | package | makes | status | after downloading |

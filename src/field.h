@@ -64,6 +64,11 @@ void field_message(Field *f, const char *text);    // show a line in the field d
 // Dev messages. Rate-limited inside; it is a debug aid, not an error path.
 bool field_take_warning(Field *f, char *out, int cap);
 
+// Headless-ish capture, for the desktop path: load `map`, place the camera at zone `zone` exactly as
+// authored, render at 640x360 x scale and write `out_path` (plus `<out>_depth.png`). No phone needed.
+void field_capture_to(Field *f, const char *map, const char *zone, int scale, const char *out_path);
+bool field_capture_done(Field *f);
+
 void field_save(Field *f, FieldSave *s);
 void field_restore(Field *f, const FieldSave *s);
 
