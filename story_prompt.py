@@ -3174,64 +3174,57 @@ def cmd_cut(args):
     print(f"{FIELD_MANIFEST.relative_to(ROOT.parent)} updated")
 
 
-# ───────────────────────── Painted screens: one painting, two masks (the main field path) ─────────────────────────
+# ───────────────────────── Painted screens: a top-down map and its walkable mask ─────────────────────────
 #
-# Owner's direction (2026-09-18), after painting one screen by hand: ChatGPT paints the whole map
-# screen from a description and the game is fitted to the painting, rather than the engine blocking a
-# scene out and the painter tracing it (`view`, which stays for that path). The owner also tried
-# asking for one three-colour mask and it failed — the model invented a fourth class of its own and
-# kept its line art — so the shape of the thing is ONE PAINTING and TWO BINARY MASKS, each asked for
-# in its own message in the same chat, so the model has its own painting in front of it and never has
-# to answer anything harder than "green or black".
+# Owner's direction, 2026-09-19: **the field is Phantasy Star IV, not Final Fantasy VIII.** The
+# angled three-quarter experiment is dropped — with an angled camera every object hides ground, the
+# walkable mask had to guess what was behind a statue, and the walker needed a per-screen scale. A
+# top-down 16-bit map has none of those problems: nothing is walked behind, one scale holds edge to
+# edge, and what the player can walk on is simply what the painter left as ground.
 #
-#   returned.png       the painting            -> story/field/screens/<map>_<zone>_paint.png
-#   returned_walk.png  green = walkable ground -> ..._walk.png, and the `nav` polygons
-#   returned_fg.png    white = stands up       -> ..._fg.png, and the base map ..._base.png
+# So a screen is ONE PAINTING and ONE MASK, in one chat, one message each:
+#
+#   returned.png       the top-down map        -> story/field/screens/<map>_<zone>_paint.png
+#   returned_walk.png  green = walkable ground -> ..._walk.png, the `nav` polygons and the `door` lines
+#
+# and, only for a screen whose entry says `- overhead: yes`, a third:
+#
+#   returned_over.png  white = drawn OVER the player (an archway top, a bridge deck, a balcony)
+#                                              -> ..._over.png, painting pixels with alpha, `over` line
 #
 # Everything the engine needs is derived into story/field/screens/<map>_<zone>.screen in SCREEN
 # PIXELS. The painting is the world here: there is no block-out to agree with and nothing to line up,
-# which is exactly why this path is the main one.
-#
-# What the first real return taught us, and why the cleaning looks like this:
-#
-# - The walkable mask traced *everything* the painter could see, reachable or not: the arches of an
-#   aqueduct on the skyline, windows, tower openings, the inside of archways, roof terraces. It also
-#   came back with 1-3 px green outlines along boat rigging and dock posts. So the walk mask is
-#   OPENED first (erode then dilate, WALK_OPEN px) — a line thinner than the brush disappears and a
-#   plaza does not — and then only the component the player actually stands in survives, plus any
-#   component that reaches a declared exit edge. Everything else is dropped and named in the report.
-# - The foreground mask merged its objects into enormous blobs in spite of the two-pixel-gap rule:
-#   the whole left side of the first return was ONE component. Per-component occluder boxes and base
-#   lines are therefore worthless, and the answer is per-pixel: a BASE MAP that gives every
-#   foreground pixel the y of the bottom of its own vertical run. The engine's rule is one line —
-#   a foreground pixel hides the walker iff base_y(pixel) > the walker's feet y — and it does not
-#   care how many objects the model merged into one shape.
+# which is why this path is the main one and `view` is the older one.
 
 SCREENS_DOC = FIELD / "screens.md"            # one '## <map>.<zone>' entry per painted screen
-SCREENS_DIR = FIELD / "screens"               # the paintings, the cleaned masks, the base maps, the .screen
+SCREENS_DIR = FIELD / "screens"               # the paintings, the cleaned masks, the .screen files
 SCREEN_MAX_W = 1536                           # everything is fitted to the painting, capped to this
 SCREEN_DEFAULT_SIZE = (1536, 1024)            # what the prompt asks for when the entry says nothing
 SCREEN_EDGES = ("left", "right", "top", "bottom")
-SCREEN_SCALE = (1.0, 0.55)                    # walker scale at the bottom row and the top walkable row
+SCREEN_WALKER = 64                            # a person's height in painting pixels, the scale of everything
+DOOR_FACTOR = 1.15                            # a door is about this much taller than the person
+PATH_PERSONS = 3                              # a path is at least this many people wide (FIELD.md 10b)
 WALK_OPEN = 3                                 # erode then dilate: kills traced outlines up to 2*3 px wide
 WALK_CLOSE = 2                                # then dilate then erode: shuts pinholes and hairline seams
-FG_CLOSE = 1                                  # the foreground mask only needs its seams shut
-BASE_GAP = 4                                  # a black gap this short does not end a vertical white run
 MASK_SPECK = 40                               # a mask blob smaller than this is the model's noise
 NAV_MIN_AREA = 600                            # a walkable island smaller than this is never kept
-NAV_RETRY_POLYS = 120                         # more than this and the outline is retraced coarser once
+NAV_RETRY_POLYS = 120                         # more than this and the outline is retraced coarser
 NAV_MAX_POLYS = 400                           # more than this and the mask is too fiddly to trust
 NAV_SIMPLIFY = 3.0                            # Douglas-Peucker tolerance, pixels
+NAV_COVER_SLACK = 0.03                        # a coarser outline is only taken if it still covers this well
 NAV_MAX_VERTS = 8                             # convex polygons stay at the size FIELD.md's nav uses
 EXIT_MIN_RUN = 12                             # a walkable run at the frame edge shorter than this is noise
+DOOR_MAX_WIDE = 1.5                           # a threshold notch is at most this many walkers wide
+DOOR_POCKET = 0.75                            # ...and has building within this much of a walker either side
+DOOR_MIN_AREA = 40                            # a notch smaller than this is mask noise, not a door
 
 WALK_MASK_PROMPT = """\
-Make a WALKABLE MASK of the image you just generated. This is a technical image for a game engine, \
-not an illustration.
+Make a WALKABLE MASK of the map you just generated. This is a technical image for a game engine, not \
+an illustration.
 
-Output: the exact same image size, framing and camera as the painting, aligned pixel for pixel, so \
-that it can be laid over the painting and every edge lines up. Do not re-imagine, re-compose, crop, \
-zoom or shift anything. Trace the painting.
+Output: the exact same image size and framing as the map, aligned pixel for pixel, so that it can be \
+laid over the map and every edge lines up. Do not re-imagine, re-compose, crop, zoom or shift \
+anything. Trace the map.
 
 Use exactly TWO flat colours and nothing else:
 - Pure green #00FF00 = ground a person could stand or walk on.
@@ -3240,47 +3233,44 @@ Use exactly TWO flat colours and nothing else:
 No outlines, no line art, no shading, no gradients, no texture, no anti-aliasing, no third colour, no \
 text. Every pixel is either pure green or pure black. Edges are hard.
 
-GREEN (walkable): paved plaza and street surfaces, stair treads (paint a whole staircase as one solid \
-green shape, not stripe by stripe), ramps, bridges and dock planks a person could walk along, doorway \
-and archway floors up to the threshold. Walkable areas that connect in the painting must connect in \
-the mask: stairs join the plaza they lead to, a dock joins the quay.
+GREEN (walkable): open ground, grass, dirt, paving, streets, paths and yards; steps and stairs (paint \
+a whole flight as one solid green shape, not tread by tread); ramps; bridges and plank walkways. \
+Walkable areas that connect on the map must connect in the mask: a path joins the square it runs \
+into, a bridge joins the bank at both ends. A doorway a person can enter gets a small green notch at \
+its threshold, in the wall, the width of the door.
 
-BLACK (not walkable): buildings, roofs, awnings, tops of walls and balustrades, water, boats, cliffs, \
-rocks, trees, bushes, planters, barrels, crates, benches, market stalls, lamp posts, statues, \
-fountains and their basins, banners, the sky. If an object stands on the ground, the footprint it \
-covers is black — cut its base out of the green, but do NOT cut out the parts of it that only overlap \
-the ground visually (a lamp post's footprint is a small dot at its base, not the whole post).
+BLACK (not walkable): every object exactly as it is drawn, its whole drawn area — buildings and their \
+roofs, walls, fences, hedges, gates, wells, troughs, barrels, crates, carts, market stalls, signposts, \
+statues, trees, bushes, crops, rocks, cliffs, water and streams. If it is drawn on the map and it is \
+not ground, it is black, over the whole shape the painting gives it.
 
-Keep passages at least as wide as they are in the painting. When unsure whether a person could walk \
-there, paint it black."""
+Keep paths at least as wide as they are on the map. When unsure whether a person could walk there, \
+paint it black."""
 
-FG_MASK_PROMPT = """\
-Now make a FOREGROUND MASK of the same painting, same rules: exact same size, framing and camera, \
-aligned pixel for pixel, traced from the painting.
+OVER_MASK_PROMPT = """\
+Now make an OVERHEAD MASK of the same map: the parts of the picture that are drawn ABOVE a person \
+walking there, rather than behind them. Same rules as the last one: exact same size and framing, \
+aligned pixel for pixel, traced from the map.
 
 Use exactly TWO flat colours: pure white #FFFFFF and pure black #000000. No outlines, no shading, no \
 gradients, no anti-aliasing, no text.
 
-WHITE = every object that rises up from the ground and could hide a person walking behind it. Paint \
-the object's whole visible silhouette in white, exactly matching its outline in the painting: lamp \
-posts, the statue and fountain, trees and bushes, planters, barrels, crates, benches, market stalls \
-and their awnings, banners, free-standing walls and balustrades, gate arches, mooring posts, and the \
-front faces of any wall or building that a walkable area passes behind.
+WHITE = anything a person walks UNDERNEATH: the top of an archway or a gate, a bridge deck with a \
+path running under it, an overhanging balcony or awning with ground beneath it, the branches of a \
+tree whose trunk the path passes under, a roof that a walkway goes below.
 
-BLACK = the ground itself (plaza, stairs, docks), water, sky, and anything far away that no walkable \
-area passes behind.
+BLACK = everything else, including all the ordinary ground, and every object a person walks AROUND \
+rather than under.
 
-Where two white objects touch or overlap, leave a 2-pixel black gap between them so they stay \
-separate shapes. Each object should be one solid white shape with no holes unless the painting really \
-shows a see-through gap (an open archway is a hole; a window is not)."""
+If nothing on this map is walked underneath, the whole image is black, and that is a correct answer."""
 
-# The locked blocks in STYLE.md that apply to a field background. `layout`, `framing`, `acting`,
-# `character_design`, `dialogue_box` and the sheet/refsheet blocks are all about a manga page —
-# panels, borders, flat backdrops with no vanishing point, people acting — and a field screen is none
-# of those, so they are deliberately left out and the package says so.
+# The locked blocks in STYLE.md that apply to a top-down field map. `layout`, `framing`, `acting`,
+# `character_design`, `dialogue_box` and the sheet blocks are all about a manga page — panels,
+# borders, crops, people acting — and a field map is none of those, so they are deliberately left out
+# and the package says so.
 SCREEN_BLOCKS = ("header", "rendering", "negative")
 SCREEN_DROP_NEG = ("even panel grid", "panels filling the whole frame", "centered full-figure composition",
-                   "deep perspective")   # panel-sheet complaints that would fight a field background
+                   "deep perspective")   # panel-sheet complaints that a map prompt has its own words for
 
 
 def screen_key(mp, zone):
@@ -3288,7 +3278,7 @@ def screen_key(mp, zone):
 
 
 def screen_entries():
-    """{'<map>.<zone>': {desc, exits, landmark, spawn, size, scale}} from story/field/screens.md."""
+    """{'<map>.<zone>': {desc, exits, landmark, spawn, size, walker, overhead}} from screens.md."""
     if not SCREENS_DOC.exists():
         die(f"{SCREENS_DOC.relative_to(ROOT.parent)} not found; it holds one '## <map>.<zone>' entry "
             f"per painted screen")
@@ -3323,17 +3313,16 @@ def screen_entries():
             if len(bits) != 2 or not all(b.lstrip("-").isdigit() for b in bits):
                 die(f"screens.md: '## {name}' spawn '{kv['spawn']}' is not 'x y' in screen pixels")
             spawn = (int(bits[0]), int(bits[1]))
-        scale = SCREEN_SCALE
-        if kv.get("scale"):
-            try:
-                near, far = (float(b) for b in kv["scale"].split())
-            except ValueError:
-                die(f"screens.md: '## {name}' scale '{kv['scale']}' is not 'near far'")
-            scale = (near, far)
+        walker = SCREEN_WALKER
+        if kv.get("walker"):
+            if not kv["walker"].strip().isdigit():
+                die(f"screens.md: '## {name}' walker '{kv['walker']}' is not a height in pixels")
+            walker = int(kv["walker"])
         mp, zone = name.split(".")
         out[name] = {"key": name, "map": mp, "zone": zone, "desc": desc, "exits": exits,
                      "landmark": squash(kv.get("landmark", "")), "spawn": spawn, "size": size,
-                     "scale": scale}
+                     "walker": walker,
+                     "overhead": (kv.get("overhead", "no").strip().lower() in ("yes", "true", "1"))}
     if unknown:
         die(f"screens.md: unknown name token(s) {', '.join('{{%s}}' % t for t in unknown)}. "
             f"Every token needs a row in {NAMES_FILE.relative_to(ROOT.parent)}.")
@@ -3346,17 +3335,18 @@ def screen_paths(mp, zone):
     """Every file one screen owns."""
     base = str(SCREENS_DIR / f"{mp}_{zone}")
     return {"paint": Path(base + "_paint.png"), "walk": Path(base + "_walk.png"),
-            "fg": Path(base + "_fg.png"), "base": Path(base + "_base.png"),
-            "screen": Path(base + ".screen"), "debug": Path(base + "_debug.png")}
+            "over": Path(base + "_over.png"), "screen": Path(base + ".screen"),
+            "debug": Path(base + "_debug.png")}
 
 
-def screen_outputs(mp, zone):
+def screen_outputs(mp, zone, overhead=False):
     p = screen_paths(mp, zone)
-    return [str(p[k].relative_to(ROOT.parent)) for k in ("paint", "walk", "fg", "base", "screen")]
+    keys = ["paint", "walk"] + (["over"] if overhead else []) + ["screen"]
+    return [str(p[k].relative_to(ROOT.parent)) for k in keys]
 
 
 def screen_attachments(style, mp, warn):
-    """A field background needs no block-out. The style sheet, then what this map already has drawn."""
+    """A map needs no block-out. The style sheet, then whatever this map already has drawn."""
     out = []
     sp = existing(style["refs"].get("style"))
     if sp:
@@ -3377,55 +3367,68 @@ def screen_attachments(style, mp, warn):
 
 
 def screen_paint_prompt(e, style, warn):
-    """Prompt A: the painting itself. A field background, not a manga page — see SCREEN_BLOCKS."""
+    """Prompt A: the map itself, in the top-down oblique a 16-bit JRPG town is drawn in."""
     b = style["blocks"]
     w, h = e["size"]
+    P = e["walker"]
+    D = int(round(P * DOOR_FACTOR))
     neg = ", ".join(p for p in (x.strip() for x in b["negative"].split(","))
                     if p and not any(d in p for d in SCREEN_DROP_NEG))
-    L = ["Paint one complete game background: the whole screen a player walks around in, as a finished "
-         "picture. This is a field background, not a comic page — no panels, no borders, no frame, one "
-         "single image filling the canvas edge to edge.", "", b["header"], ""]
+    L = ["Paint one complete top-down map for a 16-bit JRPG: the whole place the player walks around "
+         "in, as one finished picture. This is a field map, not a comic page and not a scene — no "
+         "panels, no borders, no frame, one single image filling the canvas edge to edge.", "",
+         b["header"],
+         "(That is the game's look, locked in STYLE.md. It says cutscene because the panels came "
+         "first; this is a field map drawn in the same look, not a cutscene panel.)", "",
+         "THE PROJECTION, and it is the most important instruction here: the classic top-down oblique "
+         "those games are drawn in. The ground is seen from straight above, flat, as if the map were "
+         "laid on a table. Buildings and objects show their roof and their front — their south — face "
+         "only, and every vertical edge runs straight up the screen. There is NO perspective, NO "
+         "vanishing point, NO horizon and no sky. Nothing gets smaller further up the picture: one "
+         "uniform scale from edge to edge, the same size at the top as at the bottom. Nothing leans, "
+         "nothing is foreshortened, no side or three-quarter faces on anything.", ""]
     if e["landmark"]:
-        L += [f"THE LANDMARK, which must be clearly in frame: {e['landmark'].rstrip('.')}.", ""]
+        L += [f"THE LANDMARK, which must be clearly on the map: {e['landmark'].rstrip('.')}.", ""]
     L += ["THE PLACE:", e["desc"], "",
-          "CAMERA: one fixed three-quarter view from above, looking down at about 50 degrees, on a long "
-          "lens so the perspective is gentle and near and far things stay close to the same size. The "
-          "ground fills most of the frame: if any horizon shows at all it sits in the top fifth. "
-          "Everything in the picture is seen from this one camera — roofs from above and a little to "
-          "the side, walls square on to it, the ground running away from the bottom of the frame "
-          "toward the top.", "",
-          "THE GROUND A PERSON CAN WALK ON is the most important thing in the picture and must read at "
-          "a glance: one continuous, clearly bounded surface of paving, dirt or boards, unbroken where "
-          "it is meant to be walked, with a visible edge where it stops. Do not scatter clutter across "
-          "it, do not break it into disconnected islands, and do not bury its edge in shadow. "
-          "Everything standing on it — a wall, a tree, a cart, a post — has its own clear silhouette "
-          "against it and its own clear line where it meets the ground.", ""]
+          f"THE SCALE, which everything is drawn to: a person is about {P} pixels tall on this map and "
+          f"a door about {D} pixels tall, at {w}x{h}. A house is a few people wide, a well is about one "
+          f"person across, and every path, street and gap a person has to walk through is at least "
+          f"{PATH_PERSONS * P} pixels wide — {PATH_PERSONS} people abreast. Draw no people; the scale "
+          f"is there so the buildings and the gaps between them come out the right size.", "",
+          "THE GROUND A PERSON CAN WALK ON reads at a glance: open ground, paving, dirt and grass, with "
+          "a clear edge where it stops and a clear line where every object stands on it. Paths connect "
+          "to each other and to the places they lead; nothing walkable is left as an island that "
+          "cannot be reached.", ""]
     if e["exits"]:
-        runs = "; ".join(f"the {edge} edge, a way out toward {t.replace('_', ' ')}"
+        runs = "; ".join(f"the {edge} edge, the way to {t.replace('_', ' ')}"
                          for edge, t in sorted(e["exits"].items()))
-        L += [f"THE WAYS OUT reach the edge of the picture as visible walkable paths: {runs}. Each one "
-              f"runs off that edge of the frame — a road, a lane, a track, a stair — wide enough to "
-              f"walk, touching the very edge of the canvas, not stopping short of it and not hidden "
-              f"behind anything.", ""]
-    L += ["HOW THE PLACE IS SHAPED — people grew this, they did not lay it out: nothing straight for "
-          "longer than two or three buildings, streets that bend, fork, pinch and widen, no two "
-          "neighbouring buildings set at the same angle, gaps and spacings all different, paths that "
-          "curve because something is in the way. The open ground is a rough, lopsided shape, not a "
-          "rectangle. The edges of the picture dissolve into trees, hedges, sheds, walls and fields "
-          "rather than stopping at a clean line.", "",
+        L += [f"THE WAYS OUT run off the edge of the map as roads or paths: {runs}. Each one reaches "
+              f"the very edge of the canvas, at least {PATH_PERSONS * P} pixels wide, not stopping "
+              f"short of it and not blocked by anything.", ""]
+    L += ["HOW THE PLACE IS SHAPED — people grew this, they did not lay it out. It spread from one "
+          "reason, so the oldest and densest part is round that and it thins toward the edges. Lanes "
+          "bend, fork, pinch and widen, and some end in a yard. Nothing is in a row: buildings are "
+          "staggered along the lanes at irregular spacings and in clearly different sizes and shapes, "
+          "set forward and back from the path rather than lined up, so no two edges run together for "
+          "long. No grid, no city blocks, no repeated spacing, no mirror symmetry — those belong to "
+          "the ancients and this is not one of their places. The map does not stop at a clean line: "
+          "the edges dissolve into orchard, hedge, wall, shed, rock and field.", "",
           "NO PEOPLE, no characters, no animals: the game draws those on top as moving sprites, and a "
           "painted one would stand still forever. No text, no letters, no numbers, no writing on signs "
-          "or boards, no labels, no watermark, no user interface, no frame, no border, no vignette and "
-          "no letterboxing.", "",
+          "or boards, no labels, no watermark, no user interface, no map legend, no compass, no frame, "
+          "no border, no vignette and no letterboxing.", "",
           f"RENDERING: {b['rendering']}", "",
-          f"SIZE: one landscape image, {w}x{h}, painted edge to edge with nothing left blank.", "",
-          f"AVOID: {neg}, empty unpainted areas, a comic panel layout, people or animals, text or "
-          f"writing of any kind, a user interface, a border or a vignette"]
+          f"SIZE: one landscape image, {w}x{h}, painted edge to edge, the map filling the whole frame "
+          f"like a piece cut out of a larger world.", "",
+          f"AVOID: {neg}, perspective, a vanishing point, a horizon, sky, isometric or three-quarter "
+          f"views, side views, things shrinking with distance, a grid layout, buildings in rows, empty "
+          f"unpainted areas, people or animals, text or writing of any kind, a user interface, a "
+          f"border or a vignette"]
     return "\n".join(L)
 
 
 def cmd_screen(args):
-    """One painted screen per camera view: the painting and its two masks, asked for in one chat."""
+    """One painted top-down map per screen: the map and its walkable mask, asked for in one chat."""
     pos = [a for a in args if not a.startswith("--")]
     if len(pos) == 1 and "." in pos[0]:
         pos = pos[0].split(".", 1)
@@ -3441,79 +3444,83 @@ def cmd_screen(args):
     attach = screen_attachments(style, mp, warn)
     paint = screen_paint_prompt(e, style, warn)
     w, h = e["size"]
-    p, name, outs = screen_paths(mp, zone), f"screen_{mp}_{zone}", screen_outputs(mp, zone)
+    over = e["overhead"]
+    p, name = screen_paths(mp, zone), f"screen_{mp}_{zone}"
+    outs = screen_outputs(mp, zone, over)
+    steps = [{"n": 1, "what": "paint", "save": f"{RETURNED}.png", "prompt": paint},
+             {"n": 2, "what": "walk", "save": f"{RETURNED}_walk.png", "prompt": WALK_MASK_PROMPT}]
+    if over:
+        steps.append({"n": 3, "what": "over", "save": f"{RETURNED}_over.png", "prompt": OVER_MASK_PROMPT})
 
     manifest = pkg_path(name, "sheet.json")
     manifest.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_text(json.dumps({
         "screen": name, "kind": "screen", "map": mp, "zone": zone, "size": [w, h],
         "landmark": e["landmark"], "exits": e["exits"], "spawn": list(e["spawn"]) if e["spawn"] else None,
-        "scale": list(e["scale"]), "outputs": outs,
-        "returns": {"paint": f"{RETURNED}.png", "walk": f"{RETURNED}_walk.png", "fg": f"{RETURNED}_fg.png"},
-        "prompts": {"paint": paint, "walk": WALK_MASK_PROMPT, "fg": FG_MASK_PROMPT},
+        "walker": e["walker"], "overhead": over, "outputs": outs,
+        "returns": {s["what"]: s["save"] for s in steps},
+        "steps": [{"n": s["n"], "what": s["what"], "save": s["save"]} for s in steps],
+        "prompts": {s["what"]: s["prompt"] for s in steps},
     }, indent=2) + "\n")
 
     rel = lambda q: q.relative_to(ROOT.parent)
     here = PKG_DIR.relative_to(ROOT.parent) if PKG_DIR is not None else Path("story/out")
-    have = lambda o: "**exists**" if (ROOT.parent / o).exists() else "missing"
-    L = [f"# ChatGPT package: {PKG_TITLE or f'{mp} / {zone} — painted screen'}", "",
-         "**One chat, three messages.** The painting first; then each mask, in its own message, in the",
-         "same chat, so ChatGPT is tracing an image it can see. Do not start a new chat for a mask, and",
-         "do not ask for both masks at once — one mask with three classes in it is what failed: the",
-         "model invented a class of its own and drew line art over the top.", "",
-         "## What exists already", "",
-         f"- painting `{outs[0]}` — {have(outs[0])}",
-         f"- walkable mask `{outs[1]}` — {have(outs[1])}",
-         f"- foreground mask `{outs[2]}` — {have(outs[2])}",
-         f"- base map `{outs[3]}` — {have(outs[3])}",
-         f"- the engine's file `{outs[4]}` — {have(outs[4])}", "",
-         f"Style blocks used from `story/STYLE.md`: {', '.join(SCREEN_BLOCKS)} (`negative` minus its "
-         f"comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, "
-         f"`character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: this is "
-         f"a field background, not a manga page, so there are no panels, no borders and nobody acting.",
-         "", "## 1. Start a new chat and attach these files, in this order", ""]
+    has = lambda o: "**exists**" if (ROOT.parent / o).exists() else "missing"
+    L = [f"# ChatGPT package: {PKG_TITLE or f'{mp} / {zone} — painted map'}", "",
+         f"**One chat, {len(steps)} messages.** The map first, then the mask" +
+         (", then the overhead mask" if over else "") + ", each in its own message in the same chat, so",
+         "ChatGPT is tracing a picture it can see. Do not start a new chat for the mask, and do not ask",
+         "for the map and the mask in one message — the mask must be traced from the finished map.", "",
+         "## What exists already", ""]
+    L += [f"- `{o}` — {has(o)}" for o in outs]
+    L += ["", f"Style blocks used from `story/STYLE.md`: {', '.join(SCREEN_BLOCKS)} (`negative` minus "
+              f"its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, "
+              f"`character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: "
+              f"this is a top-down field map, not a manga page.", "",
+          "## 1. Start a new chat and attach these files, in this order", ""]
     L += [f"{n}. `{rel(q)}`" for n, (q, _) in enumerate(attach, 1)] or \
          ["(nothing to attach yet — no style reference and no cut sprites for this map. The prompt "
           "carries the style on its own.)"]
     if attach:
         L += [""] + [f"- Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += ["", f"## 2. Message one — paste this and get the painting ({w}x{h})", "", "````", paint, "````",
-          "", f"Save it in **this folder** as `{RETURNED}.png` (the whole path is `{here}/{RETURNED}.png`).",
-          "A .jpg or .webp works too; the tool converts it.", "",
-          "## 3. Message two — in the same chat, paste this and get the walkable mask", "",
-          "````", WALK_MASK_PROMPT, "````", "",
-          f"Save it in this folder as `{RETURNED}_walk.png`.", "",
-          "## 4. Message three — still the same chat, paste this and get the foreground mask", "",
-          "````", FG_MASK_PROMPT, "````", "",
-          f"Save it in this folder as `{RETURNED}_fg.png`.", "",
-          "## 5. Check all three before cutting", "",
-          "- [ ] The painting is one field background: no panels, no border, painted edge to edge",
-          "- [ ] The ground a person walks on reads at a glance and is continuous",
-          "- [ ] Every way out reaches the edge of the frame as a visible path"
+    titles = {"paint": f"the map ({w}x{h})", "walk": "the walkable mask",
+              "over": "the overhead mask (what is drawn above the player)"}
+    for s in steps:
+        L += ["", f"## {s['n'] + 1}. Message {s['n']} — paste this and get {titles[s['what']]}", "",
+              "````", s["prompt"], "````", "",
+              f"Save it in **this folder** as `{s['save']}`" +
+              (f" (the whole path is `{here}/{s['save']}`). A .jpg or .webp works too; the tool "
+               f"converts it." if s["n"] == 1 else ".")]
+    L += ["", f"## {len(steps) + 2}. Check before cutting", "",
+          "- [ ] Top-down: the ground is seen from straight above, objects show only roof and front face",
+          "- [ ] No perspective, no vanishing point, no horizon, no sky, nothing shrinking with distance",
+          f"- [ ] One scale everywhere: a door about {D_of(e)} px tall, paths {PATH_PERSONS * e['walker']} px wide",
+          "- [ ] Lanes bend; buildings are staggered, different sizes, never in rows; no grid",
+          "- [ ] Every way out runs off its edge of the frame"
           + (f" ({', '.join(sorted(e['exits']))})" if e["exits"] else ""),
-          "- [ ] No people, no animals, no text, no interface, no vignette",
-          "- [ ] Both masks are the same size and framing as the painting, pixel for pixel",
-          "- [ ] Both masks are two flat colours only — no outlines, no shading, no third colour",
-          "- [ ] The walkable green is one connected shape wherever the painting connects, and is not",
-          "      painted on roofs, windows, arches on the skyline or anywhere the player cannot reach",
-          "- [ ] Every standing object is white in the foreground mask, down to where it meets the ground",
-          "", "The tool forgives a lot of this: it opens the walkable mask to kill traced outlines, keeps",
-          "only the ground the player can actually reach, and reads the foreground mask per pixel rather",
-          "than per object. What it cannot forgive is a mask at a different size or framing from the",
-          "painting. If one drifts, reply in the same chat: \"Trace the painting exactly — same size and",
-          "framing, two flat colours only, no outlines.\"", "",
-          "## 6. Then cut", "", "```", f"./story_prompt.py ingest {here}", "```", "",
-          f"That fits all three to one size and writes `{outs[0]}`, `{outs[1]}`, `{outs[2]}`, the base map",
-          f"`{outs[3]}` and `{outs[4]}` — the size, the nav polygons, the base map, the exits, the spawn",
-          "and the walker scale, all in screen pixels, which is what the engine loads.",
-          f"Add `--debug` to also write `{rel(p['debug'])}`: the painting with the nav polygons outlined",
-          "and the base map in false colour, so what the tool understood can be seen at a glance.", ""]
+          "- [ ] No people, no animals, no text, no interface, no border",
+          "- [ ] The mask is the same size and framing as the map, pixel for pixel",
+          "- [ ] The mask is two flat colours only — no outlines, no shading, no third colour",
+          "- [ ] Green is only ground: every object, roof, tree, wall and stretch of water is black",
+          "- [ ] Every enterable door has a small green notch at its threshold", "",
+          "If a mask drifts, reply in the same chat: \"Trace the map exactly — same size and framing,",
+          "two flat colours only, no outlines.\"", "",
+          f"## {len(steps) + 3}. Then cut", "", "```", f"./story_prompt.py ingest {here}", "```", "",
+          "That fits everything to one size and writes " + ", ".join(f"`{o}`" for o in outs) + " — the",
+          "size, the nav polygons, the doors, the exits, the spawn and the walker height, all in screen",
+          "pixels, which is what the engine loads.",
+          f"Add `--debug` to also write `{rel(p['debug'])}`: the map with the nav polygons outlined and",
+          "the doors and exits marked, so what the tool understood can be seen at a glance.", ""]
     pkg_path(name, "chatgpt.md").write_text("\n".join(L))
     for x in warn:
         print(f"warning: {x}", file=sys.stderr)
     print(f"wrote {pkg_path(name, 'chatgpt.md').relative_to(ROOT.parent)}  "
-          f"({w}x{h}, {len(e['exits'])} exit(s), {len(attach)} attachment(s))")
+          f"({w}x{h}, walker {e['walker']} px, {len(steps)} step(s), {len(e['exits'])} exit(s), "
+          f"{len(attach)} attachment(s))")
 
+
+def D_of(e):
+    return int(round(e["walker"] * DOOR_FACTOR))
 
 # ── binary masks, as one big integer a row ──
 #
@@ -3896,9 +3903,12 @@ def merge_convex(tris, max_verts=NAV_MAX_VERTS):
             for k in range(len(poly)):
                 a, b = poly[k], poly[(k + 1) % len(poly)]
                 edges.setdefault(tuple(sorted((a, b))), []).append((pi, k))
-        for uses in edges.values():
-            if len(uses) != 2:
-                continue
+        cands = []                                       # longest diagonal first: fewer slivers
+        for key, uses in edges.items():
+            if len(uses) == 2:
+                (ax, ay), (bx, by) = key
+                cands.append((-((ax - bx) ** 2 + (ay - by) ** 2), uses))
+        for _d, uses in sorted(cands, key=lambda c: c[0]):
             (pi, ki), (qi, kj) = uses
             if pi == qi:
                 continue
@@ -3936,71 +3946,101 @@ def polys_from_grid(g, w, h, eps):
 
 def nav_polygons(g, w, h, report):
     """Convex polygons in screen pixels covering the walkable ground."""
-    eps = NAV_SIMPLIFY
-    polys = polys_from_grid(g, w, h, eps)
-    if len(polys) > NAV_RETRY_POLYS:                     # a blobby mask: try a coarser outline once
-        coarse = polys_from_grid(g, w, h, eps * 2)
-        report.append(f"the walkable outline came apart into {len(polys)} convex polygons at "
-                      f"{eps:.0f} px (an edge with a lot of trees and bushes cut into it); retraced at "
-                      f"{eps * 2:.0f} px and got {len(coarse)}")
-        polys, eps = coarse, eps * 2
+    green = max(1, sum(g))
+    eps, tried = NAV_SIMPLIFY, []
+    while True:                                          # coarser until it is few enough, or too loose
+        polys = polys_from_grid(g, w, h, eps)
+        cover = sum(abs(shoelace(q)) for q in polys) / green
+        tried.append((eps, polys, cover))
+        if len(polys) <= NAV_RETRY_POLYS or eps >= NAV_SIMPLIFY * 16:
+            break
+        eps *= 2
+    fits = [t for t in tried if abs(t[2] - 1) <= NAV_COVER_SLACK and all(is_convex(q) for q in t[1])]
+    eps, polys, cover = (min(fits, key=lambda t: len(t[1])) if fits else
+                         min(tried, key=lambda t: abs(t[2] - 1)))
+    if len(tried) > 1:
+        report.append("the walkable outline came apart into a lot of convex polygons (an edge with "
+                      "trees and bushes cut into it): " +
+                      ", ".join(f"{n} at {e:.0f} px covering {100 * c:.0f}%"
+                                for e, ps, c in tried for n in [len(ps)]) +
+                      f" — kept {len(polys)} at {eps:.0f} px, the fewest that still cover the ground")
     if len(polys) > NAV_MAX_POLYS:
         polys.sort(key=lambda p: -abs(shoelace(p)))
-        report.append(f"still {len(polys)} polygons; keeping the {NAV_MAX_POLYS} biggest. The mask is "
-                      f"probably speckled or has line art left in it.")
+        report.append(f"still {len(polys)} polygons; keeping the {NAV_MAX_POLYS} biggest, which loses "
+                      f"walkable ground. The mask is probably speckled or has line art left in it.")
         polys = polys[:NAV_MAX_POLYS]
     return polys, eps
 
 
-# ── the base map, the exits, the .screen file ──
+# ── doors, exits, the .screen file ──
 
-def base_map(fg, w, h, gap=BASE_GAP):
-    """For every foreground pixel, the y of the bottom of its own vertical white run.
-
-    The model merges objects (the whole left side of the first return was one blob), so an object is
-    not a component and a per-component base line says nothing. Per pixel it does not matter: the
-    engine's rule is that a foreground pixel hides the walker exactly when the bottom of that pixel's
-    own column of white is lower on the screen than the walker's feet. Short black gaps inside a run
-    — the mask's own leftover outlines — are bridged, or every drawn outline would cut an object in
-    half."""
-    base = [0] * (w * h)
-    for x in range(w):
-        y = h - 1
-        while y >= 0:
-            if not fg[y * w + x]:
-                y -= 1
-                continue
-            bottom, top = y, y                           # walk up through the run, bridging short gaps
-            while top >= 0:
-                if fg[top * w + x]:
-                    top -= 1
-                    continue
-                run = 0
-                while top - run >= 0 and not fg[(top - run) * w + x]:
-                    run += 1
-                if run > gap or top - run < 0:
-                    break
-                top -= run
-            for yy in range(top + 1, bottom + 1):
-                if fg[yy * w + x]:
-                    base[yy * w + x] = bottom
-            y = top
-    return base
+def row_spans(g, w, y, value=1):
+    """[(x0, x1)] horizontal runs of `value` in one row."""
+    out, start, o = [], None, y * w
+    for x in range(w + 1):
+        v = (g[o + x] == value) if x < w else False
+        if v and start is None:
+            start = x
+        elif not v and start is not None:
+            out.append((start, x - 1))
+            start = None
+    return out
 
 
-def base_rows(base, fg, w, h):
-    """The base map as an RGB image: R = base_y >> 8, G = base_y & 255, B = 255 where foreground."""
-    out = []
+def nearest_flags(line, n):
+    """(before, after): for each index, the index of the nearest set element at or before / after it."""
+    before, after, last = [-1] * n, [n] * n, -1
+    for i in range(n):
+        if line[i]:
+            last = i
+        before[i] = last
+    last = n
+    for i in range(n - 1, -1, -1):
+        if line[i]:
+            last = i
+        after[i] = last
+    return before, after
+
+
+def doors(walk, w, h, walker, report):
+    """Green notches poked into a building: the thresholds the mask prompt asks for.
+
+    A doorway is a pocket. On its own row it has non-walkable close by on both sides, and there is
+    non-walkable close above it too, because it is cut into the front wall of something. Anything
+    wider than about one and a half people is a gap between buildings, not a door."""
+    reach = max(4, int(DOOR_POCKET * walker))
+    wide = max(6, int(DOOR_MAX_WIDE * walker))
+    pocket = bytearray(w * h)
     for y in range(h):
-        line = bytearray(w * 3)
         o = y * w
-        for x in range(w):
-            if fg[o + x]:
-                b = base[o + x]
-                line[x * 3] = (b >> 8) & 255
-                line[x * 3 + 1] = b & 255
-                line[x * 3 + 2] = 255
-        out.append(line)
+        solid = bytearray(0 if walk[o + x] else 1 for x in range(w))
+        before, after = nearest_flags(solid, w)
+        for x0, x1 in row_spans(walk, w, y):
+            if x1 - x0 + 1 > wide:
+                continue
+            l, r = before[x0], after[x1]
+            if l < 0 or r >= w or x0 - l > reach or r - x1 > reach:
+                continue
+            for x in range(x0, x1 + 1):
+                pocket[o + x] = 1
+    for x in range(w):                                   # and something solid overhead: a wall, not a lane
+        col = bytearray(0 if walk[y * w + x] else 1 for y in range(h))
+        before, _ = nearest_flags(col, h)
+        for y in range(h):
+            if pocket[y * w + x] and (before[y] < 0 or y - before[y] > reach):
+                pocket[y * w + x] = 0
+    out = []
+    for comp in grid_components(pocket, w, h, 1):
+        if len(comp) < DOOR_MIN_AREA:
+            continue
+        x, y, bw, bh = comp_box(comp, w)
+        if bw > wide or bh > wide:
+            continue
+        out.append((x, y, bw, bh))
+    out.sort(key=lambda d: (d[1], d[0]))
+    if out:
+        report.append(f"{len(out)} doorway notch(es) found in the walkable mask; they are `door` lines "
+                      f"in the .screen and nothing is bound to them yet")
     return out
 
 
@@ -4034,8 +4074,8 @@ def screen_exits(walk, w, h, declared, report):
         target = declared.get(edge)
         if target and not runs:
             report.append(f"screens.md declares an exit on the {edge} edge to '{target}', but no "
-                          f"walkable ground reaches that edge — the painting did not run the path off "
-                          f"the frame, or the mask cut it off. The engine gets no {edge} exit.")
+                          f"walkable ground reaches that edge — the map did not run the road off the "
+                          f"frame, or the mask cut it off. The engine gets no {edge} exit.")
         for r in runs:
             if not target:
                 report.append(f"walkable ground touches the {edge} edge ({r[0]},{r[1]} to {r[2]},{r[3]}) "
@@ -4062,22 +4102,27 @@ def fmt_pt(p):
     return f"{int(round(p[0]))} {int(round(p[1]))}"
 
 
-def write_screen_file(path, meta, polys, exits, spawn, scale, top_walk):
+def write_screen_file(path, meta, polys, door_list, exits, spawn):
     L = [f"# {path.name} — generated by ./story_prompt.py ingest. Never edited by hand.",
-         "# Everything is in SCREEN PIXELS of the painting: the painting is the world here.",
+         "# A top-down 16-bit map. Everything is in SCREEN PIXELS of the painting, which is the world.",
          f"map {meta['map']}", f"zone {meta['zone']}",
          f"size {meta['w']} {meta['h']}",
-         f"paint {meta['paint']}", f"walk {meta['walk']}", f"fg {meta['fg']}",
-         "# base: RGB, R = base_y >> 8, G = base_y & 255, B = 255 where foreground, (0,0,0) where not.",
-         "# A foreground pixel hides the walker iff its base_y is greater than the walker's feet y.",
-         f"base {meta['base']}",
-         f"spawn {fmt_pt(spawn)}",
-         f"scale_near {scale[0]:.3f} at {meta['h'] - 1}",
-         f"scale_far {scale[1]:.3f} at {top_walk}", "",
-         f"# nav: {len(polys)} convex polygon(s), vertices in order, walkable ground only"]
+         f"paint {meta['paint']}", f"walk {meta['walk']}"]
+    if meta.get("over"):
+        L += ["# over: the painting's pixels that are drawn ABOVE the walker (an arch top, a bridge "
+              "deck), with alpha everywhere else. Drawn after the walker, at the same position.",
+              f"over {meta['over']}"]
+    L += [f"# walker: how tall the player's sprite is drawn on this map, in screen pixels.",
+          f"walker {meta['walker']}",
+          f"spawn {fmt_pt(spawn)}",
+          "# top-down: one scale over the whole map, so the walker never changes size.",
+          "scale_near 1.000 at " + str(meta["h"] - 1), "scale_far 1.000 at 0", "",
+          f"# nav: {len(polys)} convex polygon(s), vertices in order, walkable ground only"]
     for n, poly in enumerate(polys, 1):
         L.append(f"poly {n}: " + ", ".join(fmt_pt(p) for p in poly))
-    L += ["", "# exit: edge x0 y0 x1 y1 target_map"]
+    L += ["", "# door: a threshold notch cut into a building. Nothing is bound to it yet.",
+          *(f"door {x} {y} {bw} {bh}" for x, y, bw, bh in door_list),
+          "", "# exit: edge x0 y0 x1 y1 target_map"]
     for edge, r, target in exits:
         L.append(f"exit {edge} {r[0]} {r[1]} {r[2]} {r[3]} {target}")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -4101,24 +4146,24 @@ def draw_line(rows, x0, y0, x1, y1, rgb, thick=1):
             y0 += sy
 
 
-def screen_debug_image(paint, w, h, polys, fg, base, exits, spawn, out):
-    """The painting with the nav polygons outlined and the base map over it in false colour."""
+def screen_debug_image(paint, w, h, polys, door_list, exits, spawn, over, out):
+    """The map with the nav polygons outlined, the doors and exits marked, the overhead tinted."""
     rows = [bytearray(r) for r in paint]
-    for y in range(h):
-        line, o = rows[y], y * w
-        for x in range(w):
-            if not fg[o + x]:
-                continue
-            t = base[o + x] / max(1, h - 1)              # near the bottom = red, near the top = blue
-            r, g, b = int(255 * t), int(80 + 60 * t), int(255 * (1 - t))
-            i = x * 3
-            line[i] = (line[i] + r) // 2
-            line[i + 1] = (line[i + 1] + g) // 2
-            line[i + 2] = (line[i + 2] + b) // 2
+    if over:
+        for y in range(h):
+            line, o = rows[y], y * w
+            for x in range(w):
+                if over[o + x]:
+                    i = x * 3
+                    line[i] = (line[i] + 255) // 2
+                    line[i + 1] = (line[i + 1] + 180) // 2
+                    line[i + 2] = (line[i + 2] + 255) // 2
     for poly in polys:
         for i in range(len(poly)):
             a, b = poly[i], poly[(i + 1) % len(poly)]
             draw_line(rows, int(a[0]), int(a[1]), int(b[0]), int(b[1]), (0, 255, 255), 2)
+    for x, y, bw, bh in door_list:
+        stroke_rect(rows, x - 2, y - 2, bw + 4, bh + 4, 2, (255, 200, 0))
     for _edge, r, _t in exits:
         draw_line(rows, r[0], r[1], r[2], r[3], (255, 32, 32), 9)
     sx, sy = int(spawn[0]), int(spawn[1])
@@ -4139,17 +4184,19 @@ def fit_to(rows, w, h, ch, tw, th, nearest):
 
 
 def screen_returns(data, folder):
-    want = {k: folder / v for k, v in data["returns"].items()}
-    for k in ("paint", "walk", "fg"):
-        if want[k].exists():
-            continue
-        alt = [p for p in folder.iterdir()
-               if p.stem == want[k].stem and p.suffix.lower() in RETURN_SUFFIXES]
-        if not alt:
-            die(f"a screen needs all three images, and `{want[k].name}` is missing. The painting is "
-                f"`{RETURNED}.png`, the walkable mask `{RETURNED}_walk.png`, the foreground mask "
-                f"`{RETURNED}_fg.png`, all three saved in the package folder. Nothing written.")
-        want[k] = max(alt, key=lambda p: p.stat().st_mtime)
+    """The images the owner saved, one per step. A missing one is a hard stop, nothing is written."""
+    want = {}
+    for what, fname in data["returns"].items():
+        f = folder / fname
+        if not f.exists():
+            alt = [p for p in folder.iterdir()
+                   if p.stem == f.stem and p.suffix.lower() in RETURN_SUFFIXES]
+            if not alt:
+                die(f"`{fname}` is missing from this package. It needs "
+                    f"{', '.join('`%s`' % v for v in data['returns'].values())}, one per message in "
+                    f"prompt.md. Nothing written.")
+            f = max(alt, key=lambda p: p.stat().st_mtime)
+        want[what] = f
     return want
 
 
@@ -4157,10 +4204,11 @@ SCREEN_SUMMARY = []      # the one line `ingest` prints for a screen, since it s
 
 
 def cut_screen(data, folder, debug=False):
-    """The painting and its two masks -> the cleaned files, the base map and the engine's .screen."""
+    """The map and its walkable mask -> the cleaned files and the engine's .screen."""
     SCREEN_SUMMARY.clear()
     mp, zone = data["map"], data["zone"]
     want, report = screen_returns(data, folder), []
+    walker = int(data.get("walker") or SCREEN_WALKER)
     p = screen_paths(mp, zone)
     SCREENS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -4171,40 +4219,49 @@ def cut_screen(data, folder, debug=False):
     if pch == 4:
         prows = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in prows]
     write_png(p["paint"], W, H, 3, prows)
-    print(f"painting {want['paint'].name}: {pw}x{ph} -> {p['paint'].relative_to(ROOT.parent)} {W}x{H}")
+    print(f"map {want['paint'].name}: {pw}x{ph} -> {p['paint'].relative_to(ROOT.parent)} {W}x{H}")
 
-    grids = {}
-    for k, test, what in (("walk", walk_test, "walkable"), ("fg", fg_test, "foreground")):
-        mw, mh, mch, mrows = read_png(want[k])
+    def read_mask(what, test, label):
+        mw, mh, mch, mrows = read_png(want[what])
         if abs((mw / mh) / (W / H) - 1) > 0.06:
-            die(f"{want[k].name} is {mw}x{mh}, the painting is {W}x{H}: a different shape, so the mask "
+            die(f"{want[what].name} is {mw}x{mh}, the map is {W}x{H}: a different shape, so the mask "
                 f"cannot be laid over it. Ask for it again, same size and framing. Nothing written.")
         mrows = fit_to(mrows, mw, mh, mch, W, H, nearest=True)
         g = mask_of(mrows, W, H, mch, test)
-        raw = sum(g)
-        if not raw:
-            die(f"{want[k].name} has no {what} pixels in it at all (looking for "
-                f"{'pure green' if k == 'walk' else 'white'}). Is this the right file? Nothing written.")
-        if k == "walk":
-            g = morph(g, W, H, opening=WALK_OPEN, closing=WALK_CLOSE)
-            opened = sum(g)
-            filled = fill_pinholes(g, W, H)
-            g, kept = reachable_walk(g, W, H, data.get("spawn"), data.get("exits") or {}, report)
-            print(f"walkable mask {want[k].name}: {mw}x{mh} -> {W}x{H}, {raw} px raw, {opened} px after "
-                  f"an open of {WALK_OPEN} and a close of {WALK_CLOSE} ({filled} pinhole(s) filled), "
-                  f"{sum(g)} px reachable in {len(kept)} island(s)")
-        else:
-            g = morph(g, W, H, closing=FG_CLOSE)
-            filled = fill_pinholes(g, W, H)
-            print(f"foreground mask {want[k].name}: {mw}x{mh} -> {W}x{H}, {raw} px raw, {sum(g)} px "
-                  f"after a close of {FG_CLOSE} ({filled} pinhole(s) filled)")
-        grids[k] = g
-        write_png(p[k], W, H, 3, flat_rows(g, W, H, (0, 255, 0) if k == "walk" else (255, 255, 255)))
+        print(f"{label} {want[what].name}: {mw}x{mh} -> {W}x{H}, {sum(g)} px raw")
+        return g
 
-    walk, fg = grids["walk"], grids["fg"]
+    walk = read_mask("walk", walk_test, "walkable mask")
+    if not sum(walk):
+        die(f"{want['walk'].name} has no pure green in it at all. Is this the right file? Nothing written.")
+    walk = morph(walk, W, H, opening=WALK_OPEN, closing=WALK_CLOSE)
+    filled = fill_pinholes(walk, W, H)
+    print(f"  cleaned: open {WALK_OPEN}, close {WALK_CLOSE}, {filled} pinhole(s) filled -> {sum(walk)} px")
+    walk, kept = reachable_walk(walk, W, H, data.get("spawn"), data.get("exits") or {}, report)
+    print(f"  reachable: {sum(walk)} px in {len(kept)} island(s)")
     if not sum(walk):
         die("nothing walkable survived the cleaning: the green was all outlines and unreachable "
             "islands. Check the walkable mask. Nothing more written.")
+    write_png(p["walk"], W, H, 3, flat_rows(walk, W, H, (0, 255, 0)))
+
+    over = None
+    if data.get("overhead") and "over" in want:
+        over = morph(read_mask("over", fg_test, "overhead mask"), W, H, closing=1)
+        if not sum(over):
+            report.append("the overhead mask is entirely black: nothing on this map is walked "
+                          "underneath, so no overhead layer is written")
+            over = None
+        else:
+            cut = []
+            for y in range(H):
+                line, o = bytearray(W * 4), y * W
+                for x in range(W):
+                    if over[o + x]:
+                        line[x * 4:x * 4 + 4] = bytes(prows[y][x * 3:x * 3 + 3]) + b"\xff"
+                cut.append(line)
+            write_png(p["over"], W, H, 4, cut)
+            print(f"  overhead: {sum(over)} px -> {p['over'].relative_to(ROOT.parent)}")
+
     polys, eps = nav_polygons(walk, W, H, report)
     green, covered = sum(walk), sum(abs(shoelace(q)) for q in polys)
     bad = [n for n, q in enumerate(polys, 1) if not is_convex(q)]
@@ -4213,40 +4270,38 @@ def cut_screen(data, folder, debug=False):
     print(f"nav: {len(polys)} convex polygon(s) at {eps:.0f} px tolerance, covering {covered:.0f} of "
           f"{green} walkable px ({100 * covered / max(1, green):.1f}%)")
 
-    base = base_map(fg, W, H)
-    write_png(p["base"], W, H, 3, base_rows(base, fg, W, H))
-    deep = sum(1 for i in range(W * H) if fg[i] and base[i] >= H - 1)
-    print(f"base map: {p['base'].relative_to(ROOT.parent)}  ({sum(fg)} foreground px, "
-          f"{deep} of them standing on the bottom row of the frame)")
-
+    door_list = doors(walk, W, H, walker, report)
+    print(f"doors: {len(door_list)}" + (": " + ", ".join(f"{x},{y} {bw}x{bh}"
+                                                         for x, y, bw, bh in door_list[:8])
+                                        if door_list else ""))
     exits = screen_exits(walk, W, H, data.get("exits") or {}, report)
     print("exits: " + (", ".join(f"{e} -> {t}" for e, _r, t in exits) or "none found"))
 
-    top_walk = next((y for y in range(H) if any(walk[y * W + x] for x in range(W))), 0)
     spawn = data.get("spawn")
     if spawn:
         k = W / (data["size"][0] or W)
         spawn = (spawn[0] * k, spawn[1] * k)
         sx, sy = int(spawn[0]), int(spawn[1])
         if not (0 <= sx < W and 0 <= sy < H and walk[sy * W + sx]):
-            report.append(f"screens.md puts the spawn at {sx},{sy}, which is not walkable ground in "
-                          f"this painting; using the middle of the biggest walkable polygon instead")
+            report.append(f"screens.md puts the spawn at {sx},{sy}, which is not walkable ground on "
+                          f"this map; using the middle of the biggest walkable polygon instead")
             spawn = None
     if not spawn:
         spawn = poly_centroid(max(polys, key=lambda q: abs(shoelace(q)))) if polys else (W / 2, H - 1)
     rel = lambda q: str(q.relative_to(ROOT.parent))
-    meta = {"map": mp, "zone": zone, "w": W, "h": H, "paint": rel(p["paint"]), "walk": rel(p["walk"]),
-            "fg": rel(p["fg"]), "base": rel(p["base"])}
-    write_screen_file(p["screen"], meta, polys, exits, spawn, data.get("scale") or SCREEN_SCALE, top_walk)
-    print(f"wrote {p['screen'].relative_to(ROOT.parent)}  ({len(polys)} poly, {len(exits)} exit, "
-          f"spawn {fmt_pt(spawn)}, scale {data.get('scale') or list(SCREEN_SCALE)})")
+    meta = {"map": mp, "zone": zone, "w": W, "h": H, "walker": walker,
+            "paint": rel(p["paint"]), "walk": rel(p["walk"]),
+            "over": rel(p["over"]) if over else None}
+    write_screen_file(p["screen"], meta, polys, door_list, exits, spawn)
+    print(f"wrote {p['screen'].relative_to(ROOT.parent)}  ({len(polys)} poly, {len(door_list)} door, "
+          f"{len(exits)} exit, spawn {fmt_pt(spawn)}, walker {walker} px)")
     SCREEN_SUMMARY.append(f"{W}x{H}, {len(polys)} nav polygon(s) covering "
                           f"{100 * covered / max(1, green):.1f}% of the walkable ground, "
-                          f"{len(exits)} exit(s), spawn {fmt_pt(spawn)}")
+                          f"{len(door_list)} door(s), {len(exits)} exit(s), spawn {fmt_pt(spawn)}")
     if debug:
-        screen_debug_image(prows, W, H, polys, fg, base, exits, spawn, p["debug"])
-        print(f"wrote {p['debug'].relative_to(ROOT.parent)}  (nav polygons outlined, the base map in "
-              f"false colour, exits and spawn marked)")
+        screen_debug_image(prows, W, H, polys, door_list, exits, spawn, over, p["debug"])
+        print(f"wrote {p['debug'].relative_to(ROOT.parent)}  (nav polygons outlined, doors boxed, "
+              f"exits and spawn marked)")
     for x in report:
         LOUD.append(x)
         print(f"warning: {x}", file=sys.stderr)
@@ -4394,16 +4449,16 @@ def write_return_here(d, meta):
     rel = d.relative_to(ROOT.parent)
     outs = "\n".join(f"- `{o}`" for o in meta.get("outputs", [])) or "- (nothing listed)"
     if meta.get("kind") == "screen":
-        (d / "RETURN_HERE.md").write_text(f"""# {meta['title']} — save THREE images here
+        (d / "RETURN_HERE.md").write_text(f"""# {meta['title']} — save every image here
 
-One chat, three messages: the painting, then the walkable mask, then the foreground mask. `prompt.md`
-in this folder has all three prompts in order, and each one says which name to save under.
+One chat, one message per image: the map, then the walkable mask. `prompt.md` in this folder has the
+prompts in order and each one says which name to save under.
 
-1. `{RETURNED}.png` — the painting
+1. `{RETURNED}.png` — the top-down map
 2. `{RETURNED}_walk.png` — the walkable mask (green on black)
-3. `{RETURNED}_fg.png` — the foreground mask (white on black)
+3. `{RETURNED}_over.png` — the overhead mask, **only** if `prompt.md` has a third message
 
-`ingest` needs all three and refuses until they are all here. Then, from the repository root:
+`ingest` needs every image `prompt.md` asks for and refuses until they are all here. Then, from the repository root:
 
 ```
 ./story_prompt.py ingest {rel}
@@ -4566,10 +4621,10 @@ def cmd_packages(args):
         e = screens[key]
         mp, zone = e["map"], e["zone"]
         d = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp / "screens" / zone
-        outs = screen_outputs(mp, zone)
-        add(d, {"kind": "screen", "map": mp, "zone": zone,
-                "title": f"{mp} / {zone} — painted screen",
-                "makes": f"the painting, its two cleaned masks, the base map and `{outs[-1]}`",
+        outs = screen_outputs(mp, zone, e["overhead"])
+        add(d, {"kind": "screen", "map": mp, "zone": zone, "overhead": e["overhead"],
+                "title": f"{mp} / {zone} — painted map",
+                "makes": f"the top-down map, its cleaned walkable mask and `{outs[-1]}`",
                 "outputs": outs},
             cmd_screen, [mp, zone], group="screen", map=mp, chapter=chap_of_map(mp), zone=zone)
 
@@ -4681,7 +4736,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     for r in todo_first([x for x in rows("walker") if not x.get("blocked") and x["meta"].get("handle") in cast]):
         step(r, f"{r['who']}'s walk sprite — the figure walking the map")
     for r in [x for x in rows("screen") if x["map"] == lead_map]:
-        step(r, f"the painted screen `{r['zone']}` of `{lead_map}` — the whole place in one picture, "
+        step(r, f"the top-down map `{r['zone']}` of `{lead_map}` — the whole place in one picture, "
                 f"which is what the player walks around in")
     for g, what in (("tiles", "the ground and walls of {m}"), ("props", "everything standing in {m}"),
                     ("building", "the front, wall and roof of every building in {m}")):
@@ -4725,8 +4780,8 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
 
     field = [r for r in index if r["group"] in ("tiles", "props", "building")]
     L += ["", "## 4. Field art, by chapter and map", "",
-          "A **screen** is the main path: one painting of the whole place plus two masks, and the game is",
-          "fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces",
+          "A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,",
+          "and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces",
           "the ground is made of; a building is map geometry wearing three textures (the front wall, a wall",
           "sample, a roof sample); everything else is a prop sprite.",
           f"A map named `{COMMON_MAP}` means the entry carries no `- map:` line yet.", ""]
@@ -4740,10 +4795,11 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         mapfile = FIELD / "maps" / f"{mp}.map"
         L += [f"### {chapter_label(ch)} — {mp}" + ("" if mapfile.exists() else "  (no map file yet)"), ""]
         if screens:
-            L += ["**Screens — the main path.** ChatGPT paints the whole screen from its entry in",
-                  "`story/field/screens.md`, then traces two binary masks over it in the same chat, and the",
-                  "game is fitted to the painting: the walkable mask becomes the nav polygons, the",
-                  "foreground mask becomes the base map that decides what the walker is hidden behind.", "",
+            L += ["**Screens — the main path.** ChatGPT paints the whole map, top-down and 16-bit, from",
+                  "its entry in `story/field/screens.md`, then traces a green-on-black walkable mask over it",
+                  "in the same chat, and the game is fitted to the painting: the mask becomes the nav",
+                  "polygons, the doorway notches and the exits. One more mask, only for a map with something",
+                  "the player walks underneath.", "",
                   "| zone | folder | status | after downloading |", "| --- | --- | --- | --- |"]
             for r in screens:
                 L.append(f"| `{r['zone']}` | [`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | "

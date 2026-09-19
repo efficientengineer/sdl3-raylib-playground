@@ -39,8 +39,8 @@ unblock each other. A checked box is already cut; everything below this section 
       [`cast/falke/walker`](cast/falke/walker/prompt.md) · to generate · `ingest cast/falke/walker`
 - [ ] **8.** Ottilie's walk sprite — the figure walking the map  
       [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · to generate · `ingest cast/ottilie/walker`
-- [ ] **9.** the painted screen `square` of `halm` — the whole place in one picture, which is what the player walks around in  
-      [`ch01/halm/screens/square`](ch01/halm/screens/square/prompt.md) · to generate · `ingest ch01/halm/screens/square`
+- [ ] **9.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
+      [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) · to generate · `ingest ch01/halm/screens/town`
 - [x] **10.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
 - [ ] **11.** the ground and walls of `halm`, sheet 2 of 2  
@@ -86,8 +86,8 @@ until their reference sheet exists, because the walker must match it.
 
 ## 4. Field art, by chapter and map
 
-A **screen** is the main path: one painting of the whole place plus two masks, and the game is
-fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces
+A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,
+and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces
 the ground is made of; a building is map geometry wearing three textures (the front wall, a wall
 sample, a roof sample); everything else is a prop sprite.
 A map named `common` means the entry carries no `- map:` line yet.
@@ -104,14 +104,15 @@ Shared props, drawn with another map so one id is never drawn twice: `cart` (wit
 
 ### ch01 — halm
 
-**Screens — the main path.** ChatGPT paints the whole screen from its entry in
-`story/field/screens.md`, then traces two binary masks over it in the same chat, and the
-game is fitted to the painting: the walkable mask becomes the nav polygons, the
-foreground mask becomes the base map that decides what the walker is hidden behind.
+**Screens — the main path.** ChatGPT paints the whole map, top-down and 16-bit, from
+its entry in `story/field/screens.md`, then traces a green-on-black walkable mask over it
+in the same chat, and the game is fitted to the painting: the mask becomes the nav
+polygons, the doorway notches and the exits. One more mask, only for a map with something
+the player walks underneath.
 
 | zone | folder | status | after downloading |
 | --- | --- | --- | --- |
-| `square` | [`ch01/halm/screens/square`](ch01/halm/screens/square/prompt.md) | to generate | `ingest ch01/halm/screens/square` |
+| `town` | [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) | to generate | `ingest ch01/halm/screens/town` |
 
 Tiles, props and buildings below are the sprite path, which a painted screen does not need.
 
@@ -130,10 +131,11 @@ Tiles, props and buildings below are the sprite path, which a painted screen doe
 
 ### ch01 — hart_yard
 
-**Screens — the main path.** ChatGPT paints the whole screen from its entry in
-`story/field/screens.md`, then traces two binary masks over it in the same chat, and the
-game is fitted to the painting: the walkable mask becomes the nav polygons, the
-foreground mask becomes the base map that decides what the walker is hidden behind.
+**Screens — the main path.** ChatGPT paints the whole map, top-down and 16-bit, from
+its entry in `story/field/screens.md`, then traces a green-on-black walkable mask over it
+in the same chat, and the game is fitted to the painting: the mask becomes the nav
+polygons, the doorway notches and the exits. One more mask, only for a map with something
+the player walks underneath.
 
 | zone | folder | status | after downloading |
 | --- | --- | --- | --- |
@@ -183,10 +185,11 @@ Shared props, drawn with another map so one id is never drawn twice: `bedroll` (
 
 ### ch01 — west_road  (no map file yet)
 
-**Screens — the main path.** ChatGPT paints the whole screen from its entry in
-`story/field/screens.md`, then traces two binary masks over it in the same chat, and the
-game is fitted to the painting: the walkable mask becomes the nav polygons, the
-foreground mask becomes the base map that decides what the walker is hidden behind.
+**Screens — the main path.** ChatGPT paints the whole map, top-down and 16-bit, from
+its entry in `story/field/screens.md`, then traces a green-on-black walkable mask over it
+in the same chat, and the game is fitted to the painting: the mask becomes the nav
+polygons, the doorway notches and the exits. One more mask, only for a map with something
+the player walks underneath.
 
 | zone | folder | status | after downloading |
 | --- | --- | --- | --- |
@@ -231,3 +234,10 @@ cut apart into `story/panels/`. Talk and narration scenes need no art and are no
 | scene | folder | panels | status | after downloading |
 | --- | --- | --- | --- | --- |
 | `0170_the_jar` | [`ch01/stair_shrine/scenes/0170_the_jar`](ch01/stair_shrine/scenes/0170_the_jar/prompt.md) | 5 | to generate | `ingest ch01/stair_shrine/scenes/0170_the_jar` |
+
+## Kept, but no longer generated
+
+These folders left the playlist while holding an image you generated. Nothing deletes them;
+move the image somewhere safe and delete the folder by hand when you are done with it.
+
+- `ch01/halm/screens/square`

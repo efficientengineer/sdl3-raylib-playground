@@ -1,13 +1,13 @@
-# west_road / road — painted screen — save THREE images here
+# west_road / road — painted map — save every image here
 
-One chat, three messages: the painting, then the walkable mask, then the foreground mask. `prompt.md`
-in this folder has all three prompts in order, and each one says which name to save under.
+One chat, one message per image: the map, then the walkable mask. `prompt.md` in this folder has the
+prompts in order and each one says which name to save under.
 
-1. `returned.png` — the painting
+1. `returned.png` — the top-down map
 2. `returned_walk.png` — the walkable mask (green on black)
-3. `returned_fg.png` — the foreground mask (white on black)
+3. `returned_over.png` — the overhead mask, **only** if `prompt.md` has a third message
 
-`ingest` needs all three and refuses until they are all here. Then, from the repository root:
+`ingest` needs every image `prompt.md` asks for and refuses until they are all here. Then, from the repository root:
 
 ```
 ./story_prompt.py ingest story/packages/ch01/west_road/screens/road
@@ -17,8 +17,6 @@ Add `--debug` for a picture of what the tool understood. That writes:
 
 - `story/field/screens/west_road_road_paint.png`
 - `story/field/screens/west_road_road_walk.png`
-- `story/field/screens/west_road_road_fg.png`
-- `story/field/screens/west_road_road_base.png`
 - `story/field/screens/west_road_road.screen`
 
 Nothing here is ever deleted, so a bad cut is redone by fixing and rerunning, and a regeneration is

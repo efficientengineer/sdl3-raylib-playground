@@ -2,13 +2,12 @@
   "kind": "screen",
   "map": "hart_yard",
   "zone": "yard",
-  "title": "hart_yard / yard \u2014 painted screen",
-  "makes": "the painting, its two cleaned masks, the base map and `story/field/screens/hart_yard_yard.screen`",
+  "overhead": false,
+  "title": "hart_yard / yard \u2014 painted map",
+  "makes": "the top-down map, its cleaned walkable mask and `story/field/screens/hart_yard_yard.screen`",
   "outputs": [
     "story/field/screens/hart_yard_yard_paint.png",
     "story/field/screens/hart_yard_yard_walk.png",
-    "story/field/screens/hart_yard_yard_fg.png",
-    "story/field/screens/hart_yard_yard_base.png",
     "story/field/screens/hart_yard_yard.screen"
   ],
   "dir": "story/packages/ch01/hart_yard/screens/yard"

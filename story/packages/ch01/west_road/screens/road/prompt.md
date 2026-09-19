@@ -1,19 +1,16 @@
-# ChatGPT package: west_road / road — painted screen
+# ChatGPT package: west_road / road — painted map
 
-**One chat, three messages.** The painting first; then each mask, in its own message, in the
-same chat, so ChatGPT is tracing an image it can see. Do not start a new chat for a mask, and
-do not ask for both masks at once — one mask with three classes in it is what failed: the
-model invented a class of its own and drew line art over the top.
+**One chat, 2 messages.** The map first, then the mask, each in its own message in the same chat, so
+ChatGPT is tracing a picture it can see. Do not start a new chat for the mask, and do not ask
+for the map and the mask in one message — the mask must be traced from the finished map.
 
 ## What exists already
 
-- painting `story/field/screens/west_road_road_paint.png` — missing
-- walkable mask `story/field/screens/west_road_road_walk.png` — missing
-- foreground mask `story/field/screens/west_road_road_fg.png` — missing
-- base map `story/field/screens/west_road_road_base.png` — missing
-- the engine's file `story/field/screens/west_road_road.screen` — missing
+- `story/field/screens/west_road_road_paint.png` — missing
+- `story/field/screens/west_road_road_walk.png` — missing
+- `story/field/screens/west_road_road.screen` — missing
 
-Style blocks used from `story/STYLE.md`: header, rendering, negative (`negative` minus its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, `character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: this is a field background, not a manga page, so there are no panels, no borders and nobody acting.
+Style blocks used from `story/STYLE.md`: header, rendering, negative (`negative` minus its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, `character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: this is a top-down field map, not a manga page.
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -21,44 +18,46 @@ Style blocks used from `story/STYLE.md`: header, rendering, negative (`negative`
 
 - Image 1: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
 
-## 2. Message one — paste this and get the painting (1536x1024)
+## 2. Message 1 — paste this and get the map (1536x1024)
 
 ````
-Paint one complete game background: the whole screen a player walks around in, as a finished picture. This is a field background, not a comic page — no panels, no borders, no frame, one single image filling the canvas edge to edge.
+Paint one complete top-down map for a 16-bit JRPG: the whole place the player walks around in, as one finished picture. This is a field map, not a comic page and not a scene — no panels, no borders, no frame, one single image filling the canvas edge to edge.
 
 16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.
+(That is the game's look, locked in STYLE.md. It says cutscene because the panels came first; this is a field map drawn in the same look, not a cutscene panel.)
 
-THE LANDMARK, which must be clearly in frame: the broken culvert at the bend, and the rock the road swings round.
+THE PROJECTION, and it is the most important instruction here: the classic top-down oblique those games are drawn in. The ground is seen from straight above, flat, as if the map were laid on a table. Buildings and objects show their roof and their front — their south — face only, and every vertical edge runs straight up the screen. There is NO perspective, NO vanishing point, NO horizon and no sky. Nothing gets smaller further up the picture: one uniform scale from edge to edge, the same size at the top as at the bottom. Nothing leans, nothing is foreshortened, no side or three-quarter faces on anything.
+
+THE LANDMARK, which must be clearly on the map: the broken culvert at the bend, and the rock the road swings round.
 
 THE PLACE:
-The road west out of Halm, seen from above and to one side, the light going long. A wide dirt road of two wheel ruts with a grass crown between them comes in from the bottom right of the frame, bends round a rock too big to move, and runs away to the left edge between low hedges and open valley grass. Nothing about it is straight: it swings out for the rock, wanders where the ground is wet, and forks once to a beaten side path that goes off up the slope to nothing in particular. A stone culvert carries a ditch under the road at the near bend, its arch half fallen and the roadway above it dropped into the hole, loose blocks lying in the ditch below, so the road narrows to one side of it. A two-wheeled handcart stands abandoned on the verge with its shafts down, loaded above the sides. A knee-high weathered milestone stands where the side path leaves, one flat face scrubbed bare. Broad valley trees with heavy rounded crowns stand in ones and twos along the hedge line, with a thin young staked tree near the near verge, and a blank plank board nailed across a post leans at the fork. Beyond the hedges the valley opens out in fields and hedge lines going hazy toward the hills, and the road's far end is hidden by a bend and a stand of trees rather than by the frame edge.
+The road west out of Halm, seen from straight above, the light going long. A wide dirt road of two wheel ruts with a grass crown between them comes in at the right edge of the map, swings out round a rock too big to move, wanders where the ground is wet, and leaves at the left edge between low hedges and open valley grass. It forks once to a beaten side path that climbs north to a stand of trees and stops there. A stone culvert carries a ditch under the road at the near bend, its arch half fallen and the roadway above it dropped into the hole with loose blocks in the ditch below, so the road narrows to one side of it and a person has to go round. A two-wheeled handcart stands abandoned on the verge with its shafts down. A knee-high weathered milestone stands where the side path leaves, and a blank plank board nailed across a post leans beside it. Broad valley trees with heavy rounded crowns stand in ones and twos along the hedge lines, with a thin young staked tree near the verge, and the fields either side of the road are irregular: different sizes, hedged at odd angles, one of them ploughed in curving ridges, one gone to weeds.
 
-CAMERA: one fixed three-quarter view from above, looking down at about 50 degrees, on a long lens so the perspective is gentle and near and far things stay close to the same size. The ground fills most of the frame: if any horizon shows at all it sits in the top fifth. Everything in the picture is seen from this one camera — roofs from above and a little to the side, walls square on to it, the ground running away from the bottom of the frame toward the top.
+THE SCALE, which everything is drawn to: a person is about 64 pixels tall on this map and a door about 74 pixels tall, at 1536x1024. A house is a few people wide, a well is about one person across, and every path, street and gap a person has to walk through is at least 192 pixels wide — 3 people abreast. Draw no people; the scale is there so the buildings and the gaps between them come out the right size.
 
-THE GROUND A PERSON CAN WALK ON is the most important thing in the picture and must read at a glance: one continuous, clearly bounded surface of paving, dirt or boards, unbroken where it is meant to be walked, with a visible edge where it stops. Do not scatter clutter across it, do not break it into disconnected islands, and do not bury its edge in shadow. Everything standing on it — a wall, a tree, a cart, a post — has its own clear silhouette against it and its own clear line where it meets the ground.
+THE GROUND A PERSON CAN WALK ON reads at a glance: open ground, paving, dirt and grass, with a clear edge where it stops and a clear line where every object stands on it. Paths connect to each other and to the places they lead; nothing walkable is left as an island that cannot be reached.
 
-THE WAYS OUT reach the edge of the picture as visible walkable paths: the left edge, a way out toward bridge; the right edge, a way out toward halm. Each one runs off that edge of the frame — a road, a lane, a track, a stair — wide enough to walk, touching the very edge of the canvas, not stopping short of it and not hidden behind anything.
+THE WAYS OUT run off the edge of the map as roads or paths: the left edge, the way to bridge; the right edge, the way to halm. Each one reaches the very edge of the canvas, at least 192 pixels wide, not stopping short of it and not blocked by anything.
 
-HOW THE PLACE IS SHAPED — people grew this, they did not lay it out: nothing straight for longer than two or three buildings, streets that bend, fork, pinch and widen, no two neighbouring buildings set at the same angle, gaps and spacings all different, paths that curve because something is in the way. The open ground is a rough, lopsided shape, not a rectangle. The edges of the picture dissolve into trees, hedges, sheds, walls and fields rather than stopping at a clean line.
+HOW THE PLACE IS SHAPED — people grew this, they did not lay it out. It spread from one reason, so the oldest and densest part is round that and it thins toward the edges. Lanes bend, fork, pinch and widen, and some end in a yard. Nothing is in a row: buildings are staggered along the lanes at irregular spacings and in clearly different sizes and shapes, set forward and back from the path rather than lined up, so no two edges run together for long. No grid, no city blocks, no repeated spacing, no mirror symmetry — those belong to the ancients and this is not one of their places. The map does not stop at a clean line: the edges dissolve into orchard, hedge, wall, shed, rock and field.
 
-NO PEOPLE, no characters, no animals: the game draws those on top as moving sprites, and a painted one would stand still forever. No text, no letters, no numbers, no writing on signs or boards, no labels, no watermark, no user interface, no frame, no border, no vignette and no letterboxing.
+NO PEOPLE, no characters, no animals: the game draws those on top as moving sprites, and a painted one would stand still forever. No text, no letters, no numbers, no writing on signs or boards, no labels, no watermark, no user interface, no map legend, no compass, no frame, no border, no vignette and no letterboxing.
 
 RENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.
 
-SIZE: one landscape image, 1536x1024, painted edge to edge with nothing left blank.
+SIZE: one landscape image, 1536x1024, painted edge to edge, the map filling the whole frame like a piece cut out of a larger world.
 
-AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, text, letters, captions, speech bubbles, watermark, signature, empty unpainted areas, a comic panel layout, people or animals, text or writing of any kind, a user interface, a border or a vignette
+AVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, text, letters, captions, speech bubbles, watermark, signature, perspective, a vanishing point, a horizon, sky, isometric or three-quarter views, side views, things shrinking with distance, a grid layout, buildings in rows, empty unpainted areas, people or animals, text or writing of any kind, a user interface, a border or a vignette
 ````
 
-Save it in **this folder** as `returned.png` (the whole path is `story/packages/ch01/west_road/screens/road/returned.png`).
-A .jpg or .webp works too; the tool converts it.
+Save it in **this folder** as `returned.png` (the whole path is `story/packages/ch01/west_road/screens/road/returned.png`). A .jpg or .webp works too; the tool converts it.
 
-## 3. Message two — in the same chat, paste this and get the walkable mask
+## 3. Message 2 — paste this and get the walkable mask
 
 ````
-Make a WALKABLE MASK of the image you just generated. This is a technical image for a game engine, not an illustration.
+Make a WALKABLE MASK of the map you just generated. This is a technical image for a game engine, not an illustration.
 
-Output: the exact same image size, framing and camera as the painting, aligned pixel for pixel, so that it can be laid over the painting and every edge lines up. Do not re-imagine, re-compose, crop, zoom or shift anything. Trace the painting.
+Output: the exact same image size and framing as the map, aligned pixel for pixel, so that it can be laid over the map and every edge lines up. Do not re-imagine, re-compose, crop, zoom or shift anything. Trace the map.
 
 Use exactly TWO flat colours and nothing else:
 - Pure green #00FF00 = ground a person could stand or walk on.
@@ -66,57 +65,39 @@ Use exactly TWO flat colours and nothing else:
 
 No outlines, no line art, no shading, no gradients, no texture, no anti-aliasing, no third colour, no text. Every pixel is either pure green or pure black. Edges are hard.
 
-GREEN (walkable): paved plaza and street surfaces, stair treads (paint a whole staircase as one solid green shape, not stripe by stripe), ramps, bridges and dock planks a person could walk along, doorway and archway floors up to the threshold. Walkable areas that connect in the painting must connect in the mask: stairs join the plaza they lead to, a dock joins the quay.
+GREEN (walkable): open ground, grass, dirt, paving, streets, paths and yards; steps and stairs (paint a whole flight as one solid green shape, not tread by tread); ramps; bridges and plank walkways. Walkable areas that connect on the map must connect in the mask: a path joins the square it runs into, a bridge joins the bank at both ends. A doorway a person can enter gets a small green notch at its threshold, in the wall, the width of the door.
 
-BLACK (not walkable): buildings, roofs, awnings, tops of walls and balustrades, water, boats, cliffs, rocks, trees, bushes, planters, barrels, crates, benches, market stalls, lamp posts, statues, fountains and their basins, banners, the sky. If an object stands on the ground, the footprint it covers is black — cut its base out of the green, but do NOT cut out the parts of it that only overlap the ground visually (a lamp post's footprint is a small dot at its base, not the whole post).
+BLACK (not walkable): every object exactly as it is drawn, its whole drawn area — buildings and their roofs, walls, fences, hedges, gates, wells, troughs, barrels, crates, carts, market stalls, signposts, statues, trees, bushes, crops, rocks, cliffs, water and streams. If it is drawn on the map and it is not ground, it is black, over the whole shape the painting gives it.
 
-Keep passages at least as wide as they are in the painting. When unsure whether a person could walk there, paint it black.
+Keep paths at least as wide as they are on the map. When unsure whether a person could walk there, paint it black.
 ````
 
-Save it in this folder as `returned_walk.png`.
+Save it in **this folder** as `returned_walk.png`.
 
-## 4. Message three — still the same chat, paste this and get the foreground mask
+## 4. Check before cutting
 
-````
-Now make a FOREGROUND MASK of the same painting, same rules: exact same size, framing and camera, aligned pixel for pixel, traced from the painting.
+- [ ] Top-down: the ground is seen from straight above, objects show only roof and front face
+- [ ] No perspective, no vanishing point, no horizon, no sky, nothing shrinking with distance
+- [ ] One scale everywhere: a door about 74 px tall, paths 192 px wide
+- [ ] Lanes bend; buildings are staggered, different sizes, never in rows; no grid
+- [ ] Every way out runs off its edge of the frame (left, right)
+- [ ] No people, no animals, no text, no interface, no border
+- [ ] The mask is the same size and framing as the map, pixel for pixel
+- [ ] The mask is two flat colours only — no outlines, no shading, no third colour
+- [ ] Green is only ground: every object, roof, tree, wall and stretch of water is black
+- [ ] Every enterable door has a small green notch at its threshold
 
-Use exactly TWO flat colours: pure white #FFFFFF and pure black #000000. No outlines, no shading, no gradients, no anti-aliasing, no text.
+If a mask drifts, reply in the same chat: "Trace the map exactly — same size and framing,
+two flat colours only, no outlines."
 
-WHITE = every object that rises up from the ground and could hide a person walking behind it. Paint the object's whole visible silhouette in white, exactly matching its outline in the painting: lamp posts, the statue and fountain, trees and bushes, planters, barrels, crates, benches, market stalls and their awnings, banners, free-standing walls and balustrades, gate arches, mooring posts, and the front faces of any wall or building that a walkable area passes behind.
-
-BLACK = the ground itself (plaza, stairs, docks), water, sky, and anything far away that no walkable area passes behind.
-
-Where two white objects touch or overlap, leave a 2-pixel black gap between them so they stay separate shapes. Each object should be one solid white shape with no holes unless the painting really shows a see-through gap (an open archway is a hole; a window is not).
-````
-
-Save it in this folder as `returned_fg.png`.
-
-## 5. Check all three before cutting
-
-- [ ] The painting is one field background: no panels, no border, painted edge to edge
-- [ ] The ground a person walks on reads at a glance and is continuous
-- [ ] Every way out reaches the edge of the frame as a visible path (left, right)
-- [ ] No people, no animals, no text, no interface, no vignette
-- [ ] Both masks are the same size and framing as the painting, pixel for pixel
-- [ ] Both masks are two flat colours only — no outlines, no shading, no third colour
-- [ ] The walkable green is one connected shape wherever the painting connects, and is not
-      painted on roofs, windows, arches on the skyline or anywhere the player cannot reach
-- [ ] Every standing object is white in the foreground mask, down to where it meets the ground
-
-The tool forgives a lot of this: it opens the walkable mask to kill traced outlines, keeps
-only the ground the player can actually reach, and reads the foreground mask per pixel rather
-than per object. What it cannot forgive is a mask at a different size or framing from the
-painting. If one drifts, reply in the same chat: "Trace the painting exactly — same size and
-framing, two flat colours only, no outlines."
-
-## 6. Then cut
+## 5. Then cut
 
 ```
 ./story_prompt.py ingest story/packages/ch01/west_road/screens/road
 ```
 
-That fits all three to one size and writes `story/field/screens/west_road_road_paint.png`, `story/field/screens/west_road_road_walk.png`, `story/field/screens/west_road_road_fg.png`, the base map
-`story/field/screens/west_road_road_base.png` and `story/field/screens/west_road_road.screen` — the size, the nav polygons, the base map, the exits, the spawn
-and the walker scale, all in screen pixels, which is what the engine loads.
-Add `--debug` to also write `story/field/screens/west_road_road_debug.png`: the painting with the nav polygons outlined
-and the base map in false colour, so what the tool understood can be seen at a glance.
+That fits everything to one size and writes `story/field/screens/west_road_road_paint.png`, `story/field/screens/west_road_road_walk.png`, `story/field/screens/west_road_road.screen` — the
+size, the nav polygons, the doors, the exits, the spawn and the walker height, all in screen
+pixels, which is what the engine loads.
+Add `--debug` to also write `story/field/screens/west_road_road_debug.png`: the map with the nav polygons outlined and
+the doors and exits marked, so what the tool understood can be seen at a glance.
