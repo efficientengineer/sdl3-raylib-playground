@@ -214,3 +214,15 @@ procedural placeholders so maps are walkable before art. New engine module `src/
 field (D14), painted block-outs (D15) and painted screens (D16, D17) are parked in the code. What the
 detours left behind that is still used: text ids, interact-press with "!", name tokens, the packages
 tree, `ingest`, the tray app, magenta keying, the Mac capture path, `map.flag`, the map design rules.
+
+## D19. Everything is 256 colours, one byte per pixel
+Owner (2026-09-19): "What if we did just a 256 color palette and kept each image to one byte per pixel?
+We could use this palette across all ChatGPT generations … the cutter could do that." After the
+side-by-sides (`tools/palette/`): "They all look good. Let's go ahead." Contract in `PALETTE.md`: one
+master palette for field + cast (index 0 transparent, 1 black, 2 white; material ramps), a palette per
+cutscene scene, nearest colour in Oklab, no dithering (every mode tested made this art worse), hard
+alpha, indexed PNGs, conversion as the cutter's last step. The engine draws R8 index textures through a
+colormap texture with day/dusk/night and 32 light levels, blending colours (not indices) so full-res
+art still scales smoothly. Lighting, time of day, lanterns, palette cycling and status tints all come
+from tables. To reverse or revise: every shipped image is re-derived from `story/sheets/` by
+`ingest --force`.
