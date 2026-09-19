@@ -53,3 +53,22 @@ colour outside its palette.
   needs no change.
 - Palette cycling (water, fire, lamps) is a per-frame rewrite of a few colormap columns, declared in
   `story/palette/cycles.md` as `name: indices… @ fps`.
+
+### What the engine actually did (2026-09-19, tile field; `src/TILEFIELD_NOTES.md` has the detail)
+
+- **Index 0 must be transparent in the colormap, and the tool's `colormap.png` has it opaque black**
+  (it is written as an opaque picture). The engine zeroes column 0 in every row on load; without that
+  every sprite and stamp draws inside a black rectangle.
+- **The colormap's rows run bright to dark** (`colormap.json`: "level 0 is full light, 31 the
+  darkest") and the engine's built-in fallback tables are generated in that same order, so there is
+  one convention.
+- **A point light's pool is looked up in its own table**, `lamp` or `lantern` if the colormap has one,
+  otherwise `day`. A warm `lamp` table is the missing piece for a lantern that reads as firelight
+  rather than as restored daylight — it is the tool's to add.
+- **Point lights are `lamp:` lines in a tmap's `## meta`**, not triggers, because `story_prompt.py`'s
+  `TRIGGER_KINDS` rejects an unknown trigger kind and the engine does not edit the tool. A `light`
+  trigger kind is parsed as well, for when the tool learns it.
+- **An off-palette pixel is a warning, not a build error.** The loader counts and logs it per file and
+  takes the nearest master colour, so art that has not been through the cutter still runs.
+- **Cost**: the 4-tap blend measured 8.35 ms/frame against 8.29 ms for a single tap at 2400x1080 on
+  the phone. There is no fallback path; the blend is always on.

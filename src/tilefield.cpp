@@ -2603,7 +2603,6 @@ TileField *tf_create() {
     t->ambient = 1.0f;
     t->light_table = TBL_DAY;
     t->lantern_r = 5.0f;
-    t->one_tap = true;  // TEMP measurement
     return t;
 }
 

@@ -16,6 +16,8 @@ story/portraits/
 __pycache__/
 story/refs/style.*
 android/app/src/main/assets/cutscenes/
+android/app/src/main/assets/field/
+android/app/src/main/assets/palette/
 story/packages/**/returned.*
 build_desktop/
 imgui.ini

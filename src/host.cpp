@@ -25,6 +25,8 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <stdio.h>
 
 struct HotReloader {
     void *lib_handle;
@@ -155,10 +157,14 @@ struct HotReloader {
         memset(&api, 0, sizeof(api));
         if (!load(reload_path)) {
             LOGI("Hot reload FAILED: keeping previous game logic\n");
+            remove(reload_path);
             lib_handle = old_handle;
             api = old_api;
             return false;
         }
+        // The mapping survives the name going away, so unlink it the moment it is loaded. Without
+        // this every reload left a copy behind — 45 of them, 23 MB, were sitting in files/.
+        if (remove(reload_path) != 0) LOGI("Hot reload: could not unlink %s\n", reload_path);
 #else
         unload();
         if (!load(lib_path)) {
@@ -264,6 +270,25 @@ int main(int argc, char *argv[]) {
     LOGI("SDL_GetPrefPath returned: [%s]\n", pref ? pref : "NULL");
 
 #ifdef __ANDROID__
+    // Sweep any `libgame_logic.so.<pid>.<gen>` a previous run left behind. Those copies are unlinked
+    // as soon as they are dlopen'd now, but a build from before that, or a process killed between
+    // the copy and the load, can still leave one, and 45 of them once filled 23 MB of app data.
+    {
+        DIR *d = opendir(pref);
+        int swept = 0;
+        if (d) {
+            struct dirent *e;
+            while ((e = readdir(d))) {
+                int p = 0, g = 0;
+                if (sscanf(e->d_name, "libgame_logic.so.%d.%d", &p, &g) != 2) continue;
+                char path[640];
+                snprintf(path, sizeof(path), "%s%s", pref, e->d_name);
+                if (remove(path) == 0) swept++;
+            }
+            closedir(d);
+        }
+        if (swept) LOGI("Hot reload: swept %d stale libgame_logic.so copies\n", swept);
+    }
     snprintf(reloader.lib_path, sizeof(reloader.lib_path),
              "%slibgame_logic.so", pref);
     // Try hot-reload path first, then bundled APK lib

@@ -1747,7 +1747,13 @@ static bool load_map_3d(Field *f, const char *name) {
     size_t size = 0;
     char *text = (char *)field_read(rel, &size);
     bool from_file = text != nullptr;
-    if (!text) { SDL_Log("field: %s not found, using the fallback map", rel); text = SDL_strdup(FALLBACK_MAP); }
+    if (!text) {
+        // The 3D field is parked (TILES.md / D18) and its maps and art are no longer pushed or
+        // bundled: run `./fast_reload.sh --with-parked` to put them back on the phone for a session.
+        SDL_Log("field: %s not found, using the fallback map "
+                "(the 3D field is parked — ./fast_reload.sh --with-parked restores its art)", rel);
+        text = SDL_strdup(FALLBACK_MAP);
+    }
     field_free_map(f);
     snprintf(f->map_name, sizeof(f->map_name), "%s", name);
     parse_map(f, text);

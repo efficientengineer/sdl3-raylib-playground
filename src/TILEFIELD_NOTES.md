@@ -17,6 +17,17 @@ is built on it: `SCR_FIELD` is the tile field, and the old one is one Dev button
   `sc` (2400x1080 on the phone), and every quad is emitted in **device** pixels with its edges rounded
   through one `dev()` helper, so two tiles that share a logical edge share a device edge exactly and
   there are no cracks. `u_res` is the device size; the geometry is otherwise untouched.
+- **256 colours, one byte a pixel, and the light is a table lookup (PALETTE.md / D19).** The atlas and
+  every walker sheet are decoded as RGBA, mapped back to palette indices and uploaded `GL_R8`,
+  `GL_NEAREST`; the RGBA is freed. Halm's atlas is 24 MB RGBA and 6 MB indexed, each walker 6 MB and
+  1.5 MB, so the four sheets plus the atlas went from 48 MB of texture to 12 MB. Every file logs one
+  line with its size saving and its colour count, and a file with colours the master palette has not
+  logs `N px off-palette (art not converted yet)` and takes the nearest master colour — not-yet-cut
+  art still runs, it is only quantised at load. The colour a fragment ends up with comes from the
+  **colormap** (`story/palette/colormap.png`, 256 wide, 192 rows = 6 tables x 32 levels): the shader
+  fetches four neighbouring indices, looks each up in the row for that fragment's light, and blends
+  the four colours bilinearly, premultiplied. Nothing in the engine computes colour — except the CPU
+  fallback tables, which exist only so the field still lights if the palette tool has not run.
 - **Linear filtering, and the two things that keeps honest.** Atlas cells are 128 px and walker frames
   256x384, drawn at about 0.75x, so both textures are `GL_LINEAR` min and mag — nearest at a non-integer
   ratio is what made the old 32-px art mush. No mipmaps: at 0.75x they buy nothing and mip level 1
@@ -127,6 +138,62 @@ columns — 1 then 2 on one step, 3 then 0 on the next, `parity` flipping per st
 therefore play all four frames and the feet alternate, PS4 style. Before this a step showed only column
 1 or only column 3, so half of every sheet was never seen. Followers and NPCs run the same function;
 NPCs carry their own `parity`.
+
+## Light, as implemented (PALETTE.md's engine half)
+
+- **A map's ambient is `light: <table> <level>` in `## meta`**, default `day 1.0`. `halm`, `hart_yard`
+  and `west_road` all carry it.
+- **Point lights are `lamp: x y radius level [flicker]` meta lines**, in tiles. They are NOT triggers:
+  `story_prompt.py`'s `TRIGGER_KINDS` knows six kinds and rejects a seventh, and this side does not
+  edit the tool, while meta keys it does not recognise it ignores — so `tmap check` passes as it
+  stands. A `light` TRIGGER (`x y 1 1 light <radius> <level> [flicker]`) is parsed too, for the day
+  the tool learns the word. Halm has two lamps at the well and two at the guild-hall door.
+- **Per fragment**: `level = max(ambient, Σ level·(1−d/r)²)` over up to 16 lights, in logical view
+  pixels; the fractional level blends the two adjacent colormap rows. A point-light pool is looked up
+  in its own table — `lamp`/`lantern` if the colormap has one, otherwise `day`, i.e. full-strength
+  true colour — and mixed in by how far the point light is above ambient, which is what makes a pool
+  warm inside a blue night.
+- **A walker is lit at its feet**: one level and one warm weight for the whole sprite, worked out on
+  the CPU with the same arithmetic, so a character brightens as a whole rather than in a gradient up
+  the body. That is the `lit`/`warm` pair on every vertex; `lit < 0` means "per fragment".
+- **The atlas region is a vertex attribute** and the shader clamps its four taps to it. That REPLACED
+  the half-texel UV inset for the indexed path: the inset moved the sample point, the clamp makes
+  reaching into the neighbouring cell impossible.
+- **Palette cycling** comes from `story/palette/cycles.md` (`water: 115 116 117 118 @ 6`) and is a
+  `glTexSubImage2D` of those columns across every colormap row, once per cycle step.
+- **Dev row**: a button per table (day/dusk/night/flash/poison/stone), an ambient slider, a lantern
+  toggle with a radius slider, and `1 tap (no blend)`, which is the measuring instrument below. All
+  of it survives a hot reload (`TfSave`), applied after the map's own `light:` line.
+- **Cost, measured on the phone** at 2400x1080 with `glFinish` round the world draw: **8.35 ms/frame
+  with the 4-tap blend, 8.29 ms with one tap** — 0.7%, i.e. the twelve-to-sixteen fetches are free
+  here and no scale-based fallback is needed. Frame rate is a hard 59.7-60.1 fps because
+  `SDL_GL_SetSwapInterval(1)` and the phone was in a 60 Hz mode; the ms number is the honest one.
+- **Desktop shots**: `./capture.sh --tiles halm --light night:0.35 --lantern 5` →
+  `build_desktop/tiles_halm_night_lantern.png` (env: `TILE_LIGHT=<table>:<level>`, `TILE_LANTERN=<r>`).
+
+## What ships to the phone (2026-09-19: app data went 69 MB → 0.1 MB)
+
+The owner's app was 78 MB of storage: an 8.7 MB APK and 69 MB of app data — 45 stale
+`libgame_logic.so.<pid>.<gen>` copies, the parked 3D field's art, and panels from retired scenes.
+Three changes make that permanent:
+
+- **`host.cpp` unlinks each reload copy the moment it dlopens it** (the mapping outlives the name) and
+  sweeps any `libgame_logic.so.*.*` left by an older build at startup. Copies can no longer pile up.
+- **`fast_reload.sh` prunes to a ship list.** Everything it pushes is recorded, and afterwards
+  anything in `files/cutscenes` or `files/field` it would not ship is deleted, along with stale .so
+  copies (dead pid, or not the live pid's newest gen) and the leftover `files/com.playground/`. It
+  prints what it pruned and `files/ <before> KB -> <after> KB`. Panels come from the names in the
+  **current `src/cutscene_data.h`**, not from all of `story/panels/`.
+- **The parked kinds are not pushed or bundled** — `screens, views, maps, props, tiles, buildings,
+  edges`. `./fast_reload.sh --with-parked` restores them for a session on the old 3D field; without
+  them that field logs "the 3D field is parked" and uses its built-in fallback map.
+- **`deploy.sh` rebuilds the assets from scratch** to the same list (panels named by
+  `cutscene_data.h`, portraits, `field/tmaps`, `field/walkers`, one `tilesets/<set>/`
+  {atlas.png, atlas.json, tiles.md}, `palette/`) and prints the APK and assets sizes. It used to
+  `rsync` all of `story/field/`, debug images included.
+
+After all three, with the indexed art: **APK 12 MB, assets 5.7 MB, `files/` 112 KB on a fresh
+install** (6.3 MB once `fast_reload.sh` has pushed the working copies of the art).
 
 ## Deviations from TILES.md, and why
 

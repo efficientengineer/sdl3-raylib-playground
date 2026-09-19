@@ -62,6 +62,24 @@ if ! "$ADB" -s "$DEVICE" get-state >/dev/null 2>&1; then
     echo "ERROR: $DEVICE not connected. Run: $ADB connect $DEVICE" >&2
     exit 1
 fi
+
+# THE SHIP LIST. Everything this run puts on the phone is recorded here, and afterwards the device is
+# made to match it: anything in files/cutscenes or files/field that this run would not ship is deleted.
+# Without that the phone only ever accumulates — 69 MB of app data against an 8.7 MB APK, most of it
+# art from retired scenes and the parked 3D field.
+SHIP_CUT="$(mktemp)"; SHIP_FIELD="$(mktemp)"
+trap 'rm -f "$SHIP_CUT" "$SHIP_FIELD"' EXIT
+BEFORE_KB="$("$ADB" -s "$DEVICE" shell "run-as $PKG du -sk files" | awk '{print $1}' | tr -d '\r')"
+
+# The parked streams (the old 3D field: FIELD.md's screens, views, maps, props, tiles, buildings,
+# edges) are not pushed any more — nothing the tile field draws reads them, and they were 11 MB.
+# `--with-parked` puts them back for a session on the old field; without them its Dev button finds no
+# map and says so in the log rather than crashing.
+WITH_PARKED=0
+for a in "$@"; do [ "$a" = "--with-parked" ] && WITH_PARKED=1; done
+FIELD_KINDS="tmaps walkers"
+[ "$WITH_PARKED" = 1 ] && FIELD_KINDS="tmaps walkers maps screens views props tiles buildings edges"
+
 # Panel images and speaker portraits: push only the ones the device doesn't already have at the same size.
 "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/cutscenes"
 HAVE="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/cutscenes && stat -c \"%n %s\" *.png 2>/dev/null'" | tr -d '\r')"
@@ -74,18 +92,23 @@ push_art() {                                   # $1 = local file, $2 = name on t
         "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/cutscenes/$n && rm /data/local/tmp/$n"
     fi
 }
-for f in "$SCRIPT_DIR"/story/panels/*.png; do
+# Only the panels the CURRENT src/cutscene_data.h names: a retired scene's art is not shipped.
+WANTED_PANELS="$(grep -o '"[a-z0-9_]*\.png"' "$SCRIPT_DIR/src/cutscene_data.h" | tr -d '"' | sort -u)"
+for n in $WANTED_PANELS; do
+    f="$SCRIPT_DIR/story/panels/$n"
+    echo "$n" >> "$SHIP_CUT"
     [ -f "$f" ] || continue
-    push_art "$f" "$(basename "$f")"
+    push_art "$f" "$n"
 done
 for f in "$SCRIPT_DIR"/story/portraits/*.png; do   # cutscene_data.h names these portrait_<name>.png
     [ -f "$f" ] || continue
+    echo "portrait_$(basename "$f")" >> "$SHIP_CUT"
     push_art "$f" "portrait_$(basename "$f")"
 done
 
 # Field maps and art (FIELD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
 # The game looks in files/field/<kind>/<id>.png first, then the APK assets, then its placeholder.
-for d in maps tmaps tiles props walkers edges buildings views screens; do
+for d in $FIELD_KINDS; do
     [ -d "$SCRIPT_DIR/story/field/$d" ] || continue
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/$d"
     HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
@@ -95,6 +118,7 @@ for d in maps tmaps tiles props walkers edges buildings views screens; do
         case "$f" in *_debug.png) continue;; esac          # the ingest's own check image, not art
         case "$f" in *.png|*.map|*.tmap|*.screen|*.triggers) ;; *) continue;; esac
         n="$(basename "$f")"
+        echo "$d/$n" >> "$SHIP_FIELD"
         sz="$(stat -f %z "$f")"
         # Text files are tiny and are regenerated in place: a `.screen` can change completely and
         # keep its byte count, which the size check below cannot see. Always push those.
@@ -118,6 +142,7 @@ for d in "$SCRIPT_DIR"/story/field/tilesets/*/; do
     for f in "$d"atlas.png "$d"atlas.json "$d"tiles.md; do
         [ -f "$f" ] || continue
         n="$(basename "$f")"
+        echo "tilesets/$set_name/$n" >> "$SHIP_FIELD"
         sz="$(stat -f %z "$f")"
         if [ "$n" = "tiles.md" ] || [ "$n" = "atlas.json" ] || ! echo "$HAVE_T" | grep -qx "$n $sz"; then
             echo "  tileset $set_name/$n"
@@ -150,6 +175,68 @@ if [ "$1" = "--pull-views" ]; then
         echo "  pulled views/$n"
     done
 fi
+
+# ── PRUNE: make the device mirror the ship list ────────────────────────────────────────────────
+# Anything in files/cutscenes or files/field this run would not ship is deleted. Panels belong to
+# retired scenes, field art belongs to the parked 3D streams; the phone had 69 MB of it.
+echo "$SHIP_FIELD" > /dev/null
+PRUNED=0
+DEV_CUT="$("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/cutscenes 2>/dev/null" | tr -d '\r')"
+for n in $DEV_CUT; do
+    grep -qx "$n" "$SHIP_CUT" && continue
+    echo "  prune cutscenes/$n"
+    "$ADB" -s "$DEVICE" shell "run-as $PKG rm -f files/cutscenes/$n"
+    PRUNED=$((PRUNED + 1))
+done
+DEV_FIELD="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field 2>/dev/null && ls -d */ 2>/dev/null'" | tr -d '\r/')"
+for d in $DEV_FIELD; do
+    if [ "$d" = "tilesets" ]; then
+        for sub in $("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets && ls -d */ 2>/dev/null'" | tr -d '\r/'); do
+            for n in $("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/tilesets/$sub 2>/dev/null" | tr -d '\r'); do
+                grep -qx "tilesets/$sub/$n" "$SHIP_FIELD" && continue
+                echo "  prune field/tilesets/$sub/$n"
+                "$ADB" -s "$DEVICE" shell "run-as $PKG rm -f files/field/tilesets/$sub/$n"
+                PRUNED=$((PRUNED + 1))
+            done
+        done
+        continue
+    fi
+    case " $FIELD_KINDS " in
+        *" $d "*) ;;                                  # a kind this run ships: check it file by file
+        *) echo "  prune field/$d (parked)"           # a kind it does not: the whole folder goes
+           "$ADB" -s "$DEVICE" shell "run-as $PKG rm -rf files/field/$d"
+           PRUNED=$((PRUNED + 1)); continue;;
+    esac
+    for n in $("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/$d 2>/dev/null" | tr -d '\r'); do
+        grep -qx "$d/$n" "$SHIP_FIELD" && continue
+        echo "  prune field/$d/$n"
+        "$ADB" -s "$DEVICE" shell "run-as $PKG rm -f files/field/$d/$n"
+        PRUNED=$((PRUNED + 1))
+    done
+done
+
+# Stale hot-reload copies. A copy belonging to a DEAD pid is unreferenced; for the live pid every
+# copy but the newest gen is already mapped, so unlinking it is safe (the mapping outlives the name).
+# The host unlinks its own copy the moment it dlopens it now — this is for builds from before that.
+LIVE_PID="$("$ADB" -s "$DEVICE" shell pidof $PKG | tr -d '\r' | awk '{print $1}')"
+COPIES="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'ls files/libgame_logic.so.*.* 2>/dev/null'" | tr -d '\r')"
+NEWEST_GEN=-1
+for c in $COPIES; do
+    p="$(echo "$c" | awk -F. '{print $(NF-1)}')"; g="$(echo "$c" | awk -F. '{print $NF}')"
+    [ "$p" = "$LIVE_PID" ] && [ "$g" -gt "$NEWEST_GEN" ] && NEWEST_GEN="$g"
+done
+for c in $COPIES; do
+    p="$(echo "$c" | awk -F. '{print $(NF-1)}')"; g="$(echo "$c" | awk -F. '{print $NF}')"
+    if [ "$p" = "$LIVE_PID" ] && [ "$g" = "$NEWEST_GEN" ]; then continue; fi
+    "$ADB" -s "$DEVICE" shell "run-as $PKG rm -f $c"
+    PRUNED=$((PRUNED + 1))
+done
+
+# Left over from a run whose pref path was relative: nothing reads it.
+"$ADB" -s "$DEVICE" shell "run-as $PKG rm -rf files/com.playground"
+
+AFTER_KB="$("$ADB" -s "$DEVICE" shell "run-as $PKG du -sk files" | awk '{print $1}' | tr -d '\r')"
+echo "=== Pruned $PRUNED item(s); files/ ${BEFORE_KB} KB -> ${AFTER_KB} KB ==="
 
 LOCAL_MD5=$(md5 -q "$OBJ_DIR/libgame_logic.so")
 "$ADB" -s "$DEVICE" push "$OBJ_DIR/libgame_logic.so" /data/local/tmp/libgame_logic.so

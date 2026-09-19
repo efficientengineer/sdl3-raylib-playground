@@ -10,20 +10,44 @@ ADB=~/Library/Android/sdk/platform-tools/adb
 # story/ is the source). Portraits run first: the export records which ones exist.
 ./story_prompt.py portraits
 ./story_prompt.py export
-mkdir -p android/app/src/main/assets/cutscenes
-# portrait_*.png is excluded so --delete leaves the portraits copied in below alone.
-rsync -a --delete --exclude='portrait_*.png' --include='*.png' --exclude='*' story/panels/ android/app/src/main/assets/cutscenes/
+# THE SHIP LIST, and the APK holds nothing else. It used to rsync all of story/field/, which put the
+# parked 3D art and the ingest's debug images into the APK; the assets are rebuilt from scratch each
+# time so a file that leaves the list leaves the APK.
+ASSETS=android/app/src/main/assets
+rm -rf "$ASSETS/cutscenes" "$ASSETS/field"
+mkdir -p "$ASSETS/cutscenes"
+# Only the panels the current src/cutscene_data.h names — a retired scene's art is not shipped.
+for n in $(grep -o '"[a-z0-9_]*\.png"' src/cutscene_data.h | tr -d '"' | sort -u); do
+    [ -f "story/panels/$n" ] && cp "story/panels/$n" "$ASSETS/cutscenes/$n"
+done
 for f in story/portraits/*.png; do
     [ -f "$f" ] || continue
-    d="android/app/src/main/assets/cutscenes/portrait_$(basename "$f")"   # the name cutscene_data.h uses
-    cmp -s "$f" "$d" || cp "$f" "$d"
+    cp "$f" "$ASSETS/cutscenes/portrait_$(basename "$f")"                 # the name cutscene_data.h uses
 done
 
-# Field maps and art (FIELD.md): bundled under assets/field/<kind>/, which is where the game looks
-# after the phone's files/ copy that fast_reload.sh pushes.
-if [ -d story/field ]; then
-    mkdir -p android/app/src/main/assets/field
-    rsync -a --delete story/field/ android/app/src/main/assets/field/
+# Field (TILES.md): the tile field reads tmaps, walkers, one tileset folder and the palette. The
+# parked 3D streams (screens, views, maps, props, tiles, buildings, edges) are not bundled; the old
+# field says so in the log and falls back to its built-in map.
+for d in tmaps walkers; do
+    [ -d "story/field/$d" ] || continue
+    mkdir -p "$ASSETS/field/$d"
+    for f in story/field/"$d"/*; do
+        case "$f" in *_debug.png|*.raw.png) continue;; esac
+        case "$f" in *.png|*.tmap) cp "$f" "$ASSETS/field/$d/";; esac
+    done
+done
+for d in story/field/tilesets/*/; do
+    [ -d "$d" ] || continue
+    mkdir -p "$ASSETS/field/tilesets/$(basename "$d")"
+    for n in atlas.png atlas.json tiles.md; do
+        [ -f "$d$n" ] && cp "$d$n" "$ASSETS/field/tilesets/$(basename "$d")/$n"
+    done
+done
+if [ -d story/palette ]; then                        # PALETTE.md: the colours and the light tables
+    mkdir -p "$ASSETS/palette"
+    for n in master.hex master.pal.png colormap.png colormap.json cycles.md; do
+        [ -f "story/palette/$n" ] && cp "story/palette/$n" "$ASSETS/palette/$n"
+    done
 fi
 
 export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
@@ -33,5 +57,9 @@ cd ..
 
 "$ADB" -s "$PHONE" install -r android/app/build/outputs/apk/debug/app-debug.apk
 # A stale hot-reloaded lib in files/ would override the freshly installed APK lib.
-"$ADB" -s "$PHONE" shell "run-as $PKG sh -c 'rm -f files/libgame_logic.so files/libgame_logic.so.* files/reload.flag; rm -rf files/cutscenes files/field'" || true
+"$ADB" -s "$PHONE" shell "run-as $PKG sh -c 'rm -f files/libgame_logic.so files/libgame_logic.so.* files/reload.flag; rm -rf files/cutscenes files/field files/palette files/com.playground'" || true
 "$ADB" -s "$PHONE" shell am start -n "$PKG/.MainActivity"
+
+APK=android/app/build/outputs/apk/debug/app-debug.apk
+echo "=== APK $(du -h "$APK" | awk '{print $1}')   assets $(du -sh "$ASSETS" | awk '{print $1}') ==="
+du -sh "$ASSETS"/* 2>/dev/null | sed 's/^/    /'
