@@ -740,7 +740,7 @@ struct Field {
     FTex splat_tex;
     FTex zone_paint[F_ZONES];            // the painted backdrop for each zone, when one exists
     int capture_req, cap_delay, cap_done, cap_active; // 1 or 2 = capture at that scale, after N settling frames
-    float cap_poll;
+    float cap_poll, map_poll;
     char cap_out[512];                   // explicit output path (desktop capture); empty = the pref dir
     GLuint cap_fbo, cap_tex, cap_depth; int cap_w, cap_h;
     int floor_first, floor_count;        // every non-water ground quad, drawn in one splat pass
@@ -785,9 +785,16 @@ struct Field {
     char scr_name[48];                   // <map>_<zone>: the stem of every file the screen owns
     char meta_screen[32];                // a .map's `## meta screen: <zone>` line, routed after parsing
     float scr_w, scr_h;                  // the painting's coordinate space, from the `size` line
-    FTex scr_paint, scr_base;            // the painting, and the foreground base-row map
-    char scr_paint_file[96], scr_base_file[96];
+    FTex scr_paint, scr_base, scr_over;   // the painting, the base-row map, the over-everything layer
+    char scr_paint_file[96], scr_base_file[96], scr_over_file[96];
     float scr_retry;                     // seconds since the last attempt to upload a missing one
+    char scr_map_id[32];                 // the `map` line: what a door's text id is named for
+    float walker_px;                     // a walker sprite's height in painting pixels (`walker`)
+    float view_px;                       // painting pixels of height the view shows (`view`); 0 = all
+    // The party trail (Phantasy Star IV): the leader's recent positions, and the follower walking
+    // along them a fixed distance back. Positions only — no collision, and she never blocks him.
+    float trail_x[256], trail_y[256]; int trail_n;
+    float fol_x, fol_y, fol_anim; int fol_facing, fol_on, fol_walking;
     GLuint rprog;                        // the repaint pass: the painting drawn back over a walker
     GLint r_mvp, r_paint, r_base, r_uv, r_feet, r_ghost, r_mode;
     ScrExit sexits[F_SEXITS]; int sexit_count;
@@ -806,7 +813,7 @@ const char *field_map_name_at(int i) { return (i >= 0 && i < field_map_count()) 
 // The APK's asset folder can't be listed, so the painted screens are named here the way the maps
 // are. `test_plaza` is the engine's own synthetic screen: a gradient painting and three polygons,
 // so the sorting and the silhouette can be walked on the phone before any art exists.
-static const char *FIELD_SCREENS[] = { "halm_square", "test_plaza" };
+static const char *FIELD_SCREENS[] = { "halm_town", "test_town" };
 int field_screen_count() { return (int)(sizeof(FIELD_SCREENS) / sizeof(FIELD_SCREENS[0])); }
 const char *field_screen_name_at(int i) { return (i >= 0 && i < field_screen_count()) ? FIELD_SCREENS[i] : "test_plaza"; }
 
@@ -1158,7 +1165,11 @@ static void field_free_map(Field *f) {
     memset(f->gnd, 0, sizeof(f->gnd));
     if (f->scr_paint.id) { glDeleteTextures(1, &f->scr_paint.id); f->scr_paint.id = 0; }
     if (f->scr_base.id) { glDeleteTextures(1, &f->scr_base.id); f->scr_base.id = 0; }
+    if (f->scr_over.id) { glDeleteTextures(1, &f->scr_over.id); f->scr_over.id = 0; }
     f->sexit_count = 0;
+    f->walker_px = 64.0f;               // the contract's default person height
+    f->view_px = 0.0f;
+    f->trail_n = 0;
     f->is_screen = 0; f->scr_name[0] = 0; f->meta_screen[0] = 0;
 }
 
@@ -1710,7 +1721,19 @@ static bool screen_load(Field *f, const char *name);
 // Which painted screen a plain map name plays as. Halm is walked as its painting now; its 3D
 // block-out is still there under the name `halm3d`, which is what the capture and the paint-over
 // stream works from and what the Dev map picker offers.
-static const char *SCREEN_FOR_MAP[][2] = { {"halm", "halm_square"} };
+// Chapter one's seven maps, each to its painted screen (story/field/screens.md names the zones). An
+// entry whose .screen does not exist yet simply falls through to the 3D block-out, so this table can
+// name the whole chapter before any of it is painted, and an `exit ... halm` resolves the moment it
+// is. `halm_square` was the angled experiment and is listed after `halm_town`, which supersedes it.
+static const char *SCREEN_FOR_MAP[][2] = {
+    {"halm", "halm_town"}, {"halm", "halm_square"},
+    {"hart_yard", "hart_yard_yard"},
+    {"west_road", "west_road_road"},
+    {"bridge", "bridge_bridge"},
+    {"north_grass", "north_grass_grass"},
+    {"ridge_camp", "ridge_camp_camp"},
+    {"stair_shrine", "stair_shrine_shrine"},
+};
 
 // The 3D half of field_load_map, and the way in for anything that must have the block-out whatever
 // paintings exist — the capture, above all: `capture.sh halm square` is how the painting was made in
@@ -2232,26 +2255,6 @@ static void field_gl_init(Field *f) {
     f->u_depth = glGetUniformLocation(f->prog, "u_depth");
 
     {
-        GLuint sv = make_shader(GL_VERTEX_SHADER, SVS), sf = make_shader(GL_FRAGMENT_SHADER, SFS);
-        f->sprog = glCreateProgram();
-        glAttachShader(f->sprog, sv); glAttachShader(f->sprog, sf);
-        glLinkProgram(f->sprog);
-        GLint sok = 0;
-        glGetProgramiv(f->sprog, GL_LINK_STATUS, &sok);
-        if (!sok) { char log[1024]; glGetProgramInfoLog(f->sprog, sizeof(log), nullptr, log); SDL_Log("field splat link: %s", log); }
-        glDeleteShader(sv); glDeleteShader(sf);
-        f->s_mvp = glGetUniformLocation(f->sprog, "u_mvp");
-        f->s_splat = glGetUniformLocation(f->sprog, "u_splat");
-        const char *ln[4] = {"u_l0", "u_l1", "u_l2", "u_l3"};
-        for (int i = 0; i < 4; i++) f->s_lay[i] = glGetUniformLocation(f->sprog, ln[i]);
-        f->s_scale = glGetUniformLocation(f->sprog, "u_scale");
-        f->s_map = glGetUniformLocation(f->sprog, "u_map");
-        f->s_blend = glGetUniformLocation(f->sprog, "u_blend");
-        f->s_sharp = glGetUniformLocation(f->sprog, "u_sharp");
-        f->s_hk = glGetUniformLocation(f->sprog, "u_hk");
-        f->s_depth = glGetUniformLocation(f->sprog, "u_depth");
-    }
-    {
         GLuint rv = make_shader(GL_VERTEX_SHADER, RVS), rf = make_shader(GL_FRAGMENT_SHADER, RFS);
         f->rprog = glCreateProgram();
         glAttachShader(f->rprog, rv);
@@ -2301,6 +2304,33 @@ static void field_gl_init(Field *f) {
     f->spr = (FVert *)malloc(sizeof(FVert) * (size_t)f->spr_cap);
     f->gl_ready = true;
     build_world(f);
+}
+
+// The ground splat is 3D-only, and the 3D field is parked: build its program the first time a 3D
+// map actually draws, not on every start. The screen path never touches it.
+static void field_gl_init_3d(Field *f) {
+    if (f->sprog) return;
+    {
+        GLuint sv = make_shader(GL_VERTEX_SHADER, SVS), sf = make_shader(GL_FRAGMENT_SHADER, SFS);
+        f->sprog = glCreateProgram();
+        glAttachShader(f->sprog, sv); glAttachShader(f->sprog, sf);
+        glLinkProgram(f->sprog);
+        GLint sok = 0;
+        glGetProgramiv(f->sprog, GL_LINK_STATUS, &sok);
+        if (!sok) { char log[1024]; glGetProgramInfoLog(f->sprog, sizeof(log), nullptr, log); SDL_Log("field splat link: %s", log); }
+        glDeleteShader(sv); glDeleteShader(sf);
+        f->s_mvp = glGetUniformLocation(f->sprog, "u_mvp");
+        f->s_splat = glGetUniformLocation(f->sprog, "u_splat");
+        const char *ln[4] = {"u_l0", "u_l1", "u_l2", "u_l3"};
+        for (int i = 0; i < 4; i++) f->s_lay[i] = glGetUniformLocation(f->sprog, ln[i]);
+        f->s_scale = glGetUniformLocation(f->sprog, "u_scale");
+        f->s_map = glGetUniformLocation(f->sprog, "u_map");
+        f->s_blend = glGetUniformLocation(f->sprog, "u_blend");
+        f->s_sharp = glGetUniformLocation(f->sprog, "u_sharp");
+        f->s_hk = glGetUniformLocation(f->sprog, "u_hk");
+        f->s_depth = glGetUniformLocation(f->sprog, "u_depth");
+    }
+
 }
 
 // ───────────────────────── camera zones ─────────────────────────
@@ -2672,6 +2702,7 @@ static bool player_occluded(Field *f) {
 // zone's painting down first and renders the whole block-out into depth only; `depthmode` writes
 // linear depth instead of colour, which is what the capture's depth reference is.
 static void field_draw_world(Field *f, int vw, int vh, bool painted, int depthmode) {
+    field_gl_init_3d(f);                        // parked: built the first time a 3D map really draws
     glClearColor(0.10f, 0.12f, 0.17f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -3125,9 +3156,14 @@ static float scr_scale_at(Field *f, float y) {
     return s < 0.05f ? 0.05f : s;
 }
 
-// The walker radius is authored in cells like the 3D field's; on a screen it is pixels, and it
-// shrinks with the walker, or a distant figure would be held a metre off a near wall.
-static float scr_radius(Field *f) { return f->walk_radius * PX_PER_CELL * scr_scale_at(f, f->pz); }
+// Everything about the player is a multiple of `walker`, the person's height in painting pixels, so
+// one number in the file sizes the sprite, the speed and the radius together and a map drawn at a
+// different scale needs nothing else changed. The depth scale multiplies in; on a top-down map both
+// ends of the ramp are 1, so it is exactly constant, which is what Phantasy Star IV does.
+#define SCR_SPEED   4.5f        // walker heights per second
+#define SCR_RUN     1.6f
+#define SCR_ANIM_FPS 8.0f
+static float scr_radius(Field *f) { return f->walk_radius * f->walker_px * scr_scale_at(f, f->pz); }
 
 static int edge_id(const char *s) {
     return !strcmp(s, "left") ? 0 : !strcmp(s, "right") ? 1 : !strcmp(s, "top") ? 2 : !strcmp(s, "bottom") ? 3 : -1;
@@ -3146,9 +3182,16 @@ static int scr_view_w(Field *f, int win_w, int win_h) {
     if (vw > FBO_W) vw = FBO_W;
     return vw;
 }
+// `view <V>` is how many painting pixels of HEIGHT the screen shows: the Phantasy Star IV framing
+// knob. Default 6.5 walker heights, so a 64-px person stands in ~416 px of map. A file with neither
+// `view` nor `walker` is an old perspective screen and keeps the behaviour it had: cover the whole
+// painting, no scrolling.
 static float scr_view_scale(Field *f, int vw) {
     float sw = f->scr_w > 1.0f ? f->scr_w : 1.0f, sh = f->scr_h > 1.0f ? f->scr_h : 1.0f;
-    return f->zoom * fmaxf((float)vw / sw, (float)FBO_H / sh);
+    float v = f->view_px > 1.0f ? f->view_px : 0.0f;
+    if (v <= 0.0f && f->walker_px > 0.0f && f->scr_base_file[0] == 0) v = 6.5f * f->walker_px;
+    if (v > 1.0f) return f->zoom * (float)FBO_H / v;
+    return f->zoom * fmaxf((float)vw / sw, (float)FBO_H / sh);   // cover the whole painting
 }
 
 static void screen_place(Field *f, float x, float y, int facing) {
@@ -3183,39 +3226,37 @@ static void screen_place(Field *f, float x, float y, int facing) {
 // land while Android has the app in the background, and a GL call made then returns no texture name
 // at all, which would leave the screen permanently blank until the next map change. screen_tick asks
 // for a retry once a second while either is missing, so it heals itself the moment the app is up.
-static void screen_load_images(Field *f) {
+// `name` is emptied when the file simply is not there, which is a legitimate answer for `base` (a
+// top-down map has no foreground to stand in front of you) and for `over`. That also stops the retry
+// below from asking again every second for something that will never arrive.
+static void screen_load_one(Field *f, FTex *tex, char *name, int cap, const char *what) {
+    if (tex->id || !name[0]) return;
     char rel[200];
-    if (!f->scr_paint.id) {
-        snprintf(rel, sizeof(rel), "field/screens/%s", f->scr_paint_file);
-        size_t sz = 0;
-        void *data = field_read(rel, &sz);
-        if (data) {
-            int w = 0, h = 0, nc = 0;
-            unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
-            SDL_free(data);
-            if (px) { f->scr_paint = ftex_upload(px, w, h, false, false); stbi_image_free(px); }
-        }
-        if (!f->scr_paint.id) SDL_Log("field: no painting at %s; the screen draws on flat blue", rel);
+    snprintf(rel, sizeof(rel), "field/screens/%s", name);
+    size_t sz = 0;
+    void *data = field_read(rel, &sz);
+    if (!data) {
+        if (what) SDL_Log("field: no %s at %s", what, rel);   // null = optional, absence is normal
+        name[0] = 0;
+        return;
     }
-    // The base map is sampled per pixel and its channels are numbers, not colour: NEAREST, no mips.
-    if (!f->scr_base.id) {
-        snprintf(rel, sizeof(rel), "field/screens/%s", f->scr_base_file);
-        size_t sz = 0;
-        void *data = field_read(rel, &sz);
-        if (data) {
-            int w = 0, h = 0, nc = 0;
-            unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
-            SDL_free(data);
-            if (px) {
-                f->scr_base = ftex_upload(px, w, h, false, false);
-                stbi_image_free(px);
-                if (f->scr_paint.id && (w != f->scr_paint.w || h != f->scr_paint.h))
-                    SDL_Log("field: base map %dx%d does not match the painting %dx%d; the two are sampled "
-                            "by the same uv, so the foreground will be offset", w, h, f->scr_paint.w, f->scr_paint.h);
-            }
-        }
-        if (!f->scr_base.id) SDL_Log("field: no base map at %s; nothing on this screen stands in front", rel);
-    }
+    int w = 0, h = 0, nc = 0;
+    unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
+    SDL_free(data);
+    if (!px) { SDL_Log("field: %s would not decode", rel); name[0] = 0; return; }
+    *tex = ftex_upload(px, w, h, false, false);           // NEAREST both ways: this is pixel art
+    stbi_image_free(px);
+    (void)cap;
+    if (tex != &f->scr_paint && f->scr_paint.id && (w != f->scr_paint.w || h != f->scr_paint.h))
+        SDL_Log("field: %s is %dx%d but the painting is %dx%d; they are sampled by the same uv, so it "
+                "will be offset", what, w, h, f->scr_paint.w, f->scr_paint.h);
+}
+
+static void screen_load_images(Field *f) {
+    screen_load_one(f, &f->scr_paint, f->scr_paint_file, sizeof(f->scr_paint_file), "painting");
+    // The base map's channels are numbers, not colour. Absent = a flat top-down map: no repaint pass.
+    screen_load_one(f, &f->scr_base, f->scr_base_file, sizeof(f->scr_base_file), "base map");
+    screen_load_one(f, &f->scr_over, f->scr_over_file, sizeof(f->scr_over_file), nullptr);
 }
 
 // message/npc lines, in the painting's pixels. The writer's side owns this file; a screen without
@@ -3277,9 +3318,11 @@ static bool screen_load(Field *f, const char *name) {
     f->sc_near = 1.0f; f->sc_near_y = 720; f->sc_far = 0.5f; f->sc_far_y = 0;
     f->scr_spawn_x = 640; f->scr_spawn_y = 600;
     if (f->zoom < 0.5f || f->zoom > 6.0f) f->zoom = 1.0f;
-    int dropped = 0;
+    int dropped = 0, doors = 0;
+    snprintf(f->scr_map_id, sizeof(f->scr_map_id), "%s", name);
     snprintf(f->scr_base_file, sizeof(f->scr_base_file), "%s_base.png", name);   // contract defaults
     snprintf(f->scr_paint_file, sizeof(f->scr_paint_file), "%s_paint.png", name);
+    snprintf(f->scr_over_file, sizeof(f->scr_over_file), "%s_over.png", name);   // optional, silent
     char *base_file = f->scr_base_file, *paint_file = f->scr_paint_file;
 
     char *p = text;
@@ -3298,18 +3341,37 @@ static bool screen_load(Field *f, const char *name) {
         if (!strcmp(kind, "size")) sscanf(line, "%*s %f %f", &f->scr_w, &f->scr_h);
         // The tool writes these as repo paths (`story/field/screens/x.png`); the game reads by the
         // name alone, out of the pref dir or the APK. Taking the last component covers both.
-        else if (!strcmp(kind, "paint") || !strcmp(kind, "base")) {
+        else if (!strcmp(kind, "paint") || !strcmp(kind, "base") || !strcmp(kind, "over")) {
             char path[160] = "";
             if (sscanf(line, "%*s %159s", path) != 1) continue;
             const char *slash = strrchr(path, '/');
             const char *leaf = slash ? slash + 1 : path;
             if (!strcmp(kind, "paint")) snprintf(f->scr_paint_file, sizeof(f->scr_paint_file), "%s", leaf);
+            else if (!strcmp(kind, "over")) snprintf(f->scr_over_file, sizeof(f->scr_over_file), "%s", leaf);
             else snprintf(f->scr_base_file, sizeof(f->scr_base_file), "%s", leaf);
         }
-        // `map`/`zone` name the screen, which its file name already does; `walk` is the mask the
-        // polygons were traced from and `fg` the cut-out the base map was made from. The engine
-        // needs none of the four, and says nothing about them, so the tool can keep writing them.
-        else if (!strcmp(kind, "map") || !strcmp(kind, "zone") || !strcmp(kind, "walk") || !strcmp(kind, "fg")) continue;
+        // How big a person is on this map, in the painting's own pixels. Everything else about the
+        // player — speed, radius, how much of the map is on screen — is a multiple of it.
+        else if (!strcmp(kind, "walker")) sscanf(line, "%*s %f", &f->walker_px);
+        else if (!strcmp(kind, "view")) sscanf(line, "%*s %f", &f->view_px);
+        else if (!strcmp(kind, "map")) sscanf(line, "%*s %31s", f->scr_map_id);
+        // A door is a message rectangle with a generated id, so a top-down map has something to walk
+        // up to before the writer has bound a word to it. A `.triggers` line over the same spot is a
+        // separate, nearer trigger and wins, which is how the writer takes a door over.
+        else if (!strcmp(kind, "door")) {
+            if (f->trig_count >= F_TRIGS) continue;
+            float x = 0, y = 0, dw = 0, dh = 0;
+            if (sscanf(line, "%*s %f %f %f %f", &x, &y, &dw, &dh) != 4) { SDL_Log("field: %s: bad door \"%s\"", rel, line); continue; }
+            FTrig *t = &f->trigs[f->trig_count++];
+            memset(t, 0, sizeof(*t));
+            t->x = (short)x; t->y = (short)y; t->w = (short)dw; t->h = (short)dh;
+            t->kind = TG_MESSAGE;
+            snprintf(t->arg, sizeof(t->arg), "%s.door%d", f->scr_map_id[0] ? f->scr_map_id : name, ++doors);
+        }
+        // `zone` names the screen, which its file name already does; `walk` is the mask the polygons
+        // were traced from and `fg` the cut the base map was made from. The engine needs none of the
+        // three, and says nothing about them, so the tool can keep writing them.
+        else if (!strcmp(kind, "zone") || !strcmp(kind, "walk") || !strcmp(kind, "fg")) continue;
         else if (!strcmp(kind, "spawn")) sscanf(line, "%*s %f %f", &f->scr_spawn_x, &f->scr_spawn_y);
         else if (!strcmp(kind, "scale_near")) sscanf(line, "%*s %f at %f", &f->sc_near, &f->sc_near_y);
         else if (!strcmp(kind, "scale_far")) sscanf(line, "%*s %f at %f", &f->sc_far, &f->sc_far_y);
@@ -3395,6 +3457,9 @@ static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
              : fminf(fmaxf(f->cam_x, rw * 0.5f), f->scr_w - rw * 0.5f);
     f->cam_y = (rh >= f->scr_h) ? f->scr_h * 0.5f
              : fminf(fmaxf(f->cam_y, rh * 0.5f), f->scr_h - rh * 0.5f);
+    // Snap the camera to whole painting pixels. Without it a sub-pixel camera makes a NEAREST-sampled
+    // painting shimmer along every straight edge as you walk, which on pixel art is very visible.
+    float snap_x = floorf(f->cam_x + 0.5f), snap_y = floorf(f->cam_y + 0.5f);
 
     glBindFramebuffer(GL_FRAMEBUFFER, f->fbo);
     glViewport(0, 0, vw, vh);
@@ -3412,7 +3477,12 @@ static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
     glUniform2f(f->u_uvoff, 0.0f, 0.0f);
     glUniform4f(f->u_see, 0.0f, 0.0f, 1.0f, 0.0f);        // the 3D cut has no meaning on a painting
     glActiveTexture(GL_TEXTURE0);
-    scr_matrix(f, f->mvp, vw, vh, s);
+    {
+        float keep_x = f->cam_x, keep_y = f->cam_y;
+        f->cam_x = snap_x; f->cam_y = snap_y;
+        scr_matrix(f, f->mvp, vw, vh, s);
+        f->cam_x = keep_x; f->cam_y = keep_y;
+    }
     glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
     glBindVertexArray(f->vao);
 
@@ -3434,13 +3504,21 @@ static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
         n = 0;
     }
 
-    for (int i = 0; i <= f->npc_count && ni < (int)(sizeof(items) / sizeof(items[0])); i++) {
-        bool player = (i == f->npc_count);
+    // NPCs, then the follower, then the player. `walker` in the file sets the drawn HEIGHT and the
+    // sheet's own proportions give the width, so one number rescales every character on the map.
+    int extra = f->fol_on ? 2 : 1;
+    for (int i = 0; i < f->npc_count + extra && ni < (int)(sizeof(items) / sizeof(items[0])); i++) {
+        bool player = (i == f->npc_count + extra - 1);
+        bool follower = f->fol_on && (i == f->npc_count);
         int art; float wx, wy; int face, frame;
         if (player) {
             art = art_get(f, "walkers", "falke");
             wx = f->px; wy = f->pz; face = f->facing;
-            frame = f->walking ? ((int)(f->anim_t * 7.0f) & 3) : 0;
+            frame = f->walking ? ((int)(f->anim_t * SCR_ANIM_FPS) & 3) : 0;
+        } else if (follower) {
+            art = art_get(f, "walkers", "ottilie");
+            wx = f->fol_x; wy = f->fol_y; face = f->fol_facing;
+            frame = f->fol_walking ? ((int)(f->fol_anim * SCR_ANIM_FPS) & 3) : 0;
         } else {
             FNpc *np = &f->npcs[i];
             art = np->art; wx = np->x; wy = np->y; face = np->facing; frame = 0;
@@ -3448,7 +3526,8 @@ static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
         if (art < 0) continue;
         FTex *tx = &f->art[art].tex;
         float sc = scr_scale_at(f, wy);
-        float fw = tx->w / 4.0f * sc, fh = tx->h / 4.0f * sc;
+        float fh = f->walker_px * sc;
+        float fw = (tx->h > 0) ? fh * ((float)tx->w / 4.0f) / ((float)tx->h / 4.0f) : fh;
         int row = face & 3;
         int first = n;
         push_rect(f, &n, wx - fw * 0.5f, wy - fh, wx + fw * 0.5f, wy,
@@ -3466,12 +3545,11 @@ static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
     int mark_first = -1; GLuint mark_tex = 0;
     if (!f->msg[0] && (f->exam_trig >= 0 || f->exam_npc >= 0)) {
         int mk = art_get(f, "props", "mark_examine");
-        int pw = art_get(f, "walkers", "falke");
-        if (mk >= 0 && pw >= 0) {
-            FTex *mt = &f->art[mk].tex, *px = &f->art[pw].tex;
+        if (mk >= 0) {
+            FTex *mt = &f->art[mk].tex;
             float sc = scr_scale_at(f, f->pz);
             float bob = 3.0f * sinf(f->water_t * 5.0f);
-            float top = f->pz - px->h / 4.0f * sc - 6.0f + bob;
+            float top = f->pz - f->walker_px * sc - 6.0f + bob;
             mark_first = n;
             mark_tex = mt->id;
             push_rect(f, &n, f->px - mt->w * 0.5f * sc, top - mt->h * sc, f->px + mt->w * 0.5f * sc, top, 0, 0, 1, 1);
@@ -3528,6 +3606,20 @@ static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
             glUniform4f(f->u_see, 0.0f, 0.0f, 1.0f, 0.0f);
             glUniform2f(f->u_uvoff, 0.0f, 0.0f);
         }
+    }
+
+    // The overlay: an RGBA layer the size of the painting, drawn after every walker. It is how a
+    // top-down map gets an archway top or a bridge deck to pass under without a base map — there is
+    // no depth question to answer, the thing is simply always in front.
+    if (f->scr_over.id) {
+        n = 0;
+        push_rect(f, &n, 0, 0, f->scr_w, f->scr_h, 0, 0, 1, 1);
+        glBindBuffer(GL_ARRAY_BUFFER, f->vbo_spr);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
+        set_attribs();
+        glUniform1f(f->u_alpha, 0.5f);                    // alpha-tested, like every other sprite
+        glBindTexture(GL_TEXTURE_2D, f->scr_over.id);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 
     // Dev: the base map in false colour, green where a thing meets the ground high up the screen
@@ -3629,7 +3721,8 @@ static void screen_labels(Field *f, float ox, float oy, float dw, float dh, int 
 static void screen_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *ev) {
     f->water_t += dt;
     f->msg_t += dt;
-    if (!f->scr_paint.id || !f->scr_base.id) {        // a reload that landed while backgrounded
+    if ((f->scr_paint_file[0] && !f->scr_paint.id) || (f->scr_base_file[0] && !f->scr_base.id) ||
+        (f->scr_over_file[0] && !f->scr_over.id)) {    // a reload that landed while backgrounded
         f->scr_retry += dt;
         if (f->scr_retry > 1.0f) { f->scr_retry = 0.0f; screen_load_images(f); }
     }
@@ -3641,17 +3734,68 @@ static void screen_tick(Field *f, int w, int h, float dt, bool ui_blocked, Field
     if (moving) {
         float l = sqrtf(sx * sx + sy * sy);
         if (l > 1e-4f) { sx /= l; sy /= l; }
-        float sp = WALK_SPEED * PX_PER_CELL * depth * (f->run ? RUN_MULT : 1.0f) * dt;
+        float sp = SCR_SPEED * f->walker_px * depth * (f->run ? SCR_RUN : 1.0f) * dt;
         int np = mesh_move(f, f->poly, &f->px, &f->pz, sx * sp, sy * sp);
         if (np >= 0) f->poly = np;
         f->poly = wall_buffer(f, f->poly, &f->px, &f->pz, scr_radius(f));
-        f->facing = (fabsf(sx) > fabsf(sy)) ? (sx > 0 ? 2 : 1) : (sy > 0 ? 0 : 3);
-        f->anim_t += dt * (f->run ? RUN_MULT : 1.0f);
+        // Eight directions of movement, FOUR of facing: the walker sheet has S/W/E/N and nothing
+        // else, so a diagonal keeps whichever of the two the character is already showing rather
+        // than flickering between them at every step.
+        int cur = f->facing & 3, want;
+        if (fabsf(sx) > fabsf(sy) + 0.01f) want = sx > 0 ? 2 : 1;
+        else if (fabsf(sy) > fabsf(sx) + 0.01f) want = sy > 0 ? 0 : 3;
+        else {
+            bool holds = (cur == 2 && sx > 0) || (cur == 1 && sx < 0) ||
+                         (cur == 0 && sy > 0) || (cur == 3 && sy < 0);
+            want = holds ? cur : (sy > 0 ? 0 : 3);
+        }
+        f->facing = want;
+        f->anim_t += dt * (f->run ? SCR_RUN : 1.0f);
     }
     f->walking = moving;
+
+    // The party trail. The leader drops a breadcrumb every few pixels and the follower stands a fixed
+    // distance back along it, so she rounds corners the way he did instead of cutting them. She is
+    // drawn and sorted like a walker but has no body: she never blocks him and nothing pushes her.
+    if (f->fol_on) {
+        float step = f->walker_px * 0.12f;
+        if (f->trail_n == 0) {
+            f->trail_x[0] = f->px; f->trail_y[0] = f->pz; f->trail_n = 1;
+            f->fol_x = f->px; f->fol_y = f->pz; f->fol_facing = f->facing;
+        }
+        float dx0 = f->px - f->trail_x[0], dy0 = f->pz - f->trail_y[0];
+        if (dx0 * dx0 + dy0 * dy0 > step * step) {
+            int cap = (int)(sizeof(f->trail_x) / sizeof(f->trail_x[0]));
+            if (f->trail_n < cap) f->trail_n++;
+            for (int i = f->trail_n - 1; i > 0; i--) { f->trail_x[i] = f->trail_x[i - 1]; f->trail_y[i] = f->trail_y[i - 1]; }
+            f->trail_x[0] = f->px; f->trail_y[0] = f->pz;
+        }
+        float want = f->walker_px * 0.8f, run = 0.0f;
+        float tx = f->trail_x[f->trail_n - 1], ty = f->trail_y[f->trail_n - 1];
+        for (int i = 0; i + 1 < f->trail_n; i++) {           // walk back along the trail by `want`
+            float ax = f->trail_x[i], ay = f->trail_y[i], bx = f->trail_x[i + 1], by = f->trail_y[i + 1];
+            float seg = sqrtf((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+            if (run + seg >= want) {
+                float t = seg > 1e-4f ? (want - run) / seg : 0.0f;
+                tx = ax + (bx - ax) * t; ty = ay + (by - ay) * t;
+                break;
+            }
+            run += seg;
+        }
+        float fdx = tx - f->fol_x, fdy = ty - f->fol_y, fd = sqrtf(fdx * fdx + fdy * fdy);
+        f->fol_walking = fd > 0.5f;
+        if (f->fol_walking) {
+            f->fol_x = tx; f->fol_y = ty;
+            f->fol_anim += dt * (f->run ? SCR_RUN : 1.0f);
+            int cur = f->fol_facing & 3;
+            if (fabsf(fdx) > fabsf(fdy) + 0.01f) f->fol_facing = fdx > 0 ? 2 : 1;
+            else if (fabsf(fdy) > fabsf(fdx) + 0.01f) f->fol_facing = fdy > 0 ? 0 : 3;
+            else f->fol_facing = cur;
+        }
+    } else f->trail_n = 0;
     for (int i = 0; i < f->npc_count; i++) {              // NPCs are soft bodies here too
         float dx = f->px - f->npcs[i].x, dy = f->pz - f->npcs[i].y;
-        float d = sqrtf(dx * dx + dy * dy), r = NPC_RADIUS * PX_PER_CELL * depth;
+        float d = sqrtf(dx * dx + dy * dy), r = NPC_RADIUS * f->walker_px * depth;
         if (d >= r || d < 1e-4f) continue;
         int np = mesh_move(f, f->poly, &f->px, &f->pz, dx / d * (r - d), dy / d * (r - d));
         if (np >= 0) f->poly = np;
@@ -3664,17 +3808,19 @@ static void screen_tick(Field *f, int w, int h, float dt, bool ui_blocked, Field
     // camera clamp below keeps it inside the painting.
     int vw = scr_view_w(f, w, h);
     float s = scr_view_scale(f, vw);
-    float rw = vw / s, rh = FBO_H / s;                    // keep the player inside the middle 50%
-    if (f->px - f->cam_x > rw * 0.25f) f->cam_x = f->px - rw * 0.25f;
-    if (f->cam_x - f->px > rw * 0.25f) f->cam_x = f->px + rw * 0.25f;
-    if (f->pz - f->cam_y > rh * 0.25f) f->cam_y = f->pz - rh * 0.25f;
-    if (f->cam_y - f->pz > rh * 0.25f) f->cam_y = f->pz + rh * 0.25f;
+    // Follow the player with a small dead zone, so a step or two either way does not slide the whole
+    // map. The clamp to the painting's edges happens in screen_render, with the pixel snap.
+    float rw = vw / s, rh = FBO_H / s, dz = 0.10f;
+    if (f->px - f->cam_x > rw * dz) f->cam_x = f->px - rw * dz;
+    if (f->cam_x - f->px > rw * dz) f->cam_x = f->px + rw * dz;
+    if (f->pz - f->cam_y > rh * dz) f->cam_y = f->pz - rh * dz;
+    if (f->cam_y - f->pz > rh * dz) f->cam_y = f->pz + rh * dz;
 
     // What the interact press would open: a message rectangle you stand in or face, or an NPC.
     f->exam_trig = f->exam_npc = -1;
     float best = 1e9f;
     const float fwx[4] = {0, -1, 1, 0}, fwy[4] = {1, 0, 0, -1};
-    float reach = PX_PER_CELL * depth;
+    float reach = f->walker_px * depth;      // everything the player can touch is sized in walkers
     for (int i = 0; i < f->trig_count; i++) {
         FTrig *t = &f->trigs[i];
         bool in = f->px >= t->x && f->pz >= t->y && f->px < t->x + t->w && f->pz < t->y + t->h;
@@ -3807,7 +3953,14 @@ static bool screen_dev_ui(Field *f, char *out, int cap) {
     ImGui::SameLine();
     bool see = f->see_on != 0;
     if (ImGui::Checkbox("silhouette", &see)) f->see_on = see ? 1 : 0;
+    ImGui::SameLine();
+    bool fol = f->fol_on != 0;
+    if (ImGui::Checkbox("party follower", &fol)) { f->fol_on = fol ? 1 : 0; f->trail_n = 0; }
 
+    ImGui::SliderFloat("walker px", &f->walker_px, 16.0f, 192.0f, "%.0f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(180);
+    ImGui::SliderFloat("view px", &f->view_px, 0.0f, f->scr_h, "%.0f (0 = whole painting)");
     ImGui::SliderFloat("zoom", &f->zoom, 1.0f, 4.0f, "%.2fx");
     ImGui::SliderFloat("scale near", &f->sc_near, 0.1f, 3.0f, "%.2f");
     ImGui::SameLine();
@@ -3817,10 +3970,10 @@ static bool screen_dev_ui(Field *f, char *out, int cap) {
     ImGui::SameLine();
     ImGui::SetNextItemWidth(160);
     ImGui::SliderFloat("at y##far", &f->sc_far_y, 0.0f, f->scr_h, "%.0f");
-    ImGui::SliderFloat("walk radius", &f->walk_radius, 0.0f, 0.8f, "%.2f cells");
+    ImGui::SliderFloat("walk radius", &f->walk_radius, 0.0f, 0.8f, "%.2f of a walker");
     if (ImGui::Button("print scale")) {
-        snprintf(out, cap, "scale_near %.2f at %.0f | scale_far %.2f at %.0f",
-                 f->sc_near, f->sc_near_y, f->sc_far, f->sc_far_y);
+        snprintf(out, cap, "walker %.0f | view %.0f | scale_near %.2f at %.0f | scale_far %.2f at %.0f",
+                 f->walker_px, f->view_px, f->sc_near, f->sc_near_y, f->sc_far, f->sc_far_y);
         printed = true;
     }
     return printed;
@@ -3837,7 +3990,9 @@ Field *field_create() {
     f->zone_idx = -1;
     f->poly = -1;
     f->zoom = 1.0f;
-    f->fov = 0.0f;                                // 0 = "camera not placed yet", snapped on frame 1
+    f->walker_px = 64.0f;
+    f->fol_on = 1;                                  // the party walks behind you, as in PS4
+    f->fov = 0.0f;                              // 0 = "camera not placed yet", snapped on frame 1
     snprintf(f->map_name, sizeof(f->map_name), "halm");
     return f;
 }
@@ -3929,6 +4084,35 @@ static void field_poll_capture(Field *f, float dt) {
     SDL_Log("field: capture requested (%dx) %s", scale, want[0] ? want : "current zone");
 }
 
+// `map.flag` in the pref dir names a map or a screen to load, and is truncated once consumed —
+// exactly the way reload.flag and capture.flag work. It is how the field is driven from the Mac
+// with no taps at all, which matters when the phone is in someone's hand:
+//
+//   printf 'test_town' > /tmp/map.flag
+//   adb push /tmp/map.flag /data/local/tmp/map.flag
+//   adb shell "run-as com.playground.sdlraylib cp /data/local/tmp/map.flag files/map.flag"
+static void field_poll_map(Field *f, float dt) {
+    f->map_poll += dt;
+    if (f->map_poll < 0.4f) return;
+    f->map_poll = 0.0f;
+    char path[600];
+    snprintf(path, sizeof(path), "%smap.flag", pref_path());
+    size_t sz = 0;
+    char *text = (char *)SDL_LoadFile(path, &sz);
+    if (!text) return;
+    if (sz == 0) { SDL_free(text); return; }
+    char want[64] = "";
+    sscanf(text, "%63s", want);
+    SDL_free(text);
+    SDL_IOStream *tr = SDL_IOFromFile(path, "wb");            // consume it
+    if (tr) SDL_CloseIO(tr);
+    for (char *c = want; *c; c++)                             // only ever a plain file-name word
+        if (!((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '_')) { *c = 0; break; }
+    if (!want[0]) return;
+    SDL_Log("field: map.flag asks for \"%s\"", want);
+    field_load_map(f, want);
+}
+
 static void fire(FieldEvent *ev, int kind, const char *arg) {
     if (ev->kind != FE_NONE) return;
     ev->kind = kind;
@@ -3939,6 +4123,7 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
     ev->kind = FE_NONE; ev->arg[0] = 0;
     if (!f->gl_ready) field_gl_init(f);
     if (!f->tile_count && !f->is_screen) field_load_map(f, f->map_name);
+    field_poll_map(f, dt);
     if (f->is_screen) { screen_tick(f, w, h, dt, ui_blocked, ev); return; }
     f->water_t += dt;
     f->msg_t += dt;
@@ -4205,7 +4390,7 @@ void field_save(Field *f, FieldSave *s) {
     s->walk_radius = f->walk_radius;
     if (f->zone_idx >= 0 && f->zone_idx < f->zone_count) s->zone = f->zones[f->zone_idx];
     s->is_screen = f->is_screen;
-    s->scr_debug = f->scr_debug;
+    s->scr_debug = (f->scr_debug & 7) | (f->fol_on ? 8 : 0);   // bit 3 carries the follower toggle
     s->zoom = f->zoom;
     s->sc_near = f->sc_near;
     s->sc_far = f->sc_far;
@@ -4237,7 +4422,9 @@ void field_restore(Field *f, const FieldSave *s) {
     // owner was tuning. Everything below is the 3D field's, and a screen never reaches it.
     if (f->is_screen) {
         f->scr_debug = s->scr_debug & 7;
+        if (s->is_screen) f->fol_on = (s->scr_debug & 8) ? 1 : 0;
         f->zoom = clampf(s->zoom, 0.5f, 6.0f, 1.0f);
+        f->trail_n = 0;                                  // the trail is rebuilt from where he stands
         if (s->is_screen) {
             f->sc_near = clampf(s->sc_near, 0.05f, 4.0f, f->sc_near);
             f->sc_far = clampf(s->sc_far, 0.05f, 4.0f, f->sc_far);

@@ -368,6 +368,90 @@ Rules and fallbacks:
 
 ---
 
+## Top-down screens — Phantasy Star IV
+
+**Owner's direction, 2026-09-19: "I'm over trying to do this like FF8. Let's go with the original 2D
+like Phantasy Star 4."** The screen-map kind below is the base; top-down simply uses less of it. The
+angled three-quarter experiment is dropped — with an angled camera everything hides the ground behind
+it, and in top-down nothing does, which is the whole reason the occlusion machinery can go quiet.
+
+A top-down screen is a screen map with **no `base` line**, so the repaint/occlusion pass never runs,
+and `scale_near`/`scale_far` both 1, so nothing scales with depth. What it adds:
+
+| line | what |
+|---|---|
+| `walker <P>` | **a person's height in painting pixels.** Default 64. This is the map's scale. |
+| `view <V>` | painting pixels of height the screen shows. Default `6.5 × P` |
+| `over <file>` | an RGBA layer the size of the painting, drawn **after every walker** |
+| `door x y w h` | a door rectangle; becomes a message trigger with the id `<map>.door<n>` |
+
+**`walker` sizes everything**, so one number rescales a map drawn at a different canvas size and
+nothing else changes:
+
+- the sprite's drawn **height** is `P` (its width follows the sheet's own proportions);
+- walking speed is **4.5 × P px/s**, running ×1.6 — constant, not scaled by anything;
+- the walker radius is `walk_radius × P` (0.30 by default, so a little under a third of a person);
+- what the player can reach — a door, a message, an NPC — is measured in `P` too.
+
+**Facing is four-way, movement is eight-way.** The sheet has S/W/E/N and nothing else, so a diagonal
+**keeps** whichever of its two components the character is already showing rather than flickering
+between them every step. The walk cycle runs at 8 fps while moving and rests on frame 0.
+
+**The camera** shows `view` pixels of height, covers the screen, follows the player with a 10 % dead
+zone, clamps to the painting's edges, and is **snapped to whole painting pixels** — without the snap
+a sub-pixel camera makes a NEAREST-sampled painting shimmer along every straight edge as you walk,
+which on pixel art is very visible.
+
+**`over`** is how a top-down map gets an archway top, a bridge deck or an overhanging balcony to walk
+under. There is no depth question to answer — the thing is simply always in front — so it is one
+alpha-tested quad after the walkers and needs no base map.
+
+**The party follows, PS4 style.** The leader drops a breadcrumb every `0.12 × P` pixels and the
+follower stands `0.8 × P` back **along that trail**, so she rounds a corner the way he did instead of
+cutting it. She is sorted and drawn like a walker but has no body: she never blocks him and nothing
+pushes her. Until Ottilie's sheet exists she is the procedural placeholder, which already colours
+itself from the id, so she is visibly not him. Dev toggle **party follower**, on by default, and it
+survives a reload (bit 3 of the saved `scr_debug`).
+
+### The 3D field is parked, not deleted
+
+Nothing was removed: the navmesh in 3D, the camera zones, sweeps and lathes, the splat ground, the
+see-through occluders, the capture and the painted-blockout mode are all still there and still work
+from the Dev map picker (`halm3d`, `hart_yard`) and from `capture.sh`. What changed is that none of
+it **runs or allocates** unless a 3D map is actually loaded: `build_world` returns immediately for a
+screen, and the splat program is now built by `field_gl_init_3d`, called from `field_draw_world` the
+first time a 3D map really draws. A session that only ever walks screens never compiles it.
+
+### `map.flag` — driving the field from the Mac
+
+Like `reload.flag` and `capture.flag`: a file in the pref dir naming a map or a screen, polled 2.5×
+a second and truncated once consumed. It exists because the phone is often in someone's hand and
+taking over their screen to press two Dev buttons is rude — and because a screenshot of the device
+to find those buttons can catch whatever else they were doing.
+
+```bash
+printf 'test_town' > /tmp/map.flag
+adb push /tmp/map.flag /data/local/tmp/map.flag
+adb shell "run-as com.playground.sdlraylib cp /data/local/tmp/map.flag files/map.flag"
+```
+
+### `test_town`
+
+`story/field/screens/test_town.*` is the engine's own synthetic top-down screen — not story art and
+not from the tool: a crossroads, four buildings with doors in the walls facing the street, an archway
+strip in `test_town_over.png` to walk under, `walker 48`, `view 312`, and two exits that loop back to
+itself. It is there to walk the rules above on the phone before any painted map exists.
+
+### Which map is which screen
+
+`SCREEN_FOR_MAP` names all seven of chapter one (`halm → halm_town`, `hart_yard → hart_yard_yard`,
+and so on, per `story/field/screens.md`). An entry whose `.screen` does not exist yet falls straight
+through to the 3D block-out, so the table can name the whole chapter before any of it is painted and
+an `exit … halm` starts working the moment Halm is. `halm_square` — the angled experiment — is listed
+after `halm_town` and is superseded by it.
+
+---
+
 ## Screen maps — the painting is the level
 
 The other half of the field, and now the main path (owner's direction, FF7/FF8 field screens):
