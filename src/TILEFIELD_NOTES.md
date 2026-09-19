@@ -205,14 +205,60 @@ Three changes make that permanent:
 After all three, with the indexed art: **APK 12 MB, assets 5.7 MB, `files/` 112 KB on a fresh
 install** (6.3 MB once `fast_reload.sh` has pushed the working copies of the art).
 
+## The dual grid (TILES2 / D20) — terrains, masks, decals
+
+`TILES.md`'s "Terrains, masks and decals" is the contract; this is the engine's side.
+
+- **Terrain ids stay on the world cells** and collision, walking and the maps are untouched. The
+  **display grid is offset half a tile**: display cell `(i,j)` covers `[i-0.5,j-0.5]..[i+0.5,j+0.5]`
+  and its corners are world cells NW `(i-1,j-1)`, NE `(i,j-1)`, SE `(i,j)`, SW `(i-1,j)`. Four bits
+  (1 NW, 2 NE, 4 SE, 8 SW — *is this corner my terrain*) index the 16-case table, which is **read from
+  `masks.json`**, not retyped. Variant is `h32(i, j, terrain) % 3` with the tool's FNV-1a, so the
+  phone picks the same variant as `tmap preview` and the two pictures match.
+- **Terrains draw in ascending priority**, and `terr[0]` is the base: it floods the map, and an
+  off-map cell counts as it, exactly as the tool's preview does. The base costs **one quad a frame**
+  (a screen-filling quad through a `full` mask slot) however big the map is.
+- **A terrain is a world-space swatch through a 1-bit mask.** `u_indexed == 2` in the shader: the
+  quad's UV is the mask (already rotated by the vertex data — rotation is a UV swizzle, no mask is
+  stored twice), and the swatch is sampled at `mod((world px) * 4, swatch size)`, so there is nothing
+  to match between cells and no cut in the drawing. The 4-tap colormap blend is kept, with its
+  neighbour fetches **wrapped** at the swatch size instead of clamped to an atlas cell.
+- **`masks.png` is indexed** (2 inside, 1 outside); the loader thresholds on luminance and uploads
+  `GL_R8`. It is sampled LINEAR and thresholded with a one-texel `smoothstep(0.42, 0.58)` — a hard
+  test on a nearest sample crawls along every boundary at the 1.33x minification the field runs at.
+  *(Deviation from "1-bit": the boundary is one texel soft. It reads as a hard Phantasy Star edge and
+  does not shimmer when the camera moves.)*
+- **Swatches**: `swatches/<id>.png` when the cutter has made one, otherwise a flat palette colour per
+  terrain with fine low-contrast mottling — the right *shape* with no art at all, which is what the
+  maps run on today. The hue table is in `tf_load_swatch`.
+- **Decals** are scattered with the tool's arithmetic to the letter (density x edge_bias x a
+  `vnoise` density field of period `cluster`, `h32(x, y, id)` for the roll, sub-tile jitter, one of
+  three sizes, h-flip), never on a solid tile or under a stamp. With no decal art in the atlas yet
+  **nothing is drawn** — the count is logged instead. Dev: a density slider (rebuilds the scatter)
+  and a **Print decals** button.
+- **Static geometry.** The ground and the decals are built **once per map load** into one VBO
+  (halm: 913 ground quads, 5478 verts, 0.23 MB) and the camera moves them in the vertex shader
+  (`u_pscale`/`u_poff`), so nothing is rebuilt per frame. Only the visible display rows are drawn:
+  one `glDrawArrays` per terrain (nine on halm) plus the base quad. Stamps and walkers stay in the
+  dynamic batch, which is what makes animated tiles free — no geometry to rebuild.
+- **`## flips`** mirrors a stamp placement by its top-left cell (nature only; `tmap check` enforces
+  that a building never carries `- flip: h`). **`## decals`** hand-placements are parsed and stored.
+- **`pass: NESW`** is honoured when walking: the letters present are the sides that may be walked
+  **through**, so a counter is solid but open on one side. A tile with no `pass:` line behaves exactly
+  as it always did. **`tag:`** is carried and shown by **Print tile**.
+- **`cycle: water`** hands the terrain to the palette cycle in `story/palette/cycles.md` — the
+  colormap columns already animate, so a cycling terrain costs no atlas cells and no extra draw.
+- The old **fringe path is gone**: `gen_fringe`, `draw_fringes`, `fr_edge/fr_out/fr_in` and the
+  `fringe:` key are deleted.
+
 ## Weather: macro drift and cloud shadows (light LEVELS, not colour)
 
 Both are per-fragment offsets to the colormap row, computed from the WORLD position, so they stay put
 as the camera moves and carry over unchanged to any later renderer.
 
 - **Drift** — one octave of value noise, period **12 tiles**, shifts the level by up to **±1.5 rows**.
-  **Ground and fringes only** (they push `lit = -2`; stamps push `-1`), so a house does not ripple with
-  the field it stands in. Per map: `drift: <strength>` in `## meta`, default 1.0, 0 = off.
+  **The dual-grid ground only** (terrain quads push `lit = -3`; stamps and decals push `-1`), so a
+  house does not ripple with the field it stands in. A terrain's own `- drift:` can switch it off. Per map: `drift: <strength>` in `## meta`, default 1.0, 0 = off.
 - **Clouds** — two octaves, period **25 tiles**, scrolling about **0.3 tiles/s**, soft-thresholded
   (`smoothstep(0.42, 0.68)`) and darkening by up to **4 rows**. Affects ground, stamps and walkers
   alike. Per map: `clouds: on|off|<strength>`; with no line it is **on under `day` and `dusk`** and off

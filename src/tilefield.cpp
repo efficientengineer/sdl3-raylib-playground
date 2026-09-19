@@ -42,6 +42,10 @@
 #define TF_LIGHTS 16             // point lights uploaded to the shader; the uniform array's size
 #define TF_LEVELS 32             // light levels per colormap table (PALETTE.md)
 #define TF_TABLES 8              // colormap tables we have room for
+#define TF_TERR   32             // terrains in one tileset (TILES2 / D20)
+#define MS_COUNT  5              // mask shapes: corner, edge, diag, inv, full
+#define TF_FLIPS  128            // `## flips` entries in one map
+#define TF_HAND   128            // `## decals` entries placed by hand
 
 #define WALK_STEP 0.16f          // seconds for one tile, walking
 #define RUN_STEP  0.10f
@@ -135,34 +139,7 @@ static void gen_water(Pen *n, int frame) {
     }
 }
 
-// The fringe of terrain U, drawn on top of a cell of another terrain. The convention is fixed in
-// story/field/tilesets/README.md and the art has to match it exactly, because the engine only
-// rotates: `edge` is a band along the NORTH edge about 10 px deep with a ragged southern boundary;
-// `corner_out` is the terrain in the NORTH-EAST corner only, 10 px in from each; `corner_in` is the
-// whole tile EXCEPT a ragged bite out of the SOUTH-WEST corner. Everything else is transparent.
-static void gen_fringe(Pen *n, const char *what, TCol c, uint32_t seed) {
-    TCol lip = shade(c, 0.74f);
-    int d[TS], e[TS];
-    for (int i = 0; i < TS; i++) {                                   // one ragged profile, reused
-        d[i] = 8 + (int)(trnd(i / 4, 0, (int)seed) * 5.0f);          // depth from the north/east
-        e[i] = 8 + (int)(trnd(i / 3, 9, (int)seed) * 5.0f);          // depth from the south/west
-    }
-    if (strstr(what, "corner_in")) {
-        for (int y = 0; y < TS; y++) for (int x = 0; x < TS; x++) {
-            bool bite = (y >= TS - e[x]) && (x < e[y]);               // the south-west corner only
-            if (bite) continue;
-            bool lipline = (y == TS - e[x] || x == e[y] - 1) && (y > TS - e[x] - 2 || x < e[y] + 1);
-            pset(n, x, y, lipline ? lip : c);
-        }
-    } else if (strstr(what, "corner_out")) {
-        for (int y = 0; y < TS; y++) for (int x = 0; x < TS; x++)
-            if (y < d[x] && x >= TS - d[y])                           // the north-east corner only
-                pset(n, x, y, (y >= d[x] - 2 || x <= TS - d[y] + 1) ? lip : c);
-    } else {
-        for (int x = 0; x < TS; x++)                                  // a band along the north edge
-            for (int y = 0; y < d[x]; y++) pset(n, x, y, y >= d[x] - 2 ? lip : c);
-    }
-}
+// (The fringe generator is gone with TILES2/D20: boundaries are generated masks, not art.)
 
 // A building: roof over the top `over` rows plus an eave, plastered wall under it, one door on the
 // bottom row and windows where they fit. Everything about it comes from w/h/over and the name's hash.
@@ -401,14 +378,42 @@ struct TfLight { float x, y, r, level; int flicker; };   // x,y,r in TILES; leve
 enum { LY_GROUND = 0, LY_OBJECT, LY_OVER };
 enum { TG_MESSAGE = 0, TG_EXIT, TG_DOOR, TG_ZONE, TG_TRAP, TG_SCENE, TG_NPC };
 
+// One entry of tiles.md. TILES2 (D20) gives it three kinds: a TERRAIN (no atlas cell at all — a
+// world-space swatch and a generated boundary mask), a DECAL (scattered by hash, no cell of its own
+// on the map), or an atlas tile/stamp exactly as before.
+enum { TK_TILE = 0, TK_TERRAIN, TK_DECAL };
+enum { ES_RAGGED = 0, ES_SMOOTH, ES_BANK, ES_COUNT };
+
 struct TfTile {
     char name[24];
     short index, w, h;          // index = atlas cell of the top-left tile; w,h in tiles
     unsigned char layer, over;  // over = how many of the TOP rows draw above the walkers
     unsigned char frames;       // horizontal neighbours in the atlas, animated at ANIM_FPS
-    unsigned char fringe;       // 0 = no fringe; otherwise the priority that decides who overlays whom
     unsigned char solid[8];     // bit x of row y
-    short fr_edge, fr_out, fr_in;
+    unsigned char kind;         // TK_TILE | TK_TERRAIN | TK_DECAL
+    unsigned char pass;         // `pass: NESW` — bit per direction (S,W,E,N) that may be walked THROUGH
+    char tag[16];               // `tag:` — what the entry is to the game; the engine only carries it
+
+    // terrain
+    short priority;
+    unsigned char edge_style;
+    unsigned char sw_w, sw_h;   // swatch size in TILES
+    float drift;                // per-terrain macro drift strength
+    char cycle[16];             // hands the terrain to a palette cycle in cycles.md
+    GLuint swatch;              // R8 swatch texture, art or generated
+    int swatch_px_w, swatch_px_h;
+    short border_of;            // `border: <terrain> <tiles>` — the band outside the mask
+    float border_w;
+
+    // decal
+    char on[4][24];             // terrains it may sit on
+    int on_count;
+    float density, cluster, size_tiles, sizes[3];
+    int size_count;
+    bool flip_h;
+    char bias_name[3][24];
+    float bias_k[3];
+    int bias_count;
 };
 
 struct TfPlace { short def, x, y; };
@@ -457,6 +462,24 @@ struct TileField {
     GLuint atlas;
     int atlas_w, atlas_h, cell;      // cell = atlas pixels per tile (32 placeholder-only, 128 art)
 
+    // terrains, masks and decals (TILES2 / D20)
+    short terr[TF_TERR];                      // tile indices, ascending priority; terr[0] floods the map
+    int terr_count;
+    GLuint mask_tex;                          // masks.png as R8: 255 inside the terrain, 0 outside
+    int mask_w, mask_h, mask_cell;
+    short mask_slot[ES_COUNT][MS_COUNT][3];   // [style][shape][variant] -> x, packed with y below
+    short mask_slot_y[ES_COUNT][MS_COUNT][3];
+    unsigned char case_shape[16], case_rot[16];   // the 16-case table, read from masks.json
+    bool case_on[16];
+    TfVert *gv;                               // static ground geometry, built once per map
+    int gv_count, gv_cap;
+    int gv_first[TF_TERR], gv_row[TF_TERR][TF_MAXH + 2];   // per terrain, per display row
+    int dv_first, dv_count;                   // the decals, in the same buffer after the ground
+    int dv_row[TF_MAXH + 2];
+    GLuint svbo;                              // the static VBO both live in
+    float decal_density;                      // dev multiplier
+    int decal_placed;
+
     // map
     char map_name[32], music[16];
     int mw, mh;
@@ -469,6 +492,12 @@ struct TileField {
     int trig_count;
     TfNpc npcs[TF_NPCS];
     int npc_count;
+    short flip_x[TF_FLIPS], flip_y[TF_FLIPS];     // ## flips: stamp placements drawn mirrored
+    int flip_count;
+    short hand_x[TF_HAND], hand_y[TF_HAND];       // ## decals: placed by hand, not by the scatter
+    char hand_id[TF_HAND][24];
+    bool hand_flip[TF_HAND];
+    int hand_count;
     int spawn_x, spawn_y, spawn_f;
 
     // party
@@ -482,6 +511,7 @@ struct TileField {
 
     // camera / view
     int cam_x, cam_y, vw, fbo_w, fbo_h;
+    int rvw, rvh;                             // the LOGICAL size being rendered (a view, or a whole map)
     float sc;                                 // device pixels per logical pixel (~3.0 on the phone)
     float anim_t;
 
@@ -531,7 +561,8 @@ struct TileField {
     bool gl_ready;
     GLuint prog, vao, vbo, fbo, fbo_tex, white;
     GLint u_res, u_tex, u_cmap, u_texsz, u_cmaph, u_rowa, u_rowb, u_levels, u_amb,
-          u_indexed, u_nl, u_lights, u_sc, u_taps, u_drift, u_clouds, u_time, u_cam;
+          u_indexed, u_nl, u_lights, u_sc, u_taps, u_drift, u_clouds, u_time, u_cam, u_mask,
+          u_pscale, u_poff;
     TfVert *v;
     int vn;
     GLuint cur_tex;
@@ -920,6 +951,9 @@ static void tf_cycle(TileField *t, float dt) {
 
 // ───────────────────────── tileset ─────────────────────────
 
+static bool tf_load_masks(TileField *t, const char *set);     // TILES2: the generated boundaries
+static void tf_build_terrains(TileField *t, const char *set); // and the terrains' swatches
+
 // GL_MAX_TEXTURE_SIZE, read once the context exists. 0 means "not asked yet"; every driver this ships
 // on reports at least 4096, but an atlas that is one pixel over the limit uploads as nothing at all,
 // which on a phone looks like a black map and no error.
@@ -986,11 +1020,7 @@ static void gen_stub_frame(Pen *pen, TfTile *d, int fr) {
         Pen n = *pen;
         const char *nm = d->name;
         uint32_t seed = name_seed(nm);
-        if (strstr(nm, "_edge") || strstr(nm, "_corner")) {
-            TCol c = strstr(nm, "water") ? tc(112, 96, 74) : strstr(nm, "paving") ? tc(150, 146, 138)
-                   : strstr(nm, "crop") ? tc(168, 150, 70) : tc(140, 108, 72);
-            gen_fringe(&n, nm, c, seed);
-        } else if (!strcmp(nm, "water") || !strcmp(nm, "water_deep")) {
+        if (!strcmp(nm, "water") || !strcmp(nm, "water_deep")) {
             gen_water(&n, fr);
             if (!strcmp(nm, "water_deep")) for (int y = 0; y < TS; y++) for (int x = 0; x < TS; x++) pset(&n, x, y, tc(24, 52, 96, 90));
         } else if (strstr(nm, "paving")) {
@@ -1079,7 +1109,8 @@ static bool load_tileset(TileField *t, const char *set) {
             memset(d, 0, sizeof(*d));
             snprintf(d->name, sizeof(d->name), "%s", trim(s + 2));
             d->w = d->h = 1; d->frames = 1; d->layer = LY_GROUND;
-            d->fr_edge = d->fr_out = d->fr_in = -1;
+            d->sw_w = d->sw_h = 3; d->drift = 1.0f; d->density = 0.3f; d->cluster = 4.0f;
+            d->size_tiles = 0.6f; d->sizes[0] = 1.0f; d->size_count = 1; d->border_of = -1;
             continue;
         }
         if (!d || s[0] != '-') continue;
@@ -1100,24 +1131,69 @@ static bool load_tileset(TileField *t, const char *set) {
             d->over = (unsigned char)atoi(val);
         } else if (!strcmp(key, "frames")) {
             d->frames = (unsigned char)(atoi(val) < 1 ? 1 : atoi(val));
-        } else if (!strcmp(key, "fringe")) {
-            d->fringe = (unsigned char)atoi(val);
+        } else if (!strcmp(key, "kind")) {
+            d->kind = (unsigned char)(!strcmp(val, "terrain") ? TK_TERRAIN : !strcmp(val, "decal") ? TK_DECAL : TK_TILE);
+        } else if (!strcmp(key, "priority")) {
+            d->priority = (short)atoi(val);
+        } else if (!strcmp(key, "edge_style")) {
+            d->edge_style = (unsigned char)(!strcmp(val, "smooth") ? ES_SMOOTH : !strcmp(val, "bank") ? ES_BANK : ES_RAGGED);
+        } else if (!strcmp(key, "swatch")) {
+            int a2 = 3, b2 = 3;
+            if (sscanf(val, "%dx%d", &a2, &b2) < 2) b2 = a2;
+            d->sw_w = (unsigned char)(a2 < 1 ? 1 : a2 > 8 ? 8 : a2);
+            d->sw_h = (unsigned char)(b2 < 1 ? 1 : b2 > 8 ? 8 : b2);
+        } else if (!strcmp(key, "drift")) {
+            d->drift = (float)atof(val);
+        } else if (!strcmp(key, "cycle")) {
+            snprintf(d->cycle, sizeof(d->cycle), "%s", val);
+        } else if (!strcmp(key, "border")) {
+            char nm2[24] = ""; float bw = 0;
+            if (sscanf(val, "%23s %f", nm2, &bw) >= 1) { snprintf(d->on[3], 24, "%s", nm2); d->border_w = bw; }
+        } else if (!strcmp(key, "tag")) {
+            snprintf(d->tag, sizeof(d->tag), "%s", val);
+        } else if (!strcmp(key, "pass")) {
+            // `pass: NESW` — the letters PRESENT are the sides that may be walked through.
+            d->pass = 0;
+            for (const char *c = val; *c; c++) {
+                if (*c == 'S' || *c == 's') d->pass |= 1 << 0;
+                if (*c == 'W' || *c == 'w') d->pass |= 1 << 1;
+                if (*c == 'E' || *c == 'e') d->pass |= 1 << 2;
+                if (*c == 'N' || *c == 'n') d->pass |= 1 << 3;
+            }
+        } else if (!strcmp(key, "on")) {
+            d->on_count = 0;
+            char buf[128]; snprintf(buf, sizeof(buf), "%s", val);
+            for (char *c = strtok(buf, ","); c && d->on_count < 4; c = strtok(nullptr, ","))
+                snprintf(d->on[d->on_count++], 24, "%s", trim(c));
+        } else if (!strcmp(key, "density")) {
+            d->density = (float)atof(val);
+        } else if (!strcmp(key, "cluster")) {
+            d->cluster = (float)atof(val);
+        } else if (!strcmp(key, "size_tiles")) {
+            d->size_tiles = (float)atof(val);
+        } else if (!strcmp(key, "sizes")) {
+            d->size_count = 0;
+            for (const char *c = val; *c && d->size_count < 3; ) {
+                while (*c == ' ') c++;
+                if (!*c) break;
+                d->sizes[d->size_count++] = (float)atof(c);
+                while (*c && *c != ' ') c++;
+            }
+        } else if (!strcmp(key, "flip")) {
+            d->flip_h = strchr(val, 'h') != nullptr;
+        } else if (!strcmp(key, "edge_bias")) {
+            d->bias_count = 0;
+            char buf[128]; snprintf(buf, sizeof(buf), "%s", val);
+            for (char *c = strtok(buf, ","); c && d->bias_count < 3; c = strtok(nullptr, ",")) {
+                char nm2[24] = ""; float k = 1;
+                if (sscanf(trim(c), "%23s %f", nm2, &k) == 2) {
+                    snprintf(d->bias_name[d->bias_count], 24, "%s", nm2);
+                    d->bias_k[d->bias_count++] = k;
+                }
+            }
         }
     }
     SDL_free(text);
-
-    for (int i = 0; i < t->tile_count; i++) {             // a fringed terrain names its three overlays
-        TfTile *e = &t->tiles[i];
-        if (!e->fringe) continue;
-        char nm[40];
-        snprintf(nm, sizeof(nm), "%s_edge", e->name);        e->fr_edge = (short)tile_by_name(t, nm);
-        snprintf(nm, sizeof(nm), "%s_corner_out", e->name);  e->fr_out  = (short)tile_by_name(t, nm);
-        snprintf(nm, sizeof(nm), "%s_corner_in", e->name);   e->fr_in   = (short)tile_by_name(t, nm);
-        // all three missing is deliberate — the priority alone says "nothing overlays me"; a partial
-        // set is an authoring mistake and worth a line in the log.
-        if (e->fr_edge < 0 && (e->fr_out >= 0 || e->fr_in >= 0))
-            SDL_Log("tilefield: \"%s\" has corner fringes but no %s_edge", e->name, e->name);
-    }
 
     // How tall the atlas has to be for what the file asked for; a supplied atlas.png is pasted into
     // that, so an art sheet that only covers the first rows still works.
@@ -1187,6 +1263,7 @@ static bool load_tileset(TileField *t, const char *set) {
         }
         stubs++;
     }
+    tf_load_masks(t, set);
     SDL_Log("tilefield: tileset %s — %d tiles, %d placeholders, cell %d, atlas %dx%d (%.1f MB)%s",
             set, t->tile_count, stubs, cell, aw, ah, (double)aw * ah * 4 / (1024 * 1024), have ? "" : " (no atlas.png)");
 
@@ -1220,7 +1297,210 @@ static bool load_tileset(TileField *t, const char *set) {
     free(stub_mask);
     t->atlas_w = aw; t->atlas_h = ah;
     free(px);
+    tf_build_terrains(t, set);                 // swatches need the palette and the atlas size above
     return true;
+}
+
+// ───────────────────────── terrains, masks, swatches (TILES2 / D20) ─────────────────────────
+// A terrain is not art in the atlas any more: it is one seamless SWATCH sampled in world space, and
+// the boundary where it meets a lower-priority terrain is a GENERATED 1-bit mask. The engine reads
+// masks.json for the 16-case table and the slot positions rather than retyping either.
+
+static const char *MS_NAMES[MS_COUNT] = { "corner", "edge", "diag", "inv", "full" };
+static const char *ES_NAMES[ES_COUNT] = { "ragged", "smooth", "bank" };
+
+// FNV-1a over 32-bit words — the same hash story_prompt.py uses, so the tool's preview and the phone
+// pick the same mask variant and scatter the same decals. Keep the constants.
+static uint32_t h32(int a, int b, int c) {
+    uint32_t n = 2166136261u;
+    n = (n ^ (uint32_t)a) * 16777619u;
+    n = (n ^ (uint32_t)b) * 16777619u;
+    n = (n ^ (uint32_t)c) * 16777619u;
+    return n;
+}
+// Value noise on the unit lattice, smoothstepped — the tool's `vnoise`, to the letter.
+static float vnoise2(float x, float y, uint32_t seed) {
+    int xi = (int)floorf(x), yi = (int)floorf(y);
+    float tx = x - xi, ty = y - yi;
+    tx = tx * tx * (3 - 2 * tx);
+    ty = ty * ty * (3 - 2 * ty);
+    auto r = [&](int a, int b) { return (float)(h32(a, b, (int)seed) & 0xffff) / 65535.0f * 2.0f - 1.0f; };
+    float a = r(xi, yi) * (1 - tx) + r(xi + 1, yi) * tx;
+    float b = r(xi, yi + 1) * (1 - tx) + r(xi + 1, yi + 1) * tx;
+    return a * (1 - ty) + b * ty;
+}
+
+static bool tf_load_masks(TileField *t, const char *set) {
+    memset(t->case_on, 0, sizeof(t->case_on));
+    char rel[128];
+    snprintf(rel, sizeof(rel), "field/tilesets/%s/masks.json", set);
+    size_t sz = 0;
+    char *js = (char *)tf_read(rel, &sz);
+    if (!js) { SDL_Log("tilefield: no masks.json for \"%s\" — terrains cannot draw their edges", set); return false; }
+    t->mask_cell = 128;
+    const char *k = strstr(js, "\"cell\"");
+    if (k) sscanf(k + 6, " : %d", &t->mask_cell);
+    // the 16-case table: "7": ["inv", 1]
+    for (int b = 0; b < 16; b++) {
+        char pat[8];
+        snprintf(pat, sizeof(pat), "\"%d\":", b);
+        const char *c = strstr(js, pat);
+        if (!c) continue;
+        const char *q = strchr(c, '[');
+        if (!q || (strchr(c, 'n') && strchr(c, 'n') < q)) continue;      // "0": null
+        const char *nq = strchr(q, '"');
+        if (!nq) continue;
+        const char *ne = strchr(nq + 1, '"');
+        int rot = 0;
+        const char *comma = ne ? strchr(ne, ',') : nullptr;
+        if (comma) rot = atoi(comma + 1);
+        for (int sh = 0; sh < MS_COUNT; sh++)
+            if (ne && (int)strlen(MS_NAMES[sh]) == (int)(ne - nq - 1) && !strncmp(nq + 1, MS_NAMES[sh], (size_t)(ne - nq - 1))) {
+                t->case_shape[b] = (unsigned char)sh;
+                t->case_rot[b] = (unsigned char)(rot & 3);
+                t->case_on[b] = true;
+            }
+    }
+    // the slots: {"style": "bank", "shape": "corner", "variant": 0, "x": 0, "y": 0}
+    memset(t->mask_slot, 0, sizeof(t->mask_slot));
+    memset(t->mask_slot_y, 0, sizeof(t->mask_slot_y));
+    int slots = 0;
+    for (const char *c = strstr(js, "\"style\""); c; c = strstr(c + 1, "\"style\"")) {
+        char st[16] = "", sh[16] = "";
+        int var = 0, x = 0, y = 0;
+        const char *q = strchr(c, '"');
+        q = q ? strchr(q + 1, '"') : nullptr;                            // end of "style"
+        q = q ? strchr(q + 1, '"') : nullptr;                            // start of the value
+        const char *e = q ? strchr(q + 1, '"') : nullptr;
+        if (!e) break;
+        snprintf(st, (size_t)(e - q) > 15 ? 16 : (size_t)(e - q), "%s", q + 1);
+        const char *shk = strstr(e, "\"shape\"");
+        if (!shk) break;
+        q = strchr(shk + 7, '"');
+        e = q ? strchr(q + 1, '"') : nullptr;
+        if (!e) break;
+        snprintf(sh, (size_t)(e - q) > 15 ? 16 : (size_t)(e - q), "%s", q + 1);
+        const char *vk = strstr(e, "\"variant\""), *xk = strstr(e, "\"x\""), *yk = strstr(e, "\"y\"");
+        if (vk) sscanf(vk + 9, " : %d", &var);
+        if (xk) sscanf(xk + 3, " : %d", &x);
+        if (yk) sscanf(yk + 3, " : %d", &y);
+        int si = -1, hi = -1;
+        for (int i = 0; i < ES_COUNT; i++) if (!strcmp(ES_NAMES[i], st)) si = i;
+        for (int i = 0; i < MS_COUNT; i++) if (!strcmp(MS_NAMES[i], sh)) hi = i;
+        if (si < 0 || hi < 0 || var < 0 || var > 2) continue;
+        t->mask_slot[si][hi][var] = (short)x;
+        t->mask_slot_y[si][hi][var] = (short)y;
+        slots++;
+    }
+    SDL_free(js);
+
+    snprintf(rel, sizeof(rel), "field/tilesets/%s/masks.png", set);
+    sz = 0;
+    void *data = tf_read(rel, &sz);
+    if (!data) { SDL_Log("tilefield: no masks.png for \"%s\"", set); return false; }
+    int w = 0, h = 0, ch = 0;
+    unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &ch, 4);
+    SDL_free(data);
+    if (!px) { SDL_Log("tilefield: masks.png unreadable"); return false; }
+    // Indexed on the master palette: index 2 (white) inside, index 1 (black) outside. Luminance says
+    // which without needing the palette, and a mask is only ever those two colours.
+    unsigned char *m = (unsigned char *)malloc((size_t)w * h);
+    for (size_t i = 0; i < (size_t)w * h; i++) {
+        const unsigned char *s2 = px + i * 4;
+        m[i] = (unsigned char)((s2[0] * 77 + s2[1] * 150 + s2[2] * 29) >> 8 > 128 ? 255 : 0);
+    }
+    stbi_image_free(px);
+    if (!t->mask_tex) glGenTextures(1, &t->mask_tex);
+    glBindTexture(GL_TEXTURE_2D, t->mask_tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, m);
+    // LINEAR, and the shader thresholds with a one-texel smoothstep: the mask is minified about 1.3x
+    // and a hard test on a nearest sample crawls along every boundary.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    free(m);
+    t->mask_w = w; t->mask_h = h;
+    SDL_Log("tilefield: masks %dx%d, cell %d, %d slots, %d of 16 cases draw", w, h, t->mask_cell, slots,
+            (int)(t->case_on[0] ? 16 : 15));
+    return true;
+}
+
+// A terrain's swatch: the art if the cutter has made one, otherwise a flat palette colour with a
+// little mottling, which is the right SHAPE with no art at all — the maps stay walkable and readable.
+static void tf_load_swatch(TileField *t, TfTile *e, const char *set) {
+    int px_w = e->sw_w * 128, px_h = e->sw_h * 128;
+    char rel[160];
+    snprintf(rel, sizeof(rel), "field/tilesets/%s/swatches/%s.png", set, e->name);
+    size_t sz = 0;
+    void *data = tf_read(rel, &sz);
+    unsigned char *idx = nullptr;
+    if (data) {
+        int w = 0, h = 0, ch = 0;
+        unsigned char *rgba = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &ch, 4);
+        SDL_free(data);
+        if (rgba) {
+            char label[64];
+            snprintf(label, sizeof(label), "swatch %s.png", e->name);
+            idx = t->pal_ok ? tf_index_image(t, label, rgba, w, h, nullptr) : nullptr;
+            stbi_image_free(rgba);
+            if (idx) { px_w = w; px_h = h; }
+        }
+    }
+    if (!idx) {
+        // The placeholder: the nearest master colour to a sensible hue for this terrain, mottled with
+        // its two neighbours in the palette so a big field is not a dead flat sheet.
+        static const struct { const char *key; unsigned char r, g, b; } HUES[] = {
+            { "grass_dry", 176, 168, 104 }, { "grass", 96, 140, 66 }, { "crop", 150, 132, 66 },
+            { "mud", 92, 74, 52 }, { "dirt", 150, 118, 80 }, { "gravel", 132, 126, 114 },
+            { "paving", 150, 146, 138 }, { "bridge_deck", 124, 92, 56 }, { "water", 56, 104, 156 },
+            { "sand", 196, 176, 128 }, { "stone", 140, 138, 132 },
+        };
+        unsigned char r = 120, g = 120, b = 120;
+        for (size_t i = 0; i < sizeof(HUES) / sizeof(HUES[0]); i++)
+            if (strstr(e->name, HUES[i].key)) { r = HUES[i].r; g = HUES[i].g; b = HUES[i].b; break; }
+        px_w = e->sw_w * 128; px_h = e->sw_h * 128;
+        idx = (unsigned char *)malloc((size_t)px_w * px_h);
+        unsigned char base = 1, lo = 1, hi = 1;
+        if (t->pal_ok) {
+            TfQCache *q = (TfQCache *)calloc(1, sizeof(TfQCache));
+            bool off = false;
+            base = tf_quant(t, q, 0xFF000000u | (uint32_t)b << 16 | (uint32_t)g << 8 | r, &off);
+            lo = tf_quant(t, q, 0xFF000000u | (uint32_t)(b * 88 / 100) << 16 | (uint32_t)(g * 88 / 100) << 8 | (r * 88 / 100), &off);
+            hi = tf_quant(t, q, 0xFF000000u | (uint32_t)(b > 232 ? 255 : b + 22) << 16 | (uint32_t)(g > 232 ? 255 : g + 22) << 8 | (r > 232 ? 255 : r + 22), &off);
+            free(q);
+        }
+        uint32_t seed = name_seed(e->name);
+        for (int y = 0; y < px_h; y++) for (int x = 0; x < px_w; x++) {
+            // Fine and low-contrast on purpose: a placeholder must not advertise its own repeat, and
+            // at 128 px to the tile a coarse mottle reads as a pattern rather than as ground.
+            float n = vnoise2(x / 9.0f, y / 9.0f, seed) * 0.55f + vnoise2(x / 3.5f, y / 3.5f, seed + 7) * 0.45f;
+            idx[(size_t)y * px_w + x] = n < -0.55f ? lo : n > 0.62f ? hi : base;
+        }
+        SDL_Log("tilefield: terrain \"%s\" has no swatch — flat %d,%d,%d with mottling (%dx%d)",
+                e->name, r, g, b, px_w, px_h);
+    }
+    if (!e->swatch) glGenTextures(1, &e->swatch);
+    tf_tex_index(e->swatch, idx, px_w, px_h);
+    free(idx);
+    e->swatch_px_w = px_w; e->swatch_px_h = px_h;
+}
+
+// The terrain list, ascending priority. `terr[0]` is the base: it floods the map and is what an
+// off-map cell counts as, exactly as the tool's preview does it.
+static void tf_build_terrains(TileField *t, const char *set) {
+    t->terr_count = 0;
+    for (int i = 0; i < t->tile_count && t->terr_count < TF_TERR; i++)
+        if (t->tiles[i].kind == TK_TERRAIN) t->terr[t->terr_count++] = (short)i;
+    for (int a = 0; a < t->terr_count; a++)                      // insertion sort: a handful of entries
+        for (int b = a + 1; b < t->terr_count; b++)
+            if (t->tiles[t->terr[b]].priority < t->tiles[t->terr[a]].priority) {
+                short k = t->terr[a]; t->terr[a] = t->terr[b]; t->terr[b] = k;
+            }
+    for (int i = 0; i < t->terr_count; i++) tf_load_swatch(t, &t->tiles[t->terr[i]], set);
+    if (t->terr_count)
+        SDL_Log("tilefield: %d terrain(s), base \"%s\"", t->terr_count, t->tiles[t->terr[0]].name);
 }
 
 // ───────────────────────── walker art ─────────────────────────
@@ -1435,7 +1715,8 @@ static void parse_tmap(TileField *t, char *text) {
         if (line[0] == '#' && line[1] == '#') {
             char *s = trim(line + 2);
             sec = !strcmp(s, "meta") ? 0 : !strcmp(s, "legend") ? 1 : !strcmp(s, "ground") ? 2
-                : !strcmp(s, "objects") ? 3 : !strcmp(s, "triggers") ? 4 : -1;
+                : !strcmp(s, "objects") ? 3 : !strcmp(s, "triggers") ? 4
+                : !strcmp(s, "flips") ? 5 : !strcmp(s, "decals") ? 6 : -1;
             row = 0;
             continue;
         }
@@ -1512,6 +1793,21 @@ static void parse_tmap(TileField *t, char *text) {
                 }
             }
             row++;
+        } else if (sec == 5) {                   // ## flips — x y, the top-left cell of a MIRRORED stamp
+            int fx = -1, fy = -1;
+            if (sscanf(line, "%d %d", &fx, &fy) == 2 && t->flip_count < TF_FLIPS) {
+                t->flip_x[t->flip_count] = (short)fx; t->flip_y[t->flip_count] = (short)fy;
+                t->flip_count++;
+            }
+        } else if (sec == 6) {                   // ## decals — x y <id> [flip], placed by hand
+            int dx2 = 0, dy2 = 0;
+            char id[24] = "", fl[8] = "";
+            if (sscanf(line, "%d %d %23s %7s", &dx2, &dy2, id, fl) >= 3 && t->hand_count < TF_HAND) {
+                t->hand_x[t->hand_count] = (short)dx2; t->hand_y[t->hand_count] = (short)dy2;
+                snprintf(t->hand_id[t->hand_count], 24, "%s", id);
+                t->hand_flip[t->hand_count] = !strcmp(fl, "flip");
+                t->hand_count++;
+            }
         } else if (sec == 4) {
             char work[256];
             snprintf(work, sizeof(work), "%s", line);
@@ -1569,6 +1865,158 @@ static void parse_tmap(TileField *t, char *text) {
     if (row && sec >= 2 && row != t->mh) SDL_Log("tilefield: %s: last section had %d rows, size says %d", t->map_name, row, t->mh);
 }
 
+// ───────────────────────── the dual grid, built once per map ─────────────────────────
+// Terrain ids stay on the WORLD cells; the display grid is offset half a tile, so display cell (i,j)
+// covers [i-0.5, j-0.5]..[i+0.5, j+0.5] and its four corners are the world cells (i-1,j-1) NW,
+// (i,j-1) NE, (i,j) SE, (i-1,j) SW. Four bits pick a shape and a rotation; the variant is
+// hash(i, j, terrain) % 3. None of this touches collision or walking: it is a rendering change.
+
+static void gv_push(TileField *t, const TfVert *v6) {
+    if (t->gv_count + 6 > t->gv_cap) {
+        t->gv_cap = t->gv_cap ? t->gv_cap * 2 : 8192;
+        t->gv = (TfVert *)realloc(t->gv, sizeof(TfVert) * (size_t)t->gv_cap);
+    }
+    memcpy(t->gv + t->gv_count, v6, sizeof(TfVert) * 6);
+    t->gv_count += 6;
+}
+
+// One display-cell quad of terrain `ti`, in WORLD logical pixels (the draw adds the camera).
+static void gv_quad(TileField *t, TfTile *e, float wx, float wy, int mx, int my, int rot, float lit) {
+    float mw = (float)t->mask_w, mh = (float)t->mask_h, mc = (float)t->mask_cell;
+    float u0 = mx / mw, v0 = my / mh, u1 = (mx + mc) / mw, v1 = (my + mc) / mh;
+    float uvx[4] = { u0, u1, u1, u0 }, uvy[4] = { v0, v0, v1, v1 };
+    float px[4] = { wx, wx + TS, wx + TS, wx }, py[4] = { wy, wy, wy + TS, wy + TS };
+    const int order[6] = { 0, 1, 2, 0, 2, 3 };
+    TfVert q[6];
+    for (int i = 0; i < 6; i++) {
+        int k = order[i], sl = (k + 4 - rot) & 3;
+        TfVert *o = &q[i];
+        o->x = px[k]; o->y = py[k];                      // world logical px; the draw offsets by the camera
+        o->u = uvx[sl]; o->v = uvy[sl];
+        o->r = o->g = o->b = o->a = 255;
+        o->rx0 = 0; o->ry0 = 0;
+        o->rx1 = (float)e->swatch_px_w; o->ry1 = (float)e->swatch_px_h;   // the swatch's wrap size
+        o->lit = lit; o->warm = 0;
+    }
+    gv_push(t, q);
+}
+
+static int terr_at(TileField *t, int x, int y) {
+    int base = t->terr_count ? t->terr[0] : -1;
+    if (x < 0 || y < 0 || x >= t->mw || y >= t->mh) return base;   // off the map counts as the base
+    int d = t->ground[y][x];
+    return (d >= 0 && d < t->tile_count && t->tiles[d].kind == TK_TERRAIN) ? d : base;
+}
+
+static void tf_build_ground(TileField *t) {
+    t->gv_count = 0;
+    if (!t->terr_count || !t->mask_tex) return;
+    for (int n = 1; n < t->terr_count; n++) {                      // terr[0] floods: one quad at draw time
+        int ti = t->terr[n];
+        TfTile *e = &t->tiles[ti];
+        t->gv_first[n] = t->gv_count;
+        float lit = (t->drift > 0.0f && e->drift > 0.0f) ? -3.0f : -1.0f;   // -3 = ground, takes the drift
+        for (int j = 0; j <= t->mh; j++) {
+            t->gv_row[n][j] = t->gv_count;
+            for (int i = 0; i <= t->mw; i++) {
+                int b = 0;
+                if (terr_at(t, i - 1, j - 1) == ti) b |= 1;        // NW
+                if (terr_at(t, i, j - 1) == ti) b |= 2;            // NE
+                if (terr_at(t, i, j) == ti) b |= 4;                // SE
+                if (terr_at(t, i - 1, j) == ti) b |= 8;            // SW
+                if (!t->case_on[b]) continue;
+                int sh = t->case_shape[b], rot = t->case_rot[b];
+                int var = (int)(h32(i, j, n) % 3u);
+                int st = e->edge_style < ES_COUNT ? e->edge_style : ES_RAGGED;
+                gv_quad(t, e, (float)(i * TS - TS / 2), (float)(j * TS - TS / 2),
+                        t->mask_slot[st][sh][var], t->mask_slot_y[st][sh][var], rot, lit);
+            }
+        }
+        t->gv_row[n][t->mh + 1] = t->gv_count;
+    }
+}
+
+// ───────────────────────── decals ─────────────────────────
+// Scattered by hash, never on a grid: the same arithmetic story_prompt.py's preview runs, so what the
+// owner judged on the Mac is what the phone draws. A decal is an object on nothing — no ground patch,
+// no shadow — and it never lands on a solid tile or under a stamp.
+static void tf_build_decals(TileField *t) {
+    t->dv_first = t->gv_count;
+    t->dv_count = 0;
+    t->decal_placed = 0;
+    int placed = 0, no_art = 0;
+    for (int y = 0; y < t->mh; y++) {
+        t->dv_row[y] = t->gv_count;
+        for (int x = 0; x < t->mw; x++) {
+            int gt = terr_at(t, x, y);
+            if (gt < 0) continue;
+            if (t->solid[y][x] || t->place_at[y][x]) continue;      // never under a stamp or on a wall
+            const char *tname = t->tiles[gt].name;
+            int touch[4] = { terr_at(t, x + 1, y), terr_at(t, x - 1, y), terr_at(t, x, y + 1), terr_at(t, x, y - 1) };
+            for (int di = 0; di < t->tile_count; di++) {
+                TfTile *e = &t->tiles[di];
+                if (e->kind != TK_DECAL) continue;
+                bool ok = false;
+                for (int i = 0; i < e->on_count; i++) if (!strcmp(e->on[i], tname)) ok = true;
+                if (!ok) continue;
+                float bias = 1.0f;
+                for (int i = 0; i < e->bias_count; i++)
+                    for (int k = 0; k < 4; k++)
+                        if (touch[k] >= 0 && !strcmp(t->tiles[touch[k]].name, e->bias_name[i]) && e->bias_k[i] > bias)
+                            bias = e->bias_k[i];
+                uint32_t idh = name_seed(e->name);
+                float field = 0.5f + 0.5f * vnoise2(x / e->cluster, y / e->cluster, h32((int)idh, 0, 0));
+                float want = e->density * bias * field * t->decal_density;
+                uint32_t hh = h32(x, y, (int)idh);
+                if ((float)(hh & 0xffff) / 65535.0f > want) continue;
+                placed++;
+                if (e->index <= 0) { no_art++; continue; }          // no art yet: draw nothing, by contract
+                float size = e->sizes[(hh >> 17) % (unsigned)(e->size_count ? e->size_count : 1)];
+                float sp = e->size_tiles * size * TS;
+                float ox = (float)(x * TS) + (float)((hh >> 5) % (unsigned)TS);
+                float oy = (float)(y * TS) + (float)((hh >> 11) % (unsigned)TS);
+                bool flip = e->flip_h && ((hh >> 3) & 1);
+                int cell = t->cell;
+                float tx0 = (float)((e->index % ATLAS_COLS) * cell), ty0 = (float)((e->index / ATLAS_COLS) * cell);
+                float aw = (float)t->atlas_w, ah = (float)t->atlas_h;
+                float u0 = tx0 / aw, u1 = (tx0 + cell) / aw;
+                if (flip) { float k = u0; u0 = u1; u1 = k; }
+                float v0 = ty0 / ah, v1 = (ty0 + cell) / ah;
+                float qx[4] = { ox, ox + sp, ox + sp, ox }, qy[4] = { oy, oy, oy + sp, oy + sp };
+                float uvx[4] = { u0, u1, u1, u0 }, uvy[4] = { v0, v0, v1, v1 };
+                const int order[6] = { 0, 1, 2, 0, 2, 3 };
+                TfVert q[6];
+                for (int i = 0; i < 6; i++) {
+                    int k = order[i];
+                    TfVert *o = &q[i];
+                    o->x = qx[k]; o->y = qy[k]; o->u = uvx[k]; o->v = uvy[k];
+                    o->r = o->g = o->b = o->a = 255;
+                    o->rx0 = tx0; o->ry0 = ty0; o->rx1 = tx0 + cell; o->ry1 = ty0 + cell;
+                    o->lit = -1.0f; o->warm = 0;
+                }
+                gv_push(t, q);
+                t->dv_count += 6;
+            }
+        }
+    }
+    t->dv_row[t->mh] = t->gv_count;
+    t->decal_placed = placed;
+    if (placed) SDL_Log("tilefield: %d decal(s) scattered, %d with no art yet (nothing drawn for those)",
+                        placed, no_art);
+}
+
+// Both static lists live in one VBO, uploaded once when the map loads.
+static void tf_upload_static(TileField *t) {
+    if (!t->gv_count) return;
+    if (!t->svbo) glGenBuffers(1, &t->svbo);
+    glBindBuffer(GL_ARRAY_BUFFER, t->svbo);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(TfVert) * t->gv_count), t->gv, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    SDL_Log("tilefield: static geometry — %d verts (%d ground quads, %d decal quads), %.2f MB",
+            t->gv_count, (t->gv_count - t->dv_count) / 6, t->dv_count / 6,
+            (double)sizeof(TfVert) * t->gv_count / (1024 * 1024));
+}
+
 bool tf_load_map(TileField *t, const char *name) {
     char rel[128];
     snprintf(rel, sizeof(rel), "field/tmaps/%s.tmap", name);
@@ -1585,6 +2033,7 @@ bool tf_load_map(TileField *t, const char *name) {
     memset(t->place_at, 0, sizeof(t->place_at));
     memset(t->solid, 0, sizeof(t->solid));
     t->place_count = t->trig_count = t->npc_count = 0;
+    t->flip_count = t->hand_count = 0;
     t->light_count = 0;                                       // the map's own lamps and ambient
     t->light_table = TBL_DAY;
     t->ambient = 1.0f;
@@ -1605,6 +2054,12 @@ bool tf_load_map(TileField *t, const char *name) {
     // Clouds are an outdoor thing: on by default under `day` and `dusk`, off otherwise, unless the map
     // said `clouds:` itself. An interior lit by `night` or `stone` gets none.
     if (!t->weather_set && t->light_table != TBL_DAY && t->light_table != TBL_DUSK) t->clouds = 0.0f;
+
+    // TILES2: the ground and the decals are built ONCE, here, and live in a static VBO. Nothing about
+    // them is recomputed per frame — the camera moves the geometry in the vertex shader.
+    tf_build_ground(t);
+    tf_build_decals(t);
+    tf_upload_static(t);
 
     t->party = 2;                                             // the party the intro leaves us with
     tf_place_party(t, t->spawn_x, t->spawn_y, t->spawn_f);
@@ -1634,11 +2089,15 @@ static const char *TF_VS =
     "layout(location=3) in vec4 a_rect;\n"
     "layout(location=4) in vec2 a_lit;\n"
     "uniform vec2 u_res;\n"
-    "uniform float u_sc;\n"
+    "uniform float u_sc, u_pscale;\n"
+    "uniform vec2 u_poff;\n"
     "out vec2 v_uv; out vec4 v_col; out vec4 v_rect; out vec2 v_lit; out vec2 v_world;\n"
     "void main(){ v_uv = a_uv; v_col = a_col; v_rect = a_rect; v_lit = a_lit;\n"
-    "  v_world = a_pos / u_sc;\n"                    // back to LOGICAL view pixels, which is where lights live
-    "  vec2 p = a_pos / u_res * 2.0 - 1.0;\n"
+    // The dynamic batch is already in device pixels (u_pscale 1, u_poff 0); the static map geometry is
+    // in WORLD logical pixels and is placed by the camera here, so it never has to be rebuilt.
+    "  vec2 dp = a_pos * u_pscale + u_poff;\n"
+    "  v_world = dp / u_sc;\n"                    // back to LOGICAL view pixels, which is where lights live
+    "  vec2 p = dp / u_res * 2.0 - 1.0;\n"
     "  gl_Position = vec4(p.x, -p.y, 0.0, 1.0); }\n";
 
 // The palette fragment shader (PALETTE.md). Four neighbouring INDICES are fetched, each looked up in
@@ -1650,6 +2109,7 @@ static const char *TF_FS =
     "in vec2 v_uv; in vec4 v_col; in vec4 v_rect; in vec2 v_lit; in vec2 v_world;\n"
     "uniform sampler2D u_tex;\n"
     "uniform sampler2D u_cmap;\n"
+    "uniform sampler2D u_mask;\n"
     "uniform vec2 u_texsz;\n"
     "uniform float u_cmaph, u_rowa, u_rowb, u_levels, u_amb, u_drift, u_clouds, u_time;\n"
     "uniform vec2 u_cam;\n"
@@ -1692,7 +2152,7 @@ static const char *TF_FS =
     // WORLD position, so they stay put as the camera moves, and both only move the colormap row —
     // nothing here invents a colour (PALETTE.md).
     "  vec2 wp = (v_world + u_cam) / 32.0;\n"                                  // world TILES
-    "  if (u_drift > 0.0 && v_lit.x < -1.5)\n"                                 // ground only
+    "  if (u_drift > 0.0 && v_lit.x < -2.5)\n"                                 // the dual-grid ground only
     "    lv += (vnoise(wp / 12.0) * 2.0 - 1.0) * u_drift * (1.5 / (u_levels - 1.0));\n"
     "  if (u_clouds > 0.0) {\n"
     // Two octaves, because one octave of value noise is a field of soft blobs all the same size —
@@ -1707,22 +2167,36 @@ static const char *TF_FS =
     "  float r0 = floor(f), fr = f - r0;\n"
     "  float r1 = min(r0 + 1.0, u_levels - 1.0);\n"
     "  float ra0 = u_rowa + r0, ra1 = u_rowa + r1, rb0 = u_rowb + r0, rb1 = u_rowb + r1;\n"
-    "  vec2 p = v_uv * u_texsz - 0.5;\n"
-    "  vec2 b = floor(p), g = p - b;\n"
-    "  vec2 lo = v_rect.xy, hi = v_rect.zw - 1.0;\n"
-    "  ivec2 q0 = ivec2(clamp(b, lo, hi)), q1 = ivec2(clamp(b + 1.0, lo, hi));\n"
+    "  vec2 p, b, g;\n"
+    "  ivec2 q0, q1;\n"
+    "  float cover = 1.0;\n"
+    "  if (u_indexed == 2) {\n"
+    // A terrain (TILES2 / D20): the swatch is sampled in WORLD space and wraps at its own size, so
+    // there is nothing to match between neighbouring cells and no cut in the drawing; the quad's UV
+    // is the generated boundary MASK, already rotated into place by the vertex data.
+    "    cover = smoothstep(0.42, 0.58, texture(u_mask, v_uv).r);\n"
+    "    if (cover < 0.01) discard;\n"
+    "    vec2 sz = v_rect.zw;\n"
+    "    p = mod((v_world + u_cam) * 4.0, sz) - 0.5;\n"          // 128 swatch px to a 32-px tile
+    "    b = floor(p); g = p - b;\n"
+    "    q0 = ivec2(mod(b, sz)); q1 = ivec2(mod(b + 1.0, sz));\n"
+    "  } else {\n"
+    "    p = v_uv * u_texsz - 0.5;\n"
+    "    b = floor(p); g = p - b;\n"
+    "    q0 = ivec2(clamp(b, v_rect.xy, v_rect.zw - 1.0));\n"
+    "    q1 = ivec2(clamp(b + 1.0, v_rect.xy, v_rect.zw - 1.0));\n"
+    "  }\n"
     "  if (u_taps == 1) {\n"                      // the measured fallback: nearest index, one lookup
-    "    ivec2 q = ivec2(clamp(floor(v_uv * u_texsz), lo, hi));\n"
-    "    vec4 n = tap(q, ra0, ra1, rb0, rb1, fr, warm);\n"
-    "    if (n.a < 0.01) discard;\n"
-    "    o = n * vec4(v_col.rgb * v_col.a, v_col.a); return; }\n"
+    "    vec4 n1 = tap(q0, ra0, ra1, rb0, rb1, fr, warm);\n"
+    "    if (n1.a < 0.01) discard;\n"
+    "    o = n1 * cover * vec4(v_col.rgb * v_col.a, v_col.a); return; }\n"
     "  vec4 c00 = tap(ivec2(q0.x, q0.y), ra0, ra1, rb0, rb1, fr, warm);\n"
     "  vec4 c10 = tap(ivec2(q1.x, q0.y), ra0, ra1, rb0, rb1, fr, warm);\n"
     "  vec4 c01 = tap(ivec2(q0.x, q1.y), ra0, ra1, rb0, rb1, fr, warm);\n"
     "  vec4 c11 = tap(ivec2(q1.x, q1.y), ra0, ra1, rb0, rb1, fr, warm);\n"
     "  vec4 c = mix(mix(c00, c10, g.x), mix(c01, c11, g.x), g.y);\n"
     "  if (c.a < 0.01) discard;\n"
-    "  o = c * vec4(v_col.rgb * v_col.a, v_col.a);\n"     // a tint, if a caller ever wants one
+    "  o = c * cover * vec4(v_col.rgb * v_col.a, v_col.a);\n"   // cover = the terrain mask, 1 elsewhere
     "}\n";
 
 static GLuint tf_shader(GLenum type, const char *src) {
@@ -1762,6 +2236,9 @@ static void tf_gl_init(TileField *t) {
     t->u_lights = glGetUniformLocation(t->prog, "u_lights");
     t->u_sc = glGetUniformLocation(t->prog, "u_sc");
     t->u_taps = glGetUniformLocation(t->prog, "u_taps");
+    t->u_mask = glGetUniformLocation(t->prog, "u_mask");
+    t->u_pscale = glGetUniformLocation(t->prog, "u_pscale");
+    t->u_poff = glGetUniformLocation(t->prog, "u_poff");
     t->u_cam = glGetUniformLocation(t->prog, "u_cam");
     t->u_time = glGetUniformLocation(t->prog, "u_time");
     t->u_clouds = glGetUniformLocation(t->prog, "u_clouds");
@@ -1824,6 +2301,8 @@ static void tf_flush(TileField *t) {
     glEnableVertexAttribArray(4); glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(TfVert), (void *)36);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, t->cur_tex);
+    glUniform1f(t->u_pscale, 1.0f);
+    glUniform2f(t->u_poff, 0.0f, 0.0f);
     glUniform1i(t->u_indexed, t->cur_mode);
     if (t->cur_mode) {
         float tw = 1, th = 1;
@@ -1896,6 +2375,20 @@ static void push_cell(TileField *t, int index, int cw, int ch, float x, float y,
               t->ground_pass ? -2.0f : -1.0f, 0.0f);
 }
 
+// A stamp, optionally MIRRORED (`## flips` — nature only; a mirrored building would be lit from the
+// wrong side, and tmap check enforces that).
+static void push_cell_flip(TileField *t, int index, int cw, int ch, float x, float y, unsigned int col, bool mirror) {
+    if (!mirror) { push_cell(t, index, cw, ch, x, y, 0, col); return; }
+    float aw = (float)t->atlas_w, ah = (float)t->atlas_h;
+    int cell = t->cell;
+    float tx0 = (float)((index % ATLAS_COLS) * cell), ty0 = (float)((index / ATLAS_COLS) * cell);
+    float tx1 = tx0 + (float)(cw * cell), ty1 = ty0 + (float)(ch * cell);
+    float x0 = dev(t, x), y0 = dev(t, y), x1 = dev(t, x + cw * TS), y1 = dev(t, y + ch * TS);
+    float rect[4] = { tx0, ty0, tx1, ty1 };
+    push_quad(t, x0, y0, x1 - x0, y1 - y0, tx1 / aw, ty0 / ah, tx0 / aw, ty1 / ah, 0, col,
+              t->pal_ok ? rect : nullptr, t->ground_pass ? -2.0f : -1.0f, 0.0f);
+}
+
 static void push_solid(TileField *t, float x, float y, float w, float h, unsigned int col) {
     tf_use(t, t->white, 0);
     float x0 = dev(t, x), y0 = dev(t, y);
@@ -1908,54 +2401,59 @@ static void push_solid(TileField *t, float x, float y, float w, float h, unsigne
 
 // `lit = -2` on a ground quad: per-fragment light AND the macro drift. Stamps pass -1, so a house
 // does not ripple with the field it stands in; walkers pass their own level.
-static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
-    t->ground_pass = true;
-    tf_use(t, t->atlas, t->pal_ok ? 1 : 0);
-    int frame = (int)(t->anim_t * ANIM_FPS);
-    for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
-        TfTile *d = &t->tiles[t->ground[y][x]];
-        int idx = d->index + (d->frames > 1 ? (frame % d->frames) : 0);
-        push_cell(t, idx, 1, 1, (float)(x * TS - t->cam_x), (float)(y * TS - t->cam_y), 0, TF_WHITE);
-    }
-    t->ground_pass = false;
+// The static lists, drawn straight out of their own VBO. `first`/`count` are vertices.
+static void tf_draw_static(TileField *t, int first, int count, GLuint tex, int mode, int tw, int th) {
+    if (count <= 0 || !t->svbo) return;
+    tf_flush(t);                                             // the dynamic batch goes first
+    glBindVertexArray(t->vao);
+    glBindBuffer(GL_ARRAY_BUFFER, t->svbo);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(TfVert), (void *)0);
+    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TfVert), (void *)8);
+    glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(TfVert), (void *)16);
+    glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(TfVert), (void *)20);
+    glEnableVertexAttribArray(4); glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(TfVert), (void *)36);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glUniform1f(t->u_pscale, t->sc);
+    glUniform2f(t->u_poff, -(float)t->cam_x * t->sc, -(float)t->cam_y * t->sc);
+    glUniform1i(t->u_indexed, mode);
+    glUniform2f(t->u_texsz, (float)tw, (float)th);
+    glDrawArrays(GL_TRIANGLES, first, count);
+    t->cur_tex = 0; t->cur_mode = -1;                        // the dynamic batch re-binds what it needs
 }
 
-// The neighbour test. A terrain with `fringe: n` overlays every ground cell of lower priority it
-// touches: four edges, four outer corners (diagonal only) and four inner corners (both flanks).
-static void draw_fringes(TileField *t, int x0, int y0, int x1, int y1) {
-    t->ground_pass = true;                                   // a fringe is ground: it drifts with it
-    tf_use(t, t->atlas, t->pal_ok ? 1 : 0);
-    const int cdx[4] = { 0, 1, 0, -1 }, cdy[4] = { -1, 0, 1, 0 };          // N E S W, matching rot 0..3
-    for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) {
-        TfTile *self = &t->tiles[t->ground[y][x]];
-        float sx = (float)(x * TS - t->cam_x), sy = (float)(y * TS - t->cam_y);
-        for (int pri = 1; pri < 8; pri++) {   // one pass per priority, low first, so two fringes stack sanely
-            int who = -1;
-            for (int d = 0; d < 8 && who < 0; d++) {
-                int nx = x + (d < 4 ? cdx[d] : cdx[d & 3] + cdx[(d + 1) & 3]);
-                int ny = y + (d < 4 ? cdy[d] : cdy[d & 3] + cdy[(d + 1) & 3]);
-                if (nx < 0 || ny < 0 || nx >= t->mw || ny >= t->mh) continue;
-                TfTile *o = &t->tiles[t->ground[ny][nx]];
-                if (o->fringe == pri && o != self && o->fringe > self->fringe) who = t->ground[ny][nx];
-            }
-            if (who < 0) continue;
-            TfTile *u = &t->tiles[who];
-            bool card[4];
-            for (int d = 0; d < 4; d++) {
-                int nx = x + cdx[d], ny = y + cdy[d];
-                card[d] = (nx >= 0 && ny >= 0 && nx < t->mw && ny < t->mh) && t->tiles[t->ground[ny][nx]].fringe == pri;
-                if (card[d] && u->fr_edge >= 0) push_cell(t, t->tiles[u->fr_edge].index, 1, 1, sx, sy, d, TF_WHITE);
-            }
-            for (int g = 0; g < 4; g++) {                                  // diagonals: NE SE SW NW
-                int a = g, b = (g + 1) & 3;                                // the two cardinals flanking it
-                int nx = x + cdx[a] + cdx[b], ny = y + cdy[a] + cdy[b];
-                bool diag = (nx >= 0 && ny >= 0 && nx < t->mw && ny < t->mh) && t->tiles[t->ground[ny][nx]].fringe == pri;
-                if (card[a] && card[b]) { if (u->fr_in >= 0) push_cell(t, t->tiles[u->fr_in].index, 1, 1, sx, sy, g, TF_WHITE); }
-                else if (diag && !card[a] && !card[b]) { if (u->fr_out >= 0) push_cell(t, t->tiles[u->fr_out].index, 1, 1, sx, sy, g, TF_WHITE); }
-            }
-        }
+// The ground, TILES2: the base terrain floods the view with one quad, then every other terrain draws
+// the display cells the dual grid gave it — static geometry, only the visible rows.
+static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
+    if (!t->terr_count || !t->pal_ok) return;
+    TfTile *base = &t->tiles[t->terr[0]];
+    int st = base->edge_style < ES_COUNT ? base->edge_style : ES_RAGGED;
+    // One screen-filling quad for the base. Its UV is a `full` mask slot, which is inside everywhere,
+    // so the base costs one quad a frame however big the map is.
+    {
+        float mw = (float)t->mask_w, mh = (float)t->mask_h, mc = (float)t->mask_cell;
+        float mx = t->mask_slot[st][MS_COUNT - 1][0], my = t->mask_slot_y[st][MS_COUNT - 1][0];
+        float u0 = (mx + 8) / mw, v0 = (my + 8) / mh, u1 = (mx + mc - 8) / mw, v1 = (my + mc - 8) / mh;
+        tf_use(t, base->swatch, 2);
+        float rect[4] = { 0, 0, (float)base->swatch_px_w, (float)base->swatch_px_h };
+        float lit = (t->drift > 0.0f && base->drift > 0.0f) ? -3.0f : -1.0f;
+        float vw = (float)t->rvw * t->sc, vh = (float)t->rvh * t->sc;
+        push_quad(t, 0, 0, vw, vh, u0, v0, u1, v1, 0, TF_WHITE, rect, lit, 0.0f);
+        tf_flush(t);
     }
-    t->ground_pass = false;
+    // Every other terrain: the rows of display cells the camera can see.
+    int j0 = y0 - 1 < 0 ? 0 : y0 - 1, j1 = y1 + 1 > t->mh ? t->mh + 1 : y1 + 1;
+    for (int n = 1; n < t->terr_count; n++) {
+        TfTile *e = &t->tiles[t->terr[n]];
+        int first = t->gv_row[n][j0], last = t->gv_row[n][j1];
+        tf_draw_static(t, first, last - first, e->swatch, 2, e->swatch_px_w, e->swatch_px_h);
+    }
+    // The decals sit on the ground and under everything else.
+    if (t->dv_count) {
+        int d0 = t->dv_row[j0 < t->mh ? j0 : t->mh - 1], d1 = t->dv_row[j1 - 1 < t->mh ? j1 - 1 : t->mh];
+        tf_draw_static(t, d0, d1 - d0, t->atlas, 1, t->atlas_w, t->atlas_h);
+    }
+    (void)x0; (void)x1;
 }
 
 // Stamps. `over` is how many of a stamp's TOP rows belong above the walkers, so a roof ridge or a
@@ -1971,8 +2469,10 @@ static void draw_stamps(TileField *t, int x0, int y0, int x1, int y1, bool over_
         if (r1 <= r0) continue;
         // ONE quad for the whole contiguous block of rows: a row-per-quad stamp shows a hairline seam
         // between its rows once the art is filtered, and a house is one picture, not a stack of strips.
-        push_cell(t, d->index + r0 * ATLAS_COLS, d->w, r1 - r0,
-                  (float)(p->x * TS - t->cam_x), (float)((p->y + r0) * TS - t->cam_y), 0, TF_WHITE);
+        bool mirror = false;                                           // `## flips`: nature only
+        for (int f = 0; f < t->flip_count; f++) if (t->flip_x[f] == p->x && t->flip_y[f] == p->y) mirror = true;
+        push_cell_flip(t, d->index + r0 * ATLAS_COLS, d->w, r1 - r0,
+                       (float)(p->x * TS - t->cam_x), (float)((p->y + r0) * TS - t->cam_y), TF_WHITE, mirror);
     }
 }
 
@@ -2076,6 +2576,7 @@ static int tf_gather_lights(TileField *t, float *out, float leader_x, float lead
 // with sc — it is only how big the quads and their textures come out on this screen.
 static void tf_render(TileField *t, int vw, int vh, float sc) {
     t->sc = sc;
+    t->rvw = vw; t->rvh = vh;   // a capture renders a whole map, not the player's view
     int dw = (int)(vw * sc + 0.5f), dh = (int)(vh * sc + 0.5f);
     glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
     glViewport(0, 0, dw, dh);
@@ -2106,6 +2607,9 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
         glUniform1i(t->u_cmap, 1);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, t->cmap);
+        glUniform1i(t->u_mask, 2);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, t->mask_tex);
         glActiveTexture(GL_TEXTURE0);
         int tbl = t->light_table < 0 ? 0 : t->light_table >= t->cmap_tables ? 0 : t->light_table;
         glUniform1f(t->u_cmaph, (float)t->cmap_rows);
@@ -2134,7 +2638,6 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
     if (y1 > t->mh) y1 = t->mh;
 
     draw_ground(t, x0, y0, x1, y1);
-    draw_fringes(t, x0, y0, x1, y1);
     if (t->dbg_solid) {
         for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++)
             if (t->solid[y][x]) push_solid(t, (float)(x * TS - t->cam_x), (float)(y * TS - t->cam_y), TS, TS, 0x604040FFu);
@@ -2396,6 +2899,25 @@ static void on_enter_tile(TileField *t, TfEvent *ev) {
     }
 }
 
+// Is side `dir` of the tile at x,y declared open? dir is 0 S, 1 W, 2 E, 3 N — the same order as DX/DY.
+static bool tf_pass_open(TileField *t, int x, int y, int dir) {
+    if (x < 0 || y < 0 || x >= t->mw || y >= t->mh) return false;
+    int p = t->place_at[y][x];
+    int def = p ? t->places[p - 1].def : t->ground[y][x];
+    if (def < 0 || def >= t->tile_count) return false;
+    return (t->tiles[def].pass & (1 << (dir & 3))) != 0;
+}
+
+// Leaving `from` by `dir` and entering `to` from the opposite side. A tile with no `pass:` line is
+// open on every side, which is what every tile was before TILES2.
+static bool tf_may_pass(TileField *t, int fx, int fy, int tx2, int ty2, int dir) {
+    int p = t->place_at[fy][fx];
+    int def = p ? t->places[p - 1].def : t->ground[fy][fx];
+    if (def >= 0 && def < t->tile_count && t->tiles[def].pass && !tf_pass_open(t, fx, fy, dir)) return false;
+    (void)tx2; (void)ty2;
+    return true;
+}
+
 static void tf_walk(TileField *t, int w, float dt, TfEvent *ev) {
     if (t->moving) {
         t->move_t += dt;
@@ -2416,7 +2938,11 @@ static void tf_walk(TileField *t, int w, float dt, TfEvent *ev) {
 
     t->act[0].facing = dir;
     int nx = t->act[0].tx + DX[dir], ny = t->act[0].ty + DY[dir];
-    if (!t->noclip && cell_solid(t, nx, ny)) return;         // blocked: face it, don't step
+    // `pass: NESW` (TILES2): the sides of a tile that may be walked THROUGH. A counter you talk across
+    // is solid but open on one side; a one-way ledge is open leaving and shut entering. Both tiles get
+    // a say — you have to be able to leave this one that way and enter that one from the other side.
+    if (!t->noclip && !tf_may_pass(t, t->act[0].tx, t->act[0].ty, nx, ny, dir)) return;
+    if (!t->noclip && cell_solid(t, nx, ny) && !tf_pass_open(t, nx, ny, (dir ^ 3))) return;   // blocked: face it
     if (!t->noclip && npc_at(t, nx, ny) >= 0) return;
 
     short ox[TF_PARTY], oy[TF_PARTY];
@@ -2784,6 +3310,16 @@ bool tf_dev_ui(TileField *t, char *out, int cap) {
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
             ImGui::SliderFloat("drift str", &t->drift, 0.05f, 3.0f, "%.2f");
         }
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9);
+        if (ImGui::SliderFloat("decals", &t->decal_density, 0.0f, 3.0f, "%.2f")) {
+            tf_build_decals(t);                       // the scatter is static: rebuild it, don't redraw it
+            tf_upload_static(t);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Print decals")) {
+            snprintf(out, cap, "decal density %.2f — %d placed on %s", t->decal_density, t->decal_placed, t->map_name);
+            printed = true;
+        }
         bool one = t->one_tap;
         if (ImGui::Checkbox("1 tap (no blend)", &one)) { t->one_tap = one; t->draw_ns = 0; }
         ImGui::SameLine();
@@ -2799,8 +3335,11 @@ bool tf_dev_ui(TileField *t, char *out, int cap) {
         ImGui::TextUnformatted("light: no story/palette/master.hex — unpalettised, no lighting");
     }
     if (ImGui::Button("Print tile")) {
-        snprintf(out, cap, "%s: standing on %d,%d facing %s (%s)", t->map_name, t->act[0].tx, t->act[0].ty,
-                 FACE_NAME[t->act[0].facing & 3], t->solid[t->act[0].ty][t->act[0].tx] ? "solid" : "free");
+        int gd = t->ground[t->act[0].ty][t->act[0].tx];
+        const char *gn = (gd >= 0 && gd < t->tile_count) ? t->tiles[gd].name : "?";
+        const char *tg = (gd >= 0 && gd < t->tile_count && t->tiles[gd].tag[0]) ? t->tiles[gd].tag : "-";
+        snprintf(out, cap, "%s: standing on %d,%d facing %s (%s) — %s, tag %s", t->map_name, t->act[0].tx, t->act[0].ty,
+                 FACE_NAME[t->act[0].facing & 3], t->solid[t->act[0].ty][t->act[0].tx] ? "solid" : "free", gn, tg);
         printed = true;
     }
     return printed;
@@ -2818,6 +3357,7 @@ TileField *tf_create() {
     t->lantern_r = 5.0f;
     t->drift = 1.0f;
     t->clouds = 1.0f;
+    t->decal_density = 1.0f;
     return t;
 }
 
