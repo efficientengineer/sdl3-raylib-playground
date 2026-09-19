@@ -70,7 +70,8 @@ sheds, garden walls and open field rather than stopping at a line.
 
 - exits: left -> west_road, top -> hart_yard
 - landmark: the lopsided well square, with the guild hall along one side of it
-- walker: 64
+- walker: 40
+- spawn: 750 570
 - size: 1536x1024
 
 ## hart_yard.yard

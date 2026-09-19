@@ -6,9 +6,9 @@ for the map and the mask in one message — the mask must be traced from the fin
 
 ## What exists already
 
-- `story/field/screens/halm_town_paint.png` — missing
-- `story/field/screens/halm_town_walk.png` — missing
-- `story/field/screens/halm_town.screen` — missing
+- `story/field/screens/halm_town_paint.png` — **exists**
+- `story/field/screens/halm_town_walk.png` — **exists**
+- `story/field/screens/halm_town.screen` — **exists**
 
 Style blocks used from `story/STYLE.md`: map_header, map_rendering, map_negative (`negative` minus its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, `character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: this is a top-down field map, not a manga page.
 
@@ -42,11 +42,11 @@ THE LANDMARK, which must be clearly on the map: the lopsided well square, with t
 THE PLACE:
 The whole valley town of Halm on one map, seen from straight above, late afternoon, half emptied. It grew round its well, so the middle of the map is a lopsided open square of worn grey paving — wider at its south end, pinching to a lane at its north — with the round stone well a little off centre, its plank roof on two posts and its bucket at the rim, and the paving laid in rings that spread out from it and give way to beaten dirt and creeping grass. The long low guild hall stands on the east side of the square with its deep porch on squat timber posts, its double doors open and a bare plank board fixed to the wall beside them; it is the biggest roof on the map. Plastered houses under red pantile roofs crowd the square and the lanes off it, staggered along the lanes at all different spacings and in clearly different sizes, some set forward to the path and some back behind a yard wall, none of them in a row. Their doors stand open and a shutter or two is off its hinges. Nine lanes leave the square and none of them is straight: they bend, fork, pinch to a gap and widen again, and two of them end in a yard. The grain yard fills the south-east corner behind a dry-laid stone wall with a flat coping, one stretch of it bellied out and patched with newer stone, with the dark open front of the grain shed inside it and a plank bench of grain scales by the door. North-west of the square the carters' yard stands empty: bare rutted earth, one two-wheeled handcart left with its shafts down and loaded above the sides, and nothing else. A stream comes in at the north-east, runs a crooked line south-west across the top of the town under two plank footbridges, and leaves at the west edge. A wide dirt road leaves the west edge of the map toward the valley; a narrower path climbs the north edge toward the shoulder of the hill. Broad valley trees with heavy rounded crowns stand in ones and twos through the town, and the edges of the map dissolve into orchard rows, hedges, sheds, garden walls and open field rather than stopping at a line.
 
-THE SCALE, which everything is drawn to: a person is about 64 pixels tall on this map and a door about 74 pixels tall, at 1536x1024. A house is a few people wide, a well is about one person across, and every path, street and gap a person has to walk through is at least 192 pixels wide — 3 people abreast. Draw no people; the scale is there so the buildings and the gaps between them come out the right size.
+THE SCALE, which everything is drawn to: a person is about 40 pixels tall on this map and a door about 46 pixels tall, at 1536x1024. A house is a few people wide, a well is about one person across, and every path, street and gap a person has to walk through is at least 120 pixels wide — 3 people abreast. Draw no people; the scale is there so the buildings and the gaps between them come out the right size.
 
 THE GROUND A PERSON CAN WALK ON reads at a glance: open ground, paving, dirt and grass, with a clear edge where it stops and a clear line where every object stands on it. Paths connect to each other and to the places they lead; nothing walkable is left as an island that cannot be reached.
 
-THE WAYS OUT run off the edge of the map as roads or paths: the left edge, the way to west road; the top edge, the way to hart yard. Each one reaches the very edge of the canvas, at least 192 pixels wide, not stopping short of it and not blocked by anything.
+THE WAYS OUT run off the edge of the map as roads or paths: the left edge, the way to west road; the top edge, the way to hart yard. Each one reaches the very edge of the canvas, at least 120 pixels wide, not stopping short of it and not blocked by anything.
 
 HOW THE PLACE IS SHAPED — people grew this, they did not lay it out. It spread from one reason, so the oldest and densest part is round that and it thins toward the edges. Lanes bend, fork, pinch and widen, and some end in a yard. Nothing is in a row: buildings are staggered along the lanes at irregular spacings and in clearly different sizes and shapes, set forward and back from the path rather than lined up, so no two edges run together for long. No grid, no city blocks, no repeated spacing, no mirror symmetry — those belong to the ancients and this is not one of their places. The map does not stop at a clean line: the edges dissolve into orchard, hedge, wall, shed, rock and field.
 
@@ -87,7 +87,7 @@ Save it in **this folder** as `returned_walk.png`.
 
 - [ ] Top-down: the ground is seen from straight above, objects show only roof and front face
 - [ ] No perspective, no vanishing point, no horizon, no sky, nothing shrinking with distance
-- [ ] One scale everywhere: a door about 74 px tall, paths 192 px wide
+- [ ] One scale everywhere: a door about 46 px tall, paths 120 px wide
 - [ ] Lanes bend; buildings are staggered, different sizes, never in rows; no grid
 - [ ] Every way out runs off its edge of the frame (left, top)
 - [ ] No people, no animals, no text, no interface, no border

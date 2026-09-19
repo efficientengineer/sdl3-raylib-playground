@@ -39,8 +39,8 @@ unblock each other. A checked box is already cut; everything below this section 
       [`cast/falke/walker`](cast/falke/walker/prompt.md) · to generate · `ingest cast/falke/walker`
 - [ ] **8.** Ottilie's walk sprite — the figure walking the map  
       [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · to generate · `ingest cast/ottilie/walker`
-- [ ] **9.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
-      [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) · to generate · `ingest ch01/halm/screens/town`
+- [x] **9.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
+      [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) · done · `ingest ch01/halm/screens/town`
 - [x] **10.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
 - [ ] **11.** the ground and walls of `halm`, sheet 2 of 2  
@@ -112,7 +112,7 @@ the player walks underneath.
 
 | zone | folder | status | after downloading |
 | --- | --- | --- | --- |
-| `town` | [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) | to generate | `ingest ch01/halm/screens/town` |
+| `town` | [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) | done | `ingest ch01/halm/screens/town` |
 
 Tiles, props and buildings below are the sprite path, which a painted screen does not need.
 
