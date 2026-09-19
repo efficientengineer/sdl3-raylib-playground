@@ -9,12 +9,12 @@
 
 1. `story/field/views/halm_square.png`
 2. `story/refs/style.png`
-3. `story/field/props/tree_a.png`
-4. `story/field/props/tree_b.png`
-5. `story/field/props/barrel.png`
-6. `story/field/props/cart.png`
-7. `story/field/props/fence.png`
-8. `story/field/props/sign.png`
+3. `story/field/buildings/house_b_front.png`
+4. `story/field/buildings/house_a_front.png`
+5. `story/field/buildings/ladder_house_front.png`
+6. `story/field/buildings/grain_shed_front.png`
+7. `story/field/buildings/guild_hall_front.png`
+8. `story/field/props/tree_a.png`
 
 ## 2. Paste this prompt exactly
 
@@ -26,12 +26,12 @@ Paint this exact scene. The attached image is a rough 3D block-out from the game
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: THE BLOCK-OUT. This is the scene to paint, from the game's own camera. It is the layout, not a suggestion: every object, edge, road, wall and building stays exactly where it is and exactly the size it is.
 Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
-Image 3: The tree a as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
-Image 4: The tree b as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
-Image 5: The barrel as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
-Image 6: The cart as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
-Image 7: The fence as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
-Image 8: The sign as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
+Image 3: The house b as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
+Image 4: The house a as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
+Image 5: The ladder house as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
+Image 6: The grain shed as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
+Image 7: The guild hall as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
+Image 8: The tree a as it is drawn in this game. The map puts it in this scene; keep its design, colours and proportions.
 
 THE PLACE: the lopsided well square, and the road that climbs round the shoulder of Hart's hill.
 THE GROUND is made of: grass (Short valley grass in uneven clumps with bare earth showing through and a few small stones); dirt (Packed pale earth of a walked lane, dry, with shallow wheel ruts and loose grit); stone (Flat grey paving slabs of uneven size laid close, with grass in the joints); plank (Weathered timber decking boards laid one way, gapped, with nail heads at the joins); wall_stone_top (The top of a dry stone wall seen straight down from above: a run of flat grey capstones laid across the width, chipped at the edges, moss in the joints between them); fence_top (The top of a timber fence seen straight down from above: the upper rail running the length of the tile with its grain along it, a square post head cut level at intervals, the strip either side of the rail the same flat dark colour as the fence face); hedge_top (The top of a clipped hedge seen straight down from above, dense leaf cover cut level with a slightly uneven ridge along the middle and shadow between the clumps).

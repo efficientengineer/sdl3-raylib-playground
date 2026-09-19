@@ -1,0 +1,41 @@
+{
+  "palette": "master.hex",
+  "version": 1,
+  "width": 256,
+  "height": 192,
+  "levels": 32,
+  "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest MASTER palette index, so the engine may use the colormap directly as colour.",
+  "floor": 0.15,
+  "tables": [
+    {
+      "table": "day",
+      "row0": 0,
+      "levels": 32
+    },
+    {
+      "table": "dusk",
+      "row0": 32,
+      "levels": 32
+    },
+    {
+      "table": "night",
+      "row0": 64,
+      "levels": 32
+    },
+    {
+      "table": "flash",
+      "row0": 96,
+      "levels": 32
+    },
+    {
+      "table": "poison",
+      "row0": 128,
+      "levels": 32
+    },
+    {
+      "table": "stone",
+      "row0": 160,
+      "levels": 32
+    }
+  ]
+}

@@ -1,0 +1,419 @@
+{
+  "template": "walker_guildclerk",
+  "kind": "walker",
+  "canvas": [
+    1024,
+    1536
+  ],
+  "canvas_label": "portrait, 1024x1536",
+  "background": [
+    255,
+    0,
+    255
+  ],
+  "border": 3,
+  "out": "story/field/walkers/guildclerk.png",
+  "slots": [
+    {
+      "n": 1,
+      "id": "guildclerk_s1",
+      "row": 0,
+      "col": 0,
+      "facing": "S",
+      "step": "stand",
+      "box": [
+        56,
+        120,
+        192,
+        288
+      ],
+      "inner": [
+        59,
+        123,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 2,
+      "id": "guildclerk_s2",
+      "row": 0,
+      "col": 1,
+      "facing": "S",
+      "step": "step-left",
+      "box": [
+        296,
+        120,
+        192,
+        288
+      ],
+      "inner": [
+        299,
+        123,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 3,
+      "id": "guildclerk_s3",
+      "row": 0,
+      "col": 2,
+      "facing": "S",
+      "step": "stand",
+      "box": [
+        536,
+        120,
+        192,
+        288
+      ],
+      "inner": [
+        539,
+        123,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 4,
+      "id": "guildclerk_s4",
+      "row": 0,
+      "col": 3,
+      "facing": "S",
+      "step": "step-right",
+      "box": [
+        776,
+        120,
+        192,
+        288
+      ],
+      "inner": [
+        779,
+        123,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 5,
+      "id": "guildclerk_w1",
+      "row": 1,
+      "col": 0,
+      "facing": "W",
+      "step": "stand",
+      "box": [
+        56,
+        456,
+        192,
+        288
+      ],
+      "inner": [
+        59,
+        459,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 6,
+      "id": "guildclerk_w2",
+      "row": 1,
+      "col": 1,
+      "facing": "W",
+      "step": "step-left",
+      "box": [
+        296,
+        456,
+        192,
+        288
+      ],
+      "inner": [
+        299,
+        459,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 7,
+      "id": "guildclerk_w3",
+      "row": 1,
+      "col": 2,
+      "facing": "W",
+      "step": "stand",
+      "box": [
+        536,
+        456,
+        192,
+        288
+      ],
+      "inner": [
+        539,
+        459,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 8,
+      "id": "guildclerk_w4",
+      "row": 1,
+      "col": 3,
+      "facing": "W",
+      "step": "step-right",
+      "box": [
+        776,
+        456,
+        192,
+        288
+      ],
+      "inner": [
+        779,
+        459,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 9,
+      "id": "guildclerk_e1",
+      "row": 2,
+      "col": 0,
+      "facing": "E",
+      "step": "stand",
+      "box": [
+        56,
+        792,
+        192,
+        288
+      ],
+      "inner": [
+        59,
+        795,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 10,
+      "id": "guildclerk_e2",
+      "row": 2,
+      "col": 1,
+      "facing": "E",
+      "step": "step-left",
+      "box": [
+        296,
+        792,
+        192,
+        288
+      ],
+      "inner": [
+        299,
+        795,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 11,
+      "id": "guildclerk_e3",
+      "row": 2,
+      "col": 2,
+      "facing": "E",
+      "step": "stand",
+      "box": [
+        536,
+        792,
+        192,
+        288
+      ],
+      "inner": [
+        539,
+        795,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 12,
+      "id": "guildclerk_e4",
+      "row": 2,
+      "col": 3,
+      "facing": "E",
+      "step": "step-right",
+      "box": [
+        776,
+        792,
+        192,
+        288
+      ],
+      "inner": [
+        779,
+        795,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 13,
+      "id": "guildclerk_n1",
+      "row": 3,
+      "col": 0,
+      "facing": "N",
+      "step": "stand",
+      "box": [
+        56,
+        1128,
+        192,
+        288
+      ],
+      "inner": [
+        59,
+        1131,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 14,
+      "id": "guildclerk_n2",
+      "row": 3,
+      "col": 1,
+      "facing": "N",
+      "step": "step-left",
+      "box": [
+        296,
+        1128,
+        192,
+        288
+      ],
+      "inner": [
+        299,
+        1131,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 15,
+      "id": "guildclerk_n3",
+      "row": 3,
+      "col": 2,
+      "facing": "N",
+      "step": "stand",
+      "box": [
+        536,
+        1128,
+        192,
+        288
+      ],
+      "inner": [
+        539,
+        1131,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    },
+    {
+      "n": 16,
+      "id": "guildclerk_n4",
+      "row": 3,
+      "col": 3,
+      "facing": "N",
+      "step": "step-right",
+      "box": [
+        776,
+        1128,
+        192,
+        288
+      ],
+      "inner": [
+        779,
+        1131,
+        186,
+        282
+      ],
+      "target": [
+        32,
+        48
+      ],
+      "out": "story/field/walkers/guildclerk.png"
+    }
+  ],
+  "prompt": "Create ONE image: the attached template with all 16 numbered slots filled in. Canvas: portrait, 1024x1536, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.\nImage 3: CHARACTER reference for Guildclerk. The walker is this character: keep the face, hair, outfit, and colors identical to this image in every frame. Use it for the design only; ignore its background and its three-panel layout.\nImage 4: the game's COLOUR PALETTE, one material ramp a row: use only these colours.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THIS IS: a walking sprite sheet for Guildclerk in a 2.5D field map, 16 frames of one character, cut out against the flat magenta. The magenta is empty space, not a backdrop: it runs right up to the figure on every side. No ground, no shadow, no scenery, no props that are not part of the costume.\n\nTHE GRID, four rows of four frames, read left to right, top to bottom:\nRow 1 (slots 1-4), facing S: the character walks toward the camera, seen from the front.\nRow 2 (slots 5-8), facing W: walks to the viewer's left, seen in side view from their right side.\nRow 3 (slots 9-12), facing E: walks to the viewer's right, seen in side view from their left side. This is row 2 mirrored, and the costume details stay on the correct side of the body.\nRow 4 (slots 13-16), facing N: walks away from the camera, seen from behind.\n\nTHE COLUMNS, the same four poses in every row: column 1 standing still with both feet together; column 2 mid-stride with the left leg forward and the right arm forward; column 3 the same standing pose as column 1, identical to it; column 4 mid-stride with the right leg forward and the left arm forward. Frames 1 and 3 must match each other exactly, because the game plays them as 1, 2, 3, 4 in a loop.\n\nFRAMING, the same in all 16 frames: the character is drawn at the same size, upright and centred left to right, with the feet on the bottom edge of the frame and a small gap of magenta above the head. The head does not move up or down between frames, so the sheet does not bob when it is played. Each frame is 186x282 pixels here and is squeezed down to 32x48 in game, so keep the pixels large, the silhouette clear and the face simple: a few pixels of eye, no fine detail.\n\nCHARACTER: Guildclerk, a slight upright young man with mousy brown hair combed flat in a hard side parting, small round grey eyes, a narrow clean-shaven face, a high-collared charcoal tunic buttoned to the throat over a white shirt with cuffed sleeves, a plain grey sash, ink on the first two fingers of the right hand, a pen behind one ear, flat black shoes.\n\nThe character must match the attached reference sheet exactly: same face, hair, outfit, colors and marks, in all sixteen frames.\n\nCHARACTER DESIGN: 1990s Japanese anime and manga character design, like the cast of a 1993 sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes with simple highlights, small noses and pointed chins, big layered spiky hair with hard-edged shine bands, slim necks, clean readable silhouettes. Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes, oversized shoulder plates, headbands, sashes. Simple clean shapes and large flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones per color, no gradients.\n\nRENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.\n\nAVOID: western fantasy art, tabletop RPG illustration, gritty realism, realistic anatomy, bulging muscles, wrinkles, detailed beards, noisy texture, smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render, photorealistic, modern anime, chibi, high resolution detail, lens flare, glow effects, mixed pixel sizes, even panel grid, panels filling the whole frame, deep perspective, centered full-figure composition, text, letters, captions, speech bubbles, watermark, signature, drawing outside a slot, moving or covering a slot number, ground or shadow under the feet, a different size or costume between frames, the head bobbing between frames, a background inside a frame, a soft blurred or glowing edge where the figure meets the magenta, changing the size of the image"
+}

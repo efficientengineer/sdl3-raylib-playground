@@ -1,0 +1,10 @@
+{
+  "kind": "walker",
+  "handle": "hart",
+  "title": "Hart \u2014 walk sheet",
+  "makes": "`story/field/walkers/hart.png`, the 4x4 walk sprite sheet",
+  "outputs": [
+    "story/field/walkers/hart.png"
+  ],
+  "dir": "story/packages/cast/hart/walker"
+}

@@ -4,6 +4,7 @@ tileset: valley
 size: 40 18
 spawn: 37 8 W
 music: wonder
+light: day 1.0
 ## legend
 . grass
 , grass_tuft

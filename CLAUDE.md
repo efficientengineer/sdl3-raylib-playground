@@ -92,6 +92,10 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py view <map> <zone> # (older path, block-out painting) → story/field/views/<map>_<zone>_paint.png
                                  # (export also writes src/field_text.h from story/field/text.md)
 ./story_prompt.py cut <sheet.json> <img>    # cut a filled-in template: key magenta, resize, write the files
+./story_prompt.py palette build      # fit story/palette/master.* to the raw returns, + colormap + cycles
+./story_prompt.py palette apply <files> [--palette master|<hex>]   # convert anything to an indexed PNG
+./story_prompt.py palette check      # every shipped image is indexed and holds only its own palette
+./story_prompt.py palette colormap   # story/palette/colormap.png: 6 tables x 32 light levels
 ```
 
 ## Shader pipeline
@@ -424,6 +428,33 @@ tool complaints go in `story/notes/<agent>.md` and the orchestrator rules on the
 - Dialogue is never rendered into images; the game draws it. `story/out/` is generated and gitignored;
   `story/refs/`, `story/panels/` and `story/packages/` are kept (the last is generated but tracked, so
   the owner can pick up any scene's package without running the tool).
+
+### Palette (D19) — 256 colours, one byte a pixel
+
+**`PALETTE.md` is the contract**; read it before touching colour anywhere. Every image the game ships
+is an **indexed PNG** (colour type 3, PLTE + tRNS, index 0 transparent) drawn from one of two
+palettes: **`story/palette/master.hex`** for everything that can share the field screen (the tile
+atlas, walkers, props, tiles, building faces, portraits), and **`story/panels/<scene>.hex`** for one
+cutscene scene's panels, built from that scene's own art at slice time because panels are never lit.
+The point is not disk: it is one look across every ChatGPT generation, and lighting, time of day and
+effects done as **palette tables** (`story/palette/colormap.png`, six tables x 32 light levels) rather
+than as redrawn art.
+
+- **Conversion is the last step of every cutter**, after the keying, the seam healing and the tone
+  match: exact nearest in Oklab, **no dithering ever**, alpha **hard** at 0.5 (under it is index 0).
+  There is no edge extrusion any more — an index carries no colour to bleed, and the tile shader
+  blends the neighbours' colormap colours instead.
+- **The palette can always be revised.** Every shipped file is re-derived from the raw returns kept
+  in `story/sheets/`: `./story_prompt.py palette build && ./story_prompt.py ingest --force`. The
+  `# version N` line of `master.hex` is the palette's identity; bump it when the colours change.
+- `palette check` (also run by `check --all`) fails any shipped image that is not indexed or whose
+  PLTE is not its own palette. `palette apply <files>` converts something by hand.
+- `story/palette/master_swatch.png` — one material ramp a row — is attached **last** to every tileset,
+  walker, prop, tile, building and reference-sheet package, with one line telling the generator to use
+  only those colours. Packages already drawn are unaffected: prompts update, slots never move.
+- `story/palette/cycles.md` names the water and lamp cycles as `name: indices… @ fps`; the engine
+  rewrites those colormap columns per frame.
+- Never edit anything under `story/palette/` by hand, and never paste a colour into a prompt.
 
 ### Field art — the template sheet (`tiles`, `props`, `walker`, `building`, `cut`)
 

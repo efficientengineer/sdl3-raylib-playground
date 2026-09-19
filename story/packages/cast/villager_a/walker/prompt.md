@@ -2,12 +2,13 @@
 
 ## What exists already
 
-- `story/field/walkers/villager_a.png` — missing
+- `story/field/walkers/villager_a.png` — **exists**, 1024x1536
 
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/cast/villager_a/walker/template.png`
 2. `story/refs/style.png`
+3. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
 
@@ -18,6 +19,7 @@ Create ONE image: the attached template with all 16 numbered slots filled in. Ca
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
 Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
 

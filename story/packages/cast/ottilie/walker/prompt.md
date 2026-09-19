@@ -2,13 +2,14 @@
 
 ## What exists already
 
-- `story/field/walkers/ottilie.png` — missing
+- `story/field/walkers/ottilie.png` — **exists**, 1024x1536
 
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/cast/ottilie/walker/template.png`
 2. `story/refs/style.png`
 3. `story/refs/lyra.png`
+4. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
 
@@ -20,6 +21,7 @@ ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
 Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
 Image 3: CHARACTER reference for Lyra. The walker is this character: keep the face, hair, outfit, and colors identical to this image in every frame. Use it for the design only; ignore its background and its three-panel layout.
+Image 4: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
 

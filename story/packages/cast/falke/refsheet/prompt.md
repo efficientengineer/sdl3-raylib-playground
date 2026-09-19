@@ -8,6 +8,7 @@
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/refs/style.png`
+2. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
 
@@ -17,6 +18,7 @@ Create ONE image: a character reference sheet for Bron. Canvas: landscape, 1536x
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+Image 2: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 SHEET: A character reference sheet on a solid pure black background, three separate white-bordered panels in one row. Left panel: full-body standing pose, head to boots, three-quarter view. Middle panel: head-and-shoulders portrait in three-quarter view against a flat neutral mid-grey background. Right panel: the same head in strict profile. The character is identical in all three panels: same face, hair, outfit, and colors. No text, no labels, no color swatches.
 

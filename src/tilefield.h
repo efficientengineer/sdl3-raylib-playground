@@ -24,6 +24,10 @@ struct TfSave {
     int32_t tx[TF_PARTY], ty[TF_PARTY], facing[TF_PARTY];
     int32_t party, steps;
     int32_t dbg_solid, dbg_trig, dbg_coord, noclip;
+    // What the owner set in the Dev light row (PALETTE.md / D19): the table, the ambient level and
+    // the lantern. A map's own `light:` line is re-read on load, so these are applied after it.
+    int32_t light_table, lantern;
+    float ambient, lantern_r;
 };
 
 TileField *tf_create();

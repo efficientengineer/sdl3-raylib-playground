@@ -20,3 +20,4 @@ story/packages/**/returned.*
 build_desktop/
 imgui.ini
 tools/arttray/ArtTray.app/
+tools/palette/out/

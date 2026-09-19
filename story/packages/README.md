@@ -32,54 +32,62 @@ The fringe convention (which the engine rotates) is written out in
 
 | set | sheet | tiles | folder | status | after downloading |
 | --- | --- | --- | --- | --- | --- |
-| `valley` | `terrain` | 24 | [`tilesets/valley/terrain`](tilesets/valley/terrain/prompt.md) | to generate | `ingest tilesets/valley/terrain` |
-| `valley` | `objects` | 9 | [`tilesets/valley/objects`](tilesets/valley/objects/prompt.md) | to generate | `ingest tilesets/valley/objects` |
-| `valley` | `objects_2` | 6 | [`tilesets/valley/objects_2`](tilesets/valley/objects_2/prompt.md) | to generate | `ingest tilesets/valley/objects_2` |
-| `valley` | `objects_3` | 10 | [`tilesets/valley/objects_3`](tilesets/valley/objects_3/prompt.md) | to generate | `ingest tilesets/valley/objects_3` |
-| `valley` | `objects_4` | 12 | [`tilesets/valley/objects_4`](tilesets/valley/objects_4/prompt.md) | to generate | `ingest tilesets/valley/objects_4` |
+| `valley` | `terrain` | 24 | [`tilesets/valley/terrain`](tilesets/valley/terrain/prompt.md) | done | `ingest tilesets/valley/terrain` |
+| `valley` | `objects` | 9 | [`tilesets/valley/objects`](tilesets/valley/objects/prompt.md) | done | `ingest tilesets/valley/objects` |
+| `valley` | `objects_2` | 6 | [`tilesets/valley/objects_2`](tilesets/valley/objects_2/prompt.md) | done | `ingest tilesets/valley/objects_2` |
+| `valley` | `objects_3` | 10 | [`tilesets/valley/objects_3`](tilesets/valley/objects_3/prompt.md) | done | `ingest tilesets/valley/objects_3` |
+| `valley` | `objects_4` | 12 | [`tilesets/valley/objects_4`](tilesets/valley/objects_4/prompt.md) | done | `ingest tilesets/valley/objects_4` |
 
 ## 2. The short path to something on the phone
 
 The fewest generations that put the first scene and the first map on screen, in the order they
 unblock each other. A checked box is already cut; everything below this section is the long tail.
 
-- [ ] **1.** the `terrain` sheet of the `valley` tileset — 24 tile(s) into that set's atlas, which is what the map is made of  
-      [`tilesets/valley/terrain`](tilesets/valley/terrain/prompt.md) · to generate · `ingest tilesets/valley/terrain`
-- [ ] **2.** the `objects` sheet of the `valley` tileset — 9 tile(s) into that set's atlas, which is what the map is made of  
-      [`tilesets/valley/objects`](tilesets/valley/objects/prompt.md) · to generate · `ingest tilesets/valley/objects`
-- [ ] **3.** the `objects_2` sheet of the `valley` tileset — 6 tile(s) into that set's atlas, which is what the map is made of  
-      [`tilesets/valley/objects_2`](tilesets/valley/objects_2/prompt.md) · to generate · `ingest tilesets/valley/objects_2`
-- [ ] **4.** the `objects_3` sheet of the `valley` tileset — 10 tile(s) into that set's atlas, which is what the map is made of  
-      [`tilesets/valley/objects_3`](tilesets/valley/objects_3/prompt.md) · to generate · `ingest tilesets/valley/objects_3`
-- [ ] **5.** the `objects_4` sheet of the `valley` tileset — 12 tile(s) into that set's atlas, which is what the map is made of  
-      [`tilesets/valley/objects_4`](tilesets/valley/objects_4/prompt.md) · to generate · `ingest tilesets/valley/objects_4`
-- [ ] **6.** Guildclerk's reference sheet — the portrait, the walker and every panel come from it  
-      [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) · to generate · `ingest cast/guildclerk/refsheet`
-- [ ] **7.** Hart's reference sheet — the portrait, the walker and every panel come from it  
-      [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) · to generate · `ingest cast/hart/refsheet`
-- [ ] **8.** Stolz's reference sheet — the portrait, the walker and every panel come from it  
-      [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) · to generate · `ingest cast/stolz/refsheet`
-- [ ] **9.** Shrinewoman's reference sheet — the portrait, the walker and every panel come from it  
-      [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) · to generate · `ingest cast/shrinewoman/refsheet`
-- [x] **10.** Falke's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **1.** the `terrain` sheet of the `valley` tileset — 24 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/terrain`](tilesets/valley/terrain/prompt.md) · done · `ingest tilesets/valley/terrain`
+- [x] **2.** the `objects` sheet of the `valley` tileset — 9 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/objects`](tilesets/valley/objects/prompt.md) · done · `ingest tilesets/valley/objects`
+- [x] **3.** the `objects_2` sheet of the `valley` tileset — 6 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/objects_2`](tilesets/valley/objects_2/prompt.md) · done · `ingest tilesets/valley/objects_2`
+- [x] **4.** the `objects_3` sheet of the `valley` tileset — 10 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/objects_3`](tilesets/valley/objects_3/prompt.md) · done · `ingest tilesets/valley/objects_3`
+- [x] **5.** the `objects_4` sheet of the `valley` tileset — 12 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/objects_4`](tilesets/valley/objects_4/prompt.md) · done · `ingest tilesets/valley/objects_4`
+- [x] **6.** Falke's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/falke/refsheet`](cast/falke/refsheet/prompt.md) · done · `ingest cast/falke/refsheet`
-- [x] **11.** Ottilie's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **7.** Guildclerk's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) · done · `ingest cast/guildclerk/refsheet`
+- [x] **8.** Ottilie's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) · done · `ingest cast/ottilie/refsheet`
-- [ ] **12.** Falke's walk sprite — the figure walking the map  
-      [`cast/falke/walker`](cast/falke/walker/prompt.md) · to generate · `ingest cast/falke/walker`
-- [ ] **13.** Ottilie's walk sprite — the figure walking the map  
-      [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · to generate · `ingest cast/ottilie/walker`
-- [x] **14.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
+- [x] **9.** Hart's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) · done · `ingest cast/hart/refsheet`
+- [x] **10.** Stolz's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) · done · `ingest cast/stolz/refsheet`
+- [x] **11.** Shrinewoman's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) · done · `ingest cast/shrinewoman/refsheet`
+- [ ] **12.** Guildclerk's walk sprite — the figure walking the map  
+      [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) · to generate · `ingest cast/guildclerk/walker`
+- [ ] **13.** Hart's walk sprite — the figure walking the map  
+      [`cast/hart/walker`](cast/hart/walker/prompt.md) · to generate · `ingest cast/hart/walker`
+- [ ] **14.** Stolz's walk sprite — the figure walking the map  
+      [`cast/stolz/walker`](cast/stolz/walker/prompt.md) · to generate · `ingest cast/stolz/walker`
+- [ ] **15.** Shrinewoman's walk sprite — the figure walking the map  
+      [`cast/shrinewoman/walker`](cast/shrinewoman/walker/prompt.md) · to generate · `ingest cast/shrinewoman/walker`
+- [x] **16.** Falke's walk sprite — the figure walking the map  
+      [`cast/falke/walker`](cast/falke/walker/prompt.md) · done · `ingest cast/falke/walker`
+- [x] **17.** Ottilie's walk sprite — the figure walking the map  
+      [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · done · `ingest cast/ottilie/walker`
+- [x] **18.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
       [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) · done · `ingest ch01/halm/screens/town`
-- [x] **15.** the ground and walls of `halm`, sheet 1 of 2  
+- [x] **19.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
-- [ ] **16.** the ground and walls of `halm`, sheet 2 of 2  
-      [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) · to generate · `ingest ch01/halm/tiles_2`
-- [x] **17.** everything standing in `halm`  
+- [x] **20.** the ground and walls of `halm`, sheet 2 of 2  
+      [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) · done · `ingest ch01/halm/tiles_2`
+- [x] **21.** everything standing in `halm`  
       [`ch01/halm/props`](ch01/halm/props/prompt.md) · done · `ingest ch01/halm/props`
-- [ ] **18.** the front, wall and roof of every building in `halm`  
-      [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · to generate · `ingest ch01/halm/buildings`
-- [x] **19.** the shot sheet for `0110_the_board` — the first scene the game plays  
+- [x] **22.** the front, wall and roof of every building in `halm`  
+      [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · done · `ingest ch01/halm/buildings`
+- [x] **23.** the shot sheet for `0110_the_board` — the first scene the game plays  
       [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) · done · `ingest ch01/halm/scenes/0110_the_board`
 
 Then `./story_prompt.py ingest` and `./fast_reload.sh`.
@@ -92,11 +100,11 @@ are all drawn from this one image.
 | character | folder | status | after downloading |
 | --- | --- | --- | --- |
 | Falke | [`cast/falke/refsheet`](cast/falke/refsheet/prompt.md) | done | `ingest cast/falke/refsheet` |
-| Guildclerk | [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) | to generate | `ingest cast/guildclerk/refsheet` |
+| Guildclerk | [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) | done | `ingest cast/guildclerk/refsheet` |
 | Ottilie | [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) | done | `ingest cast/ottilie/refsheet` |
-| Hart | [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) | to generate | `ingest cast/hart/refsheet` |
-| Stolz | [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) | to generate | `ingest cast/stolz/refsheet` |
-| Shrinewoman | [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) | to generate | `ingest cast/shrinewoman/refsheet` |
+| Hart | [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) | done | `ingest cast/hart/refsheet` |
+| Stolz | [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) | done | `ingest cast/stolz/refsheet` |
+| Shrinewoman | [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) | done | `ingest cast/shrinewoman/refsheet` |
 
 ## 4. Walk sprites
 
@@ -105,14 +113,14 @@ until their reference sheet exists, because the walker must match it.
 
 | who | folder | status | after downloading |
 | --- | --- | --- | --- |
-| Falke | [`cast/falke/walker`](cast/falke/walker/prompt.md) | to generate | `ingest cast/falke/walker` |
-| Guildclerk | `cast/guildclerk/walker` | needs the reference sheet first | rerun `packages` once the sheet is in |
-| Ottilie | [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) | to generate | `ingest cast/ottilie/walker` |
-| Hart | `cast/hart/walker` | needs the reference sheet first | rerun `packages` once the sheet is in |
-| Stolz | `cast/stolz/walker` | needs the reference sheet first | rerun `packages` once the sheet is in |
-| Shrinewoman | `cast/shrinewoman/walker` | needs the reference sheet first | rerun `packages` once the sheet is in |
-| villager_a | [`cast/villager_a/walker`](cast/villager_a/walker/prompt.md) | to generate | `ingest cast/villager_a/walker` |
-| villager_b | [`cast/villager_b/walker`](cast/villager_b/walker/prompt.md) | to generate | `ingest cast/villager_b/walker` |
+| Falke | [`cast/falke/walker`](cast/falke/walker/prompt.md) | done | `ingest cast/falke/walker` |
+| Guildclerk | [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) | to generate | `ingest cast/guildclerk/walker` |
+| Ottilie | [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) | done | `ingest cast/ottilie/walker` |
+| Hart | [`cast/hart/walker`](cast/hart/walker/prompt.md) | to generate | `ingest cast/hart/walker` |
+| Stolz | [`cast/stolz/walker`](cast/stolz/walker/prompt.md) | to generate | `ingest cast/stolz/walker` |
+| Shrinewoman | [`cast/shrinewoman/walker`](cast/shrinewoman/walker/prompt.md) | to generate | `ingest cast/shrinewoman/walker` |
+| villager_a | [`cast/villager_a/walker`](cast/villager_a/walker/prompt.md) | done | `ingest cast/villager_a/walker` |
+| villager_b | [`cast/villager_b/walker`](cast/villager_b/walker/prompt.md) | done | `ingest cast/villager_b/walker` |
 
 ## 5. Field art, by chapter and map
 
@@ -126,7 +134,7 @@ A map named `common` means the entry carries no `- map:` line yet.
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/bridge/props`](ch01/bridge/props/prompt.md) | `story/field/props/bridge_rail.png` | to generate | `ingest ch01/bridge/props` |
+| [`ch01/bridge/props`](ch01/bridge/props/prompt.md) | `story/field/props/bridge_rail.png` | done | `ingest ch01/bridge/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `grass` (with `halm`), `river_bank` (with `west_road`), `road` (with `west_road`), `stone` (with `halm`), `water` (with `west_road`)
 
@@ -149,9 +157,9 @@ Tiles, props and buildings below are the sprite path, which a painted screen doe
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
 | [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) | `story/field/tiles/cliff.png`, `story/field/tiles/dirt.png`, `story/field/tiles/grass.png`, `story/field/tiles/plank.png`, `story/field/tiles/stone.png`, `story/field/tiles/wall_plaster.png`, `story/field/tiles/wall_timber.png` | done | `ingest ch01/halm/tiles` |
-| [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) | `story/field/tiles/fence_top.png`, `story/field/tiles/fence_wood.png`, `story/field/tiles/hedge.png`, `story/field/tiles/hedge_top.png`, `story/field/tiles/wall_stone.png`, `story/field/tiles/wall_stone_top.png` | to generate | `ingest ch01/halm/tiles_2` |
+| [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) | `story/field/tiles/fence_top.png`, `story/field/tiles/fence_wood.png`, `story/field/tiles/hedge.png`, `story/field/tiles/hedge_top.png`, `story/field/tiles/wall_stone.png`, `story/field/tiles/wall_stone_top.png` | done | `ingest ch01/halm/tiles_2` |
 | [`ch01/halm/props`](ch01/halm/props/prompt.md) | `story/field/props/barrel.png`, `story/field/props/cart.png`, `story/field/props/fence.png`, `story/field/props/scale_bench.png`, `story/field/props/sign.png`, `story/field/props/tree_a.png`, `story/field/props/tree_b.png`, `story/field/props/well.png`, `story/field/props/yard_wall.png` | done | `ingest ch01/halm/props` |
-| [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) | `grain_shed`, `guild_hall`, `house_a`, `house_b`, `ladder_house` — front, side and roof each | to generate | `ingest ch01/halm/buildings` |
+| [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) | `grain_shed`, `guild_hall`, `house_a`, `house_b`, `ladder_house` — front, side and roof each | done | `ingest ch01/halm/buildings` |
 
 **Painted views** — the block-out the engine captured, repainted as a finished background and laid back over it. Nothing in the picture may move.
 
@@ -175,7 +183,7 @@ Tiles, props and buildings below are the sprite path, which a painted screen doe
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/hart_yard/props`](ch01/hart_yard/props/prompt.md) | `story/field/props/practice_post.png` | to generate | `ingest ch01/hart_yard/props` |
+| [`ch01/hart_yard/props`](ch01/hart_yard/props/prompt.md) | `story/field/props/practice_post.png` | done | `ingest ch01/hart_yard/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (with `halm`), `dirt` (with `halm`), `fence_top` (with `halm`), `fence_wood` (with `halm`), `grass` (with `halm`), `hedge` (with `halm`), `hedge_top` (with `halm`), `plank` (with `halm`), `wall_plaster` (with `halm`), `wall_stone` (with `halm`), `wall_stone_top` (with `halm`), `wall_timber` (with `halm`)
 
@@ -187,8 +195,8 @@ Shared buildings, drawn with another map so one id is never drawn twice: `ladder
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/north_grass/tiles`](ch01/north_grass/tiles/prompt.md) | `story/field/tiles/grass_tall.png`, `story/field/tiles/scree.png` | to generate | `ingest ch01/north_grass/tiles` |
-| [`ch01/north_grass/props`](ch01/north_grass/props/prompt.md) | `story/field/props/cave_mouth.png`, `story/field/props/slide_rubble.png` | to generate | `ingest ch01/north_grass/props` |
+| [`ch01/north_grass/tiles`](ch01/north_grass/tiles/prompt.md) | `story/field/tiles/grass_tall.png`, `story/field/tiles/scree.png` | done | `ingest ch01/north_grass/tiles` |
+| [`ch01/north_grass/props`](ch01/north_grass/props/prompt.md) | `story/field/props/cave_mouth.png`, `story/field/props/slide_rubble.png` | done | `ingest ch01/north_grass/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (with `halm`), `grass` (with `halm`), `old_road` (with `west_road`)
 
@@ -198,7 +206,7 @@ Shared props, drawn with another map so one id is never drawn twice: `ridge_rock
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/ridge_camp/props`](ch01/ridge_camp/props/prompt.md) | `story/field/props/bedroll.png`, `story/field/props/campfire.png`, `story/field/props/ridge_rock.png` | to generate | `ingest ch01/ridge_camp/props` |
+| [`ch01/ridge_camp/props`](ch01/ridge_camp/props/prompt.md) | `story/field/props/bedroll.png`, `story/field/props/campfire.png`, `story/field/props/ridge_rock.png` | done | `ingest ch01/ridge_camp/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (with `halm`), `grass` (with `halm`), `scree` (with `north_grass`)
 
@@ -206,8 +214,8 @@ Shared tiles, drawn with another map so one id is never drawn twice: `cliff` (wi
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/stair_shrine/tiles`](ch01/stair_shrine/tiles/prompt.md) | `story/field/tiles/stair_stone.png` | to generate | `ingest ch01/stair_shrine/tiles` |
-| [`ch01/stair_shrine/props`](ch01/stair_shrine/props/prompt.md) | `story/field/props/rubbing_stall.png`, `story/field/props/shrine_house.png`, `story/field/props/sitter.png`, `story/field/props/step_rope.png`, `story/field/props/stone_shelf.png`, `story/field/props/water_jar.png` | to generate | `ingest ch01/stair_shrine/props` |
+| [`ch01/stair_shrine/tiles`](ch01/stair_shrine/tiles/prompt.md) | `story/field/tiles/stair_stone.png` | done | `ingest ch01/stair_shrine/tiles` |
+| [`ch01/stair_shrine/props`](ch01/stair_shrine/props/prompt.md) | `story/field/props/rubbing_stall.png`, `story/field/props/shrine_house.png`, `story/field/props/sitter.png`, `story/field/props/step_rope.png`, `story/field/props/stone_shelf.png`, `story/field/props/water_jar.png` | done | `ingest ch01/stair_shrine/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `dirt` (with `halm`), `grass` (with `halm`), `stone` (with `halm`), `wall_plaster` (with `halm`)
 
@@ -229,8 +237,8 @@ Tiles, props and buildings below are the sprite path, which a painted screen doe
 
 | package | makes | status | after downloading |
 | --- | --- | --- | --- |
-| [`ch01/west_road/tiles`](ch01/west_road/tiles/prompt.md) | `story/field/tiles/old_road.png`, `story/field/tiles/river_bank.png`, `story/field/tiles/road.png`, `story/field/tiles/water.png` | to generate | `ingest ch01/west_road/tiles` |
-| [`ch01/west_road/props`](ch01/west_road/props/prompt.md) | `story/field/props/culvert.png`, `story/field/props/milestone.png` | to generate | `ingest ch01/west_road/props` |
+| [`ch01/west_road/tiles`](ch01/west_road/tiles/prompt.md) | `story/field/tiles/old_road.png`, `story/field/tiles/river_bank.png`, `story/field/tiles/road.png`, `story/field/tiles/water.png` | done | `ingest ch01/west_road/tiles` |
+| [`ch01/west_road/props`](ch01/west_road/props/prompt.md) | `story/field/props/culvert.png`, `story/field/props/milestone.png` | done | `ingest ch01/west_road/props` |
 
 Shared tiles, drawn with another map so one id is never drawn twice: `grass` (with `halm`)
 
@@ -245,7 +253,7 @@ cut apart into `story/panels/`. Talk and narration scenes need no art and are no
 
 | scene | folder | panels | status | after downloading |
 | --- | --- | --- | --- | --- |
-| `0150_the_road_west` | [`ch01/bridge/scenes/0150_the_road_west`](ch01/bridge/scenes/0150_the_road_west/prompt.md) | 6 | to generate | `ingest ch01/bridge/scenes/0150_the_road_west` |
+| `0150_the_road_west` | [`ch01/bridge/scenes/0150_the_road_west`](ch01/bridge/scenes/0150_the_road_west/prompt.md) | 6 | done | `ingest ch01/bridge/scenes/0150_the_road_west` |
 
 ### ch01 — halm
 
@@ -257,13 +265,13 @@ cut apart into `story/panels/`. Talk and narration scenes need no art and are no
 
 | scene | folder | panels | status | after downloading |
 | --- | --- | --- | --- | --- |
-| `0120_youre_not_ready` | [`ch01/hart_yard/scenes/0120_youre_not_ready`](ch01/hart_yard/scenes/0120_youre_not_ready/prompt.md) | 6 | to generate | `ingest ch01/hart_yard/scenes/0120_youre_not_ready` |
+| `0120_youre_not_ready` | [`ch01/hart_yard/scenes/0120_youre_not_ready`](ch01/hart_yard/scenes/0120_youre_not_ready/prompt.md) | 6 | done | `ingest ch01/hart_yard/scenes/0120_youre_not_ready` |
 
 ### ch01 — stair_shrine
 
 | scene | folder | panels | status | after downloading |
 | --- | --- | --- | --- | --- |
-| `0170_the_jar` | [`ch01/stair_shrine/scenes/0170_the_jar`](ch01/stair_shrine/scenes/0170_the_jar/prompt.md) | 5 | to generate | `ingest ch01/stair_shrine/scenes/0170_the_jar` |
+| `0170_the_jar` | [`ch01/stair_shrine/scenes/0170_the_jar`](ch01/stair_shrine/scenes/0170_the_jar/prompt.md) | 5 | done | `ingest ch01/stair_shrine/scenes/0170_the_jar` |
 
 ## Kept, but no longer generated
 

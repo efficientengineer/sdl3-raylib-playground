@@ -10,55 +10,55 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | --- | --- | --- | --- | --- |
 | `cliff` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `dirt` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
-| `fence_top` | tile | 64x64 | `tiles_fence_top-fence_wood-hedge-plus3` | yes, 64x64 |
-| `fence_wood` | tile | 64x64 | `tiles_fence_top-fence_wood-hedge-plus3` | yes, 64x64 |
+| `fence_top` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | yes, 64x64 |
+| `fence_wood` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | yes, 64x64 |
 | `grass` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
-| `grass_tall` | tile | 64x64 | `tiles_grass_tall-scree` | yes, 64x64 |
-| `hedge` | tile | 64x64 | `tiles_fence_top-fence_wood-hedge-plus3` | yes, 64x64 |
-| `hedge_top` | tile | 64x64 | `tiles_fence_top-fence_wood-hedge-plus3` | yes, 64x64 |
-| `old_road` | tile | 64x64 | `tiles_old_road-river_bank-road-plus1` | yes, 64x64 |
+| `grass_tall` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | yes, 64x64 |
+| `hedge` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | yes, 64x64 |
+| `hedge_top` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | yes, 64x64 |
+| `old_road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | yes, 64x64 |
 | `plank` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
-| `river_bank` | tile | 64x64 | `tiles_old_road-river_bank-road-plus1` | yes, 64x64 |
-| `road` | tile | 64x64 | `tiles_old_road-river_bank-road-plus1` | yes, 64x64 |
-| `scree` | tile | 64x64 | `tiles_grass_tall-scree` | yes, 64x64 |
-| `stair_stone` | tile | 64x64 | `tiles_stair_stone` | yes, 64x64 |
+| `river_bank` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | yes, 64x64 |
+| `road` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | yes, 64x64 |
+| `scree` | tile | 64x64 | `story/packages/ch01/north_grass/tiles` | yes, 64x64 |
+| `stair_stone` | tile | 64x64 | `story/packages/ch01/stair_shrine/tiles` | yes, 64x64 |
 | `stone` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
 | `wall_plaster` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
-| `wall_stone` | tile | 64x64 | `tiles_fence_top-fence_wood-hedge-plus3` | yes, 64x64 |
-| `wall_stone_top` | tile | 64x64 | `tiles_fence_top-fence_wood-hedge-plus3` | yes, 64x64 |
+| `wall_stone` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | yes, 64x64 |
+| `wall_stone_top` | tile | 64x64 | `story/packages/ch01/halm/tiles_2` | yes, 64x64 |
 | `wall_timber` | tile | 64x64 | `story/packages/ch01/halm/tiles` | yes, 64x64 |
-| `water` | tile | 64x64 | `tiles_old_road-river_bank-road-plus1` | yes, 64x64 |
+| `water` | tile | 64x64 | `story/packages/ch01/west_road/tiles` | yes, 64x64 |
 
 ## Props — alpha, 64 px to a map cell, standing on the bottom row
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
 | `barrel` | prop | 64x64 | `story/packages/ch01/halm/props` | yes, 58x61 |
-| `bedroll` | prop | 128x64 | `props_bedroll-campfire-ridge_rock` | yes, 113x55 |
-| `bridge_rail` | prop | 128x64 | `props_bridge_rail` | yes, 128x51 |
-| `campfire` | prop | 64x64 | `props_bedroll-campfire-ridge_rock` | yes, 64x57 |
+| `bedroll` | prop | 128x64 | `story/packages/ch01/ridge_camp/props` | yes, 113x55 |
+| `bridge_rail` | prop | 128x64 | `story/packages/ch01/bridge/props` | yes, 128x51 |
+| `campfire` | prop | 64x64 | `story/packages/ch01/ridge_camp/props` | yes, 64x57 |
 | `cart` | prop | 128x128 | `story/packages/ch01/halm/props` | yes, 127x128 |
-| `cave_mouth` | prop | 192x128 | `props_cave_mouth-slide_rubble` | yes, 192x123 |
-| `culvert` | prop | 192x128 | `props_culvert-milestone` | yes, 182x122 |
+| `cave_mouth` | prop | 192x128 | `story/packages/ch01/north_grass/props` | yes, 192x123 |
+| `culvert` | prop | 192x128 | `story/packages/ch01/west_road/props` | yes, 182x122 |
 | `fence` | prop | 128x64 | `story/packages/ch01/halm/props` | yes, 122x60 |
 | `grain_shed` | prop | 192x192 | `props_barrel-cart-fence-plus10` | yes, 186x192 |
 | `guild_hall` | prop | 256x192 | `props_barrel-cart-fence-plus10` | yes, 255x186 |
 | `house_a` | prop | 192x192 | `props_barrel-cart-fence-plus10` | yes, 177x185 |
 | `house_b` | prop | 128x192 | `props_barrel-cart-fence-plus10` | yes, 116x193 |
-| `milestone` | prop | 64x64 | `props_culvert-milestone` | yes, 49x64 |
-| `practice_post` | prop | 64x128 | `props_practice_post` | yes, 54x118 |
-| `ridge_rock` | prop | 192x128 | `props_bedroll-campfire-ridge_rock` | yes, 184x115 |
-| `rubbing_stall` | prop | 128x128 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 126x127 |
+| `milestone` | prop | 64x64 | `story/packages/ch01/west_road/props` | yes, 49x64 |
+| `practice_post` | prop | 64x128 | `story/packages/ch01/hart_yard/props` | yes, 54x118 |
+| `ridge_rock` | prop | 192x128 | `story/packages/ch01/ridge_camp/props` | yes, 184x115 |
+| `rubbing_stall` | prop | 128x128 | `story/packages/ch01/stair_shrine/props` | yes, 126x127 |
 | `scale_bench` | prop | 128x64 | `story/packages/ch01/halm/props` | yes, 117x60 |
-| `shrine_house` | prop | 192x128 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 188x126 |
+| `shrine_house` | prop | 192x128 | `story/packages/ch01/stair_shrine/props` | yes, 188x126 |
 | `sign` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 54x116 |
-| `sitter` | prop | 64x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 56x62 |
-| `slide_rubble` | prop | 192x128 | `props_cave_mouth-slide_rubble` | yes, 192x127 |
-| `step_rope` | prop | 64x192 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 20x194 |
-| `stone_shelf` | prop | 256x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 249x59 |
+| `sitter` | prop | 64x64 | `story/packages/ch01/stair_shrine/props` | yes, 56x62 |
+| `slide_rubble` | prop | 192x128 | `story/packages/ch01/north_grass/props` | yes, 192x127 |
+| `step_rope` | prop | 64x192 | `story/packages/ch01/stair_shrine/props` | yes, 20x194 |
+| `stone_shelf` | prop | 256x64 | `story/packages/ch01/stair_shrine/props` | yes, 249x59 |
 | `tree_a` | prop | 128x192 | `story/packages/ch01/halm/props` | yes, 127x186 |
 | `tree_b` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 53x136 |
-| `water_jar` | prop | 64x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 47x57 |
+| `water_jar` | prop | 64x64 | `story/packages/ch01/stair_shrine/props` | yes, 47x57 |
 | `well` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 62x122 |
 | `yard_wall` | prop | 192x128 | `story/packages/ch01/halm/props` | yes, 186x97 |
 
@@ -68,15 +68,15 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | --- | --- | --- | --- | --- |
 | `falke` | walker | 1024x1536 | `walker_falke` | yes, 1024x1536 |
 | `ottilie` | walker | 1024x1536 | `walker_ottilie` | yes, 1024x1536 |
-| `villager_a` | walker | 1024x1536 | `walker_villager_a` | yes, 1024x1536 |
-| `villager_b` | walker | 1024x1536 | `walker_villager_b` | yes, 1024x1536 |
+| `villager_a` | walker | 1024x1536 | `story/packages/cast/villager_a/walker` | yes, 1024x1536 |
+| `villager_b` | walker | 1024x1536 | `story/packages/cast/villager_b/walker` | yes, 1024x1536 |
 
 ## Buildings — opaque faces on map geometry: front stretched once across the front wall, side and roof seamless
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `grain_shed` | building | front 128 / side 128 / roof 64 | `buildings_grain_shed-guild_hall-house_a-plus2` | front, side, roof |
-| `guild_hall` | building | front 128 / side 128 / roof 64 | `buildings_grain_shed-guild_hall-house_a-plus2` | front, side, roof |
-| `house_a` | building | front 128 / side 128 / roof 64 | `buildings_grain_shed-guild_hall-house_a-plus2` | front, side, roof |
-| `house_b` | building | front 128 / side 128 / roof 64 | `buildings_grain_shed-guild_hall-house_a-plus2` | front, side, roof |
-| `ladder_house` | building | front 128 / side 128 / roof 64 | `buildings_grain_shed-guild_hall-house_a-plus2` | front, side, roof |
+| `grain_shed` | building | front 128 / side 128 / roof 64 | `story/packages/ch01/halm/buildings` | front, side, roof |
+| `guild_hall` | building | front 128 / side 128 / roof 64 | `story/packages/ch01/halm/buildings` | front, side, roof |
+| `house_a` | building | front 128 / side 128 / roof 64 | `story/packages/ch01/halm/buildings` | front, side, roof |
+| `house_b` | building | front 128 / side 128 / roof 64 | `story/packages/ch01/halm/buildings` | front, side, roof |
+| `ladder_house` | building | front 128 / side 128 / roof 64 | `story/packages/ch01/halm/buildings` | front, side, roof |

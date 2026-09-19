@@ -11,7 +11,8 @@ file is the part the art pipeline fixes so the engine can match it.
   `- desc:`. The art pipeline never changes a name, a size or a solid row. The one thing it writes
   back is a `- index:` line for an entry that has none, so the atlas position is recorded in the file
   the engine reads. An index already written is never moved.
-- `atlas.png` — 16 cells across, **128x128 each**, RGBA. Index 0 is the empty tile. A stamp of
+- `atlas.png` — 16 cells across, **128x128 each**, an **indexed PNG** on
+  `story/palette/master.hex` (PALETTE.md, D19): one byte a pixel, index 0 transparent. Index 0 is the empty tile. A stamp of
   `WxH` occupies a `WxH` rectangle of cells whose top-left is its index, row-major, and never wraps
   past the last column. A tile with `- frames: n` occupies `n` copies side by side starting at its
   index.
@@ -39,15 +40,19 @@ What the cut does to a slot, in order:
    cut into the tile: thin white lines all over the atlas, and a seam metric reading the white row.
 2. **Resample** the art area to exactly `cells x 128` — area-average going down, bilinear going
    up. Never nearest: at a non-integer ratio nearest drops whole columns and tears straight edges.
-3. **Key** the magenta by its cast, on a keyed entry only. Alpha stays **soft** — the engine filters
-   linearly — and the colour is un-matted at that alpha so no pink shows through the edge. An opaque
-   ground tile is never keyed; background showing inside one is a hole and is filled from the nearest
-   painted pixel.
+3. **Key** the magenta by its cast, on a keyed entry only, un-matting the colour so no pink shows
+   through the edge. Alpha is **hard** again (PALETTE.md, D19): the keying measures it softly, and
+   the palette step at the end turns anything under 0.5 into index 0 and anything above it into its
+   own nearest colour. An opaque ground tile is never keyed; background showing inside one is a hole
+   and is filled from the nearest painted pixel.
 4. **Scrub** what is left of the border: a near-white edge run, or a near-white edge pixel with no
    bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
-5. **Extrude** the silhouette two pixels outward under the transparency, so linear sampling at the
-   edge of a sprite never pulls in black or magenta.
-6. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
+   There is **no edge extrusion** any more. It existed so linear filtering at a silhouette would
+   pull clean colour rather than black or magenta; with an indexed atlas there is no colour under a
+   transparent texel to bleed, and the tile shader blends the four neighbours' *colormap colours*
+   with premultiplied alpha instead, index 0 counting as zero. The cells still have to come out
+   clean, which is what the scrub is for.
+5. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
    blending: the tile is *rolled* along each axis in turn, so its first and last line were adjacent
    lines of the drawing and the wrap is continuous by construction. The split is the **min-error**
    one of the middle third, so the join lands where the art is quietest rather than across a mortar
@@ -57,13 +62,18 @@ What the cut does to a slot, in order:
    other, never averaged, so nothing is blurred. The old `--heal-seams` cross-blend is gone: it
    removed the wrap error and left a soft ribbon at every border, which is what read on the phone as
    a faint grid over grass, dirt and gravel.
-7. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
+6. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
    `grass_flower`, `dirt`/`dirt_rut` are scattered through each other by the maps, so they must
    differ in detail and not in overall tone. Every variant after the first is shifted to the first's
    **mean Oklab lightness** and scaled to its **mean chroma** — an offset and a gain, so each pixel
    keeps its own distance from the mean and the drawing is untouched. Without it a 0.05 gap in L
    between `paving` and `paving_worn` made the square read as a checkerboard of pale and dark
    squares.
+7. **Palettise, last.** Every step above happens in full colour — the seamless roll, the tone match,
+   the un-matting — and only then is the whole atlas converted to `story/palette/master.hex`: exact
+   nearest in Oklab, **no dithering**, alpha hard at 0.5. Change the palette and nothing needs
+   redrawing: `./story_prompt.py palette build && ./story_prompt.py ingest --force` re-derives every
+   tile from the sheet archived in `story/sheets/`.
 
 Two numbers are printed for every ground tile. `wrap h/v` is the mean difference across the tile's
 own edges, and `border/interior gradient` is that compared with the texture's mean gradient on the
@@ -111,6 +121,7 @@ is not a straight line.
 `corner_in` is exactly the inverse of `corner_out` rotated 180 degrees, which is why three tiles cover
 a terrain instead of the forty-seven a full autotile needs.
 
-Alpha in a fringe is **soft** and the colour under it is clean, because the engine filters the atlas
-linearly rather than alpha-testing. The silhouette is extruded outward so there is no dark or pink
-halo at a fringe's ragged boundary.
+Alpha in a fringe is **hard** — one bit, index 0 or a colour — and the colour under the edge is clean,
+un-matted at the alpha the keying measured before it was hardened. A fringe's ragged boundary reads
+soft in game all the same, because the shader interpolates between four neighbouring texels'
+colormap colours with index 0 as transparent, rather than between the stored bytes.

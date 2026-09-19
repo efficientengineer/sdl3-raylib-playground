@@ -15,18 +15,18 @@ Style blocks used from `story/STYLE.md`: map_header, map_rendering, map_negative
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/refs/style.png`
-2. `story/field/props/tree_a.png`
-3. `story/field/props/tree_b.png`
-4. `story/field/props/barrel.png`
-5. `story/field/props/cart.png`
-6. `story/field/props/fence.png`
+2. `story/field/buildings/house_b_front.png`
+3. `story/field/buildings/house_a_front.png`
+4. `story/field/buildings/ladder_house_front.png`
+5. `story/field/buildings/grain_shed_front.png`
+6. `story/field/buildings/guild_hall_front.png`
 
 - Image 1: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
-- Image 2: The tree a as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
-- Image 3: The tree b as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
-- Image 4: The barrel as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
-- Image 5: The cart as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
-- Image 6: The fence as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
+- Image 2: The house b as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
+- Image 3: The house a as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
+- Image 4: The ladder house as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
+- Image 5: The grain shed as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
+- Image 6: The guild hall as it is drawn in this game. It belongs in this place; keep its design, colours and proportions.
 
 ## 2. Message 1 — paste this and get the map (1536x1024)
 

@@ -115,17 +115,30 @@ for d in "$SCRIPT_DIR"/story/field/tilesets/*/; do
     set_name="$(basename "$d")"
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/tilesets/$set_name"
     HAVE_T="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets/$set_name && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
-    for f in "$d"atlas.png "$d"tiles.md; do
+    for f in "$d"atlas.png "$d"atlas.json "$d"tiles.md; do
         [ -f "$f" ] || continue
         n="$(basename "$f")"
         sz="$(stat -f %z "$f")"
-        if [ "$n" = "tiles.md" ] || ! echo "$HAVE_T" | grep -qx "$n $sz"; then
+        if [ "$n" = "tiles.md" ] || [ "$n" = "atlas.json" ] || ! echo "$HAVE_T" | grep -qx "$n $sz"; then
             echo "  tileset $set_name/$n"
             "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
             "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/tilesets/$set_name/$n && rm /data/local/tmp/$n"
         fi
     done
 done
+
+# The palette (PALETTE.md / D19): the master colours, the colormap the shader reads its light from and
+# the cycle list. Small files that are rewritten in place, so they always go.
+if [ -d "$SCRIPT_DIR/story/palette" ]; then
+    "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/palette"
+    for n in master.hex master.pal.png colormap.png colormap.json cycles.md; do
+        f="$SCRIPT_DIR/story/palette/$n"
+        [ -f "$f" ] || continue
+        echo "  palette $n"
+        "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
+        "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/palette/$n && rm /data/local/tmp/$n"
+    done
+fi
 
 # --pull-views: bring the in-game "Capture view" output back into the repo for the painter.
 if [ "$1" = "--pull-views" ]; then

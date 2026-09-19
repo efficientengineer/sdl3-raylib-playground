@@ -2,19 +2,20 @@
 
 ## What exists already
 
-0 of 5 panels have been cut into `story/panels/` already.
+5 of 5 panels have been cut into `story/panels/` already.
 
-- `story/panels/0170_the_jar_p1_establishing_wide.png` — missing
-- `story/panels/0170_the_jar_p2_full_body_reveal.png` — missing
-- `story/panels/0170_the_jar_p3_object_insert.png` — missing
-- `story/panels/0170_the_jar_p4_eyes_slit.png` — missing
-- `story/panels/0170_the_jar_p5_two_shot.png` — missing
+- `story/panels/0170_the_jar_p1_establishing_wide.png` — **cut already**
+- `story/panels/0170_the_jar_p2_full_body_reveal.png` — **cut already**
+- `story/panels/0170_the_jar_p3_object_insert.png` — **cut already**
+- `story/panels/0170_the_jar_p4_eyes_slit.png` — **cut already**
+- `story/panels/0170_the_jar_p5_two_shot.png` — **cut already**
 
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/refs/style.png`
-2. `story/refs/bron.png`
-3. `story/refs/lyra.png`
+2. `story/refs/shrinewoman.png`
+3. `story/refs/bron.png`
+4. `story/refs/lyra.png`
 
 ## 2. Paste this prompt exactly
 
@@ -24,8 +25,9 @@ Create ONE image: a shot sheet of 5 separate comic panels. Canvas: portrait, 144
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
-Image 2: CHARACTER reference for Falke. Keep the face, hair, outfit, and colors identical to this image in every panel Falke appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
-Image 3: CHARACTER reference for Ottilie. Keep the face, hair, outfit, and colors identical to this image in every panel Ottilie appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 2: CHARACTER reference for Shrinewoman. Keep the face, hair, outfit, and colors identical to this image in every panel Shrinewoman appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 3: CHARACTER reference for Falke. Keep the face, hair, outfit, and colors identical to this image in every panel Falke appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 4: CHARACTER reference for Ottilie. Keep the face, hair, outfit, and colors identical to this image in every panel Ottilie appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
 
 SHEET LAYOUT: This is a production shot sheet, not a finished comic page: the panels will be cut apart afterwards. Solid pure black background (#000000). Every panel is a separate rectangle with a thin white border and a 1-pixel dark inner line. Panels never overlap, never touch each other, and never touch the edge of the image: no panel covers any part of another, not even a corner, and all four corners and all four border lines of every panel are fully visible. If space is tight, draw the panels smaller rather than closer. Leave a gutter of pure black at least 5 percent of the image width between neighbouring panels and around the outside. The panels have clearly different sizes and proportions and sit at the stated positions; this is not an even grid and the panels do not fill the image. Nothing is drawn in the gutters: no numbers, labels, captions, arrows, or decorations. Each panel is a complete, self-contained picture of a single static camera shot.
 

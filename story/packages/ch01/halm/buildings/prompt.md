@@ -2,28 +2,29 @@
 
 ## What exists already
 
-0 of 15 files in this package have been cut already.
+15 of 15 files in this package have been cut already.
 
-- slot 1 `story/field/buildings/grain_shed_front.png` — missing
-- slot 2 `story/field/buildings/grain_shed_side.png` — missing
-- slot 3 `story/field/buildings/grain_shed_roof.png` — missing
-- slot 4 `story/field/buildings/guild_hall_front.png` — missing
-- slot 5 `story/field/buildings/guild_hall_side.png` — missing
-- slot 6 `story/field/buildings/guild_hall_roof.png` — missing
-- slot 7 `story/field/buildings/house_a_front.png` — missing
-- slot 8 `story/field/buildings/house_a_side.png` — missing
-- slot 9 `story/field/buildings/house_a_roof.png` — missing
-- slot 10 `story/field/buildings/house_b_front.png` — missing
-- slot 11 `story/field/buildings/house_b_side.png` — missing
-- slot 12 `story/field/buildings/house_b_roof.png` — missing
-- slot 13 `story/field/buildings/ladder_house_front.png` — missing
-- slot 14 `story/field/buildings/ladder_house_side.png` — missing
-- slot 15 `story/field/buildings/ladder_house_roof.png` — missing
+- slot 1 `story/field/buildings/grain_shed_front.png` — **exists**
+- slot 2 `story/field/buildings/grain_shed_side.png` — **exists**
+- slot 3 `story/field/buildings/grain_shed_roof.png` — **exists**
+- slot 4 `story/field/buildings/guild_hall_front.png` — **exists**
+- slot 5 `story/field/buildings/guild_hall_side.png` — **exists**
+- slot 6 `story/field/buildings/guild_hall_roof.png` — **exists**
+- slot 7 `story/field/buildings/house_a_front.png` — **exists**
+- slot 8 `story/field/buildings/house_a_side.png` — **exists**
+- slot 9 `story/field/buildings/house_a_roof.png` — **exists**
+- slot 10 `story/field/buildings/house_b_front.png` — **exists**
+- slot 11 `story/field/buildings/house_b_side.png` — **exists**
+- slot 12 `story/field/buildings/house_b_roof.png` — **exists**
+- slot 13 `story/field/buildings/ladder_house_front.png` — **exists**
+- slot 14 `story/field/buildings/ladder_house_side.png` — **exists**
+- slot 15 `story/field/buildings/ladder_house_roof.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/packages/ch01/halm/buildings/template.png`
 2. `story/refs/style.png`
+3. `story/palette/master_swatch.png`
 
 ## 2. Paste this prompt exactly
 
@@ -34,6 +35,7 @@ Create ONE image: the attached template with all 15 numbered slots filled in. Ca
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.
 Image 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
+Image 3: the game's COLOUR PALETTE, one material ramp a row: use only these colours.
 
 TEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.
 

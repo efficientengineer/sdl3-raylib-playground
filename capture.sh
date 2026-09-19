@@ -14,24 +14,34 @@
 #   ./capture.sh --tiles halm --no-walkers      -> nobody in it
 #   ./capture.sh --tiles halm 2                 -> a different scale (1..4)
 #
+# Light (PALETTE.md / D19) — the same colormap the phone uses, so a night shot on the Mac is the
+# night the owner will see:
+#
+#   ./capture.sh --tiles halm --light night:0.35            -> build_desktop/tiles_halm_night.png
+#   ./capture.sh --tiles halm --light night:0.35 --lantern 5  -> ..._night_lantern.png
+#
 set -e
 
 if [ "$1" = "--tiles" ]; then
     MAP=${2:-halm}
     shift 2 || true
-    WHOLE=0; NOWALK=0; SCALE=3
-    for a in "$@"; do
-        case "$a" in
+    WHOLE=0; NOWALK=0; SCALE=3; LIGHT=""; LANTERN=""; SUFFIX=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
             --whole) WHOLE=1 ;;
             --no-walkers) NOWALK=1 ;;
-            [0-9]*) SCALE="$a" ;;
+            --light) LIGHT="$2"; SUFFIX="${SUFFIX}_${2%%:*}"; shift ;;
+            --lantern) LANTERN="$2"; SUFFIX="${SUFFIX}_lantern"; shift ;;
+            [0-9]*) SCALE="$1" ;;
         esac
+        shift
     done
     ROOT="$(cd "$(dirname "$0")" && pwd)"
-    OUT="$ROOT/build_desktop/tiles_${MAP}.png"
+    OUT="$ROOT/build_desktop/tiles_${MAP}${SUFFIX}.png"
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
     cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -2
     cd "$ROOT"
+    TILE_LIGHT="$LIGHT" TILE_LANTERN="$LANTERN" \
     TILE_CAPTURE_WHOLE="$WHOLE" TILE_CAPTURE_NO_WALKERS="$NOWALK" \
         TILE_CAPTURE="$MAP:$SCALE:$OUT" "$ROOT/build_desktop/quest_glory" || true
     if [ -f "$OUT" ]; then

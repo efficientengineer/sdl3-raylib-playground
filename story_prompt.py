@@ -52,7 +52,19 @@
                                                src/field_text.h from story/field/text.md, for the game
                                                (scenes whose panels are not all generated yet are skipped)
 
-  ./story_prompt.py names                      the {{TOKEN}} table from story/v3/NAMES.md, and every token
+  Palette (PALETTE.md, D19) — 256 colours, one byte a pixel, and lighting as table rows.
+  ./story_prompt.py palette build              fit story/palette/master.* to the raw returns in
+                                               story/sheets + story/refs (cutscene panels excluded:
+                                               they get their own palette per scene at slice time),
+                                               then the colormap and cycles.md
+  ./story_prompt.py palette apply <files> [--palette master|<hex>]
+                                               convert anything by hand to an indexed PNG
+  ./story_prompt.py palette check              every shipped image is indexed and holds only its own
+                                               palette (also run by `check --all`)
+  ./story_prompt.py palette colormap           story/palette/colormap.png + .json: day/dusk/night/
+                                               flash/poison/stone x 32 light levels
+
+  ./story_prompt.py names                    the {{TOKEN}} table from story/v3/NAMES.md, and every token
                                                used in the story that has no row in it (exit 1 if any)
 
   ./story_prompt.py stats [--all]              per chapter: scenes by type, panels, dialogue lines, optional
@@ -83,11 +95,15 @@ Names are tokens (DECISIONS.md D13): the story text says {{HERO}}, story/v3/NAME
 and ChatGPT only ever see real names and a rename is one line. The files stay tokenised.
 Stdlib only.
 """
+import bisect
 import json
+import math
+import random
 import re
 import struct
 import subprocess
 import sys
+import time
 import zlib
 from pathlib import Path
 
@@ -837,6 +853,8 @@ def cmd_check_build(args, build):
                 print(f"ERROR: {e}", file=sys.stderr)
             print(f"{tmap_path(mp).name}: " + (f"{len(terr)} error(s)" if terr else "ok"))
             failed += 1 if terr else 0
+        perr = cmd_palette_check([])                      # D19: every shipped image is indexed art
+        failed += 1 if perr else 0
     if failed:
         sys.exit(f"story_prompt: {failed} scene(s) rejected. Fix the scene file; do not bypass the rules.")
 
@@ -1191,6 +1209,9 @@ def cmd_refsheet(args):
         die(f"usage: refsheet <Name>. Known: {', '.join(c['name'] for c in cast.values())}")
     c, b, warn = cast[args[0].lower()], style["blocks"], []
     attach = attachments(style, cast, [], warn)
+    pa = palette_attachment(warn)                        # D19: the sheet's colours are the game's
+    if pa:
+        attach.append(pa)
     L = [f"Create ONE image: a character reference sheet for {c['name']}. Canvas: landscape, 1536x1024.",
          b["header"], ""]
     if attach:
@@ -1232,17 +1253,21 @@ def read_png(path):
         except (OSError, subprocess.CalledProcessError):
             die(f"{path.name} is not a PNG and sips could not convert it. Convert it to PNG first.")
         data = tmp.read_bytes()
-    pos, idat, w = 8, b"", 0
+    pos, idat, w, plte, trns = 8, b"", 0, b"", b""
     while pos < len(data):
         n, kind = struct.unpack(">I4s", data[pos:pos + 8])
         body = data[pos + 8:pos + 8 + n]
         pos += 12 + n
         if kind == b"IHDR":
             w, h, depth, ctype, _, _, interlace = struct.unpack(">IIBBBBB", body)
-            if depth != 8 or ctype not in (2, 6) or interlace:
-                die(f"{path.name}: unsupported PNG (need 8-bit RGB/RGBA, non-interlaced). "
+            if depth != 8 or ctype not in (0, 2, 3, 6) or interlace:
+                die(f"{path.name}: unsupported PNG (need 8-bit grey/RGB/RGBA/indexed, non-interlaced). "
                     f"Fix with: sips -s format png -s formatOptions default {path.name} --out fixed.png")
-            ch = 3 if ctype == 2 else 4
+            ch = {0: 1, 2: 3, 3: 1, 6: 4}[ctype]
+        elif kind == b"PLTE":
+            plte = body
+        elif kind == b"tRNS":
+            trns = body
         elif kind == b"IDAT":
             idat += body
     raw, stride = zlib.decompress(idat), w * ch
@@ -1268,6 +1293,17 @@ def read_png(path):
                 line[i] = (line[i] + (a if pa <= pb and pa <= pc else bb if pb <= pc else c)) & 255
         rows.append(line)
         prev = line
+    if ctype == 3:                                   # an indexed PNG the palette step wrote: expand it
+        alpha = list(trns) + [255] * (len(plte) // 3 - len(trns))
+        out = []
+        for line in rows:
+            o = bytearray()
+            for i in line:
+                o += plte[i * 3:i * 3 + 3] + bytes((alpha[i],))
+            out.append(o)
+        return w, h, 4, out
+    if ctype == 0:
+        return w, h, 3, [bytearray(b for v in line for b in (v, v, v)) for line in rows]
     return w, h, ch, rows
 
 
@@ -1375,6 +1411,8 @@ def cmd_slice(args):
         got, exp = (x1 - x0) / (y1 - y0), SHAPE_ASPECT[p["shape"]]
         note = "" if 0.6 * exp <= got <= 1.6 * exp else f"   <-- aspect {got:.2f}, expected about {exp:.1f} ({p['shape']}): check the order"
         print(f"  wrote {out.relative_to(ROOT.parent)}  {x1-x0}x{y1-y0}{note}")
+    for scene in sorted({p["scene"] for p in want}):      # D19: a scene's panels get their own palette
+        print("  " + palettise_scene(scene))
 
 
 def portrait_from_ref(key, c):
@@ -1393,7 +1431,7 @@ def portrait_from_ref(key, c):
     x0, y0, x1, y1 = x0 + t, y0 + t, x1 - t, y1 - t
     PORTRAITS.mkdir(exist_ok=True)
     out = PORTRAITS / f"{key}.png"
-    write_png(out, x1 - x0, y1 - y0, ch, [rows[y][x0 * ch:x1 * ch] for y in range(y0, y1)])
+    ship_png(out, x1 - x0, y1 - y0, ch, [rows[y][x0 * ch:x1 * ch] for y in range(y0, y1)])
     return True, f"wrote {out.relative_to(ROOT.parent)}  {x1-x0}x{y1-y0}  (ships as portrait_{key}.png)"
 
 
@@ -2054,7 +2092,27 @@ def field_attachments(style, template, ref, warn):
         warn.append(f"no style reference at {style['refs'].get('style')}; the prompt text carries the style alone")
     if ref:
         out.append(ref)
+    pa = palette_attachment(warn)
+    if pa:
+        out.append(pa)
     return out
+
+
+PALETTE_NOTE = ("the game's COLOUR PALETTE, one material ramp a row: use only these colours.")
+
+
+def palette_attachment(warn=None):
+    """The master swatch, attached LAST to every package whose art shares the field's palette (D19).
+
+    Last on purpose: it is not a reference for what to draw, it is the set of colours to draw it in,
+    and a generator takes the last image as the most recent instruction. A package drawn before this
+    existed keeps working — the slots do not move, only the prompt gains a line."""
+    if not MASTER_SWATCH.exists():
+        if warn is not None:
+            warn.append(f"no palette swatch at {MASTER_SWATCH.relative_to(ROOT.parent)}; "
+                        f"run: ./story_prompt.py palette build")
+        return None
+    return (MASTER_SWATCH, PALETTE_NOTE)
 
 
 TEMPLATE_RULES = (
@@ -3400,7 +3458,6 @@ def cut_walker(data, slots, rows, w, h, ch, sx, sy, fringe=0):
                 continue
             dx = (OW - b[2]) // 2 - b[0]
             frames[(r, c)] = shift_frame(frames[(r, c)], OW, OH, dx, dy)
-            extrude_edges(frames[(r, c)], OW, OH)
             nb = body_bounds(frames[(r, c)], OW, OH)
             report.append(f"    {WALK_FACINGS[r]} {c}: bbox {b[2]}x{b[3]} at {b[0]},{b[1]} "
                           f"-> {nb[0]},{nb[1]} (dx {dx:+d}, dy {dy:+d})")
@@ -3411,7 +3468,7 @@ def cut_walker(data, slots, rows, w, h, ch, sx, sy, fringe=0):
         for k in range(OH):
             sheet[oy + k][ox * 4:(ox + OW) * 4] = px[k]
     out = ROOT.parent / data["out"]
-    write_png(out, OW * 4, OH * 4, 4, sheet)
+    ship_png(out, OW * 4, OH * 4, 4, sheet)
     print(f"  16 frames of {OW}x{OH} -> {out.relative_to(ROOT.parent)}  {OW * 4}x{OH * 4} "
           f"(rows {', '.join(WALK_FACINGS)})"
           f"{check_alpha(sheet, OW * 4, OH * 4, out)}")
@@ -3478,7 +3535,7 @@ def cmd_cut(args):
             if ch == 4:
                 px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
             out = ROOT.parent / s["out"]
-            write_png(out, tw_, th_, 3, px)
+            ship_png(out, tw_, th_, 3, px)
             what = f"{s['id']} {s['face']}" if s.get("face") else s["id"]
             print(f"  slot {s['n']} {what}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  {tw_}x{th_}")
     elif kind == "props":
@@ -3497,7 +3554,7 @@ def cmd_cut(args):
             nw, nh = max(1, round(cw * k)), max(1, round(chh * k))
             px = resize_nn(px, cw, chh, 4, nw, nh)
             out = ROOT.parent / s["out"]
-            write_png(out, nw, nh, 4, px)
+            ship_png(out, nw, nh, 4, px)
             print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> trimmed {cw}x{chh} -> "
                   f"{out.relative_to(ROOT.parent)}  {nw}x{nh}{check_alpha(px, nw, nh, out)}")
     else:
@@ -4201,7 +4258,8 @@ file is the part the art pipeline fixes so the engine can match it.
   `- desc:`. The art pipeline never changes a name, a size or a solid row. The one thing it writes
   back is a `- index:` line for an entry that has none, so the atlas position is recorded in the file
   the engine reads. An index already written is never moved.
-- `atlas.png` — {cols} cells across, **{cell}x{cell} each**, RGBA. Index 0 is the empty tile. A stamp of
+- `atlas.png` — {cols} cells across, **{cell}x{cell} each**, an **indexed PNG** on
+  `story/palette/master.hex` (PALETTE.md, D19): one byte a pixel, index 0 transparent. Index 0 is the empty tile. A stamp of
   `WxH` occupies a `WxH` rectangle of cells whose top-left is its index, row-major, and never wraps
   past the last column. A tile with `- frames: n` occupies `n` copies side by side starting at its
   index.
@@ -4229,15 +4287,19 @@ What the cut does to a slot, in order:
    cut into the tile: thin white lines all over the atlas, and a seam metric reading the white row.
 2. **Resample** the art area to exactly `cells x {cell}` — area-average going down, bilinear going
    up. Never nearest: at a non-integer ratio nearest drops whole columns and tears straight edges.
-3. **Key** the magenta by its cast, on a keyed entry only. Alpha stays **soft** — the engine filters
-   linearly — and the colour is un-matted at that alpha so no pink shows through the edge. An opaque
-   ground tile is never keyed; background showing inside one is a hole and is filled from the nearest
-   painted pixel.
+3. **Key** the magenta by its cast, on a keyed entry only, un-matting the colour so no pink shows
+   through the edge. Alpha is **hard** again (PALETTE.md, D19): the keying measures it softly, and
+   the palette step at the end turns anything under 0.5 into index 0 and anything above it into its
+   own nearest colour. An opaque ground tile is never keyed; background showing inside one is a hole
+   and is filled from the nearest painted pixel.
 4. **Scrub** what is left of the border: a near-white edge run, or a near-white edge pixel with no
    bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
-5. **Extrude** the silhouette two pixels outward under the transparency, so linear sampling at the
-   edge of a sprite never pulls in black or magenta.
-6. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
+   There is **no edge extrusion** any more. It existed so linear filtering at a silhouette would
+   pull clean colour rather than black or magenta; with an indexed atlas there is no colour under a
+   transparent texel to bleed, and the tile shader blends the four neighbours' *colormap colours*
+   with premultiplied alpha instead, index 0 counting as zero. The cells still have to come out
+   clean, which is what the scrub is for.
+5. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
    blending: the tile is *rolled* along each axis in turn, so its first and last line were adjacent
    lines of the drawing and the wrap is continuous by construction. The split is the **min-error**
    one of the middle third, so the join lands where the art is quietest rather than across a mortar
@@ -4247,13 +4309,18 @@ What the cut does to a slot, in order:
    other, never averaged, so nothing is blurred. The old `--heal-seams` cross-blend is gone: it
    removed the wrap error and left a soft ribbon at every border, which is what read on the phone as
    a faint grid over grass, dirt and gravel.
-7. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
+6. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
    `grass_flower`, `dirt`/`dirt_rut` are scattered through each other by the maps, so they must
    differ in detail and not in overall tone. Every variant after the first is shifted to the first's
    **mean Oklab lightness** and scaled to its **mean chroma** — an offset and a gain, so each pixel
    keeps its own distance from the mean and the drawing is untouched. Without it a 0.05 gap in L
    between `paving` and `paving_worn` made the square read as a checkerboard of pale and dark
    squares.
+7. **Palettise, last.** Every step above happens in full colour — the seamless roll, the tone match,
+   the un-matting — and only then is the whole atlas converted to `story/palette/master.hex`: exact
+   nearest in Oklab, **no dithering**, alpha hard at 0.5. Change the palette and nothing needs
+   redrawing: `./story_prompt.py palette build && ./story_prompt.py ingest --force` re-derives every
+   tile from the sheet archived in `story/sheets/`.
 
 Two numbers are printed for every ground tile. `wrap h/v` is the mean difference across the tile's
 own edges, and `border/interior gradient` is that compared with the texture's mean gradient on the
@@ -4301,9 +4368,10 @@ is not a straight line.
 `corner_in` is exactly the inverse of `corner_out` rotated 180 degrees, which is why three tiles cover
 a terrain instead of the forty-seven a full autotile needs.
 
-Alpha in a fringe is **soft** and the colour under it is clean, because the engine filters the atlas
-linearly rather than alpha-testing. The silhouette is extruded outward so there is no dark or pink
-halo at a fringe's ragged boundary.
+Alpha in a fringe is **hard** — one bit, index 0 or a colour — and the colour under the edge is clean,
+un-matted at the alpha the keying measured before it was hardened. A fringe's ragged boundary reads
+soft in game all the same, because the shader interpolates between four neighbouring texels'
+colormap colours with index 0 as transparent, rather than between the stored bytes.
 """
 
 
@@ -4846,7 +4914,11 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=True, snap=
         else:
             px = key_magenta(art, tw, th, ch)
             scrubbed += scrub_border(px, tw, th, 4, True, ring)
-            extrude_edges(px, tw, th)
+            # No edge extrusion any more (D19): alpha is hard and the atlas holds indices, so there
+            # is no colour under a transparent texel to bleed into. What the bleed was for — linear
+            # filtering pulling background through the silhouette — the tile shader now does by
+            # blending the four neighbours' colormap COLOURS with premultiplied alpha, index 0 being
+            # zero. The cells still have to come out clean, which is what the scrub above is for.
         cut.append((px, tw, th, s))
     if scrubbed:
         print(f"  border scrub: {scrubbed} white edge-run pixel(s) removed")
@@ -4896,7 +4968,8 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=True, snap=
 
     ap = atlas_path(setname)
     ap.parent.mkdir(parents=True, exist_ok=True)
-    write_png(ap, ATLAS_COLS * ATLAS_CELL, len(atlas), 4, atlas)
+    pal, pidx = master_palette(), PalIndex(master_palette())
+    ship_png(ap, ATLAS_COLS * ATLAS_CELL, len(atlas), 4, atlas, pal, pidx)
     strip = write_cut_sheet(setname, data["sheet"], cut)
     for l in lines:
         print(l)
@@ -4904,7 +4977,7 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=True, snap=
           f"({len(slots)} entries placed), {strip.relative_to(ROOT.parent)}")
     if small is not None:
         sp = ap.with_name("atlas32.png")
-        write_png(sp, ATLAS_COLS * TSET_TILE, len(small), 4, small)
+        ship_png(sp, ATLAS_COLS * TSET_TILE, len(small), 4, small, pal, pidx)
         print(f"  -> {sp.relative_to(ROOT.parent)}  {ATLAS_COLS * TSET_TILE}x{len(small)} (--snap32)")
     write_atlas_json(setname, entries)
 
@@ -4932,7 +5005,7 @@ def write_cut_sheet(setname, sheet, cut):
         out += band
     p = cut_sheet_path(setname, sheet)
     p.parent.mkdir(parents=True, exist_ok=True)
-    write_png(p, W, len(out), 4, out)
+    ship_png(p, W, len(out), 4, out)                     # the receipt ships too, so it is checked too
     return p
 
 
@@ -6970,6 +7043,883 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     (PACKAGES / "README.md").write_text("\n".join(L))
 
 
+# ───────────────────────── Palette (D19): 256 colours, one byte a pixel ─────────────────────────
+#
+# PALETTE.md is the contract. Everything the game ships is an indexed PNG (colour type 3) drawn from
+# one of two palettes: the master, shared by everything that can be on screen together in the field,
+# and a per-scene palette for cutscene panels, which are never lit and need their own skies.
+#
+# Index 0 is transparent, 1 is pure black, 2 is pure white, and the other 253 are material ramps
+# (variable length) plus the corpus colours the ramps serve worst. A ramp does not spend slots on
+# near-black or near-white — that is what 1 and 2 are for — its shadows rotate toward blue-violet and
+# its highlights toward yellow, because a ramp that is a straight line through Oklab goes muddy the
+# moment the colormap darkens it.
+
+PALETTE_DIR = ROOT / "palette"
+MASTER_HEX = PALETTE_DIR / "master.hex"
+MASTER_JSON = PALETTE_DIR / "master.json"
+MASTER_SWATCH = PALETTE_DIR / "master_swatch.png"
+MASTER_PAL_PNG = PALETTE_DIR / "master.pal.png"
+COLORMAP_PNG = PALETTE_DIR / "colormap.png"
+COLORMAP_JSON = PALETTE_DIR / "colormap.json"
+CYCLES_MD = PALETTE_DIR / "cycles.md"
+PALETTE_VERSION = 1
+PAL_SIZE = 256
+PAL_TRANSPARENT, PAL_BLACK, PAL_WHITE = 0, 1, 2
+PAL_FREE = PAL_SIZE - 3               # 253 colours the build gets to choose
+MERGE_DE = 0.015                      # two palette entries this close in Oklab are one colour
+LEVELS = 32                           # light levels a colormap table carries
+
+# The material families. (name, hue anchor in Oklab degrees or None for a neutral, class) — the class
+# sets how many slots the family may have, and the corpus's own pixel share distributes the class
+# budget inside those bounds. "long" is for the materials a whole map is made of, where a missing
+# step reads as a band; "short" is for a hue that turns up on one object.
+RAMP_CLASSES = {"long": (16, 24, 104), "med": (10, 12, 50), "short": (6, 8, 24)}
+RAMP_FAMILIES = [
+    ("roof red / brick",             32,   "long"),
+    ("orange / terracotta (hair)",   45,   "med"),
+    ("skin",                         57,   "long"),
+    ("wood",                         68,   "long"),
+    ("earth / dirt",                 78,   "long"),
+    ("gold / blond",                 90,   "med"),
+    ("olive / dry grass",            108,  "short"),
+    ("foliage green (warm)",         135,  "long"),
+    ("foliage green (cool)",         158,  "long"),
+    ("teal / shallow water",         205,  "short"),
+    ("sky / cyan",                   238,  "med"),
+    ("water blue / metal",           262,  "med"),
+    ("purple / shadow",              300,  "short"),
+    ("neutral warm (plaster, cloth)", None, "med"),
+    ("neutral cool (stone, steel)",   None, "long"),
+]
+NEUTRAL_C = 0.030                     # chroma under this is a neutral, not a hue
+RAMP_LO, RAMP_HI = 0.16, 0.93         # a ramp's lightness range: black and white are indices 1 and 2
+SHADOW_HUE, HILITE_HUE = 295.0, 95.0  # shadows rotate toward blue-violet, highlights toward yellow
+
+# Where shipped art lives. `palette check` walks these; everything in them must be an indexed PNG.
+SHIPPED_MASTER = ("field/tilesets", "field/walkers", "field/props", "field/tiles",
+                  "field/buildings", "portraits")
+SHIPPED_SCENE = "panels"
+
+
+# ── the hex file ──
+
+def read_hex(path):
+    """[(r, g, b)] from a '# version N' hex file. The version line is the palette's identity."""
+    if not Path(path).exists():
+        die(f"{Path(path)} not found. Build it with: ./story_prompt.py palette build")
+    cols, ver = [], None
+    for line in Path(path).read_text().splitlines():
+        line = line.strip()
+        if line.startswith("#") and not re.fullmatch(r"#[0-9a-fA-F]{6}", line):
+            m = re.match(r"#\s*version\s+(\d+)", line)
+            if m:
+                ver = int(m.group(1))
+            continue
+        if not line:
+            continue
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", line):
+            die(f"{Path(path).name}: '{line}' is not a #rrggbb colour")
+        cols.append(tuple(int(line[i:i + 2], 16) for i in (1, 3, 5)))
+    if ver is None:
+        die(f"{Path(path).name} has no '# version N' first line; it is not a palette this tool wrote")
+    if len(cols) != PAL_SIZE:
+        die(f"{Path(path).name} holds {len(cols)} colours, not {PAL_SIZE}")
+    return cols
+
+
+def write_hex(path, pal, version=PALETTE_VERSION):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"# version {version}\n" + "".join("#%02x%02x%02x\n" % tuple(c) for c in pal))
+
+
+_MASTER = None
+
+
+def master_palette():
+    global _MASTER
+    if _MASTER is None:
+        _MASTER = read_hex(MASTER_HEX)
+    return _MASTER
+
+
+def scene_hex(scene):
+    return PANELS / f"{scene}.hex"
+
+
+# ── exact nearest colour in Oklab ──
+
+class PalIndex:
+    """Nearest palette index for an sRGB colour, exact, in Oklab.
+
+    Exact and fast enough to be the last step of every cut: the palette is sorted by lightness, and
+    |dL| is a lower bound on the distance, so a scan outward from the query's lightness stops as soon
+    as the lightness gap alone exceeds the best distance so far. Two dozen candidates out of 253 is
+    typical. Every unique colour in an image is looked up once and cached — a 1.5 MP sheet holds a
+    few hundred thousand of them, so the cache is what keeps this in seconds rather than minutes."""
+
+    def __init__(self, pal):
+        self.pal = list(pal)
+        self.labs = [_to_oklab(*c) for c in self.pal]
+        self.order = sorted(range(1, len(self.pal)), key=lambda i: self.labs[i][0])
+        self.Ls = [self.labs[i][0] for i in self.order]
+        self.cache = {}
+        self.probes = 0
+        self.lookups = 0
+
+    def of(self, r, g, b):
+        k = (r << 16) | (g << 8) | b
+        got = self.cache.get(k)
+        if got is not None:
+            return got
+        L, A, B = _to_oklab(r, g, b)
+        order, Ls, labs, n = self.order, self.Ls, self.labs, len(self.order)
+        lo = bisect.bisect_left(Ls, L)
+        hi, best, bd = lo, order[lo if lo < n else n - 1], 1e9
+        while True:
+            moved = False
+            if hi < n:
+                d = Ls[hi] - L
+                if d * d < bd:
+                    i = order[hi]
+                    q = labs[i]
+                    dd = (L - q[0]) ** 2 + (A - q[1]) ** 2 + (B - q[2]) ** 2
+                    if dd < bd:
+                        bd, best = dd, i
+                    hi += 1
+                    moved = True
+                    self.probes += 1
+            if lo > 0:
+                d = L - Ls[lo - 1]
+                if d * d < bd:
+                    lo -= 1
+                    i = order[lo]
+                    q = labs[i]
+                    dd = (L - q[0]) ** 2 + (A - q[1]) ** 2 + (B - q[2]) ** 2
+                    if dd < bd:
+                        bd, best = dd, i
+                    moved = True
+                    self.probes += 1
+            if not moved:
+                break
+        self.lookups += 1
+        self.cache[k] = best
+        return best
+
+
+def palettise(rows, w, h, ch, pal, idx=None):
+    """RGB(A) rows -> one byte a pixel. Alpha is HARD: under 0.5 is index 0, nothing else is.
+
+    Un-matting has already happened in the keying, so an edge pixel that survives carries its own
+    colour and takes its own nearest entry. No dithering, anywhere: every dither mode tested made
+    this cel-shaded art worse, and an ordered pattern is exactly what a palette-cycled colormap
+    turns into a crawling texture."""
+    idx = idx or PalIndex(pal)
+    out = []
+    of = idx.of
+    for y in range(h):
+        row, o = rows[y], bytearray(w)
+        if ch == 4:
+            for x in range(w):
+                i = x * 4
+                if row[i + 3] >= 128:
+                    o[x] = of(row[i], row[i + 1], row[i + 2])
+        else:
+            for x in range(w):
+                i = x * 3
+                o[x] = of(row[i], row[i + 1], row[i + 2])
+        out.append(o)
+    return out
+
+
+def write_indexed_png(path, w, h, index_rows, pal):
+    """Colour type 3: PLTE + a tRNS of one byte, so index 0 alone is transparent."""
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+    plte = b"".join(bytes(c) for c in pal) + b"\x00" * 3 * (PAL_SIZE - len(pal))
+    raw = b"".join(b"\x00" + bytes(r) for r in index_rows)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 3, 0, 0, 0))
+        + chunk(b"PLTE", plte) + chunk(b"tRNS", b"\x00")
+        + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+
+
+PALETTE_OFF = False       # tools/palette/proof.py: write the cut in full colour beside the shipped
+                          # file, as <name>.raw.png, so the two can be looked at side by side
+
+
+def ship_png(path, w, h, ch, rows, pal=None, idx=None, note=True):
+    """The last step of every cutter: palettise and write the indexed PNG the game ships."""
+    if PALETTE_OFF:
+        write_png(Path(path).with_suffix(".raw.png"), w, h, ch, rows)
+        return None
+    pal = pal or master_palette()
+    t0 = time.time()
+    index_rows = palettise(rows, w, h, ch, pal, idx)
+    write_indexed_png(path, w, h, index_rows, pal)
+    if note:
+        PAL_TIMING.append((Path(path).name, w * h, time.time() - t0))
+    return index_rows
+
+
+PAL_TIMING = []
+
+
+# ── building the master from the corpus ──
+
+def palette_corpus():
+    """The raw returns the master is fitted to: field and cast sheets, never cutscene panels.
+
+    Panels get their own palette per scene (PALETTE.md), so letting their skies and their lamplight
+    into the master would spend the field's slots on colours the field never uses."""
+    files = sorted(SHEETS.glob("*.png")) + sorted((ROOT / "refs").glob("*.png"))
+    out = []
+    for f in files:
+        if f.name.startswith("_") or f.stem.endswith("_walk"):
+            continue
+        if "-scenes-" in f.name or f.stem.startswith("003_the_warning"):
+            continue                                    # a cutscene sheet: not the master's business
+        out.append(f)
+    return out
+
+
+def corpus_keep(r, g, b):
+    """Drop the template's magenta, its white borders and numbers, and the pure sheet background."""
+    if min(r, b) - g > 40 and r > 90 and b > 90:
+        return False
+    if r > 236 and g > 236 and b > 236:
+        return False
+    if r < 12 and g < 12 and b < 12:
+        return False
+    return True
+
+
+def palette_thumb(path, width=260):
+    """A sips-downscaled copy, cached. The corpus is 60 MP of PNG; the histogram does not need it."""
+    cache = OUT / "_palcache"
+    cache.mkdir(parents=True, exist_ok=True)
+    dst = cache / (path.parent.name + "__" + path.name)
+    if not dst.exists() or dst.stat().st_mtime < path.stat().st_mtime:
+        subprocess.run(["sips", "--resampleWidth", str(width), str(path), "--out", str(dst)],
+                       check=True, capture_output=True)
+    return dst
+
+
+def palette_histogram(paths, thumbs=True, keep=corpus_keep, drop_bg=False):
+    """[(L, a, b, weight, r, g, b)] over 5-bit RGB buckets, each bucket's true mean colour.
+
+    `drop_bg` throws away each sheet's own background before counting: a template's flat grey or the
+    neutral card behind a reference sheet is a third of its pixels and none of its art, and left in
+    it buys the plaster ramp a dozen slots to describe one colour nobody ever draws."""
+    h = {}
+    for p in paths:
+        w, ht, ch, rows = read_png(palette_thumb(p) if thumbs else p)
+        one = {}
+        for y in range(ht):
+            row = rows[y]
+            for x in range(0, w * ch, ch):
+                r, g, b = row[x], row[x + 1], row[x + 2]
+                if ch == 4 and row[x + 3] < 128:
+                    continue
+                if keep and not keep(r, g, b):
+                    continue
+                k = (r >> 3) << 10 | (g >> 3) << 5 | (b >> 3)
+                e = one.get(k)
+                if e is None:
+                    one[k] = [1, r, g, b]
+                else:
+                    e[0] += 1
+                    e[1] += r
+                    e[2] += g
+                    e[3] += b
+        if drop_bg and one:
+            tot = sum(e[0] for e in one.values())
+            top = max(one, key=lambda k: one[k][0])
+            e = one[top]
+            lab = _to_oklab(*(int(v / e[0]) for v in e[1:]))
+            if e[0] > 0.18 * tot and math.hypot(lab[1], lab[2]) < 0.045:
+                for k in [k for k in one
+                          if ((lambda q: (q[0] - lab[0]) ** 2 + (q[1] - lab[1]) ** 2
+                               + (q[2] - lab[2]) ** 2)(_to_oklab(*(int(v / one[k][0])
+                                                                   for v in one[k][1:])))) < 0.0004]:
+                    del one[k]
+        for k, e in one.items():
+            g0 = h.get(k)
+            if g0 is None:
+                h[k] = e
+            else:
+                for i in range(4):
+                    g0[i] += e[i]
+    pts = []
+    for n, sr, sg, sb in h.values():
+        r, g, b = sr / n, sg / n, sb / n
+        L, A, B = _to_oklab(int(r), int(g), int(b))
+        pts.append((L, A, B, n, r, g, b))
+    return pts
+
+
+def _lerp_ang(a, b, t):
+    d = math.atan2(math.sin(b - a), math.cos(b - a))
+    return a + d * t
+
+
+def hue_families(pts):
+    """Circular k-means on Oklab hue, seeded on the material anchors, for the chromatic buckets."""
+    seeds = [f for f in RAMP_FAMILIES if f[1] is not None]
+    cents = [math.radians(f[1]) for f in seeds]
+    groups = [[] for _ in cents]
+    for _ in range(12):
+        groups = [[] for _ in cents]
+        for p in pts:
+            a = math.atan2(p[2], p[1])
+            best, bd = 0, 9.0
+            for j, c in enumerate(cents):
+                d = abs(math.atan2(math.sin(a - c), math.cos(a - c)))
+                if d < bd:
+                    bd, best = d, j
+            groups[best].append(p)
+        for j, g in enumerate(groups):
+            if not g:
+                continue
+            sx = sum(math.cos(math.atan2(q[2], q[1])) * q[3] for q in g)
+            sy = sum(math.sin(math.atan2(q[2], q[1])) * q[3] for q in g)
+            if sx or sy:
+                cents[j] = math.atan2(sy, sx)
+    return {seeds[i][0]: g for i, g in enumerate(groups)}
+
+
+def _thirds(g):
+    """Weighted (L, chroma, hue) of a family's dark, mid and light thirds — the ramp's spine."""
+    g = sorted(g, key=lambda p: p[0])
+    tot = sum(p[3] for p in g) or 1
+    parts, acc, part = [], 0.0, []
+    for p in g:
+        part.append(p)
+        acc += p[3]
+        if acc >= tot / 3 and len(parts) < 2:
+            parts.append(part)
+            part, acc = [], 0.0
+    parts.append(part)
+    while len(parts) < 3:
+        parts.append(parts[-1] or [g[0]])
+    res = []
+    for part in parts:
+        part = part or [g[0]]
+        wsum = sum(p[3] for p in part) or 1
+        L = sum(p[0] * p[3] for p in part) / wsum
+        ax = sum(p[1] * p[3] for p in part) / wsum
+        by = sum(p[2] * p[3] for p in part) / wsum
+        res.append((L, math.hypot(ax, by), math.atan2(by, ax)))
+    return res
+
+
+def build_ramp(g, n, lo=RAMP_LO, hi=RAMP_HI):
+    """n steps through one family's own colours, shadows blue-violet, highlights yellow."""
+    t3 = _thirds(g)
+    Ls = [t3[0][0], t3[1][0], t3[2][0]]
+    sh, hl = math.radians(SHADOW_HUE), math.radians(HILITE_HUE)
+    out = []
+    for i in range(n):
+        u = i / max(1, n - 1)
+        L = lo + (hi - lo) * u
+        if L <= Ls[0]:
+            C, H = t3[0][1], t3[0][2]
+        elif L <= Ls[1]:
+            t = (L - Ls[0]) / max(1e-6, Ls[1] - Ls[0])
+            C = t3[0][1] + (t3[1][1] - t3[0][1]) * t
+            H = _lerp_ang(t3[0][2], t3[1][2], t)
+        elif L <= Ls[2]:
+            t = (L - Ls[1]) / max(1e-6, Ls[2] - Ls[1])
+            C = t3[1][1] + (t3[2][1] - t3[1][1]) * t
+            H = _lerp_ang(t3[1][2], t3[2][2], t)
+        else:
+            C, H = t3[2][1], t3[2][2]
+        mid = (Ls[0] + Ls[2]) / 2
+        if L < mid:
+            k = min(1.0, (mid - L) / max(1e-6, mid - lo))
+            H = _lerp_ang(H, sh, 0.22 * k)
+            C *= 1.0 - 0.45 * k * k
+        else:
+            k = min(1.0, (L - mid) / max(1e-6, hi - mid))
+            H = _lerp_ang(H, hl, 0.18 * k)
+            C *= 1.0 - 0.55 * k * k
+        out.append(tuple(_from_oklab(L, C * math.cos(H), C * math.sin(H))))
+    return out
+
+
+def ramp_lengths(groups):
+    """Each class's slot budget, split between its families by pixel share, inside the class bounds."""
+    lens = {}
+    for cls, (lo, hi, budget) in RAMP_CLASSES.items():
+        fams = [f for f in RAMP_FAMILIES if f[2] == cls]
+        share = {f[0]: max(1.0, sum(p[3] for p in groups.get(f[0], []))) for f in fams}
+        root = {k: math.sqrt(v) for k, v in share.items()}
+        tot = sum(root.values()) or 1.0
+        raw = {k: budget * v / tot for k, v in root.items()}
+        got = {k: max(lo, min(hi, int(round(v)))) for k, v in raw.items()}
+        # hand back or take up the rounding and the clamping, largest share first
+        order = sorted(fams, key=lambda f: -share[f[0]])
+        while sum(got.values()) != budget:
+            step = 1 if sum(got.values()) < budget else -1
+            moved = False
+            for f in (order if step > 0 else order[::-1]):
+                if lo <= got[f[0]] + step <= hi:
+                    got[f[0]] += step
+                    moved = True
+                    break
+            if not moved:
+                break
+        lens.update(got)
+    return lens
+
+
+def cmd_palette_build(args):
+    """story/palette/master.* — the 256 colours everything in the field is drawn from."""
+    t0 = time.time()
+    files = palette_corpus()
+    if not files:
+        die(f"no raw returns in {SHEETS.relative_to(ROOT.parent)}; there is nothing to fit a palette to")
+    print(f"corpus: {len(files)} sheet(s) from {SHEETS.relative_to(ROOT.parent)} and story/refs "
+          f"(cutscene sheets excluded: panels get their own palette per scene)")
+    pts = palette_histogram(files, drop_bg=True)
+    total = sum(p[3] for p in pts)
+    chromatic = [p for p in pts if math.hypot(p[1], p[2]) >= NEUTRAL_C]
+    neutral = [p for p in pts if math.hypot(p[1], p[2]) < NEUTRAL_C]
+    groups = hue_families(chromatic)
+    groups["neutral warm (plaster, cloth)"] = [p for p in neutral if p[2] >= 0]
+    groups["neutral cool (stone, steel)"] = [p for p in neutral if p[2] < 0]
+    lens = ramp_lengths(groups)
+
+    ramps, meta = [], []
+    for name, _, cls in RAMP_FAMILIES:
+        g = groups.get(name) or pts
+        n = lens[name]
+        ramps.append((name, build_ramp(g, n), cls, sum(p[3] for p in groups.get(name, []))))
+    # the reserved three, then the ramps, merging entries too close to tell apart
+    pal, labs, spans, dropped = [(0, 0, 0), (0, 0, 0), (255, 255, 255)], [], [], 0
+    for c in pal[1:]:
+        labs.append(_to_oklab(*c))
+    for name, ramp, cls, px in ramps:
+        # A ramp keeps every step it asked for, but a step within MERGE_DE of a colour the palette
+        # already holds SHARES that index instead of spending a new one. Skin, wood and earth really
+        # are the same browns in this corpus: saying so costs nothing and frees the slot for a colour
+        # nothing else serves. So a ramp is a list of indices, not a range, and two ramps may overlap.
+        got, own = [], 0
+        for c in ramp:
+            lab = _to_oklab(*c)
+            hit = next((j for j, q in enumerate(labs)
+                        if ((lab[0] - q[0]) ** 2 + (lab[1] - q[1]) ** 2 + (lab[2] - q[2]) ** 2) ** 0.5
+                        < MERGE_DE), None)
+            if hit is not None:
+                got.append(hit + 1)                     # labs[0] is index 1: index 0 is transparent
+                dropped += 1
+                continue
+            got.append(len(pal))
+            pal.append(tuple(c))
+            labs.append(lab)
+            own += 1
+        spans.append({"name": name, "class": cls, "indices": got, "len": len(got), "own": own,
+                      "corpus_px": int(px), "share": round(px / max(1, total), 4)})
+        print(f"  {name:32s} {cls:5s} {len(ramp):2d} steps, {own:2d} of its own  "
+              f"{100 * px / max(1, total):5.1f}% of the corpus")
+    print(f"  {dropped} near-duplicate(s) merged (dE < {MERGE_DE}); "
+          f"{PAL_SIZE - len(pal)} slot(s) go to the colours the ramps serve worst")
+
+    # refill: the corpus colours furthest from anything the ramps offer, weighted by how much of the
+    # corpus they are. This is what keeps a ramp palette honest against a purely statistical one.
+    extra_start = len(pal)
+    # each bucket keeps its own distance to the nearest palette entry, updated against the one colour
+    # just added, so this is one pass over the corpus a slot instead of a full re-scan.
+    near = [min((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2 for q in labs) for p in pts]
+    weight = [math.log1p(p[3]) for p in pts]
+    while len(pal) < PAL_SIZE and pts:
+        k = max(range(len(pts)), key=lambda i: near[i] * weight[i])
+        best = pts[k]
+        c = (int(round(best[4])), int(round(best[5])), int(round(best[6])))
+        pal.append(c)
+        q = _to_oklab(*c)
+        labs.append(q)
+        for i, p in enumerate(pts):
+            d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2
+            if d < near[i]:
+                near[i] = d
+    while len(pal) < PAL_SIZE:
+        pal.append((0, 0, 0))
+    spans.append({"name": "worst-served corpus colours", "class": "extra",
+                  "indices": list(range(extra_start, PAL_SIZE)), "len": PAL_SIZE - extra_start,
+                  "own": PAL_SIZE - extra_start, "corpus_px": 0, "share": 0.0})
+
+    PALETTE_DIR.mkdir(parents=True, exist_ok=True)
+    write_hex(MASTER_HEX, pal)
+    write_png(MASTER_PAL_PNG, PAL_SIZE, 1, 4,
+              [bytearray(v for i, c in enumerate(pal)
+                         for v in (c[0], c[1], c[2], 0 if i == 0 else 255))])
+    write_swatch(MASTER_SWATCH, pal, spans)
+    MASTER_JSON.write_text(json.dumps({
+        "version": PALETTE_VERSION, "size": PAL_SIZE,
+        "reserved": {"0": "transparent", "1": "black", "2": "white"},
+        "ramp_lightness": [RAMP_LO, RAMP_HI],
+        "shadow_hue": SHADOW_HUE, "highlight_hue": HILITE_HUE,
+        "merge_dE": MERGE_DE, "merged": dropped,
+        "corpus": [str(f.relative_to(ROOT.parent)) for f in files],
+        "ramps": spans,
+    }, indent=2) + "\n")
+    print(f"wrote {MASTER_HEX.relative_to(ROOT.parent)}, master.pal.png, master_swatch.png, master.json "
+          f"({time.time()-t0:.1f}s)")
+    cmd_palette_colormap([])
+    write_cycles(pal, spans)
+
+
+def write_swatch(path, pal, spans, cell=24):
+    """One material ramp a row, left-aligned, reserved three on the top row. No labels: it is a
+    reference image for ChatGPT, and any text on it comes back drawn into the art."""
+    rows_of = [[pal[1], pal[2]]]
+    for s in spans:
+        cols = [pal[i] for i in s["indices"]]
+        if s["class"] == "extra":                       # the leftovers wrap, or one row is 100 wide
+            rows_of += [cols[i:i + 16] for i in range(0, len(cols), 16)]
+        else:
+            rows_of.append(cols)
+    W = max(len(r) for r in rows_of) * cell
+    out = []
+    for r in rows_of:
+        line = bytearray()
+        for c in r:
+            line += bytes(c) * cell
+        line += bytes((16, 16, 18)) * (W // cell - len(r)) * cell
+        for _ in range(cell):
+            out.append(bytearray(line))
+    write_png(path, W, len(out), 3, out)
+
+
+# ── the colormap: light, time of day and effects, as table rows ──
+
+COLORMAP_TABLES = ("day", "dusk", "night", "flash", "poison", "stone")
+SHADE_FLOOR = 0.15                    # a colour that started above this lightness never falls below it
+
+
+def shade_colour(lab, s, table):
+    """One palette colour at light level s (1.0 full light, 0.0 darkest), in the named table."""
+    L0, a, b = lab
+    C, H = math.hypot(a, b), math.atan2(b, a)
+    L = L0 * s
+    C *= 0.30 + 0.70 * s
+    H = _lerp_ang(H, math.radians(SHADOW_HUE), 0.30 * (1 - s))
+    if table == "night":
+        L *= 0.80
+        H = _lerp_ang(H, math.radians(265), 0.45)
+        C = C * 0.55 + 0.022
+        a, b = C * math.cos(H), C * math.sin(H)
+        a, b = a - 0.004, b - 0.030
+    elif table == "dusk":
+        H = _lerp_ang(H, math.radians(55), 0.32 * (1 - s) + 0.12)
+        C = C * 1.05 + 0.018 * (1 - s)
+        L, a, b = L * 0.95, C * math.cos(H), C * math.sin(H) + 0.010
+    elif table == "flash":                              # a hit, a spell, lightning: washed toward white
+        f = 0.75 * s
+        a, b = C * math.cos(H) * (1 - f), C * math.sin(H) * (1 - f)
+        L = L + (1.0 - L) * f
+    elif table == "poison":
+        H = _lerp_ang(H, math.radians(140), 0.55)
+        C = C * 0.75 + 0.030
+        a, b = C * math.cos(H), C * math.sin(H)
+    elif table == "stone":                              # petrified, or a statue: all the colour out
+        a, b = C * math.cos(H) * 0.10, C * math.sin(H) * 0.10
+        L = L * 0.92 + 0.04
+    else:
+        a, b = C * math.cos(H), C * math.sin(H)
+    if L0 > SHADE_FLOOR:                                # the floor PALETTE.md asks for: it still reads
+        L = max(L, SHADE_FLOOR)
+    return (L, a, b)
+
+
+def build_colormap(pal):
+    """[(table, [row of 256 palette indices] per light level)] — row 0 is full light."""
+    idx = PalIndex(pal)
+    out = []
+    for table in COLORMAP_TABLES:
+        rows = []
+        for lv in range(LEVELS):
+            s = 1.0 - 0.95 * (lv / (LEVELS - 1))
+            row = bytearray(PAL_SIZE)
+            for i, c in enumerate(pal):
+                if i == PAL_TRANSPARENT:
+                    continue
+                L, a, b = shade_colour(_to_oklab(*c), s, table)
+                row[i] = idx.of(*_from_oklab(L, a, b))
+            rows.append(row)
+        out.append((table, rows))
+        print(f"  {table}: {LEVELS} light levels")
+    return out
+
+
+def cmd_palette_colormap(args):
+    """story/palette/colormap.png — every table at every light level, as colours the engine can use."""
+    pal = read_hex(args[0]) if args and not args[0].startswith("--") else master_palette()
+    t0 = time.time()
+    tables = build_colormap(pal)
+    rows, meta = [], []
+    for table, trows in tables:
+        meta.append({"table": table, "row0": len(rows), "levels": LEVELS})
+        for r in trows:
+            line = bytearray()
+            for i in range(PAL_SIZE):
+                line += bytes(pal[r[i]])
+            rows.append(line)
+    PALETTE_DIR.mkdir(parents=True, exist_ok=True)
+    write_png(COLORMAP_PNG, PAL_SIZE, len(rows), 3, rows)
+    COLORMAP_JSON.write_text(json.dumps({
+        "palette": "master.hex", "version": PALETTE_VERSION,
+        "width": PAL_SIZE, "height": len(rows), "levels": LEVELS,
+        "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. "
+                "Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest "
+                "MASTER palette index, so the engine may use the colormap directly as colour.",
+        "floor": SHADE_FLOOR,
+        "tables": meta,
+    }, indent=2) + "\n")
+    print(f"wrote {COLORMAP_PNG.relative_to(ROOT.parent)}  {PAL_SIZE}x{len(rows)} "
+          f"({len(tables)} tables x {LEVELS} levels) and colormap.json ({time.time()-t0:.1f}s)")
+
+
+def write_cycles(pal, spans):
+    """Seed story/palette/cycles.md with a water cycle and a fire/lamp cycle out of the real ramps."""
+    by = {s["name"]: s for s in spans}
+
+    def mid(name, n):
+        s = by.get(name)
+        if not s or s["len"] < n:
+            return []
+        first = max(0, (s["len"] - n) // 2)
+        return s["indices"][first:first + n]
+
+    water = mid("water blue / metal", 4) or mid("teal / shallow water", 4)
+    fire = mid("orange / terracotta (hair)", 4) or mid("gold / blond", 4)
+    lines = ["# Palette cycles (D19)", "",
+             "One line a cycle: `name: index index index… @ fps`. The engine rewrites those columns of",
+             "the colormap every frame, rotating the listed indices through each other's colours, so a",
+             "river moves and a lamp flickers without a second frame of art being drawn. The indices are",
+             "consecutive steps of one ramp in `master.hex`; see `master.json` for the ramp spans.", ""]
+    if water:
+        lines.append(f"water: {' '.join(str(i) for i in water)} @ 6")
+    if fire:
+        lines.append(f"fire_lamp: {' '.join(str(i) for i in fire)} @ 10")
+    lines.append("")
+    CYCLES_MD.write_text("\n".join(lines))
+    print(f"wrote {CYCLES_MD.relative_to(ROOT.parent)}  "
+          f"(water {water or 'none'}, fire {fire or 'none'})")
+
+
+# ── per-scene palettes for cutscene panels ──
+
+def kmeans_palette(pts, k, iters=8, seed=7):
+    """k-means++ in Oklab, weighted by pixel count. Returns sRGB means — statistical, no ramps.
+
+    Panels are never lit and never share the screen with the field, so nothing here has to shade
+    gracefully; what matters is that a sky with forty blues keeps forty blues."""
+    rnd = random.Random(seed)
+    if len(pts) <= k:
+        return [(int(round(p[4])), int(round(p[5])), int(round(p[6]))) for p in pts]
+    first = max(pts, key=lambda p: p[3] * rnd.random())
+    cents = [(first[0], first[1], first[2])]
+    d2 = [((p[0] - cents[0][0]) ** 2 + (p[1] - cents[0][1]) ** 2 + (p[2] - cents[0][2]) ** 2) * p[3]
+          for p in pts]
+    while len(cents) < k:
+        tot = sum(d2)
+        if tot <= 0:
+            cents.append(pts[rnd.randrange(len(pts))][0:3])
+            continue
+        t, acc, pick = rnd.random() * tot, 0.0, len(pts) - 1
+        for i, v in enumerate(d2):
+            acc += v
+            if acc >= t:
+                pick = i
+                break
+        c = (pts[pick][0], pts[pick][1], pts[pick][2])
+        cents.append(c)
+        for i, p in enumerate(pts):
+            nd = ((p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2) * p[3]
+            if nd < d2[i]:
+                d2[i] = nd
+    for _ in range(iters):
+        sums = [[0.0] * 7 for _ in range(k)]
+        for p in pts:
+            best, bd = 0, 1e9
+            for j, c in enumerate(cents):
+                d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2
+                if d < bd:
+                    bd, best = d, j
+            s = sums[best]
+            for n, v in enumerate((p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3],
+                                   p[4] * p[3], p[5] * p[3], p[6] * p[3])):
+                s[n] += v
+        for j in range(k):
+            if sums[j][3] > 0:
+                cents[j] = (sums[j][0] / sums[j][3], sums[j][1] / sums[j][3], sums[j][2] / sums[j][3])
+    out, sums = [], [[0.0] * 4 for _ in range(k)]
+    for p in pts:
+        best, bd = 0, 1e9
+        for j, c in enumerate(cents):
+            d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2
+            if d < bd:
+                bd, best = d, j
+        s = sums[best]
+        s[0] += p[3]
+        s[1] += p[4] * p[3]
+        s[2] += p[5] * p[3]
+        s[3] += p[6] * p[3]
+    for s in sums:
+        if s[0] > 0:
+            out.append(tuple(int(round(s[i] / s[0])) for i in (1, 2, 3)))
+    return out
+
+
+def scene_panels(scene):
+    return sorted(PANELS.glob(f"{scene}_p*.png"))
+
+
+def palettise_scene(scene):
+    """Fit a palette to one scene's own panels and convert them all. (message)."""
+    files = scene_panels(scene)
+    if not files:
+        return f"{scene}: no panels to palettise"
+    pts = palette_histogram(files, thumbs=True, keep=None)
+    cols = kmeans_palette(pts, PAL_SIZE - 1)
+    pal = [(0, 0, 0)] + cols[:PAL_SIZE - 1]
+    while len(pal) < PAL_SIZE:
+        pal.append((0, 0, 0))
+    write_hex(scene_hex(scene), pal)
+    idx = PalIndex(pal)
+    for f in files:
+        w, h, ch, rows = read_png(f)
+        ship_png(f, w, h, ch, rows, pal, idx)
+    return (f"{scene}: {len(files)} panel(s) -> {scene_hex(scene).name} "
+            f"({len(cols)} colours + transparent)")
+
+
+# ── apply, check ──
+
+def palette_for(arg):
+    if not arg or arg == "master":
+        return master_palette()
+    return read_hex(Path(arg))
+
+
+def cmd_palette_apply(args):
+    pal_arg, files = None, []
+    it = iter(args)
+    for a in it:
+        if a == "--palette":
+            pal_arg = next(it, "master")
+        elif not a.startswith("--"):
+            files.append(a)
+    if not files:
+        die("usage: palette apply <file.png> [more files] [--palette master|<hex file>]")
+    pal = palette_for(pal_arg)
+    idx = PalIndex(pal)
+    for f in files:
+        p = Path(f).expanduser()
+        if not p.exists():
+            die(f"{p} not found")
+        w, h, ch, rows = read_png(p)
+        was = p.stat().st_size
+        t0 = time.time()
+        ship_png(p, w, h, ch, rows, pal, idx, note=False)
+        print(f"{p.name}: {w}x{h} -> indexed, {was} -> {p.stat().st_size} bytes ({time.time()-t0:.1f}s)")
+
+
+def png_palette(path):
+    """(colour type, PLTE as [(r,g,b)], tRNS bytes) without expanding the image."""
+    data = Path(path).read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        return None, [], b""
+    pos, ctype, plte, trns = 8, None, [], b""
+    while pos < len(data):
+        n, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + n]
+        pos += 12 + n
+        if kind == b"IHDR":
+            ctype = body[9]
+        elif kind == b"PLTE":
+            plte = [tuple(body[i:i + 3]) for i in range(0, len(body), 3)]
+        elif kind == b"tRNS":
+            trns = body
+        elif kind == b"IDAT":
+            break
+    return ctype, plte, trns
+
+
+def shipped_images():
+    """[(path, palette, what)] — every image the game ships, with the palette it must be drawn from."""
+    out = []
+    for rel in SHIPPED_MASTER:
+        d = ROOT / rel
+        if not d.exists():
+            continue
+        for p in sorted(d.rglob("*.png")):
+            out.append((p, "master"))
+    for p in sorted(PANELS.glob("*.png")):
+        scene = re.sub(r"_p\d+_.*$", "", p.stem)
+        out.append((p, scene))
+    return out
+
+
+def cmd_palette_check(args, quiet=False):
+    """Every shipped image is an indexed PNG holding nothing but its own palette. (errors)."""
+    err, seen, pals = [], 0, {}
+    for p, which in shipped_images():
+        seen += 1
+        rel = p.relative_to(ROOT.parent)
+        if which not in pals:
+            hexf = MASTER_HEX if which == "master" else scene_hex(which)
+            if not Path(hexf).exists():
+                err.append(f"{rel}: no palette at {Path(hexf).relative_to(ROOT.parent)}; "
+                           f"run ./story_prompt.py ingest --force on the package that made it")
+                pals[which] = None
+            else:
+                pals[which] = read_hex(hexf)
+        pal = pals[which]
+        if pal is None:
+            continue
+        ctype, plte, trns = png_palette(p)
+        if ctype != 3:
+            err.append(f"{rel}: colour type {ctype}, not an indexed PNG (PALETTE.md: everything ships "
+                       f"at one byte a pixel). Recut it, or: ./story_prompt.py palette apply {rel}")
+            continue
+        if plte[:len(pal)] != [tuple(c) for c in pal]:
+            bad = next((i for i in range(min(len(plte), len(pal))) if tuple(plte[i]) != tuple(pal[i])), -1)
+            err.append(f"{rel}: its PLTE is not the {which} palette (first difference at index {bad}). "
+                       f"The palette changed since this was cut: ./story_prompt.py ingest --force")
+            continue
+        if list(trns) != [0]:
+            err.append(f"{rel}: tRNS is {list(trns)}; only index 0 may be transparent")
+    if not quiet:
+        for e in err:
+            print(f"ERROR: {e}", file=sys.stderr)
+        print(f"palette check: {seen} shipped image(s), {len(err)} problem(s)")
+    return err
+
+
+def cmd_palette(args):
+    sub = args[0] if args else ""
+    if sub == "build":
+        cmd_palette_build(args[1:])
+    elif sub == "apply":
+        cmd_palette_apply(args[1:])
+    elif sub == "check":
+        if cmd_palette_check(args[1:]):
+            sys.exit("story_prompt: shipped art does not match its palette.")
+    elif sub == "colormap":
+        cmd_palette_colormap(args[1:])
+    elif sub == "scene":
+        for s in args[1:]:
+            print(palettise_scene(s))
+    else:
+        die("usage: palette build | apply <files> [--palette master|<hex>] | check | colormap | "
+            "scene <scene stem>")
+
+
 # ───────────────────────── Ingest: one command for every returned image ─────────────────────────
 
 def to_png(src, dst):
@@ -7080,6 +8030,11 @@ def cmd_ingest(args):
         for w in LOUD:                                   # never let a cutter's warning vanish into the capture
             print(f"      ! {w}", file=sys.stderr)
         loud += len(LOUD)
+    if PAL_TIMING:
+        secs = sum(t for _, _, t in PAL_TIMING)
+        worst = max(PAL_TIMING, key=lambda r: r[2])
+        print(f"\npalette: {len(PAL_TIMING)} file(s) converted to indexed art in {secs:.1f}s "
+              f"(slowest {worst[0]}, {worst[1] / 1e6:.2f} MP in {worst[2]:.1f}s)")
     print(f"\n{done} cut, {failed} failed, {fresh} already up to date, {waiting} still waiting for an image "
           f"({len(metas)} package(s))" + (f", {loud} warning(s) above" if loud else ""))
     if done:
@@ -7250,6 +8205,8 @@ def main():
         cmd_packages(args[1:])
     elif cmd == "ingest":
         cmd_ingest(args[1:])
+    elif cmd == "palette":
+        cmd_palette(args[1:])
     elif cmd == "names":
         cmd_names(args[1:])
     else:

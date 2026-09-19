@@ -1,0 +1,10 @@
+{
+  "kind": "walker",
+  "handle": "shrinewoman",
+  "title": "Shrinewoman \u2014 walk sheet",
+  "makes": "`story/field/walkers/shrinewoman.png`, the 4x4 walk sprite sheet",
+  "outputs": [
+    "story/field/walkers/shrinewoman.png"
+  ],
+  "dir": "story/packages/cast/shrinewoman/walker"
+}
