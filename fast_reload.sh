@@ -85,16 +85,22 @@ done
 
 # Field maps and art (FIELD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
 # The game looks in files/field/<kind>/<id>.png first, then the APK assets, then its placeholder.
-for d in maps tiles props walkers edges buildings views; do
+for d in maps tiles props walkers edges buildings views screens; do
     [ -d "$SCRIPT_DIR/story/field/$d" ] || continue
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/$d"
     HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
     for f in "$SCRIPT_DIR"/story/field/"$d"/*; do
         [ -f "$f" ] || continue
-        case "$f" in *.png|*.map) ;; *) continue;; esac   # authoring scripts stay off the phone
+        # authoring scripts stay off the phone; screens carry .screen and .triggers text files
+        case "$f" in *_debug.png) continue;; esac          # the ingest's own check image, not art
+        case "$f" in *.png|*.map|*.screen|*.triggers) ;; *) continue;; esac
         n="$(basename "$f")"
         sz="$(stat -f %z "$f")"
-        if ! echo "$HAVE_F" | grep -qx "$n $sz"; then
+        # Text files are tiny and are regenerated in place: a `.screen` can change completely and
+        # keep its byte count, which the size check below cannot see. Always push those.
+        always=""
+        case "$f" in *.screen|*.triggers|*.map) always=1;; esac
+        if [ -n "$always" ] || ! echo "$HAVE_F" | grep -qx "$n $sz"; then
             echo "  field $d/$n"
             "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
             "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/$d/$n && rm /data/local/tmp/$n"

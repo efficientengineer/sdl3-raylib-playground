@@ -783,7 +783,7 @@ static int game_wants_quit(void *state) { return ((Star *)state)->cap_state == 2
 // judged on the exact line you were looking at, and the field keeps the map, the spot on the navmesh
 // and whatever camera the owner was tuning. Everything else is rebuilt from those few numbers.
 struct ReloadBlob { uint32_t magic; int32_t screen, scene, line, to_field, has_field; FieldSave field; };
-#define RELOAD_MAGIC 0x36525453u   // 'STR6' — bumped again as the field's save layout grew
+#define RELOAD_MAGIC 0x37525453u   // 'STR7' — bumped again as the field's save layout grew (screens)
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;

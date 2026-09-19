@@ -368,6 +368,171 @@ Rules and fallbacks:
 
 ---
 
+## Screen maps — the painting is the level
+
+The other half of the field, and now the main path (owner's direction, FF7/FF8 field screens):
+**ChatGPT paints the whole screen and the game is fitted to the painting.** The 3D block-out is still
+there — it is what a screen is captured from and painted over — but a screen map plays with no 3D at
+all. Both kinds live in the same `Field`; `f->is_screen` picks the path at the top of `field_tick`.
+
+### The files
+
+Everything a screen owns sits in `story/field/screens/` under the stem `<map>_<zone>`:
+
+| file | what |
+|---|---|
+| `<stem>_paint.png` | the painting, up to 1536 wide |
+| `<stem>_base.png` | the foreground base-row map (below) — **not** art |
+| `<stem>.screen` | the text file: size, nav, exits, spawn, the depth ramp |
+| `<stem>.triggers` | optional sidecar, the writer's side: message rectangles and NPCs |
+
+Lookup is the usual `files/field/screens/…` on the phone, then the APK assets, then `story/…` on
+desktop. `fast_reload.sh` pushes the whole folder (`.screen` and `.triggers` were added to its
+extension filter); `deploy.sh` already rsyncs all of `story/field/`.
+
+Two things `fast_reload.sh` had to learn. It pushed a file only when the device's copy differed in
+**size**, and a regenerated `.screen` can change completely and keep its byte count to the byte —
+which is exactly what happened, and cost an hour chasing a spawn that was already fixed on the Mac.
+Text files (`.screen`, `.triggers`, `.map`) are now pushed unconditionally; they are tiny.
+
+The two images are also **retried**. A hot reload can land while Android has the app in the
+background, and a GL call made then yields no texture name at all, which would leave the screen
+blank until the next map change. `screen_tick` re-attempts the upload once a second while either
+texture is missing, so it heals itself the moment the app is in front again.
+
+```
+map halm                                          # named for the reader; the file name is the truth
+zone square
+size 1536 1024
+paint story/field/screens/halm_square_paint.png   # repo paths: the game takes the last component
+walk  story/field/screens/halm_square_walk.png    # the mask the polygons were traced from — unused
+fg    story/field/screens/halm_square_fg.png      # the cut the base map was made from — unused
+base  story/field/screens/halm_square_base.png
+spawn 392 513
+scale_near 1.000 at 1023
+scale_far  0.550 at 160
+poly 1: 514 548, 329 541, 312 537, 294 518        # convex, 3-8 points, in the painting's pixels
+poly 2: 847 539, 829 706, 818 752, 724 805
+exit left 0 190 0 249 west_road                   # edge = left|right|top|bottom
+```
+
+`map`, `zone`, `walk` and `fg` are accepted and ignored — the engine needs none of them, and saying
+so here is what lets the tool keep writing them. `paint` and `base` default to `<stem>_paint.png`
+and `<stem>_base.png` when the file does not name them. **`_debug.png` is the ingest's own check
+image and is deliberately not pushed to the phone** (it is 3.4 MB and the game never reads it).
+
+`.triggers`, same pixels:
+
+```
+message 700 640 90 60 halm.well
+npc 980 705 villager_a S halm.marta
+```
+
+### Occlusion — the base map, not cut-outs
+
+The first real painting came back with its foreground merged into a few huge blobs, so per-object
+cut-outs with one base line each were never going to work. The contract is one image instead:
+
+> `<stem>_base.png` is the size of the painting, RGB 8-bit. For every **foreground** pixel,
+> `R<<8 | G` is the screen row at which *that pixel's object* meets the ground, and `B` is 255.
+> `0,0,0` means not foreground.
+
+**A foreground pixel hides a walker exactly when its `base_y` is greater than the walker's feet row.**
+No ids, no sorting, and a blob of six merged things still layers correctly, per pixel.
+
+Draw order per frame:
+
+1. the painting, one quad, the whole thing;
+2. the walkers, y-sorted among themselves by their feet (two figures still have to overlap right);
+3. the **repaint pass** — one quad per walker over that walker's own rectangle, in its own tiny
+   shader (`RVS`/`RFS`), sampling the painting and the base map by the same uv and discarding unless
+   `B > 0.5 && base_y > feet_y`. It puts the painting's own pixels back over the walker exactly where
+   something nearer stands. This is the whole occlusion system;
+4. the examine "!" mark, above the player, outside the sort and outside the repaint — it is
+   interface and nothing may ever cover it.
+
+The **hidden-player silhouette** is the same pass with one uniform: the player's repaint quad also
+drops every other pixel on a 4×4 Bayer grid, so where he is hidden half of him shows through and it
+reads as the dithered silhouette the FF games use. Dev toggle **silhouette** (`see_on`).
+
+`base_y` is a 16-bit row packed into two 8-bit channels, so the repaint fragment shader declares
+`precision highp float` — mediump cannot hold 65535 and the comparison collapses.
+
+### Movement, scale and the camera
+
+- **The navmesh is the 3D one, in 2D.** `poly` lines fill `NavPoly` with `vx/vz` = the painting's
+  x/y and `vy = 0`, so `poly_finish`, `mesh_link`, `mesh_move` and `wall_buffer` are used unchanged —
+  the same shared-edge crossing, the same slide along an open edge, the same rescue.
+  **`F_POLYS` is 512.** It was 128, which a hand-authored 3D map never came near; a screen's
+  polygons are traced from the walk mask and Halm's square alone is 209, so the cap was silently
+  dropping a third of the plaza. A file that still exceeds it now logs, loudly, how many were
+  dropped. Adjacency is the same O(n²·v²) edge match — 209 polygons is a few ms, once, at load.
+- **The player is never left off the mesh.** `screen_place` — used by the spawn, by every exit and by
+  the reload restore — moves a point that is inside no polygon to the nearest polygon's centroid
+  (always inside, the polygons being convex) and logs it. A spawn that no longer agrees with a
+  regenerated navmesh therefore costs you a line in the log, not a player standing on a roof.
+- **The walker radius is in pixels and shrinks with the walker**: `walk_radius` cells × 64 px ×
+  the depth scale at the player's feet, or a distant figure would be held a metre off a near wall.
+- **Depth scale** is `lerp(scale_near, scale_far)` by the feet row, clamped a little outside the two
+  authored rows. The sprite is drawn at `frame size × scale`, anchored feet-centre, and **the walk
+  speed is scaled by the same number**, so distance feels right. At scale 1 the speed is
+  `WALK_SPEED × 64` = 205 px/s, which crosses a 1536-wide plaza in ~7.5 s.
+- **The camera fills the screen.** The internal viewport takes the *phone's* aspect at a fixed 360
+  height, exactly as the 3D field's `fill width` does, and the painting is scaled to **cover** it —
+  `zoom 1 = cover`, so there are never black bars. (It first took the painting's aspect and
+  letterboxed, which put 3:2 art in the middle of a 20:9 phone with huge bars; the owner's call is
+  cover.) Whichever way the two shapes differ, the excess scrolls: the camera keeps the player inside
+  the middle 50 % and clamps to the painting's edges. The Dev **zoom** slider goes to 4×.
+- **Exits** fire on the rising edge when the player's disc touches the segment, then load the target
+  and place the player at that target's **matching opposite-edge exit** (left↔right, top↔bottom),
+  one radius plus 24 px inside it; with no matching exit the target's own `spawn` is used. A target
+  that is a 3D map simply takes over.
+- Message triggers and NPCs behave as everywhere else: **nothing fires on entry**, a "!" appears and
+  the interact press opens the box. Text still comes from `story/field/text.md` via `field_text.h`.
+
+### Routing — which kind a map name is
+
+`field_load_map(name)` resolves in this order:
+
+1. `field/screens/<name>.screen` exists → it is a screen (so `test_plaza` just works);
+2. the `SCREEN_FOR_MAP` table in `field.cpp` maps the name to a screen that exists —
+   **`halm` → `halm_square`**, so walking Halm means walking the painting the moment the art lands,
+   and falls straight back to the 3D map until then;
+3. a `.map` file, and if its `## meta` has `screen: <zone>`, `<map>_<zone>` is loaded instead.
+
+Halm's block-out is still reachable from the Dev map picker under the name **`halm3d`** (the same
+`halm.map`, under a name that does not route to the painting), which is what the capture and
+paint-over stream works from.
+
+### Dev overlay for screens
+
+`field_dev_ui` branches on `is_screen`. The screen panel has the screen and map pickers, **Respawn**,
+and toggles for **nav polys** (wireframe with polygon ids), **base map** (the base rows in false
+colour, green = meets the ground high/far, red = low/near, foreground only) and **exits**;
+**tap to print**, which arms one finger and posts the painting pixel under it to the Dev messages so
+a trigger rectangle can be authored by pointing at the painting; the **zoom** slider; **scale near /
+far** with their rows and a **print scale** button that logs the two lines ready to paste.
+
+The 3D panel also lists the screens, or there would be no way back to one after stepping into a
+block-out map.
+
+### Hot reload
+
+`FieldSave` grew `is_screen`, `scr_debug`, `zoom`, `sc_near`, `sc_far` (and `RELOAD_MAGIC` went to
+`STR7`). A reload keeps the screen, the spot in the painting, the zoom and the depth ramp being
+tuned. The position is validated against the *new* screen's mesh, so an edited `.screen` falls back
+to its spawn rather than putting the player outside the polygons.
+
+### `test_plaza`
+
+`story/field/screens/test_plaza.*` is the engine's own synthetic screen, not story art: a gradient
+painting, three pillars with real base rows, four navmesh polygons and two exits that loop back to
+itself. It exists so the sorting, the depth ramp, the base-map occlusion and the silhouette can be
+walked on the phone before any painting exists, and it is listed in `FIELD_SCREENS` beside the real
+ones. Regenerate it with the script in this file's git history if it is ever lost.
+
+---
+
 ## Ground — the splat map
 
 Per-cell tile ids made every cell boundary read as a grid. The ground is now one pass over a **splat

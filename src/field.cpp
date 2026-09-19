@@ -38,7 +38,7 @@
 #define F_EXITS 16
 #define F_TRIGS 48
 #define F_ART 64
-#define F_POLYS 128
+#define F_POLYS 512             // a hand-authored 3D map uses dozens; a traced screen walkmask, hundreds
 #define F_POLY_V 8
 #define F_ZONES 24
 #define F_WALLS 64
@@ -47,6 +47,7 @@
 #define F_PROF_PTS 40
 #define F_SWEEPS 64
 #define F_LATHES 16
+#define F_SEXITS 16
 
 #define FBO_W 1024              // widest internal buffer; the used width tracks the screen aspect
 #define FBO_H 360               // FIELD.md's 640x360, height fixed, width filled to the phone's 20:9
@@ -695,6 +696,23 @@ struct FLathe { int prof, segs; float x, z, y; unsigned char fixed_y; };
 
 struct FVert { float x, y, z, u, v; unsigned char r, g, b, a; };
 
+// ── screen maps ──
+// A SCREEN is a painting ChatGPT made of the whole view, plus a text file saying where the walkable
+// ground is in the painting's own pixels. There is no 3D at all: the navmesh runs in 2D (z = 0, the
+// polygon's x/z are the painting's x/y), and everything visible is one y-sorted list of rectangles.
+// What the player can walk behind is not a list of cut-outs — the first real painting came back with
+// its foreground merged into a few huge blobs, so per-object boxes were never going to work. It is a
+// BASE MAP: one RGB image the size of the painting where, for every foreground pixel,
+// `R<<8 | G` is the screen row at which *that pixel's* object meets the ground and `B` is 255.
+// A foreground pixel hides a walker exactly when its base_y is below the walker's feet. No sorting,
+// no ids, and a blob of six merged things still layers correctly.
+struct ScrExit {
+    int edge;                                  // 0 left, 1 right, 2 top, 3 bottom
+    float x0, y0, x1, y1;
+    char map[32];
+    bool inside;
+};
+
 struct Field {
     char map_name[32];
     int mw, mh;
@@ -761,11 +779,36 @@ struct Field {
 
     char msg[256], msg_who[40]; float msg_t;
     int exam_trig, exam_npc;   // what the interact press would open, -1 for none
+
+    // ── screen maps ──
+    int is_screen;                       // 1 = this "map" is a painted screen, not the 3D block-out
+    char scr_name[48];                   // <map>_<zone>: the stem of every file the screen owns
+    char meta_screen[32];                // a .map's `## meta screen: <zone>` line, routed after parsing
+    float scr_w, scr_h;                  // the painting's coordinate space, from the `size` line
+    FTex scr_paint, scr_base;            // the painting, and the foreground base-row map
+    char scr_paint_file[96], scr_base_file[96];
+    float scr_retry;                     // seconds since the last attempt to upload a missing one
+    GLuint rprog;                        // the repaint pass: the painting drawn back over a walker
+    GLint r_mvp, r_paint, r_base, r_uv, r_feet, r_ghost, r_mode;
+    ScrExit sexits[F_SEXITS]; int sexit_count;
+    float scr_spawn_x, scr_spawn_y;
+    float sc_near, sc_near_y, sc_far, sc_far_y;   // walker depth scale: S0 at y0, S1 at y1
+    float zoom, cam_x, cam_y;            // 1x = the painting's height fills the view
+    int scr_debug;                       // bit 0 nav, 1 occluders, 2 exits, 3 tap-to-print armed
+    float view_ox, view_oy, view_dw, view_dh; int view_vw, view_vh;   // last frame's FBO placement
+    int tap_armed;                       // a tap-to-print probe is waiting for a finger
 };
 
-static const char *FIELD_MAPS[] = { "halm", "hart_yard" };
+static const char *FIELD_MAPS[] = { "halm3d", "hart_yard" };
 int field_map_count() { return (int)(sizeof(FIELD_MAPS) / sizeof(FIELD_MAPS[0])); }
 const char *field_map_name_at(int i) { return (i >= 0 && i < field_map_count()) ? FIELD_MAPS[i] : "halm"; }
+
+// The APK's asset folder can't be listed, so the painted screens are named here the way the maps
+// are. `test_plaza` is the engine's own synthetic screen: a gradient painting and three polygons,
+// so the sorting and the silhouette can be walked on the phone before any art exists.
+static const char *FIELD_SCREENS[] = { "halm_square", "test_plaza" };
+int field_screen_count() { return (int)(sizeof(FIELD_SCREENS) / sizeof(FIELD_SCREENS[0])); }
+const char *field_screen_name_at(int i) { return (i >= 0 && i < field_screen_count()) ? FIELD_SCREENS[i] : "test_plaza"; }
 
 // A map that always parses, so a missing or broken file is a flat green square and not a crash.
 static const char *FALLBACK_MAP =
@@ -1113,6 +1156,10 @@ static void field_free_map(Field *f) {
     f->splat_tex.id = 0;
     memset(f->hgt, 0, sizeof(f->hgt));
     memset(f->gnd, 0, sizeof(f->gnd));
+    if (f->scr_paint.id) { glDeleteTextures(1, &f->scr_paint.id); f->scr_paint.id = 0; }
+    if (f->scr_base.id) { glDeleteTextures(1, &f->scr_base.id); f->scr_base.id = 0; }
+    f->sexit_count = 0;
+    f->is_screen = 0; f->scr_name[0] = 0; f->meta_screen[0] = 0;
 }
 
 static void build_world(Field *f);
@@ -1218,6 +1265,9 @@ static void parse_map(Field *f, char *text) {
             char *v = c + 1;
             while (*v == ' ') v++;
             if (!strcmp(line, "size")) sscanf(v, "%d %d", &f->mw, &f->mh);
+            // `screen: <zone>` says this map is played as the painted screen <map>_<zone>. The rest of
+            // the file still parses, so the 3D block-out stays there to be captured and painted over.
+            else if (!strcmp(line, "screen")) sscanf(v, "%31s", f->meta_screen);
             else if (!strcmp(line, "spawn")) {
                 int sx = 0, sy = 0; char fc = 'S';
                 sscanf(v, "%d %d %c", &sx, &sy, &fc);
@@ -1655,9 +1705,22 @@ static void field_place(Field *f, float x, float z, int facing) {
     }
 }
 
-bool field_load_map(Field *f, const char *name) {
+static bool screen_load(Field *f, const char *name);
+
+// Which painted screen a plain map name plays as. Halm is walked as its painting now; its 3D
+// block-out is still there under the name `halm3d`, which is what the capture and the paint-over
+// stream works from and what the Dev map picker offers.
+static const char *SCREEN_FOR_MAP[][2] = { {"halm", "halm_square"} };
+
+// The 3D half of field_load_map, and the way in for anything that must have the block-out whatever
+// paintings exist — the capture, above all: `capture.sh halm square` is how the painting was made in
+// the first place, and it would be a poor joke if it started capturing the painting.
+static bool load_map_3d(Field *f, const char *name) {
+    // `halm3d` is Halm's block-out: the same file, under a name that does not route to the painting.
+    char file[64];
+    snprintf(file, sizeof(file), "%s", !strcmp(name, "halm3d") ? "halm" : name);
     char rel[128];
-    snprintf(rel, sizeof(rel), "field/maps/%s.map", name);
+    snprintf(rel, sizeof(rel), "field/maps/%s.map", file);
     size_t size = 0;
     char *text = (char *)field_read(rel, &size);
     bool from_file = text != nullptr;
@@ -1666,11 +1729,27 @@ bool field_load_map(Field *f, const char *name) {
     snprintf(f->map_name, sizeof(f->map_name), "%s", name);
     parse_map(f, text);
     SDL_free(text);
+    // `## meta screen: <zone>` routes a block-out map to its painting once the painting exists.
+    if (f->meta_screen[0]) {
+        char want[80];
+        snprintf(want, sizeof(want), "%s_%s", file, f->meta_screen);
+        if (screen_load(f, want)) return true;
+    }
     field_place(f, f->spawn_x + 0.5f, f->spawn_y + 0.5f, f->spawn_f);
     f->msg[0] = 0; f->msg_who[0] = 0; f->msg_t = 0;
     f->zone_idx = -1; f->blend_t = 0; f->fov = 0.0f;       // fov 0 = snap the new map's shot, don't blend
     if (f->gl_ready) build_world(f);
     return from_file;
+}
+
+bool field_load_map(Field *f, const char *name) {
+    if (screen_load(f, name)) return true;                 // the name is itself a screen
+    for (int i = 0; i < (int)(sizeof(SCREEN_FOR_MAP) / sizeof(SCREEN_FOR_MAP[0])); i++)
+        if (!strcmp(name, SCREEN_FOR_MAP[i][0]) && screen_load(f, SCREEN_FOR_MAP[i][1])) {
+            snprintf(f->map_name, sizeof(f->map_name), "%s", name);   // `halm` still means `halm`
+            return true;
+        }
+    return load_map_3d(f, name);
 }
 
 // ───────────────────────── geometry ─────────────────────────
@@ -1924,6 +2003,7 @@ static void emit_edges(Field *f, FVert **w, int *n, int cap) {
 // One pass per tile id so the whole ground is a handful of draw calls; walls share the wall tile.
 // Vertex colours bake the light (CLAUDE.md: no realtime lighting). Sun from +X, -Z.
 static void build_world(Field *f) {
+    if (f->is_screen) return;                   // a screen has no world geometry: it is a painting
     f->geo_count = 0;
     int cap = f->mw * f->mh * 26 + F_POLYS * F_POLY_V * 6 + 48 * 66 + F_SWEEPS * F_WALL_PTS * 4 * 8 + F_LATHES * 48 * 8 * 6 + 64;
     FVert *buf = (FVert *)malloc(sizeof(FVert) * (size_t)cap);
@@ -2067,6 +2147,44 @@ static const char *SFS =
     "  o = vec4(c * v_col.rgb, 1.0);\n"
     "}\n";
 
+// Screen maps: the REPAINT pass. After a walker is drawn, one quad over its rectangle puts the
+// painting's own pixels back wherever something nearer stands — the base map says, per pixel, the
+// screen row at which that pixel's object meets the ground, so `base_y > feet_y` is the whole test.
+// `highp` is not optional: base_y is a 16-bit row packed into R and G, and mediump cannot hold it.
+static const char *RVS =
+    "layout(location=0) in vec3 a_pos;\n"
+    "layout(location=1) in vec2 a_uv;\n"
+    "layout(location=2) in vec4 a_col;\n"
+    "uniform mat4 u_mvp;\n"
+    "out vec2 v_uv;\n"
+    "void main(){ v_uv = a_uv; gl_Position = u_mvp * vec4(a_pos,1.0); }\n";
+static const char *RFS =
+    "precision highp float;\n"
+    "in vec2 v_uv;\n"
+    "uniform sampler2D u_paint, u_base;\n"
+    "uniform float u_feet;   // the walker's feet row, in the painting's pixels\n"
+    "uniform float u_ghost;  // 1 = this is the player: let half his pixels through, dithered\n"
+    "uniform float u_mode;   // 1 = Dev false colour of the base map instead of the repaint\n"
+    "uniform vec2 u_size;    // the painting in pixels, for the false-colour ramp\n"
+    "out vec4 o;\n"
+    "float bayer(vec2 p){\n"
+    "  int m[16] = int[16](0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5);\n"
+    "  return float(m[int(mod(p.y,4.0))*4 + int(mod(p.x,4.0))]) / 16.0;\n"
+    "}\n"
+    "void main(){\n"
+    "  vec4 b = texture(u_base, v_uv);\n"
+    "  float base_y = b.r * 255.0 * 256.0 + b.g * 255.0;\n"
+    "  if (u_mode > 0.5) {\n"
+    "    if (b.b < 0.5) discard;\n"
+    "    float t = clamp(base_y / max(u_size.y, 1.0), 0.0, 1.0);\n"
+    "    o = vec4(t, 1.0 - t, 0.35, 1.0); return;\n"
+    "  }\n"
+    "  if (b.b < 0.5) discard;                 // not foreground: nothing stands here\n"
+    "  if (base_y <= u_feet) discard;          // it meets the ground behind the walker\n"
+    "  if (u_ghost > 0.5 && bayer(gl_FragCoord.xy) < 0.5) discard;   // the player shows through\n"
+    "  o = vec4(texture(u_paint, v_uv).rgb, 1.0);\n"
+    "}\n";
+
 // One shader source, two dialects: the bodies below are written without a #version line and
 // `make_shader` prepends the right one. ES needs the precision qualifiers, desktop core must not
 // have `es` in the version. Nothing else in these shaders differs between the two.
@@ -2132,6 +2250,24 @@ static void field_gl_init(Field *f) {
         f->s_sharp = glGetUniformLocation(f->sprog, "u_sharp");
         f->s_hk = glGetUniformLocation(f->sprog, "u_hk");
         f->s_depth = glGetUniformLocation(f->sprog, "u_depth");
+    }
+    {
+        GLuint rv = make_shader(GL_VERTEX_SHADER, RVS), rf = make_shader(GL_FRAGMENT_SHADER, RFS);
+        f->rprog = glCreateProgram();
+        glAttachShader(f->rprog, rv);
+        glAttachShader(f->rprog, rf);
+        glLinkProgram(f->rprog);
+        GLint ok = 0;
+        glGetProgramiv(f->rprog, GL_LINK_STATUS, &ok);
+        if (!ok) { char log[512]; glGetProgramInfoLog(f->rprog, sizeof(log), nullptr, log); SDL_Log("field: repaint link: %s", log); }
+        glDeleteShader(rv); glDeleteShader(rf);
+        f->r_mvp = glGetUniformLocation(f->rprog, "u_mvp");
+        f->r_paint = glGetUniformLocation(f->rprog, "u_paint");
+        f->r_base = glGetUniformLocation(f->rprog, "u_base");
+        f->r_feet = glGetUniformLocation(f->rprog, "u_feet");
+        f->r_ghost = glGetUniformLocation(f->rprog, "u_ghost");
+        f->r_mode = glGetUniformLocation(f->rprog, "u_mode");
+        f->r_uv = glGetUniformLocation(f->rprog, "u_size");
     }
 
     glGenVertexArrays(1, &f->vao);
@@ -2955,6 +3091,741 @@ static void draw_nav_labels(Field *f, float ox, float oy, float dw, float dh) {
     }
 }
 
+// ───────────────────────── screen maps ─────────────────────────
+//
+// The other half of the field. A SCREEN is a painting of the whole view (FF7/FF8 field screens) and
+// a text file, `story/field/screens/<map>_<zone>.screen`, saying where the ground is in the
+// painting's own pixels. Nothing here is 3D: the navmesh is the same convex-polygon code with z = 0,
+// and the frame is one y-sorted list of rectangles — walkers by their feet, occluder cut-outs by the
+// screen row where they meet the ground. Larger y draws later, so it is in front.
+//
+//   size W H
+//   base <file>                          the foreground base-row map, beside the painting
+//   poly <id>: x y, x y, x y[, ...]      convex, in the painting's pixels
+//   exit <edge> x0 y0 x1 y1 <target>     a segment on the frame edge (edge = left|right|top|bottom)
+//   spawn x y
+//   scale_near S0 at y0
+//   scale_far  S1 at y1
+//
+// An optional sidecar `<map>_<zone>.triggers` carries what the writer owns, in the same pixels:
+//   message x y w h <text-id>
+//   npc x y <walker> <facing> <text-id>
+
+static void field_say(Field *f, const char *who, const char *id);
+static void fire(FieldEvent *ev, int kind, const char *arg);
+
+// The walker's size at a screen row: the whole illusion of depth on a flat painting, and what the
+// walk speed is scaled by too, so crossing the far end of a square takes as long as it looks.
+static float scr_scale_at(Field *f, float y) {
+    float dy = f->sc_far_y - f->sc_near_y;
+    float t = (fabsf(dy) < 1e-3f) ? 0.0f : (y - f->sc_near_y) / dy;
+    if (t < -0.5f) t = -0.5f;
+    if (t > 1.5f) t = 1.5f;
+    float s = f->sc_near + (f->sc_far - f->sc_near) * t;
+    return s < 0.05f ? 0.05f : s;
+}
+
+// The walker radius is authored in cells like the 3D field's; on a screen it is pixels, and it
+// shrinks with the walker, or a distant figure would be held a metre off a near wall.
+static float scr_radius(Field *f) { return f->walk_radius * PX_PER_CELL * scr_scale_at(f, f->pz); }
+
+static int edge_id(const char *s) {
+    return !strcmp(s, "left") ? 0 : !strcmp(s, "right") ? 1 : !strcmp(s, "top") ? 2 : !strcmp(s, "bottom") ? 3 : -1;
+}
+static const char *EDGE_NAME[4] = {"left", "right", "top", "bottom"};
+
+// The player is never left off the mesh. A point outside every polygon is moved to the centroid of
+// the nearest one — that is always inside, because the polygons are convex — and it is logged,
+// because it means a spawn or a restored position no longer agrees with the navmesh.
+// The internal viewport is the phone's shape at a fixed 360 height, exactly as the 3D field's
+// `fill width` is; the painting then covers it. zoom 1 = cover, so the screen is always full.
+static int scr_view_w(Field *f, int win_w, int win_h) {
+    (void)f;
+    int vw = (int)((float)FBO_H * (float)win_w / (win_h > 0 ? (float)win_h : 1.0f) + 0.5f);
+    if (vw < 320) vw = 320;
+    if (vw > FBO_W) vw = FBO_W;
+    return vw;
+}
+static float scr_view_scale(Field *f, int vw) {
+    float sw = f->scr_w > 1.0f ? f->scr_w : 1.0f, sh = f->scr_h > 1.0f ? f->scr_h : 1.0f;
+    return f->zoom * fmaxf((float)vw / sw, (float)FBO_H / sh);
+}
+
+static void screen_place(Field *f, float x, float y, int facing) {
+    f->px = x; f->pz = y; f->py = 0.0f; f->facing = facing;
+    f->poly = mesh_find(f, x, y);
+    if (f->poly < 0) {
+        f->poly = mesh_nearest(f, x, y);
+        if (f->poly >= 0) {
+            SDL_Log("field: screen %s: %.0f,%.0f is outside every polygon; snapped to poly %d at %.0f,%.0f",
+                    f->scr_name, x, y, f->polys[f->poly].id, f->polys[f->poly].cx, f->polys[f->poly].cz);
+            f->px = f->polys[f->poly].cx; f->pz = f->polys[f->poly].cz;
+        } else SDL_Log("field: screen %s has no polygons to stand on", f->scr_name);
+    }
+    f->poly = wall_buffer(f, f->poly, &f->px, &f->pz, scr_radius(f));
+    for (int i = 0; i < f->sexit_count; i++) {
+        ScrExit *e = &f->sexits[i];
+        float ex, ey, t = 0;
+        float dx = e->x1 - e->x0, dy = e->y1 - e->y0, l2 = dx * dx + dy * dy;
+        if (l2 > 1e-6f) t = ((f->px - e->x0) * dx + (f->pz - e->y0) * dy) / l2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        ex = e->x0 + dx * t; ey = e->y0 + dy * t;
+        float d = sqrtf((f->px - ex) * (f->px - ex) + (f->pz - ey) * (f->pz - ey));
+        e->inside = d < scr_radius(f) + 8.0f;             // standing in your own doorway never fires
+    }
+    for (int i = 0; i < f->trig_count; i++) {
+        FTrig *t = &f->trigs[i];
+        t->inside = f->px >= t->x && f->pz >= t->y && f->px < t->x + t->w && f->pz < t->y + t->h;
+    }
+}
+
+// The painting and the base map. Kept apart from the parser because it is RETRIED: a hot reload can
+// land while Android has the app in the background, and a GL call made then returns no texture name
+// at all, which would leave the screen permanently blank until the next map change. screen_tick asks
+// for a retry once a second while either is missing, so it heals itself the moment the app is up.
+static void screen_load_images(Field *f) {
+    char rel[200];
+    if (!f->scr_paint.id) {
+        snprintf(rel, sizeof(rel), "field/screens/%s", f->scr_paint_file);
+        size_t sz = 0;
+        void *data = field_read(rel, &sz);
+        if (data) {
+            int w = 0, h = 0, nc = 0;
+            unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
+            SDL_free(data);
+            if (px) { f->scr_paint = ftex_upload(px, w, h, false, false); stbi_image_free(px); }
+        }
+        if (!f->scr_paint.id) SDL_Log("field: no painting at %s; the screen draws on flat blue", rel);
+    }
+    // The base map is sampled per pixel and its channels are numbers, not colour: NEAREST, no mips.
+    if (!f->scr_base.id) {
+        snprintf(rel, sizeof(rel), "field/screens/%s", f->scr_base_file);
+        size_t sz = 0;
+        void *data = field_read(rel, &sz);
+        if (data) {
+            int w = 0, h = 0, nc = 0;
+            unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &nc, 4);
+            SDL_free(data);
+            if (px) {
+                f->scr_base = ftex_upload(px, w, h, false, false);
+                stbi_image_free(px);
+                if (f->scr_paint.id && (w != f->scr_paint.w || h != f->scr_paint.h))
+                    SDL_Log("field: base map %dx%d does not match the painting %dx%d; the two are sampled "
+                            "by the same uv, so the foreground will be offset", w, h, f->scr_paint.w, f->scr_paint.h);
+            }
+        }
+        if (!f->scr_base.id) SDL_Log("field: no base map at %s; nothing on this screen stands in front", rel);
+    }
+}
+
+// message/npc lines, in the painting's pixels. The writer's side owns this file; a screen without
+// one is simply a screen you can only walk around in.
+static void screen_triggers(Field *f, const char *name) {
+    char rel[160];
+    snprintf(rel, sizeof(rel), "field/screens/%s.triggers", name);
+    size_t sz = 0;
+    char *text = (char *)field_read(rel, &sz);
+    if (!text) return;
+    char *p = text;
+    while (p && *p) {
+        char *nl = strchr(p, '\n');
+        if (nl) *nl = 0;
+        char *line = p;
+        p = nl ? nl + 1 : nullptr;
+        while (*line == ' ' || *line == '\t') line++;
+        char *cr = strchr(line, '\r');
+        if (cr) *cr = 0;
+        if (!line[0] || line[0] == '#') continue;
+        char kind[16] = "", a[40] = "", b[40] = "", id[64] = "";
+        float x = 0, y = 0, w = 0, h = 0;
+        if (sscanf(line, "%15s", kind) != 1) continue;
+        if (!strcmp(kind, "message") && f->trig_count < F_TRIGS) {
+            if (sscanf(line, "%*s %f %f %f %f %63s", &x, &y, &w, &h, id) != 5) continue;
+            FTrig *t = &f->trigs[f->trig_count++];
+            memset(t, 0, sizeof(*t));
+            t->x = (short)x; t->y = (short)y; t->w = (short)w; t->h = (short)h;
+            t->kind = TG_MESSAGE;
+            snprintf(t->arg, sizeof(t->arg), "%s", id);
+        } else if (!strcmp(kind, "npc") && f->npc_count < F_NPCS) {
+            if (sscanf(line, "%*s %f %f %39s %39s %63s", &x, &y, a, b, id) != 5) continue;
+            FNpc *np = &f->npcs[f->npc_count++];
+            memset(np, 0, sizeof(*np));
+            np->x = (short)x; np->y = (short)y;
+            snprintf(np->walker, sizeof(np->walker), "%s", a);
+            np->facing = facing_char(b[0]);
+            snprintf(np->say, sizeof(np->say), "%s", id);
+            np->art = art_get(f, "walkers", np->walker);
+        } else SDL_Log("field: %s: unknown trigger line \"%s\"", rel, line);
+    }
+    SDL_free(text);
+}
+
+// Loads story/field/screens/<name>.screen and everything it names. Returns false — leaving the field
+// untouched — when there is no such screen, which is how field_load_map decides which kind a name is.
+static bool screen_load(Field *f, const char *name) {
+    char rel[160];
+    snprintf(rel, sizeof(rel), "field/screens/%s.screen", name);
+    size_t sz = 0;
+    char *text = (char *)field_read(rel, &sz);
+    if (!text) return false;
+
+    field_free_map(f);
+    f->is_screen = 1;
+    snprintf(f->scr_name, sizeof(f->scr_name), "%s", name);
+    snprintf(f->map_name, sizeof(f->map_name), "%s", name);
+    f->scr_w = 1280; f->scr_h = 720;
+    f->sc_near = 1.0f; f->sc_near_y = 720; f->sc_far = 0.5f; f->sc_far_y = 0;
+    f->scr_spawn_x = 640; f->scr_spawn_y = 600;
+    if (f->zoom < 0.5f || f->zoom > 6.0f) f->zoom = 1.0f;
+    int dropped = 0;
+    snprintf(f->scr_base_file, sizeof(f->scr_base_file), "%s_base.png", name);   // contract defaults
+    snprintf(f->scr_paint_file, sizeof(f->scr_paint_file), "%s_paint.png", name);
+    char *base_file = f->scr_base_file, *paint_file = f->scr_paint_file;
+
+    char *p = text;
+    while (p && *p) {
+        char *nl = strchr(p, '\n');
+        if (nl) *nl = 0;
+        char *line = p;
+        p = nl ? nl + 1 : nullptr;
+        while (*line == ' ' || *line == '\t') line++;
+        char *cr = strchr(line, '\r');
+        if (cr) *cr = 0;
+        if (!line[0] || line[0] == '#') continue;
+        char kind[16] = "";
+        if (sscanf(line, "%15s", kind) != 1) continue;
+
+        if (!strcmp(kind, "size")) sscanf(line, "%*s %f %f", &f->scr_w, &f->scr_h);
+        // The tool writes these as repo paths (`story/field/screens/x.png`); the game reads by the
+        // name alone, out of the pref dir or the APK. Taking the last component covers both.
+        else if (!strcmp(kind, "paint") || !strcmp(kind, "base")) {
+            char path[160] = "";
+            if (sscanf(line, "%*s %159s", path) != 1) continue;
+            const char *slash = strrchr(path, '/');
+            const char *leaf = slash ? slash + 1 : path;
+            if (!strcmp(kind, "paint")) snprintf(f->scr_paint_file, sizeof(f->scr_paint_file), "%s", leaf);
+            else snprintf(f->scr_base_file, sizeof(f->scr_base_file), "%s", leaf);
+        }
+        // `map`/`zone` name the screen, which its file name already does; `walk` is the mask the
+        // polygons were traced from and `fg` the cut-out the base map was made from. The engine
+        // needs none of the four, and says nothing about them, so the tool can keep writing them.
+        else if (!strcmp(kind, "map") || !strcmp(kind, "zone") || !strcmp(kind, "walk") || !strcmp(kind, "fg")) continue;
+        else if (!strcmp(kind, "spawn")) sscanf(line, "%*s %f %f", &f->scr_spawn_x, &f->scr_spawn_y);
+        else if (!strcmp(kind, "scale_near")) sscanf(line, "%*s %f at %f", &f->sc_near, &f->sc_near_y);
+        else if (!strcmp(kind, "scale_far")) sscanf(line, "%*s %f at %f", &f->sc_far, &f->sc_far_y);
+        else if (!strcmp(kind, "poly")) {
+            char *c = strchr(line, ':');
+            if (!c) continue;
+            if (f->poly_count >= F_POLYS) {
+                dropped++;                        // counted and shouted about after the file, once
+                continue;
+            }
+            NavPoly *P = &f->polys[f->poly_count];
+            memset(P, 0, sizeof(*P));
+            P->id = atoi(line + 4);
+            char *v = c + 1;
+            while (*v && P->n < F_POLY_V) {
+                float x = 0, y = 0;
+                if (sscanf(v, " %f %f", &x, &y) != 2) break;
+                P->vx[P->n] = x; P->vz[P->n] = y; P->vy[P->n] = 0.0f; P->n++;
+                char *cm = strchr(v, ',');
+                if (!cm) break;
+                v = cm + 1;
+            }
+            if (P->n >= 3) { poly_finish(P); f->poly_count++; }
+            else SDL_Log("field: %s: poly %d has %d points, ignoring it", rel, P->id, P->n);
+        } else if (!strcmp(kind, "base")) {
+            char bf[96] = "";
+            if (sscanf(line, "%*s %95s", bf) != 1) continue;
+            snprintf(base_file, sizeof(base_file), "%s", bf);
+        } else if (!strcmp(kind, "exit")) {
+            if (f->sexit_count >= F_SEXITS) continue;
+            char e[16] = "", to[32] = "";
+            float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+            if (sscanf(line, "%*s %15s %f %f %f %f %31s", e, &x0, &y0, &x1, &y1, to) != 6) {
+                SDL_Log("field: %s: bad exit line \"%s\"", rel, line);
+                continue;
+            }
+            int ed = edge_id(e);
+            if (ed < 0) { SDL_Log("field: %s: \"%s\" is not an edge", rel, e); continue; }
+            ScrExit *x = &f->sexits[f->sexit_count++];
+            memset(x, 0, sizeof(*x));
+            x->edge = ed; x->x0 = x0; x->y0 = y0; x->x1 = x1; x->y1 = y1;
+            snprintf(x->map, sizeof(x->map), "%s", to);
+        } else SDL_Log("field: %s: unknown line \"%s\"", rel, line);
+    }
+    SDL_free(text);
+
+    if (dropped)
+        SDL_Log("field: screen %s has %d more poly lines than F_POLYS (%d) — %d POLYGONS WERE DROPPED "
+                "and that much of the map is not walkable. Raise F_POLYS.", name, dropped, F_POLYS, dropped);
+    screen_load_images(f);
+    mesh_link(f);
+    screen_triggers(f, name);
+    if (!f->poly_count) SDL_Log("field: screen %s has no poly lines; nothing is walkable", name);
+    f->msg[0] = 0; f->msg_who[0] = 0; f->msg_t = 0;
+    f->cam_x = f->scr_spawn_x; f->cam_y = f->scr_spawn_y;
+    screen_place(f, f->scr_spawn_x, f->scr_spawn_y, 0);
+    SDL_Log("field: screen %s loaded (%.0fx%.0f, %d polys, base %s, %d exits)",
+            name, f->scr_w, f->scr_h, f->poly_count, f->scr_base.id ? "yes" : "no", f->sexit_count);
+    return true;
+}
+
+// The painting's pixels -> clip space. Column-major like everything m_mul produces; y is down in the
+// painting and up in clip, which is the only sign that differs from the 3D path.
+static void scr_matrix(Field *f, float *m, int vw, int vh, float s) {
+    memset(m, 0, sizeof(float) * 16);
+    m[0] = 2.0f * s / vw;   m[12] = -f->cam_x * 2.0f * s / vw;
+    m[5] = -2.0f * s / vh;  m[13] = f->cam_y * 2.0f * s / vh;
+    m[10] = 1.0f;
+    m[15] = 1.0f;
+}
+
+static void push_rect(Field *f, int *n, float x0, float y0, float x1, float y1,
+                      float u0, float v0, float u1, float v1) {
+    FVert *w = f->spr;
+    float a[3] = {x0, y0, 0}, b[3] = {x1, y0, 0}, c[3] = {x1, y1, 0}, d[3] = {x0, y1, 0};
+    quad(&w, n, f->spr_cap, a, b, c, d, u0, v0, u1, v1, 1.0f, 1.0f);
+}
+
+static void screen_render(Field *f, int win_w, int win_h, int vw, int vh) {
+    float s = scr_view_scale(f, vw);
+    float rw = vw / s, rh = vh / s;                       // the painting region the view can see
+    f->cam_x = (rw >= f->scr_w) ? f->scr_w * 0.5f
+             : fminf(fmaxf(f->cam_x, rw * 0.5f), f->scr_w - rw * 0.5f);
+    f->cam_y = (rh >= f->scr_h) ? f->scr_h * 0.5f
+             : fminf(fmaxf(f->cam_y, rh * 0.5f), f->scr_h - rh * 0.5f);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, f->fbo);
+    glViewport(0, 0, vw, vh);
+    glClearColor(0.05f, 0.07f, 0.12f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);                             // 2D: the y-sort is the whole depth rule
+    glDepthMask(GL_FALSE);
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    glUseProgram(f->prog);
+    glUniform1i(f->u_tex, 0);
+    glUniform1f(f->u_ghost, 0.0f);
+    glUniform1f(f->u_depth, 0.0f);
+    glUniform1f(f->u_occl, 0.0f);
+    glUniform2f(f->u_uvoff, 0.0f, 0.0f);
+    glUniform4f(f->u_see, 0.0f, 0.0f, 1.0f, 0.0f);        // the 3D cut has no meaning on a painting
+    glActiveTexture(GL_TEXTURE0);
+    scr_matrix(f, f->mvp, vw, vh, s);
+    glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
+    glBindVertexArray(f->vao);
+
+    // Walkers, y-sorted among themselves (two figures still have to overlap the right way round).
+    // Everything in the painting is handled by the repaint pass below, not by this list.
+    struct SItem { float feet, x0, y0, x1, y1; GLuint tex; int first; bool player; };
+    SItem items[F_NPCS + 4];
+    int ni = 0, n = 0;
+
+    if (f->scr_paint.id) {
+        glUniform1f(f->u_alpha, 0.0f);
+        int first = n;
+        push_rect(f, &n, 0, 0, f->scr_w, f->scr_h, 0, 0, 1, 1);
+        glBindBuffer(GL_ARRAY_BUFFER, f->vbo_spr);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
+        set_attribs();
+        glBindTexture(GL_TEXTURE_2D, f->scr_paint.id);
+        glDrawArrays(GL_TRIANGLES, first, 6);
+        n = 0;
+    }
+
+    for (int i = 0; i <= f->npc_count && ni < (int)(sizeof(items) / sizeof(items[0])); i++) {
+        bool player = (i == f->npc_count);
+        int art; float wx, wy; int face, frame;
+        if (player) {
+            art = art_get(f, "walkers", "falke");
+            wx = f->px; wy = f->pz; face = f->facing;
+            frame = f->walking ? ((int)(f->anim_t * 7.0f) & 3) : 0;
+        } else {
+            FNpc *np = &f->npcs[i];
+            art = np->art; wx = np->x; wy = np->y; face = np->facing; frame = 0;
+        }
+        if (art < 0) continue;
+        FTex *tx = &f->art[art].tex;
+        float sc = scr_scale_at(f, wy);
+        float fw = tx->w / 4.0f * sc, fh = tx->h / 4.0f * sc;
+        int row = face & 3;
+        int first = n;
+        push_rect(f, &n, wx - fw * 0.5f, wy - fh, wx + fw * 0.5f, wy,
+                  frame * 0.25f, row * 0.25f, frame * 0.25f + 0.25f, row * 0.25f + 0.25f);
+        items[ni++] = {wy, wx - fw * 0.5f, wy - fh, wx + fw * 0.5f, wy, f->art[art].tex.id, first, player};
+    }
+    for (int i = 1; i < ni; i++) {                        // insertion sort: a handful of walkers
+        SItem it = items[i];
+        int j = i - 1;
+        while (j >= 0 && items[j].feet > it.feet) { items[j + 1] = items[j]; j--; }
+        items[j + 1] = it;
+    }
+    // The examine mark rides above the player, outside the sort and outside the repaint: it is
+    // interface, not a thing in the painting, and nothing may ever cover it.
+    int mark_first = -1; GLuint mark_tex = 0;
+    if (!f->msg[0] && (f->exam_trig >= 0 || f->exam_npc >= 0)) {
+        int mk = art_get(f, "props", "mark_examine");
+        int pw = art_get(f, "walkers", "falke");
+        if (mk >= 0 && pw >= 0) {
+            FTex *mt = &f->art[mk].tex, *px = &f->art[pw].tex;
+            float sc = scr_scale_at(f, f->pz);
+            float bob = 3.0f * sinf(f->water_t * 5.0f);
+            float top = f->pz - px->h / 4.0f * sc - 6.0f + bob;
+            mark_first = n;
+            mark_tex = mt->id;
+            push_rect(f, &n, f->px - mt->w * 0.5f * sc, top - mt->h * sc, f->px + mt->w * 0.5f * sc, top, 0, 0, 1, 1);
+        }
+    }
+    // The repaint quads: one per walker, over its own rectangle, textured from the painting.
+    int repaint_first = n;
+    for (int i = 0; i < ni; i++)
+        push_rect(f, &n, items[i].x0, items[i].y0, items[i].x1, items[i].y1,
+                  items[i].x0 / f->scr_w, items[i].y0 / f->scr_h, items[i].x1 / f->scr_w, items[i].y1 / f->scr_h);
+
+    if (n) {
+        glBindBuffer(GL_ARRAY_BUFFER, f->vbo_spr);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
+        set_attribs();
+        glUniform1f(f->u_alpha, 0.5f);
+        for (int i = 0; i < ni; i++) {
+            glBindTexture(GL_TEXTURE_2D, items[i].tex);
+            glDrawArrays(GL_TRIANGLES, items[i].first, 6);
+        }
+        if (mark_first >= 0) {
+            glBindTexture(GL_TEXTURE_2D, mark_tex);
+            glDrawArrays(GL_TRIANGLES, mark_first, 6);
+        }
+        // Now put the painting back wherever something nearer stands. This is what "in front" means
+        // here: there is no cut-out and no per-object sort, only base_y > feet_y, per pixel. The
+        // player's own repaint drops every other pixel on a Bayer grid, so where he is hidden he
+        // reads as the dithered silhouette the FF games use rather than vanishing.
+        if (f->scr_base.id && f->scr_paint.id) {
+            glUseProgram(f->rprog);
+            glUniformMatrix4fv(f->r_mvp, 1, GL_FALSE, f->mvp);
+            glUniform1i(f->r_paint, 0);
+            glUniform1i(f->r_base, 1);
+            glUniform1f(f->r_mode, 0.0f);
+            glUniform2f(f->r_uv, f->scr_w, f->scr_h);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, f->scr_base.id);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, f->scr_paint.id);
+            for (int i = 0; i < ni; i++) {
+                glUniform1f(f->r_feet, items[i].feet);
+                glUniform1f(f->r_ghost, (items[i].player && f->see_on) ? 1.0f : 0.0f);
+                glDrawArrays(GL_TRIANGLES, repaint_first + i * 6, 6);
+            }
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glActiveTexture(GL_TEXTURE0);
+            glUseProgram(f->prog);
+            glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
+            glUniform1i(f->u_tex, 0);
+            glUniform1f(f->u_ghost, 0.0f);
+            glUniform1f(f->u_depth, 0.0f);
+            glUniform1f(f->u_occl, 0.0f);
+            glUniform4f(f->u_see, 0.0f, 0.0f, 1.0f, 0.0f);
+            glUniform2f(f->u_uvoff, 0.0f, 0.0f);
+        }
+    }
+
+    // Dev: the base map in false colour, green where a thing meets the ground high up the screen
+    // (far) through red where it meets it low (near). Only the foreground is drawn.
+    if ((f->scr_debug & 2) && f->scr_base.id) {
+        int first = 0;
+        n = 0;
+        push_rect(f, &n, 0, 0, f->scr_w, f->scr_h, 0, 0, 1, 1);
+        glBindBuffer(GL_ARRAY_BUFFER, f->vbo_spr);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)n, f->spr, GL_STREAM_DRAW);
+        set_attribs();
+        glUseProgram(f->rprog);
+        glUniformMatrix4fv(f->r_mvp, 1, GL_FALSE, f->mvp);
+        glUniform1i(f->r_paint, 0);
+        glUniform1i(f->r_base, 1);
+        glUniform1f(f->r_mode, 1.0f);
+        glUniform1f(f->r_ghost, 0.0f);
+        glUniform2f(f->r_uv, f->scr_w, f->scr_h);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, f->scr_base.id);
+        glActiveTexture(GL_TEXTURE0);
+        glDrawArrays(GL_TRIANGLES, first, 6);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0);
+        glUseProgram(f->prog);
+        glUniformMatrix4fv(f->u_mvp, 1, GL_FALSE, f->mvp);
+        glUniform1i(f->u_tex, 0);
+    }
+
+    // Dev overlays: the nav polygons, the occluder boxes with their ground rows, the exit segments.
+    if (f->scr_debug & 5) {
+        int ln = 0;
+        FVert *o = f->spr;
+        auto line2 = [&](float ax, float ay, float bx, float by, int r, int g, int b) {
+            if (ln + 2 > f->spr_cap) return;
+            o[ln].x = ax; o[ln].y = ay; o[ln].z = 0; o[ln].u = o[ln].v = 0.5f;
+            o[ln].r = (unsigned char)r; o[ln].g = (unsigned char)g; o[ln].b = (unsigned char)b; o[ln].a = 255; ln++;
+            o[ln].x = bx; o[ln].y = by; o[ln].z = 0; o[ln].u = o[ln].v = 0.5f;
+            o[ln].r = (unsigned char)r; o[ln].g = (unsigned char)g; o[ln].b = (unsigned char)b; o[ln].a = 255; ln++;
+        };
+        if (f->scr_debug & 1)
+            for (int i = 0; i < f->poly_count; i++) {
+                NavPoly *P = &f->polys[i];
+                uint32_t hh = fhash(P->id, 17, 5);
+                int r = 110 + (hh & 127), g = 110 + ((hh >> 8) & 127), b = 110 + ((hh >> 16) & 127);
+                for (int e = 0; e < P->n; e++) {
+                    int j = (e + 1) % P->n;
+                    int k = (P->nb[e] >= 0) ? 2 : 1;                  // an open edge draws bright
+                    line2(P->vx[e], P->vz[e], P->vx[j], P->vz[j], r / k, g / k, b / k);
+                }
+            }
+        if (f->scr_debug & 4)
+            for (int i = 0; i < f->sexit_count; i++) {
+                ScrExit *e = &f->sexits[i];
+                line2(e->x0, e->y0, e->x1, e->y1, 90, 255, 130);
+                line2(e->x0, e->y0 - 5, e->x1, e->y1 - 5, 90, 255, 130);
+                line2(e->x0, e->y0 + 5, e->x1, e->y1 + 5, 90, 255, 130);
+            }
+        if (ln) {
+            glBindBuffer(GL_ARRAY_BUFFER, f->vbo_spr);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(FVert) * (size_t)ln, f->spr, GL_STREAM_DRAW);
+            set_attribs();
+            glUniform1f(f->u_alpha, 0.0f);
+            glBindTexture(GL_TEXTURE_2D, f->white.id);
+            glDrawArrays(GL_LINES, 0, ln);
+        }
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, win_w, win_h);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glUseProgram(0);
+}
+
+// Polygon ids drawn over the nav wireframe, the same debug aid the 3D field has.
+static void screen_labels(Field *f, float ox, float oy, float dw, float dh, int vw, int vh, float s) {
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    ImFont *font = ImGui::GetFont();
+    for (int i = 0; i < f->poly_count; i++) {
+        NavPoly *P = &f->polys[i];
+        float fx = (P->cx - f->cam_x) * s + vw * 0.5f, fy = (P->cz - f->cam_y) * s + vh * 0.5f;
+        if (fx < 0 || fy < 0 || fx > vw || fy > vh) continue;
+        char lbl[16];
+        snprintf(lbl, sizeof(lbl), "%d", P->id);
+        dl->AddText(font, dh * 0.045f, ImVec2(ox + fx / vw * dw, oy + fy / vh * dh),
+                    IM_COL32(255, 255, 160, 220), lbl);
+    }
+}
+
+static void screen_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *ev) {
+    f->water_t += dt;
+    f->msg_t += dt;
+    if (!f->scr_paint.id || !f->scr_base.id) {        // a reload that landed while backgrounded
+        f->scr_retry += dt;
+        if (f->scr_retry > 1.0f) { f->scr_retry = 0.0f; screen_load_images(f); }
+    }
+    field_input(f, w, h, ui_blocked, dt);
+
+    float sx = 0, sy = 0;
+    bool moving = f->msg[0] ? false : stick_dir(f, w, &sx, &sy);
+    float depth = scr_scale_at(f, f->pz);
+    if (moving) {
+        float l = sqrtf(sx * sx + sy * sy);
+        if (l > 1e-4f) { sx /= l; sy /= l; }
+        float sp = WALK_SPEED * PX_PER_CELL * depth * (f->run ? RUN_MULT : 1.0f) * dt;
+        int np = mesh_move(f, f->poly, &f->px, &f->pz, sx * sp, sy * sp);
+        if (np >= 0) f->poly = np;
+        f->poly = wall_buffer(f, f->poly, &f->px, &f->pz, scr_radius(f));
+        f->facing = (fabsf(sx) > fabsf(sy)) ? (sx > 0 ? 2 : 1) : (sy > 0 ? 0 : 3);
+        f->anim_t += dt * (f->run ? RUN_MULT : 1.0f);
+    }
+    f->walking = moving;
+    for (int i = 0; i < f->npc_count; i++) {              // NPCs are soft bodies here too
+        float dx = f->px - f->npcs[i].x, dy = f->pz - f->npcs[i].y;
+        float d = sqrtf(dx * dx + dy * dy), r = NPC_RADIUS * PX_PER_CELL * depth;
+        if (d >= r || d < 1e-4f) continue;
+        int np = mesh_move(f, f->poly, &f->px, &f->pz, dx / d * (r - d), dy / d * (r - d));
+        if (np >= 0) f->poly = np;
+        f->poly = wall_buffer(f, f->poly, &f->px, &f->pz, scr_radius(f));
+    }
+    f->py = 0.0f;
+
+    // The view takes the SCREEN's aspect, not the painting's, and the painting is scaled to COVER it
+    // (owner's call: no black bars). Whichever way the two shapes differ, the excess scrolls, and the
+    // camera clamp below keeps it inside the painting.
+    int vw = scr_view_w(f, w, h);
+    float s = scr_view_scale(f, vw);
+    float rw = vw / s, rh = FBO_H / s;                    // keep the player inside the middle 50%
+    if (f->px - f->cam_x > rw * 0.25f) f->cam_x = f->px - rw * 0.25f;
+    if (f->cam_x - f->px > rw * 0.25f) f->cam_x = f->px + rw * 0.25f;
+    if (f->pz - f->cam_y > rh * 0.25f) f->cam_y = f->pz - rh * 0.25f;
+    if (f->cam_y - f->pz > rh * 0.25f) f->cam_y = f->pz + rh * 0.25f;
+
+    // What the interact press would open: a message rectangle you stand in or face, or an NPC.
+    f->exam_trig = f->exam_npc = -1;
+    float best = 1e9f;
+    const float fwx[4] = {0, -1, 1, 0}, fwy[4] = {1, 0, 0, -1};
+    float reach = PX_PER_CELL * depth;
+    for (int i = 0; i < f->trig_count; i++) {
+        FTrig *t = &f->trigs[i];
+        bool in = f->px >= t->x && f->pz >= t->y && f->px < t->x + t->w && f->pz < t->y + t->h;
+        t->inside = in;
+        if (t->kind != TG_MESSAGE) continue;
+        float cx = f->px < t->x ? t->x : (f->px > t->x + t->w ? t->x + t->w : f->px);
+        float cy = f->pz < t->y ? t->y : (f->pz > t->y + t->h ? t->y + t->h : f->pz);
+        float dx = cx - f->px, dy = cy - f->pz, d = sqrtf(dx * dx + dy * dy);
+        if (!in) {
+            if (d > reach * 0.6f) continue;
+            if (d > 1e-4f && (dx / d) * fwx[f->facing & 3] + (dy / d) * fwy[f->facing & 3] < 0.25f) continue;
+        }
+        if (d < best) { best = d; f->exam_trig = i; }
+    }
+    for (int i = 0; i < f->npc_count; i++) {
+        float ex = f->npcs[i].x - f->px, ey = f->npcs[i].y - f->pz;
+        float d = sqrtf(ex * ex + ey * ey);
+        if (d > reach * 1.8f || d < 1e-3f) continue;
+        if ((ex / d) * fwx[f->facing & 3] + (ey / d) * fwy[f->facing & 3] < 0.25f) continue;
+        if (d < best) { best = d; f->exam_npc = i; f->exam_trig = -1; }
+    }
+
+    // Exits fire on the rising edge: the player's disc touching the segment. The target's matching
+    // opposite-edge exit is where you come out, so two screens back onto each other without a table.
+    bool changed = false;
+    for (int i = 0; i < f->sexit_count && !changed; i++) {
+        ScrExit *e = &f->sexits[i];
+        float dx = e->x1 - e->x0, dy = e->y1 - e->y0, l2 = dx * dx + dy * dy, t = 0;
+        if (l2 > 1e-6f) t = ((f->px - e->x0) * dx + (f->pz - e->y0) * dy) / l2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        float qx = e->x0 + dx * t, qy = e->y0 + dy * t;
+        float d = sqrtf((f->px - qx) * (f->px - qx) + (f->pz - qy) * (f->pz - qy));
+        bool in = d < scr_radius(f) + 8.0f;
+        if (!in || e->inside) { e->inside = in; continue; }
+        char to[32];
+        int back = e->edge ^ 1;                                    // left<->right, top<->bottom
+        snprintf(to, sizeof(to), "%s", e->map);
+        field_load_map(f, to);
+        changed = true;
+        if (!f->is_screen) return;                                 // walked into a 3D map: it takes over
+        {
+            for (int j = 0; j < f->sexit_count; j++) {
+                ScrExit *o = &f->sexits[j];
+                if (o->edge != back) continue;
+                float mx = (o->x0 + o->x1) * 0.5f, my = (o->y0 + o->y1) * 0.5f;
+                float inx = (back == 0) ? 1.0f : (back == 1) ? -1.0f : 0.0f;
+                float iny = (back == 2) ? 1.0f : (back == 3) ? -1.0f : 0.0f;
+                float step = scr_radius(f) + 24.0f;
+                screen_place(f, mx + inx * step, my + iny * step, f->facing);
+                f->cam_x = f->px; f->cam_y = f->pz;
+                break;
+            }
+        }
+    }
+
+    if (!changed && f->tapped) {
+        if (f->msg[0]) { f->msg[0] = 0; f->msg_who[0] = 0; }
+        else if (f->exam_npc >= 0) {
+            FNpc *np = &f->npcs[f->exam_npc];
+            if (np->scene[0]) fire(ev, FE_SCENE, np->scene);
+            else field_say(f, np->name, np->say[0] ? np->say : "missing.line");
+        } else if (f->exam_trig >= 0) field_say(f, nullptr, f->trigs[f->exam_trig].arg);
+    }
+
+    if (changed) {                                       // a new screen has its own size and ramp
+        vw = scr_view_w(f, w, h);
+        s = scr_view_scale(f, vw);
+        f->exam_trig = f->exam_npc = -1;
+    }
+    screen_render(f, w, h, vw, FBO_H);
+
+    float fit = fminf((float)w / vw, (float)h / FBO_H);
+    float dw = vw * fit, dh = FBO_H * fit, ox = (w - dw) * 0.5f, oy = (h - dh) * 0.5f;
+    f->view_ox = ox; f->view_oy = oy; f->view_dw = dw; f->view_dh = dh; f->view_vw = vw; f->view_vh = FBO_H;
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
+    dl->AddImage((ImTextureID)(intptr_t)f->fbo_tex, ImVec2(ox, oy), ImVec2(ox + dw, oy + dh),
+                 ImVec2(0.0f, 1.0f), ImVec2((float)vw / FBO_W, 0.0f));
+    if (f->scr_debug & 1) screen_labels(f, ox, oy, dw, dh, vw, FBO_H, s);
+
+    // Tap-to-print: one finger anywhere reports the painting pixel under it to the Dev messages, so
+    // a trigger rectangle or an occluder's ground row can be authored by pointing at the painting.
+    if (f->tap_armed) {
+        Touch t[8];
+        int nt = gather_touch(t, 8, w, h);
+        if (nt > 0 && !f->warn_pending) {
+            float fx = (t[0].x - ox) / (dw > 1 ? dw : 1) * vw, fy = (t[0].y - oy) / (dh > 1 ? dh : 1) * FBO_H;
+            float X = f->cam_x + (fx - vw * 0.5f) / s, Y = f->cam_y + (fy - FBO_H * 0.5f) / s;
+            snprintf(f->warn, sizeof(f->warn), "screen %s: tapped %.0f %.0f", f->scr_name, X, Y);
+            f->warn_pending = true;
+            f->tap_armed = 0;
+        }
+    }
+    draw_touch_ui(f, w, h);
+    draw_msg_box(f, w, h);
+}
+
+static bool screen_dev_ui(Field *f, char *out, int cap) {
+    bool printed = false;
+    ImGui::Text("screen %s  x %.0f y %.0f  poly %d  scale %.2f  facing %s", f->scr_name, f->px, f->pz,
+                (f->poly >= 0 && f->poly < f->poly_count) ? f->polys[f->poly].id : -1,
+                scr_scale_at(f, f->pz),
+                f->facing == 0 ? "S" : f->facing == 1 ? "W" : f->facing == 2 ? "E" : "N");
+    ImGui::TextDisabled("painting %.0fx%.0f  base %s  %d exits  %d triggers  %d npcs",
+                        f->scr_w, f->scr_h, f->scr_base.id ? "loaded" : "MISSING",
+                        f->sexit_count, f->trig_count, f->npc_count);
+    for (int i = 0; i < field_screen_count(); i++) {
+        if (i) ImGui::SameLine();
+        bool cur = !strcmp(f->scr_name, field_screen_name_at(i));
+        if (cur) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.3f, 1));
+        if (ImGui::Button(field_screen_name_at(i))) field_load_map(f, field_screen_name_at(i));
+        if (cur) ImGui::PopStyleColor();
+    }
+    ImGui::SameLine();
+    for (int i = 0; i < field_map_count(); i++) {
+        ImGui::SameLine();
+        if (ImGui::Button(field_map_name_at(i))) field_load_map(f, field_map_name_at(i));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Respawn")) screen_place(f, f->scr_spawn_x, f->scr_spawn_y, 0);
+
+    static const char *TOG[3] = {"nav polys", "base map", "exits"};
+    for (int i = 0; i < 3; i++) {
+        if (i) ImGui::SameLine();
+        bool on = (f->scr_debug & (1 << i)) != 0;
+        if (ImGui::Checkbox(TOG[i], &on)) f->scr_debug = on ? (f->scr_debug | (1 << i)) : (f->scr_debug & ~(1 << i));
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(f->tap_armed ? "tap now..." : "tap to print")) f->tap_armed = 1;
+    ImGui::SameLine();
+    bool see = f->see_on != 0;
+    if (ImGui::Checkbox("silhouette", &see)) f->see_on = see ? 1 : 0;
+
+    ImGui::SliderFloat("zoom", &f->zoom, 1.0f, 4.0f, "%.2fx");
+    ImGui::SliderFloat("scale near", &f->sc_near, 0.1f, 3.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(160);
+    ImGui::SliderFloat("at y##near", &f->sc_near_y, 0.0f, f->scr_h, "%.0f");
+    ImGui::SliderFloat("scale far", &f->sc_far, 0.1f, 3.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(160);
+    ImGui::SliderFloat("at y##far", &f->sc_far_y, 0.0f, f->scr_h, "%.0f");
+    ImGui::SliderFloat("walk radius", &f->walk_radius, 0.0f, 0.8f, "%.2f cells");
+    if (ImGui::Button("print scale")) {
+        snprintf(out, cap, "scale_near %.2f at %.0f | scale_far %.2f at %.0f",
+                 f->sc_near, f->sc_near_y, f->sc_far, f->sc_far_y);
+        printed = true;
+    }
+    return printed;
+}
+
 // ───────────────────────── public ─────────────────────────
 
 Field *field_create() {
@@ -2965,7 +3836,8 @@ Field *field_create() {
     f->walk_radius = WALK_RADIUS;
     f->zone_idx = -1;
     f->poly = -1;
-    f->fov = 0.0f;                                  // 0 = "camera not placed yet", snapped on frame 1
+    f->zoom = 1.0f;
+    f->fov = 0.0f;                                // 0 = "camera not placed yet", snapped on frame 1
     snprintf(f->map_name, sizeof(f->map_name), "halm");
     return f;
 }
@@ -3066,7 +3938,8 @@ static void fire(FieldEvent *ev, int kind, const char *arg) {
 void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *ev) {
     ev->kind = FE_NONE; ev->arg[0] = 0;
     if (!f->gl_ready) field_gl_init(f);
-    if (!f->tile_count) field_load_map(f, f->map_name);
+    if (!f->tile_count && !f->is_screen) field_load_map(f, f->map_name);
+    if (f->is_screen) { screen_tick(f, w, h, dt, ui_blocked, ev); return; }
     f->water_t += dt;
     f->msg_t += dt;
 
@@ -3197,6 +4070,7 @@ void field_tick(Field *f, int w, int h, float dt, bool ui_blocked, FieldEvent *e
 }
 
 bool field_dev_ui(Field *f, char *out, int cap) {
+    if (f->is_screen) return screen_dev_ui(f, out, cap);
     bool printed = false;
     CamZone *z = (f->zone_idx >= 0 && f->zone_idx < f->zone_count) ? &f->zones[f->zone_idx] : nullptr;
     ImGui::Text("map %s  x %.2f z %.2f  poly %d  zone %d  facing %s", f->map_name, f->px, f->pz,
@@ -3208,6 +4082,12 @@ bool field_dev_ui(Field *f, char *out, int cap) {
         if (cur) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.3f, 1));
         if (ImGui::Button(field_map_name_at(i))) field_load_map(f, field_map_name_at(i));
         if (cur) ImGui::PopStyleColor();
+    }
+    // The painted screens, from the 3D panel too — otherwise there is no way back to one once you
+    // have stepped into a block-out map, because the screen panel is the only other place they are.
+    for (int i = 0; i < field_screen_count(); i++) {
+        ImGui::SameLine();
+        if (ImGui::Button(field_screen_name_at(i))) field_load_map(f, field_screen_name_at(i));
     }
     if (f->landmark[0]) ImGui::TextDisabled("landmark: %s", f->landmark);
     ImGui::SameLine();
@@ -3292,7 +4172,7 @@ bool field_dev_ui(Field *f, char *out, int cap) {
 }
 
 void field_capture_to(Field *f, const char *map, const char *zone, int scale, const char *out_path) {
-    if (strcmp(f->map_name, map) || !f->tile_count) field_load_map(f, map);
+    if (strcmp(f->map_name, map) || !f->tile_count || f->is_screen) load_map_3d(f, map);
     int zi = -1;
     for (int i = 0; i < f->zone_count; i++) if (!strcmp(f->zones[i].id, zone)) { zi = i; break; }
     if (zi < 0) { SDL_Log("field: map %s has no zone \"%s\"", map, zone); f->cap_done = 1; return; }
@@ -3324,6 +4204,11 @@ void field_save(Field *f, FieldSave *s) {
     s->see_radius = f->see_radius;
     s->walk_radius = f->walk_radius;
     if (f->zone_idx >= 0 && f->zone_idx < f->zone_count) s->zone = f->zones[f->zone_idx];
+    s->is_screen = f->is_screen;
+    s->scr_debug = f->scr_debug;
+    s->zoom = f->zoom;
+    s->sc_near = f->sc_near;
+    s->sc_far = f->sc_far;
 }
 
 static float clampf(float v, float lo, float hi, float def) {
@@ -3347,6 +4232,22 @@ void field_restore(Field *f, const FieldSave *s) {
     f->see_on = s->see_on ? 1 : 0;
     f->see_radius = clampf(s->see_radius, 4.0f, 400.0f, 46.0f);
     f->walk_radius = clampf(s->walk_radius, 0.0f, 1.2f, WALK_RADIUS);
+
+    // A screen keeps its own few numbers: the spot in the painting, the zoom and the depth ramp the
+    // owner was tuning. Everything below is the 3D field's, and a screen never reaches it.
+    if (f->is_screen) {
+        f->scr_debug = s->scr_debug & 7;
+        f->zoom = clampf(s->zoom, 0.5f, 6.0f, 1.0f);
+        if (s->is_screen) {
+            f->sc_near = clampf(s->sc_near, 0.05f, 4.0f, f->sc_near);
+            f->sc_far = clampf(s->sc_far, 0.05f, 4.0f, f->sc_far);
+            float x = clampf(s->x, -8.0f, f->scr_w + 8.0f, -1e9f), y = clampf(s->z, -8.0f, f->scr_h + 8.0f, -1e9f);
+            if (x > -1e8f && y > -1e8f && mesh_find(f, x, y) >= 0)
+                screen_place(f, x, y, (s->facing >= 0 && s->facing < 4) ? s->facing : f->facing);
+        }
+        f->cam_x = f->px; f->cam_y = f->pz;
+        return;
+    }
 
     float x = clampf(s->x, -1.0f, (float)f->mw + 1.0f, -1e9f), z = clampf(s->z, -1.0f, (float)f->mh + 1.0f, -1e9f);
     if (x > -1e8f && z > -1e8f) {

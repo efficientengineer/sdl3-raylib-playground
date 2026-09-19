@@ -41,6 +41,10 @@ struct FieldSave {
     int32_t zone_idx, nav_debug, fill_width, show_blockers, see_on;
     float see_radius, walk_radius;
     CamZone zone;                    // the live (possibly slider-edited) zone
+    // Screen maps (a painted FF7/FF8 screen): the map name above is the screen's stem, x/z are the
+    // player's position in the painting's pixels, and these carry the view the owner was looking at.
+    int32_t is_screen, scr_debug;
+    float zoom, sc_near, sc_far;
 };
 
 Field *field_create();
@@ -74,3 +78,8 @@ void field_restore(Field *f, const FieldSave *s);
 
 int field_map_count();
 const char *field_map_name_at(int i);
+
+// Screen maps: story/field/screens/<map>_<zone>.screen, a painting the game is fitted to. The same
+// name goes to field_load_map, which routes to the screen loader when the .screen file exists.
+int field_screen_count();
+const char *field_screen_name_at(int i);
