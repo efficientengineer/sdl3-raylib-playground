@@ -33,19 +33,23 @@ for d in tmaps walkers; do
     mkdir -p "$ASSETS/field/$d"
     for f in story/field/"$d"/*; do
         case "$f" in *_debug.png|*.raw.png) continue;; esac
-        case "$f" in *.png|*.tmap) cp "$f" "$ASSETS/field/$d/";; esac
+        case "$f" in *.png|*.tmap|*.json) cp "$f" "$ASSETS/field/$d/";; esac
     done
 done
 for d in story/field/tilesets/*/; do
     [ -d "$d" ] || continue
     mkdir -p "$ASSETS/field/tilesets/$(basename "$d")"
-    for n in atlas.png atlas.json tiles.md; do
+    for n in atlas.png atlas.json tiles.md masks.png masks.json; do
         [ -f "$d$n" ] && cp "$d$n" "$ASSETS/field/tilesets/$(basename "$d")/$n"
     done
+    if [ -d "$d/swatches" ]; then
+        mkdir -p "$ASSETS/field/tilesets/$(basename "$d")/swatches"
+        cp "$d"swatches/*.png "$ASSETS/field/tilesets/$(basename "$d")/swatches/" 2>/dev/null || true
+    fi
 done
 if [ -d story/palette ]; then                        # PALETTE.md: the colours and the light tables
     mkdir -p "$ASSETS/palette"
-    for n in master.hex master.pal.png colormap.png colormap.json cycles.md; do
+    for n in master.hex master.json master.pal.png colormap.png colormap.json cycles.md; do
         [ -f "story/palette/$n" ] && cp "story/palette/$n" "$ASSETS/palette/$n"
     done
 fi

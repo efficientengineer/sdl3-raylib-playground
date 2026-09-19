@@ -116,14 +116,14 @@ for d in $FIELD_KINDS; do
         [ -f "$f" ] || continue
         # authoring scripts stay off the phone; screens carry .screen and .triggers text files
         case "$f" in *_debug.png) continue;; esac          # the ingest's own check image, not art
-        case "$f" in *.png|*.map|*.tmap|*.screen|*.triggers) ;; *) continue;; esac
+        case "$f" in *.png|*.map|*.tmap|*.screen|*.triggers|*.json) ;; *) continue;; esac
         n="$(basename "$f")"
         echo "$d/$n" >> "$SHIP_FIELD"
         sz="$(stat -f %z "$f")"
         # Text files are tiny and are regenerated in place: a `.screen` can change completely and
         # keep its byte count, which the size check below cannot see. Always push those.
         always=""
-        case "$f" in *.screen|*.triggers|*.map|*.tmap) always=1;; esac
+        case "$f" in *.screen|*.triggers|*.map|*.tmap|*.json) always=1;; esac
         if [ -n "$always" ] || ! echo "$HAVE_F" | grep -qx "$n $sz"; then
             echo "  field $d/$n"
             "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
@@ -139,24 +139,40 @@ for d in "$SCRIPT_DIR"/story/field/tilesets/*/; do
     set_name="$(basename "$d")"
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/tilesets/$set_name"
     HAVE_T="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets/$set_name && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
-    for f in "$d"atlas.png "$d"atlas.json "$d"tiles.md; do
+    for f in "$d"atlas.png "$d"atlas.json "$d"tiles.md "$d"masks.png "$d"masks.json; do
         [ -f "$f" ] || continue
         n="$(basename "$f")"
         echo "tilesets/$set_name/$n" >> "$SHIP_FIELD"
         sz="$(stat -f %z "$f")"
-        if [ "$n" = "tiles.md" ] || [ "$n" = "atlas.json" ] || ! echo "$HAVE_T" | grep -qx "$n $sz"; then
+        if [ "$n" = "tiles.md" ] || [ "$n" = "atlas.json" ] || [ "$n" = "masks.json" ] || ! echo "$HAVE_T" | grep -qx "$n $sz"; then
             echo "  tileset $set_name/$n"
             "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
             "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/tilesets/$set_name/$n && rm /data/local/tmp/$n"
         fi
     done
+    # TILES2: the terrain swatches live in their own folder beside the atlas.
+    if [ -d "$d/swatches" ]; then
+        "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/field/tilesets/$set_name/swatches"
+        HAVE_S="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets/$set_name/swatches && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
+        for f in "$d"swatches/*.png; do
+            [ -f "$f" ] || continue
+            n="$(basename "$f")"
+            echo "tilesets/$set_name/swatches/$n" >> "$SHIP_FIELD"
+            sz="$(stat -f %z "$f")"
+            if ! echo "$HAVE_S" | grep -qx "$n $sz"; then
+                echo "  swatch $set_name/$n"
+                "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
+                "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/field/tilesets/$set_name/swatches/$n && rm /data/local/tmp/$n"
+            fi
+        done
+    fi
 done
 
 # The palette (PALETTE.md / D19): the master colours, the colormap the shader reads its light from and
 # the cycle list. Small files that are rewritten in place, so they always go.
 if [ -d "$SCRIPT_DIR/story/palette" ]; then
     "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/palette"
-    for n in master.hex master.pal.png colormap.png colormap.json cycles.md; do
+    for n in master.hex master.json master.pal.png colormap.png colormap.json cycles.md; do
         f="$SCRIPT_DIR/story/palette/$n"
         [ -f "$f" ] || continue
         echo "  palette $n"
@@ -193,6 +209,7 @@ for d in $DEV_FIELD; do
     if [ "$d" = "tilesets" ]; then
         for sub in $("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets && ls -d */ 2>/dev/null'" | tr -d '\r/'); do
             for n in $("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/tilesets/$sub 2>/dev/null" | tr -d '\r'); do
+                [ "$n" = "swatches" ] && continue        # a folder, and its files are listed by path
                 grep -qx "tilesets/$sub/$n" "$SHIP_FIELD" && continue
                 echo "  prune field/tilesets/$sub/$n"
                 "$ADB" -s "$DEVICE" shell "run-as $PKG rm -f files/field/tilesets/$sub/$n"
@@ -274,7 +291,20 @@ for i in $(seq 1 12); do
     LINE=$("$ADB" -s "$DEVICE" logcat -d -s QuestGlory 2>/dev/null | grep -E "Hot reload (SUCCESS|FAILED|SKIPPED)|layout changed|failed validation" | tail -1)
     if [ -n "$LINE" ]; then
         echo "$LINE"
-        case "$LINE" in *SUCCESS*|*"layout changed"*|*"failed validation"*) echo "=== Done ==="; exit 0;; esac
+        case "$LINE" in *SUCCESS*|*"layout changed"*|*"failed validation"*)
+            # The device's own summary of what it actually loaded. The Mac reads the repo directly, so
+            # this line is the only place a missing mask or swatch on the PHONE shows up.
+            sleep 2
+            CHECK="$("$ADB" -s "$DEVICE" logcat -d -s SDL/APP 2>/dev/null | grep "SELFCHECK" | tail -1)"
+            if [ -n "$CHECK" ]; then
+                echo "${CHECK#*SDL/APP : }"
+                case "$CHECK" in *"ground quads 0,"*)
+                    echo "ERROR: the phone built NO ground quads — masks or swatches are missing on the device" >&2
+                    exit 1;; esac
+                case "$CHECK" in *"masks MISSING"*)
+                    echo "WARNING: masks.json/png did not load on the device; terrains are square cells" >&2;; esac
+            fi
+            echo "=== Done ==="; exit 0;; esac
         exit 1
     fi
     if [ -z "$("$ADB" -s "$DEVICE" shell pidof $PKG)" ]; then

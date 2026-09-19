@@ -402,6 +402,11 @@ struct TfTile {
     char cycle[16];             // hands the terrain to a palette cycle in cycles.md
     GLuint swatch;              // R8 swatch texture, art or generated
     int swatch_px_w, swatch_px_h;
+    bool swatch_art;            // true when the pixels came from swatches/<id>.png, not the placeholder
+    unsigned char fill;         // 0 = swatch art, 1 = procedural recipe
+    unsigned char recipe;       // meadow, earth, cobble, plank, water, field
+    unsigned char ramp[16];     // the master-palette ramp the recipe steps along
+    int ramp_n;
     short border_of;            // `border: <terrain> <tiles>` — the band outside the mask
     float border_w;
 
@@ -443,6 +448,7 @@ struct TfArt {
     int row_of[4];              // facing S,W,E,N -> sheet row
     bool flip[4];               // draw that row with flipped UVs (E from the W row)
     int col_stand, col_a, col_b;
+    bool has_sidecar;
 };
 
 struct TfActor { short tx, ty, px, py; int facing; };
@@ -465,6 +471,11 @@ struct TileField {
     // terrains, masks and decals (TILES2 / D20)
     short terr[TF_TERR];                      // tile indices, ascending priority; terr[0] floods the map
     int terr_count;
+    char ramp_name[24][32];
+    unsigned char ramp_idx[24][16];
+    int ramp_len[24], ramp_count;
+    int ground_mode;                          // 0 = swatch art, 1 = procedural, 2 = per-terrain (tiles.md)
+    int snap_px, wind;                        // procedural: snap features to logical px; sway the blades
     GLuint mask_tex;                          // masks.png as R8: 255 inside the terrain, 0 outside
     int mask_w, mask_h, mask_cell;
     short mask_slot[ES_COUNT][MS_COUNT][3];   // [style][shape][variant] -> x, packed with y below
@@ -562,7 +573,7 @@ struct TileField {
     GLuint prog, vao, vbo, fbo, fbo_tex, white;
     GLint u_res, u_tex, u_cmap, u_texsz, u_cmaph, u_rowa, u_rowb, u_levels, u_amb,
           u_indexed, u_nl, u_lights, u_sc, u_taps, u_drift, u_clouds, u_time, u_cam, u_mask,
-          u_pscale, u_poff;
+          u_pscale, u_poff, u_recipe, u_ramp, u_ramp_n, u_snap, u_wind, u_havemask;
     TfVert *v;
     int vn;
     GLuint cur_tex;
@@ -951,7 +962,10 @@ static void tf_cycle(TileField *t, float dt) {
 
 // ───────────────────────── tileset ─────────────────────────
 
+static void tf_gl_init(TileField *t);                        // the palette must exist before a tileset
 static bool tf_load_masks(TileField *t, const char *set);     // TILES2: the generated boundaries
+static void tf_load_ramps(TileField *t);
+static void tf_pick_recipe(TileField *t, TfTile *e);
 static void tf_build_terrains(TileField *t, const char *set); // and the terrains' swatches
 
 // GL_MAX_TEXTURE_SIZE, read once the context exists. 0 means "not asked yet"; every driver this ships
@@ -959,11 +973,19 @@ static void tf_build_terrains(TileField *t, const char *set); // and the terrain
 // which on a phone looks like a black map and no error.
 static int tf_max_tex = 0;
 static void tf_probe_limits() {
-    if (tf_max_tex) return;
+    // Re-ask while the answer looks wrong. A query made before the context is really current comes
+    // back as a tiny number (2048 was logged once on a phone that reports 16384), and that silently
+    // HALVES the atlas — soft art and a wasted load. Anything under 4096 is worth another look.
+    if (tf_max_tex >= 4096) return;
     GLint m = 0;
+    while (glGetError() != GL_NO_ERROR) { }
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m);
-    tf_max_tex = m > 0 ? (int)m : 2048;
-    SDL_Log("tilefield: GL_MAX_TEXTURE_SIZE %d", tf_max_tex);
+    GLenum err = glGetError();
+    int v = (m > 0 && err == GL_NO_ERROR) ? (int)m : 0;
+    if (!v) { SDL_Log("tilefield: GL_MAX_TEXTURE_SIZE query failed (0x%x) — assuming 2048 for now", err); v = 2048; }
+    if (v != tf_max_tex) SDL_Log("tilefield: GL_MAX_TEXTURE_SIZE %d%s", v,
+                                 tf_max_tex ? " (re-queried; the first answer was smaller)" : "");
+    tf_max_tex = v;
 }
 
 // Box-average an RGBA image to half size, in place of the original buffer (which it frees).
@@ -1146,6 +1168,15 @@ static bool load_tileset(TileField *t, const char *set) {
             d->drift = (float)atof(val);
         } else if (!strcmp(key, "cycle")) {
             snprintf(d->cycle, sizeof(d->cycle), "%s", val);
+        } else if (!strcmp(key, "fill")) {
+            // `- fill: swatch | procedural <recipe>`. The tool does not write it yet; the engine reads
+            // it so a terrain can be pinned either way while the two are compared.
+            char rc[16] = "";
+            d->fill = strstr(val, "procedural") ? 1 : 0;
+            if (sscanf(val, "procedural %15s", rc) == 1) {
+                static const char *RN[6] = { "meadow", "earth", "cobble", "plank", "water", "field" };
+                for (int i = 0; i < 6; i++) if (!strcmp(rc, RN[i])) d->recipe = (unsigned char)i;
+            }
         } else if (!strcmp(key, "border")) {
             char nm2[24] = ""; float bw = 0;
             if (sscanf(val, "%23s %f", nm2, &bw) >= 1) { snprintf(d->on[3], 24, "%s", nm2); d->border_w = bw; }
@@ -1336,7 +1367,11 @@ static bool tf_load_masks(TileField *t, const char *set) {
     snprintf(rel, sizeof(rel), "field/tilesets/%s/masks.json", set);
     size_t sz = 0;
     char *js = (char *)tf_read(rel, &sz);
-    if (!js) { SDL_Log("tilefield: no masks.json for \"%s\" — terrains cannot draw their edges", set); return false; }
+    if (!js) {
+        SDL_Log("tilefield: ERROR no masks.json for \"%s\" (looked for field/tilesets/%s/masks.json under "
+                "the pref dir, the cwd and story/) — terrains will draw as FULL CELLS with no edges", set, set);
+        return false;
+    }
     t->mask_cell = 128;
     const char *k = strstr(js, "\"cell\"");
     if (k) sscanf(k + 6, " : %d", &t->mask_cell);
@@ -1397,7 +1432,7 @@ static bool tf_load_masks(TileField *t, const char *set) {
     snprintf(rel, sizeof(rel), "field/tilesets/%s/masks.png", set);
     sz = 0;
     void *data = tf_read(rel, &sz);
-    if (!data) { SDL_Log("tilefield: no masks.png for \"%s\"", set); return false; }
+    if (!data) { SDL_Log("tilefield: ERROR no masks.png for \"%s\" — terrains will draw as FULL CELLS", set); return false; }
     int w = 0, h = 0, ch = 0;
     unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &ch, 4);
     SDL_free(data);
@@ -1445,10 +1480,11 @@ static void tf_load_swatch(TileField *t, TfTile *e, const char *set) {
             snprintf(label, sizeof(label), "swatch %s.png", e->name);
             idx = t->pal_ok ? tf_index_image(t, label, rgba, w, h, nullptr) : nullptr;
             stbi_image_free(rgba);
-            if (idx) { px_w = w; px_h = h; }
+            if (idx) { px_w = w; px_h = h; e->swatch_art = true; }
         }
     }
     if (!idx) {
+        e->swatch_art = false;
         // The placeholder: the nearest master colour to a sensible hue for this terrain, mottled with
         // its two neighbours in the palette so a big field is not a dead flat sheet.
         static const struct { const char *key; unsigned char r, g, b; } HUES[] = {
@@ -1478,13 +1514,70 @@ static void tf_load_swatch(TileField *t, TfTile *e, const char *set) {
             float n = vnoise2(x / 9.0f, y / 9.0f, seed) * 0.55f + vnoise2(x / 3.5f, y / 3.5f, seed + 7) * 0.45f;
             idx[(size_t)y * px_w + x] = n < -0.55f ? lo : n > 0.62f ? hi : base;
         }
-        SDL_Log("tilefield: terrain \"%s\" has no swatch — flat %d,%d,%d with mottling (%dx%d)",
-                e->name, r, g, b, px_w, px_h);
+        SDL_Log("tilefield: terrain \"%s\" has no swatch%s — flat %d,%d,%d with mottling (%dx%d)",
+                e->name, t->pal_ok ? "" : " (NO PALETTE YET — that is a bug, not a missing file)",
+                r, g, b, px_w, px_h);
     }
     if (!e->swatch) glGenTextures(1, &e->swatch);
     tf_tex_index(e->swatch, idx, px_w, px_h);
     free(idx);
     e->swatch_px_w = px_w; e->swatch_px_h = px_h;
+}
+
+// The master palette's ramps (story/palette/master.json). A procedural terrain steps along one of
+// them, which is what keeps the result palette-exact: the recipe never invents a colour, it chooses
+// a step, and the colormap does the rest.
+static void tf_load_ramps(TileField *t) {
+    if (t->ramp_count) return;
+    size_t sz = 0;
+    char *js = (char *)tf_read("palette/master.json", &sz);
+    if (!js) { SDL_Log("tilefield: no master.json — procedural terrain has no ramps"); return; }
+    for (const char *c = strstr(js, "\"name\""); c && t->ramp_count < 24; c = strstr(c + 1, "\"name\"")) {
+        const char *q = strchr(c + 6, '"'), *e = q ? strchr(q + 1, '"') : nullptr;
+        if (!e) break;
+        int len = (int)(e - q - 1);
+        if (len > 31) len = 31;
+        memcpy(t->ramp_name[t->ramp_count], q + 1, (size_t)len);
+        t->ramp_name[t->ramp_count][len] = 0;
+        const char *ix = strstr(e, "\"indices\"");
+        if (!ix) break;
+        const char *br = strchr(ix, '[');
+        int n = 0;
+        for (const char *k2 = br; k2 && *k2 != ']' && n < 16; k2++)
+            if ((*k2 >= '0' && *k2 <= '9') && (k2 == br + 1 || !(k2[-1] >= '0' && k2[-1] <= '9'))) {
+                t->ramp_idx[t->ramp_count][n++] = (unsigned char)atoi(k2);
+            }
+        t->ramp_len[t->ramp_count] = n;
+        t->ramp_count++;
+    }
+    SDL_free(js);
+    SDL_Log("tilefield: %d palette ramp(s) for procedural terrain", t->ramp_count);
+}
+
+static int tf_ramp_by_name(TileField *t, const char *want) {
+    for (int i = 0; i < t->ramp_count; i++) if (strstr(t->ramp_name[i], want)) return i;
+    return -1;
+}
+
+// Which recipe and which ramp a terrain gets when tiles.md does not say. Keyed on the name, exactly
+// as the placeholder swatch colours are.
+static void tf_pick_recipe(TileField *t, TfTile *e) {
+    const char *n = e->name;
+    int rc = 0, rp = -1;
+    if (strstr(n, "water")) { rc = 4; rp = tf_ramp_by_name(t, "water blue"); }
+    else if (strstr(n, "paving") || strstr(n, "gravel") || strstr(n, "stone")) { rc = 2; rp = tf_ramp_by_name(t, "neutral cool"); }
+    else if (strstr(n, "bridge") || strstr(n, "plank") || strstr(n, "wood")) { rc = 3; rp = tf_ramp_by_name(t, "wood"); }
+    else if (strstr(n, "crop")) { rc = 5; rp = tf_ramp_by_name(t, "olive"); }
+    else if (strstr(n, "grass_dry")) { rc = 0; rp = tf_ramp_by_name(t, "olive"); }
+    else if (strstr(n, "grass")) { rc = 0; rp = tf_ramp_by_name(t, "foliage green (warm)"); }
+    else if (strstr(n, "mud") || strstr(n, "dirt") || strstr(n, "earth")) { rc = 1; rp = tf_ramp_by_name(t, "earth"); }
+    else { rc = 1; rp = tf_ramp_by_name(t, "earth"); }
+    if (!e->recipe) e->recipe = (unsigned char)rc;
+    if (rp < 0) rp = 0;
+    e->ramp_n = t->ramp_len[rp];
+    for (int i = 0; i < e->ramp_n && i < 16; i++) e->ramp[i] = t->ramp_idx[rp][i];
+    SDL_Log("tilefield: terrain \"%s\" — recipe %d on ramp \"%s\" (%d steps)", n, e->recipe,
+            t->ramp_count ? t->ramp_name[rp] : "?", e->ramp_n);
 }
 
 // The terrain list, ascending priority. `terr[0]` is the base: it floods the map and is what an
@@ -1498,7 +1591,12 @@ static void tf_build_terrains(TileField *t, const char *set) {
             if (t->tiles[t->terr[b]].priority < t->tiles[t->terr[a]].priority) {
                 short k = t->terr[a]; t->terr[a] = t->terr[b]; t->terr[b] = k;
             }
-    for (int i = 0; i < t->terr_count; i++) tf_load_swatch(t, &t->tiles[t->terr[i]], set);
+    tf_load_ramps(t);
+    for (int i = 0; i < t->terr_count; i++) {
+        TfTile *e = &t->tiles[t->terr[i]];
+        tf_pick_recipe(t, e);
+        tf_load_swatch(t, e, set);
+    }
     if (t->terr_count)
         SDL_Log("tilefield: %d terrain(s), base \"%s\"", t->terr_count, t->tiles[t->terr[0]].name);
 }
@@ -1542,8 +1640,8 @@ static int art_get(TileField *t, const char *id) {
     }
     int clear = 0;
     for (size_t i = 3; i < (size_t)w * h * 4; i += 4) if (px[i] < 128) clear++;
-    SDL_Log("tilefield: walker \"%s\" — %s, sheet %dx%d, frame %dx%d, %d%% transparent%s",
-            id, why, w, h, w / 4, h / 4, clear * 100 / (w * h), clear ? "" : "  <-- NO TRANSPARENCY");
+    SDL_Log("tilefield: walker \"%s\" — %s, sheet %dx%d, %d%% transparent%s",
+            id, why, w, h, clear * 100 / (w * h), clear ? "" : "  <-- NO TRANSPARENCY");
     glGenTextures(1, &a->tex);
     unsigned char *widx = nullptr;
     if (t->pal_ok) {
@@ -1564,11 +1662,20 @@ static int art_get(TileField *t, const char *id) {
     if (own) free(px); else stbi_image_free(px);
     a->w = w; a->h = h;
 
-    // Layout: the sidecar if there is one, else the 4x4 contract.
+    // Layout: the sidecar if there is one; otherwise INFERRED from the sheet's shape, because a
+    // sidecar that did not make it onto the device used to be read as a 4x4 and drew half-frames.
+    // 128x192 frames in a 3-wide, 4-tall grid is 384x576; the legacy contract is a square 4x4 grid.
+    a->col_stand = 0; a->col_a = 1; a->col_b = 3;
     a->nrows = 4; a->ncols = 4;
     a->fw = w / 4; a->fh = h / 4;
+    const char *why_layout = "4x4 (the legacy contract)";
+    if (w * 3 == h * 2) {                       // 384x576, 256x384, … : 3 columns x 4 rows of 2:3 frames
+        a->ncols = 3; a->nrows = 4;
+        a->fw = w / 3; a->fh = h / 4;
+        a->col_stand = 0; a->col_a = 1; a->col_b = 2;
+        why_layout = "3x4 inferred from the sheet's 2:3 shape";
+    }
     for (int i = 0; i < 4; i++) { a->row_of[i] = i; a->flip[i] = false; }
-    a->col_stand = 0; a->col_a = 1; a->col_b = 3;
     char jrel[128];
     snprintf(jrel, sizeof(jrel), "field/walkers/%s.json", id);
     size_t jsz = 0;
@@ -1622,9 +1729,13 @@ static int art_get(TileField *t, const char *id) {
                         id, nc, nr, a->fw, a->fh, w, h);
             SDL_Log("tilefield: walker \"%s\" layout from %s.json — %d rows x %d cols, frame %dx%d%s",
                     id, id, nr, nc, a->fw, a->fh, a->flip[2] ? ", E mirrored from W" : "");
+            a->has_sidecar = true;
         }
         SDL_free(js);
     }
+    if (!a->has_sidecar)
+        SDL_Log("tilefield: walker \"%s\" layout %s — %d rows x %d cols, frame %dx%d (no sidecar)",
+                id, why_layout, a->nrows, a->ncols, a->fw, a->fh);
     return t->art_count++;
 }
 
@@ -1910,7 +2021,26 @@ static int terr_at(TileField *t, int x, int y) {
 
 static void tf_build_ground(TileField *t) {
     t->gv_count = 0;
-    if (!t->terr_count || !t->mask_tex) return;
+    if (!t->terr_count) return;
+    if (!t->mask_tex) {
+        // No masks: draw each terrain as FULL world cells. The edges are square and it is obviously
+        // wrong, but the ground is never black, which is what a missing file used to give.
+        for (int n = 1; n < t->terr_count; n++) {
+            int ti = t->terr[n];
+            TfTile *e = &t->tiles[ti];
+            t->gv_first[n] = t->gv_count;
+            for (int j = 0; j <= t->mh; j++) {
+                t->gv_row[n][j] = t->gv_count;
+                if (j >= t->mh) continue;
+                for (int i = 0; i < t->mw; i++)
+                    if (terr_at(t, i, j) == ti)
+                        gv_quad(t, e, (float)(i * TS), (float)(j * TS), 0, 0, 0, -1.0f);
+            }
+            t->gv_row[n][t->mh + 1] = t->gv_count;
+        }
+        SDL_Log("tilefield: ground built WITHOUT masks — square cells (%d quads)", t->gv_count / 6);
+        return;
+    }
     for (int n = 1; n < t->terr_count; n++) {                      // terr[0] floods: one quad at draw time
         int ti = t->terr[n];
         TfTile *e = &t->tiles[ti];
@@ -2018,6 +2148,12 @@ static void tf_upload_static(TileField *t) {
 }
 
 bool tf_load_map(TileField *t, const char *name) {
+    // The palette, the colormap and the masks have to exist before a tileset is loaded: a swatch is
+    // indexed against the palette, and the ground refuses to draw without one. On the phone the FIRST
+    // map load comes from tf_restore during a hot reload — before any tick, so before tf_gl_init —
+    // and every swatch silently fell back to its placeholder while the ground came out black. The Mac
+    // never saw it because the capture path inits GL first.
+    if (!t->gl_ready) tf_gl_init(t);
     char rel[128];
     snprintf(rel, sizeof(rel), "field/tmaps/%s.tmap", name);
     size_t sz = 0;
@@ -2070,6 +2206,18 @@ bool tf_load_map(TileField *t, const char *name) {
             TBL_NAMES[t->light_table >= 0 && t->light_table < TBL_COUNT ? t->light_table : 0],
             t->ambient, t->light_count);
     SDL_Log("tilefield: %s weather — drift %.2f, clouds %.2f", name, t->drift, t->clouds);
+    {   // THE SELF-CHECK. One line, device-side, after everything the map needs has been loaded —
+        // fast_reload.sh greps for it and fails loudly when the ground came out empty, which is what
+        // a missing masks.json or a missing swatch folder looks like from the Mac (i.e. invisible).
+        int sw_found = 0;
+        for (int i = 0; i < t->terr_count; i++) if (t->tiles[t->terr[i]].swatch_art) sw_found++;
+        int sidecars = 0;
+        for (int i = 0; i < t->art_count; i++) if (t->art[i].has_sidecar) sidecars++;
+        SDL_Log("tilefield: SELFCHECK %s — ground quads %d, swatches found %d/%d, masks %s, "
+                "walkers with sidecar %d/%d, ramps %d, max_tex %d",
+                name, (t->gv_count - t->dv_count) / 6, sw_found, t->terr_count,
+                t->mask_tex ? "ok" : "MISSING", sidecars, t->art_count, t->ramp_count, tf_max_tex);
+    }
     return ok;
 }
 
@@ -2113,7 +2261,8 @@ static const char *TF_FS =
     "uniform vec2 u_texsz;\n"
     "uniform float u_cmaph, u_rowa, u_rowb, u_levels, u_amb, u_drift, u_clouds, u_time;\n"
     "uniform vec2 u_cam;\n"
-    "uniform int u_indexed, u_nl, u_taps;\n"
+    "uniform int u_indexed, u_nl, u_taps, u_recipe, u_ramp_n, u_snap, u_wind, u_havemask;\n"
+    "uniform float u_ramp[16];\n"
     "uniform vec4 u_lights[16];\n"
     "out vec4 o;\n"
     "float dhash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n"
@@ -2123,6 +2272,93 @@ static const char *TF_FS =
     "  float a = dhash(i), b = dhash(i + vec2(1.0, 0.0));\n"
     "  float c = dhash(i + vec2(0.0, 1.0)), d = dhash(i + vec2(1.0, 1.0));\n"
     "  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y); }\n"
+    "float h21(vec2 p){ return fract(sin(dot(floor(p), vec2(127.1, 311.7))) * 43758.5453); }\n"
+    // PROCEDURAL TERRAIN (the owner's experiment): no texture at all. Every recipe picks a STEP of the
+    // terrain's master-palette ramp, so what comes out is palette-exact and then goes through the
+    // colormap like everything else — lit, drifted, clouded and cycled for free. Features are sized
+    // and snapped in LOGICAL pixels (about 3 device px), which is what keeps it reading as pixel art
+    // rather than as smooth vector noise.
+    "float recipe_step(vec2 W, float cover){\n"
+    "  vec2 P = (u_snap == 1) ? floor(W) : W;\n"
+    "  float s = 0.6;\n"
+    "  if (u_recipe == 0) {\n"                       // meadow
+    "    float n1 = vnoise(P / 44.0), n2 = vnoise(P / 15.0), n3 = vnoise(P / 4.5);\n"
+    "    float v = n1 * 0.60 + n2 * 0.40 + n3 * 0.13;\n"   // the fine octave only ragged-edges the thresholds
+    "    s = v < -0.30 ? 0.46 : v < 0.02 ? 0.58 : v < 0.36 ? 0.68 : 0.78;\n"
+    // Tufts: three blades on a hashed lattice, a few logical pixels tall, so they read as the little
+    // grass marks of the target sheet rather than as noise specks.
+    "    vec2 g = floor(P / 11.0);\n"
+    "    float hb = h21(g);\n"
+    // Tufts arrive in DRIFTS, not at an even rate: a slow field decides where grass is lush, and only
+    // there does the lattice fire. Evenly scattered marks read as hatching, which is what the first
+    // pass looked like.
+    "    float lush = 0.5 + 0.5 * vnoise(P / 70.0 + 17.0);\n"
+    "    if (hb > 1.0 - 0.34 * lush * lush) {\n"
+    "      vec2 c = g * 11.0 + vec2(1.5 + h21(g + 3.1) * 8.0, 2.5 + h21(g + 7.7) * 7.0);\n"
+    "      float sway = (u_wind == 1) ? sin(u_time * 1.1 + hb * 6.28) * 0.8 : 0.0;\n"
+    // UNROLLED on purpose: as a `for` loop this miscompiled on the desktop GL driver and corrupted
+    // later draw calls in the same frame (the stamps came out as rainbow speckle). Three blades is
+    // three blades; there is nothing to gain from the loop.
+    "      vec2 d0 = P - (c + vec2(-2.0, 0.0));\n"
+    "      vec2 d1 = P - c;\n"
+    "      vec2 d2 = P - (c + vec2(2.0, 0.0));\n"
+    "      float h0 = 3.0 + h21(g + 11.0) * 2.5, h1 = 3.5 + h21(g + 12.0) * 2.5, h2 = 3.0 + h21(g + 13.0) * 2.5;\n"
+    "      d0.x -= sway * 0.6 * (-d0.y / h0);\n"
+    "      d1.x -= sway * 1.0 * (-d1.y / h1);\n"
+    "      d2.x -= sway * 1.4 * (-d2.y / h2);\n"
+    "      if ((abs(d0.x) < 0.9 && d0.y > -h0 && d0.y < 0.0) ||\n"
+    "          (abs(d1.x) < 0.9 && d1.y > -h1 && d1.y < 0.0) ||\n"
+    "          (abs(d2.x) < 0.9 && d2.y > -h2 && d2.y < 0.0)) s -= 0.16;\n"
+    "    }\n"
+    "  } else if (u_recipe == 1) {\n"                // earth
+    "    float n1 = vnoise(vec2(P.x / 58.0, P.y / 20.0)), n2 = vnoise(P / 9.0);\n"
+    "    float v = n1 * 0.7 + n2 * 0.3;\n"
+    "    s = v < -0.22 ? 0.42 : v < 0.10 ? 0.52 : v < 0.40 ? 0.60 : 0.66;\n"
+    "    vec2 g = floor(P / 13.0);\n"
+    "    if (h21(g + 1.7) > 0.86) {\n"
+    "      vec2 c = g * 13.0 + vec2(h21(g + 2.3) * 10.0, h21(g + 5.9) * 10.0);\n"
+    "      vec2 d = (P - c) / vec2(1.9, 1.3);\n"
+    "      if (dot(d, d) < 1.0) s += 0.20;\n"
+    "      if (dot(d, d) < 1.0 && d.y < -0.35) s += 0.12;\n"   // one lit pixel on top of the pebble
+    "    }\n"
+    "  } else if (u_recipe == 2) {\n"                // cobble
+    // The grid is WARPED by low-frequency noise before the brick is computed, so every mortar course
+    // wanders a little and no two stones are the same rectangle — a straight grid reads as a wall.
+    "    vec2 Q = P + vec2(vnoise(P / 11.0) * 2.2, vnoise(P / 13.0 + 4.0) * 1.6);\n"
+    "    vec2 cs = vec2(13.0, 9.0);\n"
+    "    float row = floor(Q.y / cs.y);\n"
+    "    float ox = (h21(vec2(row, 2.0)) * 0.7 + mod(row, 2.0) * 0.4) * cs.x;\n"
+    "    float wide = h21(vec2(floor((Q.x + ox) / cs.x), row) + 6.2) > 0.78 ? 1.6 : 1.0;\n"
+    "    vec2 c = vec2(floor((Q.x + ox) / (cs.x * wide)), row);\n"
+    "    vec2 lp = vec2(mod(Q.x + ox, cs.x * wide), mod(Q.y, cs.y));\n"
+    "    s = 0.58 + (h21(c) - 0.5) * 0.26;\n"
+    "    if (lp.x < 1.2 || lp.y < 1.2) s = 0.33;\n"                    // the mortar course
+    "    else if (lp.y < 2.2) s += 0.08;\n"                            // a lit top lip on each stone
+    "    if (cover < 0.985 && h21(c + 8.1) > 0.55) s -= 0.10;\n"       // moss where the stone meets grass
+    "  } else if (u_recipe == 3) {\n"                // plank
+    "    float pw = 8.0;\n"
+    "    float pi = floor(P.y / pw), lp = mod(P.y, pw);\n"
+    "    s = 0.54 + (h21(vec2(pi, 3.0)) - 0.5) * 0.18;\n"
+    "    if (lp < 1.0) s = 0.32;\n"
+    "    float jx = floor(P.x / 44.0);\n"
+    "    if (mod(P.x + h21(vec2(pi, jx)) * 20.0, 44.0) < 1.0) s = 0.36;\n"
+    "    if (lp > 1.5 && lp < 3.0 && mod(P.x + 4.0, 44.0) < 1.5) s += 0.16;\n"   // nail heads
+    "  } else if (u_recipe == 4) {\n"                // water
+    "    s = 0.34;\n"
+    "    float a = vnoise(vec2(P.x / 30.0 - u_time * 0.55, P.y / 15.0));\n"
+    "    float b = vnoise(vec2(P.x / 12.0 - u_time * 0.95, P.y / 7.0 + u_time * 0.12));\n"
+    "    if (a > 0.20) s = 0.52;\n"
+    "    if (b > 0.42) s = 0.70;\n"
+    "    if (cover < 0.95) s = 0.80;\n"                                // the light band at the bank
+    "  } else if (u_recipe == 5) {\n"                // field (crop)
+    "    float rw = 6.0;\n"
+    "    float lp = mod(P.y, rw);\n"
+    "    s = 0.42 + vnoise(P / 26.0) * 0.06;\n"
+    "    if (lp < 2.5) s = 0.60;\n"
+    "    vec2 g = vec2(floor(P.x / 4.0), floor(P.y / rw));\n"
+    "    if (lp < 3.5 && h21(g) > 0.45) s = 0.72;\n"
+    "  }\n"
+    "  return clamp(s, 0.0, 1.0); }\n"
     "vec4 look(float idx, float row){\n"
     "  vec4 c = texture(u_cmap, vec2((idx + 0.5) / 256.0, (row + 0.5) / u_cmaph));\n"
     "  return vec4(c.rgb * c.a, c.a); }\n"                 // premultiplied; index 0 is a straight zero
@@ -2167,6 +2403,16 @@ static const char *TF_FS =
     "  float r0 = floor(f), fr = f - r0;\n"
     "  float r1 = min(r0 + 1.0, u_levels - 1.0);\n"
     "  float ra0 = u_rowa + r0, ra1 = u_rowa + r1, rb0 = u_rowb + r0, rb1 = u_rowb + r1;\n"
+    "  if (u_indexed == 3) {\n"                   // procedural terrain: one palette index, no texture
+    "    float cov = (u_havemask == 1) ? smoothstep(0.42, 0.58, texture(u_mask, v_uv).r) : 1.0;\n"
+    "    if (cov < 0.01) discard;\n"
+    "    float st = recipe_step(v_world + u_cam, cov);\n"
+    "    float k = float(u_ramp_n - 1);\n"
+    "    float idx = u_ramp[int(clamp(floor(st * k + 0.5), 0.0, k))];\n"
+    "    vec4 cA = mix(look(idx, ra0), look(idx, ra1), fr);\n"
+    "    vec4 cP = warm > 0.001 ? mix(cA, mix(look(idx, rb0), look(idx, rb1), fr), warm) : cA;\n"
+    "    o = cP * cov * vec4(v_col.rgb * v_col.a, v_col.a);\n"
+    "    return; }\n"
     "  vec2 p, b, g;\n"
     "  ivec2 q0, q1;\n"
     "  float cover = 1.0;\n"
@@ -2174,7 +2420,7 @@ static const char *TF_FS =
     // A terrain (TILES2 / D20): the swatch is sampled in WORLD space and wraps at its own size, so
     // there is nothing to match between neighbouring cells and no cut in the drawing; the quad's UV
     // is the generated boundary MASK, already rotated into place by the vertex data.
-    "    cover = smoothstep(0.42, 0.58, texture(u_mask, v_uv).r);\n"
+    "    cover = (u_havemask == 1) ? smoothstep(0.42, 0.58, texture(u_mask, v_uv).r) : 1.0;\n"
     "    if (cover < 0.01) discard;\n"
     "    vec2 sz = v_rect.zw;\n"
     "    p = mod((v_world + u_cam) * 4.0, sz) - 0.5;\n"          // 128 swatch px to a 32-px tile
@@ -2237,6 +2483,12 @@ static void tf_gl_init(TileField *t) {
     t->u_sc = glGetUniformLocation(t->prog, "u_sc");
     t->u_taps = glGetUniformLocation(t->prog, "u_taps");
     t->u_mask = glGetUniformLocation(t->prog, "u_mask");
+    t->u_havemask = glGetUniformLocation(t->prog, "u_havemask");
+    t->u_wind = glGetUniformLocation(t->prog, "u_wind");
+    t->u_snap = glGetUniformLocation(t->prog, "u_snap");
+    t->u_ramp_n = glGetUniformLocation(t->prog, "u_ramp_n");
+    t->u_ramp = glGetUniformLocation(t->prog, "u_ramp");
+    t->u_recipe = glGetUniformLocation(t->prog, "u_recipe");
     t->u_pscale = glGetUniformLocation(t->prog, "u_pscale");
     t->u_poff = glGetUniformLocation(t->prog, "u_poff");
     t->u_cam = glGetUniformLocation(t->prog, "u_cam");
@@ -2402,6 +2654,22 @@ static void push_solid(TileField *t, float x, float y, float w, float h, unsigne
 // `lit = -2` on a ground quad: per-fragment light AND the macro drift. Stamps pass -1, so a house
 // does not ripple with the field it stands in; walkers pass their own level.
 // The static lists, drawn straight out of their own VBO. `first`/`count` are vertices.
+// Which way a terrain's pixels come: the Dev/env ground mode wins, otherwise the terrain's own
+// `- fill:`. Mode 2 sets u_indexed 3 and hands the recipe and its ramp over.
+static int tf_terr_mode(TileField *t, TfTile *e) {
+    int proc = t->ground_mode == 1 ? 1 : t->ground_mode == 0 ? 0 : (e->fill == 1);
+    return proc ? 3 : 2;
+}
+static void tf_set_recipe(TileField *t, TfTile *e) {
+    glUniform1i(t->u_recipe, e->recipe);
+    glUniform1i(t->u_ramp_n, e->ramp_n < 2 ? 2 : e->ramp_n);
+    glUniform1i(t->u_snap, t->snap_px ? 1 : 0);
+    glUniform1i(t->u_wind, t->wind ? 1 : 0);
+    float r[16];
+    for (int i = 0; i < 16; i++) r[i] = (float)e->ramp[i < e->ramp_n ? i : (e->ramp_n ? e->ramp_n - 1 : 0)];
+    glUniform1fv(t->u_ramp, 16, r);
+}
+
 static void tf_draw_static(TileField *t, int first, int count, GLuint tex, int mode, int tw, int th) {
     if (count <= 0 || !t->svbo) return;
     tf_flush(t);                                             // the dynamic batch goes first
@@ -2434,7 +2702,9 @@ static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
         float mw = (float)t->mask_w, mh = (float)t->mask_h, mc = (float)t->mask_cell;
         float mx = t->mask_slot[st][MS_COUNT - 1][0], my = t->mask_slot_y[st][MS_COUNT - 1][0];
         float u0 = (mx + 8) / mw, v0 = (my + 8) / mh, u1 = (mx + mc - 8) / mw, v1 = (my + mc - 8) / mh;
-        tf_use(t, base->swatch, 2);
+        int bm = tf_terr_mode(t, base);
+        tf_use(t, base->swatch, bm);
+        if (bm == 3) tf_set_recipe(t, base);
         float rect[4] = { 0, 0, (float)base->swatch_px_w, (float)base->swatch_px_h };
         float lit = (t->drift > 0.0f && base->drift > 0.0f) ? -3.0f : -1.0f;
         float vw = (float)t->rvw * t->sc, vh = (float)t->rvh * t->sc;
@@ -2446,7 +2716,9 @@ static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
     for (int n = 1; n < t->terr_count; n++) {
         TfTile *e = &t->tiles[t->terr[n]];
         int first = t->gv_row[n][j0], last = t->gv_row[n][j1];
-        tf_draw_static(t, first, last - first, e->swatch, 2, e->swatch_px_w, e->swatch_px_h);
+        int md = tf_terr_mode(t, e);
+        if (md == 3) { tf_flush(t); tf_set_recipe(t, e); }
+        tf_draw_static(t, first, last - first, e->swatch, md, e->swatch_px_w, e->swatch_px_h);
     }
     // The decals sit on the ground and under everything else.
     if (t->dv_count) {
@@ -2608,6 +2880,7 @@ static void tf_render(TileField *t, int vw, int vh, float sc) {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, t->cmap);
         glUniform1i(t->u_mask, 2);
+        glUniform1i(t->u_havemask, t->mask_tex ? 1 : 0);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, t->mask_tex);
         glActiveTexture(GL_TEXTURE0);
@@ -3240,6 +3513,10 @@ void tf_capture_to(TileField *t, const char *map, int scale, const char *out_pat
             t->ambient = lv < 0 ? 0 : lv > 1 ? 1 : lv;
         }
     }
+    const char *dc = SDL_getenv("TILE_DECALS");         // 0 while the decal art is being re-cut
+    if (dc && dc[0]) t->decal_density = (float)atof(dc);
+    const char *gm = SDL_getenv("TILE_GROUND");         // swatches | procedural | flat(= per terrain)
+    if (gm && gm[0]) t->ground_mode = !strcmp(gm, "procedural") ? 1 : !strcmp(gm, "swatches") ? 0 : 2;
     const char *wt = SDL_getenv("TILE_WEATHER");        // "<drift>:<clouds>", for tuning from the Mac
     if (wt && wt[0]) {
         float d = 1, c = 1;
@@ -3310,6 +3587,22 @@ bool tf_dev_ui(TileField *t, char *out, int cap) {
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
             ImGui::SliderFloat("drift str", &t->drift, 0.05f, 3.0f, "%.2f");
         }
+        {   // Ground: the owner's swatch-versus-procedural comparison, live on the phone.
+            const char *names[3] = { "swatches", "procedural", "per terrain" };
+            ImGui::TextUnformatted("ground:");
+            for (int i = 0; i < 3; i++) {
+                ImGui::SameLine();
+                bool cur = t->ground_mode == i;
+                if (cur) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.3f, 1));
+                if (ImGui::Button(names[i])) t->ground_mode = i;
+                if (cur) ImGui::PopStyleColor();
+            }
+            ImGui::SameLine();
+            bool sp = t->snap_px != 0, wd = t->wind != 0;
+            if (ImGui::Checkbox("snap px", &sp)) t->snap_px = sp;
+            ImGui::SameLine();
+            if (ImGui::Checkbox("wind", &wd)) t->wind = wd;
+        }
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9);
         if (ImGui::SliderFloat("decals", &t->decal_density, 0.0f, 3.0f, "%.2f")) {
             tf_build_decals(t);                       // the scatter is static: rebuild it, don't redraw it
@@ -3358,6 +3651,8 @@ TileField *tf_create() {
     t->drift = 1.0f;
     t->clouds = 1.0f;
     t->decal_density = 1.0f;
+    t->ground_mode = 2;   // per terrain: tiles.md's `- fill:` (swatch art unless it says otherwise)
+    t->snap_px = 1;
     return t;
 }
 
@@ -3377,6 +3672,7 @@ void tf_save(TileField *t, TfSave *s) {
     s->light_table = t->light_table; s->lantern = t->lantern ? 1 : 0;
     s->ambient = t->ambient; s->lantern_r = t->lantern_r;
     s->drift = t->drift; s->clouds = t->clouds;
+    s->ground_mode = t->ground_mode; s->snap_px = t->snap_px;
 }
 
 // Everything read back is validated: a map that no longer has that tile, or a tile that is now solid,
@@ -3397,6 +3693,8 @@ void tf_restore(TileField *t, const TfSave *s) {
     t->lantern_r = (s->lantern_r >= 1.0f && s->lantern_r <= 32.0f) ? s->lantern_r : 5.0f;
     if (s->drift >= 0.0f && s->drift <= 4.0f) t->drift = s->drift;
     if (s->clouds >= 0.0f && s->clouds <= 4.0f) t->clouds = s->clouds;
+    if (s->ground_mode >= 0 && s->ground_mode <= 2) t->ground_mode = s->ground_mode;
+    t->snap_px = s->snap_px ? 1 : 0;
     int lx = s->tx[0], ly = s->ty[0];
     if (lx < 0 || ly < 0 || lx >= t->mw || ly >= t->mh) { SDL_Log("tilefield: restored tile %d,%d is off %s", lx, ly, map); return; }
     tf_place_party(t, lx, ly, s->facing[0] & 3);

@@ -29,6 +29,7 @@ struct TfSave {
     int32_t light_table, lantern;
     float ambient, lantern_r;
     float drift, clouds;         // weather, so a tuned sky survives a reload
+    int32_t ground_mode, snap_px; // swatch art vs procedural terrain, and the pixel snap
 };
 
 TileField *tf_create();
