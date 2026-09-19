@@ -226,3 +226,17 @@ colormap texture with day/dusk/night and 32 light levels, blending colours (not 
 art still scales smoothly. Lighting, time of day, lanterns, palette cycling and status tints all come
 from tables. To reverse or revise: every shipped image is re-derived from `story/sheets/` by
 `ingest --force`.
+
+## D20. TILES2: terrains through dual-grid masks, swatches, decals; measured art sizes; 9-frame walkers
+Owner (2026-09-19): the first tile art was "too noisy"; chose a flat, luminous cel style from a reference
+painting, asked for "a more robust tile system … look up state of the art practices", overlay props on a
+toned-down base, buildings at least 2x2 that fill their footprint, mirrored walk frames, and smaller
+assets where detail allows. Adopted from `TILES2_PROPOSAL.md` (research with sources) and
+`tools/sizes/REPORT.md` (measurements): terrain ids stay on the world cells; ground is drawn on a dual
+grid through procedurally generated 1-bit masks (16 corner cases → 6 classes by rotation; the Age of
+Empires II blendomatic model) over one seamless world-space swatch per terrain, by priority; hashed,
+clustered decals; macro light drift and cloud shadows through the colormap; per-tile flags (`pass`,
+`tag`); h-flip for nature stamps only. ChatGPT now draws one swatch per terrain and one decal sheet per
+biome instead of matched transition tiles. Sizes: atlas cell 128, walker frame 128x192 in a 3x3 sheet
+(side row mirrored), portraits 288 tall, panels at display size. Grid walking, collision, stamps and the
+text maps are unchanged. To reverse: the v1 atlas and fringe code are in git at 3bd149c.
