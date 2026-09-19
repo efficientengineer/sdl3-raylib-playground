@@ -1,0 +1,26 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "fringes",
+  "ids": [
+    "dirt_edge",
+    "dirt_corner_out",
+    "dirt_corner_in",
+    "paving_edge",
+    "paving_corner_out",
+    "paving_corner_in",
+    "water_edge",
+    "water_corner_out",
+    "water_corner_in",
+    "crop_edge",
+    "crop_corner_out",
+    "crop_corner_in"
+  ],
+  "title": "valley \u2014 fringes tile sheet",
+  "makes": "12 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/fringes.png"
+  ],
+  "dir": "story/packages/tilesets/valley/fringes"
+}

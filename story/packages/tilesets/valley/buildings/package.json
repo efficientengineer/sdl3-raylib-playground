@@ -1,0 +1,22 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "buildings",
+  "ids": [
+    "wall_ew",
+    "wall_ns",
+    "wall_corner",
+    "gate_post",
+    "house_a",
+    "house_b",
+    "hut",
+    "house_c"
+  ],
+  "title": "valley \u2014 buildings tile sheet (1 of 3)",
+  "makes": "8 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/buildings.png"
+  ],
+  "dir": "story/packages/tilesets/valley/buildings"
+}

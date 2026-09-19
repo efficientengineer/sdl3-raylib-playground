@@ -18,43 +18,85 @@ prompt attaches them), walk sprites, the field art for each map, the scene shot 
 
 Scenes come from `story/playlist.md` — a scene file no chapter list names gets no package; 7 scene(s) selected.
 
-## 1. The short path to something on the phone
+## 1. Tilesets — the tile field
+
+The field is tile sheets and grid walking (`TILES.md`). One sheet is one generation: the
+template is drawn at 4x, so a 32x32 tile is a 128-px slot and every art pixel is a 4x4 block.
+`ingest` snaps the return back onto that grid, keys the magenta on anything that is not opaque
+ground, and packs each tile into its set's `atlas.png` at the index `tiles.md` gives it —
+never disturbing a cell that belongs to another entry. A sheet that has been generated is
+frozen; new tiles go into a fresh `<sheet>_2` beside it.
+
+The fringe convention (which the engine rotates) is written out in
+`story/field/tilesets/README.md`.
+
+| set | sheet | tiles | folder | status | after downloading |
+| --- | --- | --- | --- | --- | --- |
+| `valley` | `ground` | 12 | [`tilesets/valley/ground`](tilesets/valley/ground/prompt.md) | to generate | `ingest tilesets/valley/ground` |
+| `valley` | `fringes` | 12 | [`tilesets/valley/fringes`](tilesets/valley/fringes/prompt.md) | to generate | `ingest tilesets/valley/fringes` |
+| `valley` | `props` | 16 | [`tilesets/valley/props`](tilesets/valley/props/prompt.md) | to generate | `ingest tilesets/valley/props` |
+| `valley` | `props_2` | 2 | [`tilesets/valley/props_2`](tilesets/valley/props_2/prompt.md) | to generate | `ingest tilesets/valley/props_2` |
+| `valley` | `props_3` | 1 | [`tilesets/valley/props_3`](tilesets/valley/props_3/prompt.md) | to generate | `ingest tilesets/valley/props_3` |
+| `valley` | `buildings` | 8 | [`tilesets/valley/buildings`](tilesets/valley/buildings/prompt.md) | to generate | `ingest tilesets/valley/buildings` |
+| `valley` | `buildings_2` | 2 | [`tilesets/valley/buildings_2`](tilesets/valley/buildings_2/prompt.md) | to generate | `ingest tilesets/valley/buildings_2` |
+| `valley` | `buildings_3` | 1 | [`tilesets/valley/buildings_3`](tilesets/valley/buildings_3/prompt.md) | to generate | `ingest tilesets/valley/buildings_3` |
+| `valley` | `nature` | 7 | [`tilesets/valley/nature`](tilesets/valley/nature/prompt.md) | to generate | `ingest tilesets/valley/nature` |
+
+## 2. The short path to something on the phone
 
 The fewest generations that put the first scene and the first map on screen, in the order they
 unblock each other. A checked box is already cut; everything below this section is the long tail.
 
-- [ ] **1.** Guildclerk's reference sheet — the portrait, the walker and every panel come from it  
+- [ ] **1.** the `ground` sheet of the `valley` tileset — 12 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/ground`](tilesets/valley/ground/prompt.md) · to generate · `ingest tilesets/valley/ground`
+- [ ] **2.** the `fringes` sheet of the `valley` tileset — 12 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/fringes`](tilesets/valley/fringes/prompt.md) · to generate · `ingest tilesets/valley/fringes`
+- [ ] **3.** the `props` sheet of the `valley` tileset — 16 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/props`](tilesets/valley/props/prompt.md) · to generate · `ingest tilesets/valley/props`
+- [ ] **4.** the `props_2` sheet of the `valley` tileset — 2 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/props_2`](tilesets/valley/props_2/prompt.md) · to generate · `ingest tilesets/valley/props_2`
+- [ ] **5.** the `props_3` sheet of the `valley` tileset — 1 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/props_3`](tilesets/valley/props_3/prompt.md) · to generate · `ingest tilesets/valley/props_3`
+- [ ] **6.** the `buildings` sheet of the `valley` tileset — 8 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/buildings`](tilesets/valley/buildings/prompt.md) · to generate · `ingest tilesets/valley/buildings`
+- [ ] **7.** the `buildings_2` sheet of the `valley` tileset — 2 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/buildings_2`](tilesets/valley/buildings_2/prompt.md) · to generate · `ingest tilesets/valley/buildings_2`
+- [ ] **8.** the `buildings_3` sheet of the `valley` tileset — 1 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/buildings_3`](tilesets/valley/buildings_3/prompt.md) · to generate · `ingest tilesets/valley/buildings_3`
+- [ ] **9.** the `nature` sheet of the `valley` tileset — 7 tile(s) into that set's atlas, which is what the map is made of  
+      [`tilesets/valley/nature`](tilesets/valley/nature/prompt.md) · to generate · `ingest tilesets/valley/nature`
+- [ ] **10.** Guildclerk's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) · to generate · `ingest cast/guildclerk/refsheet`
-- [ ] **2.** Hart's reference sheet — the portrait, the walker and every panel come from it  
+- [ ] **11.** Hart's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) · to generate · `ingest cast/hart/refsheet`
-- [ ] **3.** Stolz's reference sheet — the portrait, the walker and every panel come from it  
+- [ ] **12.** Stolz's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) · to generate · `ingest cast/stolz/refsheet`
-- [ ] **4.** Shrinewoman's reference sheet — the portrait, the walker and every panel come from it  
+- [ ] **13.** Shrinewoman's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) · to generate · `ingest cast/shrinewoman/refsheet`
-- [x] **5.** Falke's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **14.** Falke's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/falke/refsheet`](cast/falke/refsheet/prompt.md) · done · `ingest cast/falke/refsheet`
-- [x] **6.** Ottilie's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **15.** Ottilie's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) · done · `ingest cast/ottilie/refsheet`
-- [ ] **7.** Falke's walk sprite — the figure walking the map  
+- [ ] **16.** Falke's walk sprite — the figure walking the map  
       [`cast/falke/walker`](cast/falke/walker/prompt.md) · to generate · `ingest cast/falke/walker`
-- [ ] **8.** Ottilie's walk sprite — the figure walking the map  
+- [ ] **17.** Ottilie's walk sprite — the figure walking the map  
       [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · to generate · `ingest cast/ottilie/walker`
-- [x] **9.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
+- [x] **18.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
       [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) · done · `ingest ch01/halm/screens/town`
-- [x] **10.** the ground and walls of `halm`, sheet 1 of 2  
+- [x] **19.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
-- [ ] **11.** the ground and walls of `halm`, sheet 2 of 2  
+- [ ] **20.** the ground and walls of `halm`, sheet 2 of 2  
       [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) · to generate · `ingest ch01/halm/tiles_2`
-- [x] **12.** everything standing in `halm`  
+- [x] **21.** everything standing in `halm`  
       [`ch01/halm/props`](ch01/halm/props/prompt.md) · done · `ingest ch01/halm/props`
-- [ ] **13.** the front, wall and roof of every building in `halm`  
+- [ ] **22.** the front, wall and roof of every building in `halm`  
       [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · to generate · `ingest ch01/halm/buildings`
-- [x] **14.** the shot sheet for `0110_the_board` — the first scene the game plays  
+- [x] **23.** the shot sheet for `0110_the_board` — the first scene the game plays  
       [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) · done · `ingest ch01/halm/scenes/0110_the_board`
 
 Then `./story_prompt.py ingest` and `./fast_reload.sh`.
 
-## 2. Character reference sheets
+## 3. Character reference sheets
 
 Do these first: the portrait beside the dialogue box, the walk sprite, and every scene panel
 are all drawn from this one image.
@@ -68,7 +110,7 @@ are all drawn from this one image.
 | Stolz | [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) | to generate | `ingest cast/stolz/refsheet` |
 | Shrinewoman | [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) | to generate | `ingest cast/shrinewoman/refsheet` |
 
-## 3. Walk sprites
+## 4. Walk sprites
 
 The 4x4 sheet the field renderer animates (rows S, W, E, N). A character's package is blocked
 until their reference sheet exists, because the walker must match it.
@@ -84,7 +126,7 @@ until their reference sheet exists, because the walker must match it.
 | villager_a | [`cast/villager_a/walker`](cast/villager_a/walker/prompt.md) | to generate | `ingest cast/villager_a/walker` |
 | villager_b | [`cast/villager_b/walker`](cast/villager_b/walker/prompt.md) | to generate | `ingest cast/villager_b/walker` |
 
-## 4. Field art, by chapter and map
+## 5. Field art, by chapter and map
 
 A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,
 and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces
@@ -206,7 +248,7 @@ Shared tiles, drawn with another map so one id is never drawn twice: `grass` (wi
 
 Shared props, drawn with another map so one id is never drawn twice: `cart` (with `halm`), `sign` (with `halm`), `tree_a` (with `halm`), `tree_b` (with `halm`)
 
-## 5. Scene shot sheets, by chapter and map
+## 6. Scene shot sheets, by chapter and map
 
 One sheet per panel scene: all of its panels as separate white-bordered rectangles on black,
 cut apart into `story/panels/`. Talk and narration scenes need no art and are not listed.

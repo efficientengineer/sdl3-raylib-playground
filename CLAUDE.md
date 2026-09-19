@@ -79,11 +79,15 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py names          # the {{TOKEN}} table, and every token used with no row in it
 ./story_prompt.py packages [--all]  # (re)build story/packages/ — the art tray, by chapter and map
 ./story_prompt.py ingest [folder]   # cut every returned.png waiting in story/packages/ (the owner's one command)
-./story_prompt.py tiles <id>...  # field art: template sheet of square slots → story/field/tiles/
+./story_prompt.py tileset <set>  # THE FIELD ART PATH (D18): story/field/tilesets/<set>/tiles.md → one
+                                 # template sheet package per sheet; ingest packs them into atlas.png
+./story_prompt.py tmap check <map>|--all    # validate a .tmap against its tileset, text ids and exits
+./story_prompt.py tmap preview <map>        # render it from the atlas → story/out/<map>.tmap.png
+./story_prompt.py tiles <id>...  # (parked) field art: template sheet of square slots → story/field/tiles/
 ./story_prompt.py props <id>...  # field art: slots sized by each prop's footprint → story/field/props/
 ./story_prompt.py walker <Name>  # field art: the 4x4 walk grid (S W E N) → story/field/walkers/
 ./story_prompt.py building <id>...  # field art: front wall + wall and roof samples → story/field/buildings/
-./story_prompt.py screen <map> <zone>  # THE FIELD ART PATH: a top-down 16-bit map painted whole from
+./story_prompt.py screen <map> <zone>  # (parked) a top-down 16-bit map painted whole from
                                  # story/field/screens.md, plus its walkable mask → story/field/screens/<map>_<zone>.screen
 ./story_prompt.py view <map> <zone> # (older path, block-out painting) → story/field/views/<map>_<zone>_paint.png
                                  # (export also writes src/field_text.h from story/field/text.md)
@@ -486,34 +490,54 @@ leave the background untouched, no text.
 - **`story/field/manifest.md`** is regenerated on every one of those runs: every id ever requested,
   its kind, target size, the package that asked for it, and whether the file exists. Humans and agents
   read it; the engine does not.
-- **Screens — the main field-art path (owner, 2026-09-19: Phantasy Star IV, not Final Fantasy VIII).**
-  A screen is a **top-down 16-bit JRPG map**, painted whole by ChatGPT, and the game is fitted to the
-  painting. The angled three-quarter experiment is dropped: with an angled camera every object hides
-  ground behind it, the mask has to guess what is back there and the walker needs a per-screen scale;
-  top-down has none of those problems. Written for one map at a time in
-  **`story/field/screens.md`** — one `## <map>.<zone>` entry: a paragraph of description for the
-  artist, `- exits: left -> west_road, ...`, `- landmark:`, optional `- spawn: x y`, `- walker: 64`
-  (a person's height in painting pixels, which is the scale of the whole map), `- size:` and
-  `- overhead: yes`. `./story_prompt.py screen <map> <zone>` writes the package: **one chat, one
-  message per image** — the map, then a green-on-black walkable mask traced over it, and only for an
-  `overhead` map a white-on-black mask of what the player walks *underneath*. Asking for a map and a
-  mask in one message, or for one mask with three classes in it, is what failed first time round: the
-  model invented a class of its own and drew line art over the top.
-  `ingest` fits everything to one size (the painting's, capped at 1536 wide; box filter for the
-  painting, nearest for a mask), opens the mask to kill the 1-3 px outlines the model traces, keeps
-  only the ground that connects to the ground the player stands on — the first return painted green
-  on skyline arches, windows and roof terraces — and derives
-  **`story/field/screens/<map>_<zone>.screen`**, plain text in SCREEN PIXELS: `size`, `paint`, `walk`,
-  optional `over`, `walker`, `spawn`, `scale_near`/`scale_far` (both 1.0: one scale over a top-down
-  map), `poly n: x y, ...` convex nav polygons, `door x y w h` for each threshold notch the mask cut
-  into a building, and `exit edge x0 y0 x1 y1 target_map`. A declared exit with no walkable ground at
-  that edge is a loud warning, as is a spawn that is not on walkable ground. `--debug` writes
-  `..._debug.png`: the map with the polygons outlined and the doors, exits and spawn marked, which is
-  how to judge what the tool understood without touching the phone. The nav decomposition is contour
-  trace → Douglas-Peucker → ear clipping → Hertel-Mehlhorn, retried at a coarser tolerance while it
-  comes apart into too many polygons and kept at the fewest that still cover the walkable ground to
-  within 3%.
-- **Painted views (the older path, the Final Fantasy VIII arrangement).** The 3D block-out stays —
+- **Tile field (D18) — the main field-art path** (owner, 2026-09-19, final after a day of 2.5D,
+  painted block-outs and painted screens: *"Sega style, top down, using tile sheets, grid walking. No
+  more screen navmesh."*). `TILES.md` is the contract; **Screens and the 3D/painted-view field are
+  parked** — the code stays, nothing new is built on them.
+  A **tileset** is `story/field/tilesets/<set>/`: `tiles.md` (**the engine's file** — one `## <id>` per
+  tile or stamp with `- index:`, `- layer:`, `- solid:`, `- desc:`), `atlas.png` (16 columns of 32x32
+  tiles, index 0 empty), `atlas.json` and `cut/<sheet>.png`. The art pipeline never renames an entry,
+  never changes a size or a solid row, and **never moves an index that is already written**; the one
+  thing it writes back into `tiles.md` is a `- index:` line for an entry that has none.
+  `./story_prompt.py tileset <set>` groups the entries into sheets — by an optional `- sheet:` line,
+  else `ground` (opaque, neutral dark-grey background), `fringes`, `buildings`, `nature`, `props` (all
+  magenta) — and writes one package per sheet under `story/packages/tilesets/<set>/<sheet>/`, listed
+  **first** in the packages README. Slots are at **exactly 4x**: a tile is a 128-px slot, a 4x3 stamp a
+  512x384 one, the white 3-px border is drawn *outside* the art area, and the prompt's loudest rule is
+  that every art pixel must be a 4x4 block aligned to the slot. A drawn sheet is frozen; new ids go to
+  a fresh `<sheet>_2`.
+  `ingest` cuts the return by taking each art pixel's **mode colour** over its exact region in the
+  returned image — never an average, and never a resize first, because the sheet comes back at
+  about 1.5 MP whatever was asked for and a non-integer resize puts the blocks half a pixel out of
+  step. Magenta is keyed on anything that is not opaque ground, the alpha is **hard-thresholded at
+  0.5** (a tile is on or off; the engine alpha-tests), and each entry is packed into `atlas.png` at
+  its own index without disturbing a cell that belongs to anything else. Ground tiles get a **seam
+  check** — the mean colour difference across the wrap, warned above 24 — with `--heal-seams` to
+  cross-blend two pixels at the edges, and `--palette N` to quantise a whole sheet by median cut.
+  On a synthetic sheet a 1:1 return cuts back **pixel-exact**, and an 0.82x return to a mean absolute
+  error of 0.1/255.
+  **The fringe convention is fixed here and the engine rotates it** (written out in full in
+  `story/field/tilesets/README.md`): a fringe tile carries **only its own terrain**, ragged, over
+  transparency, and is laid on the neighbouring tile. `_edge` is a band along the **north** edge about
+  10 of the tile's 32 px deep; `_corner_out` fills only the **north-east** corner about 10 px in from
+  each; `_corner_in` is its inverse — everything except a ragged bite out of the **south-west**
+  corner. Three tiles a terrain, rotated 90/180/270, instead of forty-seven.
+  **Maps** are `story/field/tmaps/<map>.tmap`, the plain-text format in `TILES.md`.
+  `./story_prompt.py tmap check <map>|--all` (also run by `check --all`) validates the legend against
+  the tileset, every stamp's footprint and its `+` cells, overlaps, the spawn and every exit or door
+  target standing on a non-solid tile, every `message`/`npc` id against `story/field/text.md`, and
+  every exit's target map against the `.tmap` files or the `## todo` list in
+  `story/field/tmaps/README.md`. `tmap preview <map>` renders the map from the atlas to
+  `story/out/<map>.tmap.png`, drawing a flat labelled colour for any tile whose atlas cell is still
+  empty, so a map can be judged on the Mac before any art exists.
+  **`story/field/tilesets/**` and `story/field/tmaps/**` have to ship** — the push and bundle lists in
+  `fast_reload.sh` and `deploy.sh` are the engine agent's to change; this side does not touch those
+  scripts.
+- **Screens (parked).** A screen was a top-down 16-bit map painted whole by ChatGPT with a
+  green-on-black walkable mask traced over it, derived into `story/field/screens/<map>_<zone>.screen`
+  (nav polygons, doors, exits) by `./story_prompt.py screen <map> <zone>`. The tooling still works and
+  the packages still build; nothing new is authored against it.
+- **Painted views (parked, the Final Fantasy VIII arrangement).** The 3D block-out stays —
   it is what collision, depth and the camera are computed from — and what the player sees is a
   painting laid over it. The engine captures a zone from the game's own camera to
   **`story/field/views/<map>_<zone>.png`** (1280x720 or 640x360, opaque); `./story_prompt.py view <map>
@@ -553,8 +577,9 @@ leave the background untouched, no text.
   `v3/NAMES.md` (the `{{TOKEN}}` table), `scenes/`, `panels/`, `refs/`, `portraits/` (generated from
   `refs/`, gitignored), `packages/` (the art tray: generated by `packages`, tracked, holds the owner's
   `returned.png` files); `story_prompt.py` builds the prompts, cuts what comes back, and exports
-- `story/field/` — the walking-around art contract in `FIELD.md` and `src/FIELD_NOTES.md`:
-  `screens.md` (**the main path**: one top-down map per entry) and `screens/` (the paintings, the
-  cleaned masks and the `.screen` files the engine loads); then the older sprite path — `tiles.md`,
+- `story/field/` — the walking-around art contract. **Main path (D18, `TILES.md`):** `tilesets/<set>/`
+  (`tiles.md` the engine's list, `atlas.png`, `atlas.json`, `cut/`, and `README.md` with the fringe
+  convention) and `tmaps/<map>.tmap` (the maps, plus `README.md` with the `## todo` map list).
+  Parked: `screens.md` and `screens/` (painted maps and `.screen` files); the sprite path — `tiles.md`,
   `props.md`, `walkers.md`, `buildings.md` (what to draw), `maps/` (the maps themselves), `tiles/`,
   `props/`, `walkers/`, `buildings/` (the PNGs the game ships), `manifest.md` (generated)

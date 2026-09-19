@@ -1,0 +1,15 @@
+{
+  "kind": "tileset",
+  "set": "valley",
+  "sheet": "props_3",
+  "ids": [
+    "guild_hall"
+  ],
+  "title": "valley \u2014 props_3 tile sheet (3 of 3)",
+  "makes": "1 tile(s) packed into `story/field/tilesets/valley/atlas.png`",
+  "outputs": [
+    "story/field/tilesets/valley/atlas.png",
+    "story/field/tilesets/valley/cut/props_3.png"
+  ],
+  "dir": "story/packages/tilesets/valley/props_3"
+}

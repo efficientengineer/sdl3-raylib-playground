@@ -15,23 +15,34 @@
   ./story_prompt.py portraits                  cut each character's reference sheet down to story/portraits/<name>.png
                                                (the middle head-and-shoulders panel; shipped as portrait_<name>.png)
 
-  Field art (FIELD.md): the tool draws the sheet's layout itself as a template PNG, ChatGPT only fills
+  Field art (parked paths; the tile field below is the live one): the tool draws the sheet's layout
+  itself as a template PNG, ChatGPT only fills
   the numbered slots, and cutting needs no border detection because the boxes are in the package JSON.
   ./story_prompt.py tiles  grass dirt water    story/out/tiles_....template.png + .chatgpt.md + .sheet.json
   ./story_prompt.py props  well cart sign      slots sized by each prop's footprint in map cells
   ./story_prompt.py walker Bron                the 4x4 walk grid (rows S W E N), the ref sheet attached
   ./story_prompt.py building house_a           three slots a building: the front wall, a wall sample, a
                                                roof sample -> story/field/buildings/<id>_{front,side,roof}.png
-  ./story_prompt.py screen halm square         THE MAIN FIELD PATH: ChatGPT paints the whole map screen
+  ./story_prompt.py screen halm square         (parked, see the tile field below) ChatGPT paints a map screen
                                                from story/field/screens.md and the game is fitted to it —
                                                one painting, two binary masks, one chat, three messages ->
                                                story/field/screens/<map>_<zone>.screen for the engine
   ./story_prompt.py view   halm square         paint the engine's block-out of one camera zone (the older path):
                                                story/field/views/<map>_<zone>.png -> ..._paint.png
+  Tile field (TILES.md, D18) — THE FIELD: 32x32 tiles, an atlas, grid walking.
+  ./story_prompt.py tileset valley             read story/field/tilesets/valley/tiles.md, assign any missing
+                                               atlas index, and write one template sheet package per sheet
+                                               under story/packages/tilesets/valley/<sheet>/ (slots at 4x:
+                                               a tile is a 128-px slot, a 4x3 stamp a 512x384 one)
+  ./story_prompt.py tmap check   halm | --all  validate story/field/tmaps/<map>.tmap against its tileset
+  ./story_prompt.py tmap preview halm          render it from the atlas -> story/out/<map>.tmap.png
+
   ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png [--fringe N]
                                                key the magenta (--fringe N shaves N more pixels off the
                                                edge), cut the slots, write story/field/tiles|props|walkers/
-                                               and regenerate story/field/manifest.md ('slice' redirects here)
+                                               and regenerate story/field/manifest.md ('slice' redirects here).
+                                               A tileset sheet takes --palette N (quantise the sheet) and
+                                               --heal-seams (cross-blend a ground tile's wrap).
 
   ./story_prompt.py preview story/scenes/003_x.md
                                                write story/out/<scene>.preview.html: panels layered manga-style and
@@ -818,6 +829,14 @@ def cmd_check_build(args, build):
         print(f"{FIELD_TEXT.relative_to(ROOT.parent)}: " +
               (f"{len(err)} error(s)" if err else f"ok ({n} line(s), {todo} still a placeholder)"))
         failed += 1 if err else 0
+        for mp in all_tmaps():                           # the tile maps answer to their tileset
+            terr, twarn = check_tmap(mp)
+            for wmsg in twarn:
+                print(f"warning: {wmsg}", file=sys.stderr)
+            for e in terr:
+                print(f"ERROR: {e}", file=sys.stderr)
+            print(f"{tmap_path(mp).name}: " + (f"{len(terr)} error(s)" if terr else "ok"))
+            failed += 1 if terr else 0
     if failed:
         sys.exit(f"story_prompt: {failed} scene(s) rejected. Fix the scene file; do not bypass the rules.")
 
@@ -3081,14 +3100,18 @@ def scaled_inner(slot, sx, sy, w, h):
 
 
 def cmd_cut(args):
-    pos, fringe, it = [], 0, iter(args)
+    pos, fringe, palette, it = [], 0, 0, iter(args)
     for a in it:
         if a == "--fringe":
             fringe = int(next(it, "0"))
+        elif a == "--palette":
+            palette = int(next(it, "0"))
         elif not a.startswith("--"):
             pos.append(a)
+    heal = "--heal-seams" in args
     if len(pos) != 2:
-        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] [--nearest]")
+        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] [--nearest] "
+            "[--palette N] [--heal-seams]")
     data = json.loads(Path(pos[0]).read_text())
     image = Path(pos[1]).expanduser()
     kind = data.get("kind")
@@ -3096,7 +3119,7 @@ def cmd_cut(args):
         if not image.exists():
             die(f"{image} not found")
         return cut_view(data, image, "--nearest" in args)
-    if kind not in FIELD_KINDS:
+    if kind not in FIELD_KINDS + ("tileset",):
         die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
     if not image.exists():
         die(f"{image} not found")
@@ -3122,6 +3145,8 @@ def cmd_cut(args):
             f"this package, or the generator repainted the background. Nothing written.")
     print(f"{image.name}: {w}x{h}, template {tw}x{th} ({sx:.2f}x), {len(slots)} slot(s), kind {kind}")
 
+    if kind == "tileset":                                 # a tile sheet: snap, key, pack into the atlas
+        return cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette, heal)
     if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
         FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
         for s in slots:
@@ -3172,6 +3197,1146 @@ def cmd_cut(args):
                 if kind == "walker" else kind_rows(KIND_DIR[kind], slots, data["template"]))
     write_field_manifest(rows_out)
     print(f"{FIELD_MANIFEST.relative_to(ROOT.parent)} updated")
+
+
+# ───────────────────────── Tile field (D18): tilesets, atlases and tmaps ─────────────────────────
+#
+# Owner's call, 2026-09-19, final: "Sega style, top down, using tile sheets, grid walking. No more
+# screen navmesh." TILES.md is the contract. The engine owns `story/field/tilesets/<set>/tiles.md`
+# (the names, the sizes, the solid rows, the layers); this half owns everything that turns that list
+# into art and back into an atlas.
+#
+#   tileset <set>   read tiles.md, assign any missing atlas index, lay every tile and stamp out on
+#                   template sheets at EXACTLY 4x (a 32-px tile is a 128-px slot), write one package
+#                   per sheet under story/packages/tilesets/<set>/<sheet>/
+#   ingest          cut a returned sheet: snap to the 4x4 art-pixel grid by mode filter, downsample
+#                   4:1, key the magenta on anything that is not opaque ground, hard-threshold the
+#                   alpha (the engine alpha-tests; there is no partial alpha in a tile), then pack
+#                   every tile into story/field/tilesets/<set>/atlas.png at its own index
+#   tmap check|preview   validate a .tmap against its tileset, or render it from the atlas
+#
+# Two things are load-bearing and easy to get wrong:
+#
+# 1. **Nothing ever moves in the atlas.** An index that tiles.md already carries is never reassigned,
+#    and a cut only ever writes the cells its own entries own. That is what lets the engine hard-code
+#    indices and lets one sheet be recut years later.
+# 2. **The 4x grid.** ChatGPT does not draw on a pixel grid, it draws a picture that looks pixelated.
+#    Downsampling that by averaging turns every hard tile edge into mush and the seams stop meeting.
+#    So the cut resizes each slot to exactly 4x the tile, then takes the MODE colour of each 4x4
+#    block — the colour the artist meant that art pixel to be — and that is the tile.
+
+TILESETS = FIELD / "tilesets"
+TMAPS = FIELD / "tmaps"
+TSET_TILE = 32                        # a tile is 32x32 px in game (TILES.md)
+TSET_SCALE = 4                        # ...drawn at 4x on the sheet, so one art pixel is a 4x4 block
+TSET_SLOT = TSET_TILE * TSET_SCALE    # 128: one tile's slot on a template sheet
+ATLAS_COLS = 16                       # the atlas is 16 tiles wide; index 0 is the empty tile
+TSET_CANVAS = (1536, 1024, "landscape, 1536x1024")   # one sheet, never bigger
+TSET_GREY = (56, 56, 60)              # the ground sheet's background: neutral, dark, not magenta
+TSET_LAYERS = ("ground", "object", "over")
+FRINGE_KINDS = ("edge", "corner_out", "corner_in")   # TILES.md: three fringe tiles a terrain, rotated
+FRINGE_DEPTH = 10                     # how far the bordering terrain creeps in, in the tile's 32 px
+SEAM_WARN = 24.0                      # mean per-channel difference across a ground tile's wrap: warn above
+TSET_ALPHA_CUT = 128                  # the engine alpha-tests at 0.5; a tile pixel is on or off
+ATLAS_JSON = "atlas.json"
+
+# Which sheet an entry lands on when it carries no '- sheet:' line. Ground and its fringes are split,
+# because a ground tile is opaque and wants a neutral background while a fringe has to be keyed.
+TSET_SHEET_WORDS = (
+    ("buildings", ("house", "roof", "wall", "door", "window", "shop", "inn", "gate", "chimney",
+                   "eave", "porch", "hut", "tower", "shrine", "steps", "stair")),
+    ("nature", ("tree", "bush", "rock", "stump", "log", "flower", "grass_tuft", "reed", "cliff",
+                "boulder", "hedge", "crop", "vine", "water_", "fall")),
+)
+
+
+def tileset_dir(name):
+    return TILESETS / slug(name)
+
+
+def tileset_doc(name):
+    return tileset_dir(name) / "tiles.md"
+
+
+def atlas_path(name):
+    return tileset_dir(name) / "atlas.png"
+
+
+def cut_sheet_path(name, sheet):
+    return tileset_dir(name) / "cut" / f"{sheet}.png"
+
+
+def is_fringe(name):
+    return any(name.endswith("_" + k) for k in FRINGE_KINDS)
+
+
+def fringe_kind(name):
+    return next((k for k in FRINGE_KINDS if name.endswith("_" + k)), "")
+
+
+def sheet_guess(name, entry):
+    """The sheet an entry belongs on with no '- sheet:' line of its own."""
+    if entry.get("sheet"):
+        return slug(entry["sheet"])
+    if is_fringe(name):
+        return "fringes"
+    if entry["layer"] == "ground":
+        return "ground"
+    for sheet, words in TSET_SHEET_WORDS:
+        if any(w in name for w in words):
+            return sheet
+    return "props"
+
+
+def parse_wh(text, where):
+    m = re.fullmatch(r"(\d+)\s*[xX]\s*(\d+)", (text or "").strip())
+    if not m:
+        die(f"{where}: '{text}' is not a WxH size")
+    w, h = int(m.group(1)), int(m.group(2))
+    if not (1 <= w <= ATLAS_COLS and 1 <= h <= 16):
+        die(f"{where}: {w}x{h} is not a usable stamp size (1..{ATLAS_COLS} across, 1..16 down)")
+    return w, h
+
+
+def tileset_entries(name):
+    """Ordered {id: entry} from story/field/tilesets/<set>/tiles.md. The engine owns this file."""
+    path = tileset_doc(name)
+    if not path.exists():
+        die(f"{path.relative_to(ROOT.parent)} not found. The engine writes it: one '## <id>' per tile "
+            f"or stamp, with '- layer:', '- solid:' and '- desc:' (see TILES.md).")
+    out, unknown = {}, []
+    for ident, body in h2_sections(detok(path.read_text(), unknown)).items():
+        if not re.fullmatch(r"[a-z0-9_]+", ident):
+            die(f"{path.name}: '## {ident}' is not a usable tile id (lower case, digits, underscores)")
+        kv = kv_lines(body)
+        desc = kv.get("desc") or next((squash(l) for l in body.splitlines()
+                                       if l.strip() and not re.match(r"^\s*- [\w ]+?:", l)), "")
+        layer = (kv.get("layer") or "ground").lower()
+        if layer == "fringe":                       # a friendlier synonym the engine may use
+            layer = "ground"
+        if layer not in TSET_LAYERS:
+            die(f"{path.name}: '## {ident}' has '- layer: {layer}'; use one of: {', '.join(TSET_LAYERS)}")
+        idx, w, h = None, 1, 1
+        if "index" in kv:
+            m = re.fullmatch(r"(\d+)(?:\s+(\d+\s*[xX]\s*\d+))?", kv["index"].strip())
+            if not m:
+                die(f"{path.name}: '## {ident}' has '- index: {kv['index']}'; "
+                    f"write 'index: 12' or 'index: 12 4x3' for a stamp")
+            idx = int(m.group(1))
+            if m.group(2):
+                w, h = parse_wh(m.group(2), f"{path.name} '{ident}'")
+        elif kv.get("size") or kv.get("footprint"):
+            w, h = parse_wh(kv.get("size") or kv["footprint"], f"{path.name} '{ident}'")
+        frames = int(kv["frames"]) if re.fullmatch(r"\d+", (kv.get("frames") or "").strip()) else 1
+        if frames < 1 or frames > ATLAS_COLS:
+            die(f"{path.name}: '## {ident}' has '- frames: {kv.get('frames')}'; 1..{ATLAS_COLS}")
+        e = {"id": ident, "desc": desc, "layer": layer, "index": idx, "w": w, "h": h,
+             "frames": frames, "solid": (kv.get("solid") or "no").strip(),
+             "sheet": kv.get("sheet"), "raw": kv}
+        e["opaque"] = e["layer"] == "ground" and not is_fringe(ident)
+        e["cells"] = (w * frames, h)                 # what it occupies in the atlas and on the sheet
+        e["foot"] = (w, h)                           # what it occupies on a map: frames are alternatives
+        e["sheet"] = sheet_guess(ident, e)
+        if not desc:
+            die(f"{path.name}: '## {ident}' has no '- desc:' line; the art pipeline has nothing to ask for")
+        check_description(desc, ident, str(path.relative_to(ROOT.parent)))
+        out[ident] = e
+    if not out:
+        die(f"{path.name}: no '## <id>' entries")
+    if unknown:
+        die(f"{path.name}: unknown name token(s) {', '.join('{{%s}}' % t for t in unknown)}")
+    return out
+
+
+def atlas_cells(idx, w, h):
+    return [idx + ATLAS_COLS * r + c for r in range(h) for c in range(w)]
+
+
+def assign_indices(name, entries):
+    """Give every entry that has none an atlas index, and write just those lines back. [(id, index)]."""
+    used, path = {}, tileset_doc(name)
+    for e in entries.values():
+        if e["index"] is None:
+            continue
+        w, h = e["cells"]
+        if e["index"] < 1:
+            die(f"{path.name}: '## {e['id']}' has index {e['index']}; index 0 is the empty tile")
+        if e["index"] % ATLAS_COLS + w > ATLAS_COLS:
+            die(f"{path.name}: '## {e['id']}' at index {e['index']} is {w} cells wide and would wrap "
+                f"past column {ATLAS_COLS}. A stamp is one rectangle in the atlas; move it to a row start.")
+        for c in atlas_cells(e["index"], w, h):
+            if c in used:
+                die(f"{path.name}: '## {e['id']}' at index {e['index']} overlaps '## {used[c]}' at "
+                    f"atlas cell {c}. Indices already written are never moved by this tool; fix tiles.md.")
+            used[c] = e["id"]
+    fresh = []
+    for e in entries.values():                       # in file order, so a fresh file reads in order
+        if e["index"] is not None:
+            continue
+        w, h = e["cells"]
+        idx = 1
+        while True:
+            if idx % ATLAS_COLS + w <= ATLAS_COLS and all(c not in used for c in atlas_cells(idx, w, h)):
+                break
+            idx += 1
+        e["index"] = idx
+        for c in atlas_cells(idx, w, h):
+            used[c] = e["id"]
+        fresh.append((e["id"], idx, e["w"], e["h"], e["frames"]))
+    if fresh:
+        write_indices(path, fresh)
+    return fresh
+
+
+def write_indices(path, fresh):
+    """Insert a '- index:' line into each named entry, leaving every other byte of the file alone."""
+    lines = path.read_text().splitlines(keepends=True)
+    want = {ident: (idx, w, h) for ident, idx, w, h, _ in fresh}
+    starts = [i for i, l in enumerate(lines) if re.match(r"^## (?!#)", l)]
+    edits = []
+    for n, i in enumerate(starts):
+        ident = lines[i][3:].strip().lower()
+        if ident not in want:
+            continue
+        end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+        idx, w, h = want[ident]
+        text = f"- index: {idx}" + (f" {w}x{h}" if w * h > 1 else "") + "\n"
+        at = next((j for j in range(i + 1, end) if re.match(r"^- [\w ]+?:", lines[j])), None)
+        if at is None:                               # no metadata at all: after the last non-blank line
+            at = max([j for j in range(i + 1, end) if lines[j].strip()], default=i) + 1
+        edits.append((at, text))
+    for at, text in sorted(edits, reverse=True):
+        lines.insert(at, text)
+    path.write_text("".join(lines))
+
+
+# ── laying the sheets out ──
+
+def tileset_sheets(entries):
+    """{sheet: [ids]} in file order, each list small enough to lay out on one canvas."""
+    by_sheet = {}
+    for ident, e in entries.items():
+        by_sheet.setdefault(e["sheet"], []).append(ident)
+    return by_sheet
+
+
+def tileset_pack(ids, entries):
+    """[[ids]] split so each group fits one canvas at exactly TSET_SLOT per cell."""
+    W, H, _ = TSET_CANVAS
+    groups, cur = [], []
+    for i in ids:
+        trial = cur + [i]
+        if pack_cells([entries[x]["cells"] for x in trial], W, H, TSET_SLOT) is None:
+            if not cur:
+                die(f"'{i}' is {entries[i]['cells'][0]}x{entries[i]['cells'][1]} tiles and does not fit "
+                    f"a {W}x{H} sheet on its own. Split the stamp or shrink it in tiles.md.")
+            groups.append(cur)
+            cur = [i]
+        else:
+            cur = trial
+    if cur:
+        groups.append(cur)
+    return groups
+
+
+def tileset_slots(ids, entries):
+    """(W, H, label, boxes-as-slots) for one sheet."""
+    W, H, label = TSET_CANVAS
+    boxes = pack_cells([entries[i]["cells"] for i in ids], W, H, TSET_SLOT)
+    if boxes is None:
+        die(f"{len(ids)} slots do not fit a {W}x{H} sheet")
+    dy = (H - max(b[1] + b[3] for b in boxes) - SLOT_MARGIN) // 2
+    slots = []
+    for n, (i, box) in enumerate(zip(ids, boxes), 1):
+        # The white border goes OUTSIDE the art, unlike the older field templates: a tile slot has to
+        # be exactly 4x the tile (128 px) so the returned image can be cropped and read back on the
+        # 4x4 art-pixel grid with no resampling at all. pack_cells laid the art areas out; grow each
+        # box by the border thickness and keep the art area as the inner box.
+        inner = (box[0], box[1] + dy, box[2], box[3])
+        box = (inner[0] - SLOT_BORDER, inner[1] - SLOT_BORDER,
+               inner[2] + 2 * SLOT_BORDER, inner[3] + 2 * SLOT_BORDER)
+        e = entries[i]
+        slots.append({"n": n, "id": i, "box": list(box), "inner": list(inner),
+                      "cells": list(e["cells"]), "index": e["index"], "layer": e["layer"],
+                      "frames": e["frames"], "opaque": e["opaque"],
+                      "target": [e["cells"][0] * TSET_TILE, e["cells"][1] * TSET_TILE]})
+    return W, H, label, slots
+
+
+FRINGE_RULE = (
+    "FRINGE TILES (the ids ending in _edge, _corner_out and _corner_in) are not whole tiles: each one "
+    "is a ragged scrap of its own terrain drawn over the empty background, which the game lays on top "
+    "of the neighbouring ground so the boundary between two terrains is not a straight line. Draw "
+    f"only the terrain, never the neighbour, and let the background show through the rest:\n"
+    f"  - _edge: a band of the terrain along the NORTH edge of the slot, solid and full width at the "
+    f"very top, reaching about {FRINGE_DEPTH} of the tile's 32 pixels down at its deepest, with a "
+    f"ragged, organic, uneven southern boundary — clumps and gaps, never a straight line and never a "
+    f"repeating scallop. The bottom two thirds of the slot is background.\n"
+    f"  - _corner_out: the same terrain filling only the NORTH-EAST corner, reaching about "
+    f"{FRINGE_DEPTH} pixels in from the north edge and {FRINGE_DEPTH} pixels in from the east edge, a "
+    f"ragged quarter-round. Everything else is background.\n"
+    f"  - _corner_in: the exact inverse — the terrain fills the whole slot EXCEPT a ragged bite out of "
+    f"the SOUTH-WEST corner about {FRINGE_DEPTH} pixels deep from the south edge and {FRINGE_DEPTH} "
+    f"pixels in from the west edge. Only that bite is background.\n"
+    "A slot's own description below gives the MATERIAL only — what the terrain is made of. Where it "
+    "also mentions an edge or a corner, the three shapes above win: draw the shape described here, in "
+    "that material.\n"
+    "The north / north-east / south-west wording is fixed: the game rotates each of these three by 90, 180 and "
+    "270 degrees to cover the other sides and corners, so all three must be drawn at the orientation "
+    "described and the terrain must meet the slot's edges at full strength wherever it touches them."
+)
+
+
+def tileset_package_lines(setname, sheet, ids, entries, slots, style, label, opaque_sheet, attach):
+    b = style["blocks"]
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
+         f"Canvas: {label}, exactly the same size and proportions as the template.", "", b["map_header"], "",
+         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
+    L += ["", TEMPLATE_RULES, "",
+          f"WHAT THIS SHEET IS: the '{sheet}' tile sheet for the '{setname}' tileset of a top-down "
+          f"16-bit JRPG field map. Every slot is one tile or one multi-tile object, and in game each "
+          f"tile is exactly {TSET_TILE}x{TSET_TILE} pixels.", "",
+          f"PIXEL GRID — the most important rule on this sheet. Everything is drawn at {TSET_SCALE}x. "
+          f"Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block of identical colour, aligned to the "
+          f"slot: the blocks start at the slot's top-left inside corner and run in an even grid across "
+          f"and down it, so a {TSET_SLOT}-pixel slot is a {TSET_TILE}x{TSET_TILE} pixel-art tile blown "
+          f"up {TSET_SCALE} times. No block is half a colour, no edge falls between blocks, no detail "
+          f"is finer than one block, and no two objects on the sheet use different block sizes.", "",
+          "PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for every slot:", "",
+          "- The ground is seen from straight above: a patch of grass, dirt, paving or water is a flat "
+          "texture with no thickness and no side visible.",
+          "- An object standing on the ground is seen from slightly in front of straight above: you see "
+          "its top or roof AND its south-facing front, and nothing of its north, east or west sides.",
+          "- Every vertical edge in the world — a wall corner, a tree trunk, a post — runs straight up "
+          "the image. Nothing leans, nothing converges, nothing is foreshortened.",
+          "- No perspective, no vanishing point, no horizon, no sky. Nothing gets smaller because it is "
+          "further away: a thing the same size in the world is the same size in pixels wherever it sits.",
+          "- One light direction for the whole sheet, from the upper left. Every object's shading and "
+          "every contact shadow agrees with it.", ""]
+    if opaque_sheet:
+        L += ["GROUND TILES: every slot is filled edge to edge with its texture, right up to the white "
+              "border, opaque, with no frame, no vignette, no empty corner and no background showing. "
+              "Each one is SEAMLESS on all four edges: the right edge continues into the left edge and "
+              "the bottom edge into the top, so a floor tiled with copies of it shows no seam. Keep the "
+              "detail even and small — no single large feature the eye can count across a field, no "
+              "object standing on the ground, no character, no shadow cast by anything outside the tile.", ""]
+    else:
+        L += ["BACKGROUND: the flat magenta between and around the objects is empty space and is keyed "
+              "out by the tool. Leave it completely untouched right up to the edge of what you draw: no "
+              "magenta tint on an object, no soft halo, no gradient, no drop shadow lying on the "
+              "magenta. Do not paint ground under an object — the map draws its own ground underneath.", ""]
+    if any(is_fringe(i) for i in ids):
+        L += [FRINGE_RULE, ""]
+    stamps = [i for i in ids if (entries[i]["w"], entries[i]["h"]) != (1, 1)]
+    if stamps:
+        L += ["MULTI-TILE OBJECTS: a slot taller or wider than one tile holds one object, drawn to fill "
+              "its slot's footprint and STANDING ON THE SLOT'S BOTTOM EDGE — its base touches the bottom "
+              "inside edge of the border, centred left to right. No ground under it and no cast shadow "
+              "beyond a contact shadow no more than one tile high tucked under its south face. A door is "
+              "one tile wide and about 1.3 tiles tall, centred on a tile column so it lines up with the "
+              "grid. Every slot on this sheet is drawn to ONE common scale: a tile is a stride, a person "
+              "would be one tile wide and one and a half tiles tall.", ""]
+    L += [f"SLOTS — {len(slots)} of them:"]
+    for s in slots:
+        e = entries[s["id"]]
+        cw, chh = e["cells"]
+        size = (f"{s['inner'][2]}x{s['inner'][3]} px, {cw}x{chh} tile"
+                + ("s" if cw * chh > 1 else ""))
+        what = []
+        if e["frames"] > 1:
+            what.append(f"{e['frames']} animation frames of the same tile side by side, left to right, "
+                        f"each one {e['w']}x{e['h']} tile"
+                        + ("s" if e["w"] * e["h"] > 1 else "")
+                        + ", the same subject with only the moving part changed, the motion looping "
+                          "from the last frame back to the first, and every frame obeying the rules "
+                          "below on its own")
+        if is_fringe(s["id"]):
+            what.append(f"drawn as the _{fringe_kind(s['id'])} fringe shape described above, in this "
+                        f"material")
+        elif e["opaque"]:
+            what.append("seen straight down from directly above, seamless on all four edges, opaque")
+        else:
+            what.append("standing on the slot's bottom edge, everything else left as background")
+        L.append(f"Slot {s['n']} ({s['id']}), {size}: {e['desc'].rstrip('.')}. " + ". ".join(
+            w[0].upper() + w[1:] for w in what) + ".")
+    L += ["", f"RENDERING: {b['map_rendering']}", "",
+          f"AVOID: {b['map_negative']}, drawing outside a slot, moving or covering a slot number, a "
+          f"border or frame inside a slot, pixels not aligned to the {TSET_SCALE}x{TSET_SCALE} block "
+          f"grid, anti-aliased or soft edges, a visible seam at a ground tile's edge, changing the "
+          f"size of the image"]
+    return "\n".join(L)
+
+
+def build_tileset_sheet(setname, sheet, ids, entries=None, style=None):
+    """One sheet's package: template.png, sheet.json, prompt.md."""
+    entries = entries or tileset_entries(setname)
+    style, warn = style or load_style(), []
+    missing = [i for i in ids if i not in entries]
+    if missing:
+        die(f"{tileset_doc(setname).name}: no entry for {', '.join(missing)}")
+    W, H, label, slots = tileset_slots(ids, entries)
+    opaque_sheet = all(entries[i]["opaque"] for i in ids)
+    bg = TSET_GREY if opaque_sheet else MAGENTA
+    name = f"tileset_{setname}_{sheet}"
+    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
+    prompt = tileset_package_lines(setname, sheet, ids, entries, slots, style, label, opaque_sheet, attach)
+    atlas = str(atlas_path(setname).relative_to(ROOT.parent))
+    cutfile = str(cut_sheet_path(setname, sheet).relative_to(ROOT.parent))
+    status = [f"- `{atlas}` — " + ("**exists**" if atlas_path(setname).exists() else "not started yet"),
+              f"- `{cutfile}` — " + ("**cut already**" if cut_sheet_path(setname, sheet).exists()
+                                     else "not cut yet"), "",
+              f"This sheet carries {len(ids)} of the tileset's entries: " + ", ".join(f"`{i}`" for i in ids)]
+    after = field_after(pkg_path(name, "sheet.json"), [
+        f"- [ ] All {len(slots)} slots filled; every border and every number exactly where it was",
+        f"- [ ] Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block on one grid — zoom in and check a "
+        f"diagonal edge is a clean staircase of blocks, not a soft ramp",
+        "- [ ] Nothing drawn in the gutters; the background between slots is still flat and untouched",
+        ("- [ ] Each tile fills its slot to the border, and its left edge would meet its right edge "
+         "without a seam" if opaque_sheet else
+         "- [ ] Each object stands on its slot's bottom edge, with clean magenta right up against it "
+         "and no magenta tint on the object itself"),
+        "- [ ] One light direction, upper left, across the whole sheet",
+        "- [ ] No text, labels, numbers of your own, swatches or signature", "",
+        "If one slot fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot and "
+        "the whole template exactly as it is. <what was wrong>\"."],
+        makes=f"the {len(ids)} tile(s) into `{atlas}`")
+    template, manifest, md = write_field_package(
+        "tileset", name, label, W, H, bg, slots, prompt, attach, after,
+        out_file=atlas, status=status)
+    data = json.loads(manifest.read_text())
+    data.update({"set": setname, "sheet": sheet, "cut": cutfile, "opaque_sheet": opaque_sheet,
+                 "tile": TSET_TILE, "scale": TSET_SCALE, "cols": ATLAS_COLS})
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} slots, {label}, "
+          f"{'opaque ground' if opaque_sheet else 'magenta key'})")
+    return slots
+
+
+def tileset_plan(setname, entries=None):
+    """[(folder, meta, builder args)] for one tileset, freezing any sheet that has been drawn."""
+    entries = entries or tileset_entries(setname)
+    here = PACKAGES / "tilesets" / setname
+    plan = []
+    for sheet, ids in tileset_sheets(entries).items():
+        done = frozen_packages(here, sheet, "tileset", ids)
+        taken = set()
+        for _, keep in done:
+            taken |= set(keep)
+        rest = [i for i in ids if i not in taken]
+        groups = tileset_pack(rest, entries) if rest else []
+        laid = list(done)
+        if not done and len(groups) == 1:
+            laid.append((sheet, groups[0]))
+        else:
+            for g in groups:
+                laid.append((next_package_name(sheet, {n for n, _ in laid}), g))
+        for n, (folder, group) in enumerate(laid, 1):
+            outs = [str(atlas_path(setname).relative_to(ROOT.parent)),
+                    str(cut_sheet_path(setname, folder).relative_to(ROOT.parent))]
+            plan.append((here / folder,
+                         {"kind": "tileset", "set": setname, "sheet": folder, "ids": group,
+                          "title": f"{setname} — {folder} tile sheet"
+                                   + (f" ({n} of {len(laid)})" if len(laid) > 1 else ""),
+                          "makes": f"{len(group)} tile(s) packed into `{outs[0]}`",
+                          "outputs": outs},
+                         [setname, "--sheet", folder, *group]))
+    return plan
+
+
+TILESETS_README = """\
+# story/field/tilesets — the tile art contract
+
+Generated by `./story_prompt.py tileset <set>`; do not edit by hand. `TILES.md` is the decision, this
+file is the part the art pipeline fixes so the engine can match it.
+
+## What a set is
+
+`story/field/tilesets/<set>/`
+
+- `tiles.md` — **the engine's file.** One `## <id>` per tile or stamp, with `- layer:`, `- solid:` and
+  `- desc:`. The art pipeline never changes a name, a size or a solid row. The one thing it writes
+  back is a `- index:` line for an entry that has none, so the atlas position is recorded in the file
+  the engine reads. An index already written is never moved.
+- `atlas.png` — {cols} tiles across, {tile}x{tile} each, RGBA. Index 0 is the empty tile. A stamp of
+  `WxH` occupies a `WxH` rectangle of cells whose top-left is its index, row-major, and never wraps
+  past the last column. A tile with `- frames: n` occupies `n` copies side by side starting at its
+  index.
+- `atlas.json` — the same thing for humans and for tools: name to index, size and frame count.
+- `cut/<sheet>.png` — what one returned sheet cut down to, kept so a sheet can be eyeballed.
+
+## Sizes
+
+A tile is **{tile}x{tile}**. On a ChatGPT sheet it is drawn at **{scale}x**, so one slot is
+**{slot}x{slot}** and a `4x3` stamp is a `{stamp_w}x{stamp_h}` slot. Every art pixel on a sheet is a
+{scale}x{scale} block aligned to the slot; the cut takes the mode colour of each block, so nothing is
+averaged and the hard edges survive.
+
+## Sheets
+
+Entries are grouped by an optional `- sheet:` line, and otherwise by this rule:
+
+- `ground` — `layer: ground`, not a fringe. Opaque, so the sheet's background is a neutral dark grey
+  and nothing is keyed out.
+- `fringes` — any id ending `_edge`, `_corner_out` or `_corner_in`. Magenta background.
+- `buildings`, `nature`, `props` — everything else, by keyword, magenta background.
+
+A sheet that has been generated is **frozen**: its slot boxes never change, so the image can always be
+recut. New entries go into a fresh `<sheet>_2` beside it.
+
+## The fringe convention — this is the part the engine has to match
+
+Each terrain that borders another has three fringe tiles, and the engine **rotates** them by 90, 180
+and 270 degrees to cover all four sides and all four corners. A fringe tile carries **only its own
+terrain**, ragged, over transparency, and is drawn **on top of the neighbouring tile** so the boundary
+is not a straight line.
+
+| id | what is drawn, at 0 degrees | what the engine does with it |
+| --- | --- | --- |
+| `<terrain>_edge` | a band of the terrain along the **north** edge, full width and solid at the very top, about {depth} of the tile's {tile} px deep at its deepest, ragged and uneven along its southern boundary; the rest transparent | laid on the neighbour tile that sits **south** of the terrain; rotate 90/180/270 for the other three sides |
+| `<terrain>_corner_out` | the terrain filling only the **north-east** corner, about {depth} px in from the north edge and {depth} px in from the east edge, a ragged quarter-round; the rest transparent | laid on the neighbour diagonally off an **outside (convex)** corner; rotate for the other three |
+| `<terrain>_corner_in` | the terrain filling the whole tile **except** a ragged bite out of the **south-west** corner, about {depth} px deep from the south edge and {depth} px in from the west edge | laid on the neighbour at an **inside (concave)** corner; rotate for the other three |
+
+`corner_in` is exactly the inverse of `corner_out` rotated 180 degrees, which is why three tiles cover
+a terrain instead of the forty-seven a full autotile needs.
+
+Alpha in a fringe is **hard**: the cut thresholds it at 0.5 and writes 0 or 255, because the engine
+alpha-tests rather than blends.
+"""
+
+
+def write_tilesets_readme():
+    TILESETS.mkdir(parents=True, exist_ok=True)
+    (TILESETS / "README.md").write_text(TILESETS_README.format(
+        cols=ATLAS_COLS, tile=TSET_TILE, scale=TSET_SCALE, slot=TSET_SLOT, depth=FRINGE_DEPTH,
+        stamp_w=4 * TSET_SLOT, stamp_h=3 * TSET_SLOT))
+
+
+def cmd_tileset(args):
+    pos = []
+    sheet, it = None, iter(args)
+    for a in it:
+        if a == "--sheet":
+            sheet = next(it, None)
+        elif not a.startswith("--"):
+            pos.append(a)
+    if not pos:
+        die("usage: tileset <set> [--sheet <name> <id>...]   "
+            "(reads story/field/tilesets/<set>/tiles.md)")
+    setname = slug(pos[0])
+    entries = tileset_entries(setname)
+    fresh = assign_indices(setname, entries)
+    if sheet:                                        # one sheet, called by `packages` as a builder
+        return build_tileset_sheet(setname, sheet, pos[1:], entries)
+    write_tilesets_readme()
+    for ident, idx, w, h, fr in fresh:
+        print(f"assigned index {idx} to '{ident}'" + (f" ({w}x{h})" if w * h > 1 else "")
+              + (f" x{fr} frames" if fr > 1 else ""))
+    plan, style = tileset_plan(setname, entries), load_style()
+    built = set()
+    for d, meta, bargs in plan:
+        ok, msg = write_package(d, meta, cmd_tileset, bargs)
+        built.add(d.resolve())
+        print(f"{'ok  ' if ok else 'FAIL'}  {d.relative_to(ROOT.parent)}  "
+              f"{len(meta['ids'])} slot(s)" + (f"  {msg}" if msg else ""))
+    write_atlas_json(setname, entries)
+    print(f"\n{len(plan)} sheet(s) for tileset '{setname}', {len(entries)} entries, "
+          f"atlas {atlas_path(setname).relative_to(ROOT.parent)}")
+    print(f"convention: {(TILESETS / 'README.md').relative_to(ROOT.parent)}")
+
+
+# ── cutting a returned tile sheet ──
+
+def mode_region(rows, ch, x0, y0, bw, bh, ow, oh):
+    """Downsample a crop to ow x oh by taking each output pixel's MODE colour in the source.
+
+    This is the whole reason a ChatGPT sheet can be used as pixel art. The model draws something that
+    looks blocky but is not: a block's edge lands a pixel or two off, and its interior carries a faint
+    gradient. Averaging turns every hard tile edge into mush and two tiles stop meeting cleanly. The
+    mode is the colour the artist meant that art pixel to be, and it is one of the colours that is
+    actually there, so the palette never grows.
+
+    The region is computed straight from the crop rather than by resizing to 4x first, because the
+    sheet comes back at whatever size the app felt like (it caps at about 1.5 megapixels), so the
+    ratio is never a whole number. Resizing first would put the 4x4 art blocks half a pixel out of
+    step and the tile's last row would be its neighbour's."""
+    out = []
+    for y in range(oh):
+        sy0, sy1 = y0 + y * bh // oh, y0 + max(y * bh // oh + 1, (y + 1) * bh // oh)
+        dst = bytearray(ow * ch)
+        for x in range(ow):
+            sx0, sx1 = x0 + x * bw // ow, x0 + max(x * bw // ow + 1, (x + 1) * bw // ow)
+            counts, best, bn = {}, None, 0
+            for yy in range(sy0, sy1):
+                row = rows[yy]
+                for xx in range(sx0, sx1):
+                    pxl = bytes(row[xx * ch:xx * ch + ch])
+                    n = counts.get(pxl, 0) + 1
+                    counts[pxl] = n
+                    if n > bn:
+                        best, bn = pxl, n
+            if bn < 2:                               # a flat tie: take the middle of the region
+                mid = rows[(sy0 + sy1) // 2]
+                cx = (sx0 + sx1) // 2
+                best = bytes(mid[cx * ch:cx * ch + ch])
+            dst[x * ch:(x + 1) * ch] = best
+        out.append(dst)
+    return out
+
+
+def to_rgba(rows, w, h, ch, alpha=255):
+    if ch == 4:
+        return [bytearray(r) for r in rows]
+    out = []
+    for r in rows:
+        dst = bytearray(w * 4)
+        for x in range(w):
+            dst[x * 4:x * 4 + 3] = r[x * 3:x * 3 + 3]
+            dst[x * 4 + 3] = alpha
+        out.append(dst)
+    return out
+
+
+def harden_alpha(px, w, h):
+    """A tile pixel is on or off: the engine alpha-tests at 0.5 and there is no blending in a tile."""
+    for y in range(h):
+        row = px[y]
+        for x in range(w):
+            if row[x * 4 + 3] < TSET_ALPHA_CUT:
+                row[x * 4:x * 4 + 4] = b"\0\0\0\0"
+            else:
+                row[x * 4 + 3] = 255
+    return px
+
+
+def seam_error(px, w, h):
+    """(horizontal, vertical) mean per-channel difference across a tile's wrap. 0 = perfectly seamless."""
+    hz = sum(abs(px[y][(w - 1) * 4 + c] - px[y][c]) for y in range(h) for c in range(3)) / (h * 3)
+    vt = sum(abs(px[h - 1][x * 4 + c] - px[0][x * 4 + c]) for x in range(w) for c in range(3)) / (w * 3)
+    return hz, vt
+
+
+def heal_seams(px, w, h):
+    """A 2-px cross-blend at the wrap, so the last column reads as the neighbour of the first.
+
+    The outer ring is averaged outright (the two pixels that actually sit next to each other in a
+    tiled field), the ring inside it is pulled a quarter of the way. Then the result is snapped back
+    onto the colours that were already in the tile, so the palette does not grow a blended tint."""
+    pal = {bytes(px[y][x * 4:x * 4 + 3]) for y in range(h) for x in range(w) if px[y][x * 4 + 3]}
+
+    def near(c):
+        return min(pal, key=lambda p: sum((a - b) ** 2 for a, b in zip(p, c))) if pal else bytes(c)
+
+    def blend(a, b, t):
+        return [int(round(a[i] * (1 - t) + b[i] * t)) for i in range(3)]
+
+    for y in range(h):
+        l0, r0 = px[y][0:3], px[y][(w - 1) * 4:(w - 1) * 4 + 3]
+        mid = blend(l0, r0, 0.5)
+        px[y][0:3], px[y][(w - 1) * 4:(w - 1) * 4 + 3] = near(mid), near(mid)
+        if w > 3:
+            px[y][4:7] = near(blend(px[y][4:7], mid, 0.25))
+            px[y][(w - 2) * 4:(w - 2) * 4 + 3] = near(blend(px[y][(w - 2) * 4:(w - 2) * 4 + 3], mid, 0.25))
+    for x in range(w):
+        t0, b0 = px[0][x * 4:x * 4 + 3], px[h - 1][x * 4:x * 4 + 3]
+        mid = blend(t0, b0, 0.5)
+        px[0][x * 4:x * 4 + 3], px[h - 1][x * 4:x * 4 + 3] = near(mid), near(mid)
+        if h > 3:
+            px[1][x * 4:x * 4 + 3] = near(blend(px[1][x * 4:x * 4 + 3], mid, 0.25))
+            px[h - 2][x * 4:x * 4 + 3] = near(blend(px[h - 2][x * 4:x * 4 + 3], mid, 0.25))
+    return px
+
+
+def median_cut(colours, n):
+    """A palette of at most n colours from [((r,g,b), count)]. Plain median cut, stdlib only."""
+    spread = lambda box: max(max(c[0][i] for c in box) - min(c[0][i] for c in box) for i in range(3))
+    boxes = [list(colours)]
+    while len(boxes) < n:
+        can = [b for b in boxes if len(b) > 1 and spread(b) > 0]
+        if not can:
+            break
+        big = max(can, key=lambda b: spread(b) * sum(c[1] for c in b))
+        i = max(range(3), key=lambda c: max(x[0][c] for x in big) - min(x[0][c] for x in big))
+        big.sort(key=lambda x: x[0][i])
+        half, run, target = 1, 0, sum(c[1] for c in big) / 2
+        for k, c in enumerate(big):
+            run += c[1]
+            if run >= target:
+                half = max(1, min(len(big) - 1, k))
+                break
+        boxes.remove(big)
+        boxes += [big[:half], big[half:]]
+    out = []
+    for b in boxes:
+        tot = sum(c[1] for c in b) or 1
+        out.append(tuple(sum(c[0][i] * c[1] for c in b) // tot for i in range(3)))
+    return out
+
+
+def apply_palette(tiles, n):
+    """Quantise every cut tile on one sheet to a shared palette of n colours."""
+    counts = {}
+    for px, w, h, _ in tiles:
+        for y in range(h):
+            for x in range(w):
+                if px[y][x * 4 + 3]:
+                    c = tuple(px[y][x * 4:x * 4 + 3])
+                    counts[c] = counts.get(c, 0) + 1
+    if len(counts) <= n:
+        return len(counts), len(counts)
+    pal = median_cut([(c, k) for c, k in counts.items()], n)
+    cache = {}
+    for px, w, h, _ in tiles:
+        for y in range(h):
+            for x in range(w):
+                if not px[y][x * 4 + 3]:
+                    continue
+                c = tuple(px[y][x * 4:x * 4 + 3])
+                if c not in cache:
+                    cache[c] = min(pal, key=lambda p: sum((a - b) ** 2 for a, b in zip(p, c)))
+                px[y][x * 4:x * 4 + 3] = bytes(cache[c])
+    return len(counts), len(pal)
+
+
+def load_atlas(setname, need_rows):
+    """The atlas as RGBA rows, grown to need_rows tiles tall. Existing cells are never touched."""
+    p, W = atlas_path(setname), ATLAS_COLS * TSET_TILE
+    rows = []
+    if p.exists():
+        w, h, ch, px = read_png(p)
+        if w != W:
+            die(f"{p.relative_to(ROOT.parent)} is {w}px wide, expected {W} "
+                f"({ATLAS_COLS} columns of {TSET_TILE}). Delete it and recut every sheet.")
+        rows = to_rgba(px, w, h, ch)
+    while len(rows) < need_rows * TSET_TILE:
+        rows.append(bytearray(W * 4))
+    return rows
+
+
+def place_in_atlas(atlas, index, px, cw, chh):
+    """Write one entry's tiles into its own cells, and nobody else's."""
+    for r in range(chh):
+        for c in range(cw):
+            cell = index + ATLAS_COLS * r + c
+            ax, ay = (cell % ATLAS_COLS) * TSET_TILE, (cell // ATLAS_COLS) * TSET_TILE
+            for y in range(TSET_TILE):
+                sy = r * TSET_TILE + y
+                atlas[ay + y][ax * 4:(ax + TSET_TILE) * 4] = \
+                    px[sy][c * TSET_TILE * 4:(c + 1) * TSET_TILE * 4]
+
+
+def write_atlas_json(setname, entries):
+    d = tileset_dir(setname)
+    d.mkdir(parents=True, exist_ok=True)
+    top = max((e["index"] or 0) + ATLAS_COLS * (e["cells"][1] - 1) + e["cells"][0] - 1
+              for e in entries.values())
+    (d / ATLAS_JSON).write_text(json.dumps({
+        "set": setname, "tile": TSET_TILE, "cols": ATLAS_COLS,
+        "rows": top // ATLAS_COLS + 1,
+        "note": "generated by story_prompt.py tileset; tiles.md is the source of truth",
+        "tiles": {i: {"index": e["index"], "w": e["w"], "h": e["h"], "frames": e["frames"],
+                      "layer": e["layer"], "solid": e["solid"], "sheet": e["sheet"]}
+                  for i, e in entries.items()},
+    }, indent=2) + "\n")
+
+
+def exact_inner(slot, sx, sy, w, h):
+    """A tile slot's art area in the returned image, to the pixel — no padding shaved off.
+
+    The other template kinds shave CUT_PAD off each side to lose a soft border. A tile cannot afford
+    that: the art area is exactly TSET_SCALE times the tile, and shaving two pixels would put every
+    4x4 art block half a pixel out of step with the grid the cut reads it back on. The border is
+    drawn outside the art area instead, so there is nothing to shave."""
+    ix, iy, iw, ih = slot["inner"]
+    x0, y0 = int(round(ix * sx)), int(round(iy * sy))
+    x1, y1 = int(round((ix + iw) * sx)), int(round((iy + ih) * sy))
+    if x0 < 0 or y0 < 0 or x1 > w or y1 > h or x1 - x0 < 8 or y1 - y0 < 8:
+        die(f"slot {slot['n']} falls outside the image; is this the right file for this package?")
+    return x0, y0, x1 - x0, y1 - y0
+
+
+def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False):
+    """A returned tile sheet: snap to the art-pixel grid, key, harden, pack into the atlas."""
+    setname = data["set"]
+    entries = tileset_entries(setname)
+    cut, lines = [], []
+    for s in slots:
+        x, y, bw, bh = exact_inner(s, sx, sy, w, h)
+        cw, chh = s["cells"]
+        tw, th = cw * TSET_TILE, chh * TSET_TILE
+        small = mode_region(rows, ch, x, y, bw, bh, tw, th)
+        if s["opaque"]:
+            px = to_rgba(small, tw, th, ch)
+            for r in px:
+                for i in range(3, len(r), 4):
+                    r[i] = 255
+        else:
+            px = key_magenta(small, tw, th, ch)
+            harden_alpha(px, tw, th)
+        cut.append((px, tw, th, s))
+    if palette:
+        was, now = apply_palette(cut, palette)
+        print(f"  palette: {was} colours -> {now}")
+
+    atlas_rows = max((s["index"] + ATLAS_COLS * (s["cells"][1] - 1)) // ATLAS_COLS + 1 for s in slots)
+    atlas = load_atlas(setname, atlas_rows)
+    for px, tw, th, s in cut:
+        cw, chh = s["cells"]
+        note = ""
+        if s["opaque"] and cw == chh == 1:
+            if heal:
+                heal_seams(px, tw, th)
+            hz, vt = seam_error(px, tw, th)
+            note = f"  seam h{hz:.0f}/v{vt:.0f}"
+            if max(hz, vt) > SEAM_WARN:
+                LOUD.append(f"{s['id']} does not tile cleanly: mean edge difference {hz:.0f} across "
+                            f"and {vt:.0f} down (warn above {SEAM_WARN:.0f}). Rerun with --heal-seams, "
+                            f"or ask for that slot again with its edges made to meet.")
+                print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+                note += "  <-- SEAM"
+        elif not s["opaque"]:
+            clear = sum(1 for r in px for i in range(3, len(r), 4) if not r[i])
+            note = f"  ({100 * clear // (tw * th)}% transparent)"
+            if not clear:
+                LOUD.append(f"{s['id']} came out with no transparent pixel anywhere; the magenta was "
+                            f"painted over, so the game will draw a solid rectangle.")
+                print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+        place_in_atlas(atlas, s["index"], px, cw, chh)
+        lines.append(f"  slot {s['n']} {s['id']}: index {s['index']}, {cw}x{chh} tile(s){note}")
+
+    ap = atlas_path(setname)
+    ap.parent.mkdir(parents=True, exist_ok=True)
+    write_png(ap, ATLAS_COLS * TSET_TILE, len(atlas), 4, atlas)
+    strip = write_cut_sheet(setname, data["sheet"], cut)
+    for l in lines:
+        print(l)
+    print(f"  -> {ap.relative_to(ROOT.parent)}  {ATLAS_COLS * TSET_TILE}x{len(atlas)} "
+          f"({len(slots)} entries placed), {strip.relative_to(ROOT.parent)}")
+    write_atlas_json(setname, entries)
+
+
+def write_cut_sheet(setname, sheet, cut):
+    """Every tile this sheet produced, laid out at 1:1 — the receipt the package's status reads."""
+    MAXW = ATLAS_COLS * TSET_TILE
+    lanes, x, lane = [[]], 0, 0
+    for px, tw, th, s in cut:
+        if x and x + tw > MAXW:
+            lanes.append([])
+            lane, x = lane + 1, 0
+        lanes[lane].append((px, x, tw, th))
+        x += tw
+    W = max((t[1] + t[2] for L in lanes for t in L), default=TSET_TILE)
+    out = []
+    for L in lanes:
+        if not L:
+            continue
+        lh = max(t[3] for t in L)
+        band = [bytearray(W * 4) for _ in range(lh)]
+        for px, lx, tw, th in L:
+            for r in range(th):
+                band[r][lx * 4:(lx + tw) * 4] = px[r]
+        out += band
+    p = cut_sheet_path(setname, sheet)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    write_png(p, W, len(out), 4, out)
+    return p
+
+
+# ── tmaps ──
+
+TRIGGER_KINDS = {"exit": 4, "door": 4, "message": 1, "npc": 3, "zone": 1, "trap": 1}
+
+
+def tmap_path(mp):
+    return TMAPS / f"{slug(mp)}.tmap"
+
+
+def strip_comment(line):
+    return re.sub(r"\s{2,}#.*$", "", line).rstrip()
+
+
+def parse_tmap(mp):
+    path = tmap_path(mp)
+    if not path.exists():
+        die(f"{path.relative_to(ROOT.parent)} not found")
+    secs = h2_sections(path.read_text())
+    for need in ("meta", "legend", "ground"):
+        if need not in secs:
+            die(f"{path.name}: no '## {need}' section (see TILES.md, 'Maps')")
+    meta = {}
+    for l in secs["meta"].splitlines():
+        l = strip_comment(l)
+        if ":" in l:
+            k, v = l.split(":", 1)
+            meta[k.strip().lower()] = v.strip()
+    legend = {}
+    for l in secs["legend"].splitlines():
+        l = strip_comment(l)
+        if not l.strip():
+            continue
+        ch, rest = l[0], l[1:].strip().split()
+        if not rest:
+            die(f"{path.name}: legend line '{l}' names no tile")
+        legend[ch] = rest[0]
+    grid = lambda key: [l.rstrip("\n") for l in secs.get(key, "").splitlines()
+                        if l.strip() and not l.lstrip().startswith("#")]
+    trig = []
+    for l in secs.get("triggers", "").splitlines():
+        l = strip_comment(l).strip()
+        if l and not l.startswith("#"):
+            trig.append(l.split())
+    return {"path": path, "meta": meta, "legend": legend, "ground": grid("ground"),
+            "objects": grid("objects"), "triggers": trig}
+
+
+def tmap_todo():
+    """Map names that are allowed to be missing: '## todo' in story/field/tmaps/README.md."""
+    p = TMAPS / "README.md"
+    if not p.exists():
+        return set()
+    body = h2_sections(p.read_text()).get("todo", "")
+    return {slug(w) for l in body.splitlines() for w in re.findall(r"`([a-z0-9_]+)`", l)}
+
+
+def tmap_solid_grid(m, entries, err):
+    """(w, h, solid[y][x], stamp tops) after laying the ground and every stamp down."""
+    w, h = (int(x) for x in (m["meta"].get("size") or "0 0").split()[:2]) if m["meta"].get("size") \
+        else (0, 0)
+    solid = [[False] * w for _ in range(h)]
+    tops = []
+    for y, line in enumerate(m["ground"][:h]):
+        for x, c in enumerate(line[:w]):
+            name = m["legend"].get(c)
+            e = entries.get(name)
+            if e and e["solid"].lower() in ("yes", "true", "1"):
+                solid[y][x] = True
+    claimed = {}
+    for y, line in enumerate(m["objects"][:h]):
+        for x, c in enumerate(line[:w]):
+            if c in (".", "+", " "):
+                continue
+            name = m["legend"].get(c)
+            e = entries.get(name)
+            if not e:
+                continue
+            cw, chh = e["foot"]
+            if x + cw > w or y + chh > h:
+                err.append(f"stamp '{name}' at {x},{y} is {cw}x{chh} and runs off the map")
+                continue
+            rows = re.split(r"[\s/]+", e["solid"].strip()) if set(e["solid"]) <= set("#./ ") \
+                and "#" in e["solid"] else []
+            hit, notplus = [], []                # one message a stamp, not one a cell
+            for r in range(chh):
+                for cc in range(cw):
+                    key = (x + cc, y + r)
+                    if key in claimed:
+                        hit.append(claimed[key])
+                    claimed[key] = name
+                    if (r or cc) and m["objects"][y + r][x + cc] != "+":
+                        notplus.append(f"{x + cc},{y + r}")
+                    blocked = e["solid"].lower() in ("yes", "true", "1")
+                    if rows and r < len(rows) and cc < len(rows[r]):
+                        blocked = rows[r][cc] == "#"
+                    if blocked:
+                        solid[y + r][x + cc] = True
+            if hit:
+                err.append(f"stamp '{name}' at {x},{y} ({cw}x{chh}) overlaps {', '.join(sorted(set(hit)))}")
+            if notplus:
+                err.append(f"stamp '{name}' at {x},{y} is {cw}x{chh}, so cell(s) "
+                           f"{', '.join(notplus[:6])}{' ...' if len(notplus) > 6 else ''} must be '+' "
+                           f"in '## objects'")
+            tops.append((x, y, name, e))
+    orphan = [f"{x},{y}" for y, line in enumerate(m["objects"][:h])
+              for x, c in enumerate(line[:w]) if c == "+" and (x, y) not in claimed]
+    if orphan:
+        err.append(f"{len(orphan)} cell(s) marked '+' that no stamp's footprint covers: "
+                   f"{', '.join(orphan[:8])}{' ...' if len(orphan) > 8 else ''}")
+    return w, h, solid, tops
+
+
+def check_tmap(mp):
+    """(errors, warnings) for one .tmap against its tileset."""
+    m, err, warn = parse_tmap(mp), [], []
+    name = m["path"].name
+    setname = slug(m["meta"].get("tileset", ""))
+    if not setname:
+        return [f"{name}: '## meta' has no 'tileset:' line"], []
+    if not tileset_doc(setname).exists():
+        return [f"{name}: tileset '{setname}' has no {tileset_doc(setname).relative_to(ROOT.parent)}"], []
+    entries = tileset_entries(setname)
+    if not m["meta"].get("size"):
+        return [f"{name}: '## meta' has no 'size: W H' line"], []
+    try:
+        w, h = (int(x) for x in m["meta"]["size"].split()[:2])
+    except ValueError:
+        return [f"{name}: 'size: {m['meta']['size']}' is not 'W H'"], []
+    for ch, tile in sorted(m["legend"].items()):
+        if tile not in entries:
+            err.append(f"{name}: legend '{ch}' is '{tile}', which has no entry in "
+                       f"{tileset_doc(setname).relative_to(ROOT.parent)}")
+    for key in ("ground", "objects"):
+        rows = m[key]
+        if key == "objects" and not rows:
+            continue
+        if len(rows) != h:
+            err.append(f"{name}: '## {key}' has {len(rows)} rows, 'size:' says {h}")
+        for y, line in enumerate(rows):
+            if len(line) != w:
+                err.append(f"{name}: '## {key}' row {y} is {len(line)} chars, 'size:' says {w}")
+            for x, c in enumerate(line):
+                if c in (".", "+", " ") and key == "objects":
+                    continue
+                if c not in m["legend"]:
+                    err.append(f"{name}: '## {key}' cell {x},{y} is '{c}', which the legend does not name")
+                elif key == "ground" and entries.get(m["legend"][c], {}).get("layer") != "ground":
+                    warn.append(f"{name}: ground cell {x},{y} uses '{m['legend'][c]}', "
+                                f"which is layer '{entries[m['legend'][c]]['layer']}'")
+    hard = []
+    w2, h2, solid, tops = tmap_solid_grid(m, entries, hard)
+    err += [f"{name}: {e}" for e in hard]
+    walkable = lambda x, y, what: (
+        err.append(f"{name}: {what} at {x},{y} is outside the map") if not (0 <= x < w and 0 <= y < h)
+        else err.append(f"{name}: {what} at {x},{y} stands on a solid tile") if solid[y][x] else None)
+    sp = (m["meta"].get("spawn") or "").split()
+    if len(sp) < 2:
+        err.append(f"{name}: '## meta' has no 'spawn: x y [facing]' line")
+    else:
+        walkable(int(sp[0]), int(sp[1]), "spawn")
+    text_ids = set(load_field_text())
+    todo = tmap_todo()
+    for t in m["triggers"]:
+        if len(t) < 5:
+            err.append(f"{name}: trigger '{' '.join(t)}' is not 'x y w h kind ...'")
+            continue
+        try:
+            tx, ty, tw, th = (int(v) for v in t[:4])
+        except ValueError:
+            err.append(f"{name}: trigger '{' '.join(t)}' has a non-numeric box")
+            continue
+        kind, rest = t[4], t[5:]
+        if kind not in TRIGGER_KINDS:
+            err.append(f"{name}: trigger kind '{kind}' is not one of {', '.join(sorted(TRIGGER_KINDS))}")
+            continue
+        if len(rest) < TRIGGER_KINDS[kind]:
+            err.append(f"{name}: '{kind}' trigger at {tx},{ty} wants {TRIGGER_KINDS[kind]} argument(s), "
+                       f"got {len(rest)}")
+            continue
+        if not (0 <= tx < w and 0 <= ty < h and tx + tw <= w and ty + th <= h):
+            err.append(f"{name}: trigger box {tx},{ty} {tw}x{th} runs off the {w}x{h} map")
+        if kind in ("exit", "door"):
+            target = slug(rest[0])
+            if not tmap_path(target).exists() and target not in todo:
+                err.append(f"{name}: {kind} points at map '{target}', which has no "
+                           f"{tmap_path(target).relative_to(ROOT.parent)} and is not listed under "
+                           f"'## todo' in {(TMAPS / 'README.md').relative_to(ROOT.parent)}")
+        elif kind == "message" and rest[0] not in text_ids:
+            err.append(f"{name}: message id '{rest[0]}' has no '## {rest[0]}' entry in "
+                       f"{FIELD_TEXT.relative_to(ROOT.parent)}")
+        elif kind == "npc":
+            if rest[2] not in text_ids:
+                err.append(f"{name}: npc text id '{rest[2]}' has no entry in "
+                           f"{FIELD_TEXT.relative_to(ROOT.parent)}")
+            sprite = FIELD_DIRS["walker"] / f"{slug(rest[0])}.png"
+            if not sprite.exists():
+                warn.append(f"{name}: npc walker '{rest[0]}' has no {sprite.relative_to(ROOT.parent)} yet")
+    return err, warn
+
+
+def placeholder_rgb(name):
+    """A stable muted colour for a tile with no atlas cell yet, so a preview is still readable."""
+    v = zlib.crc32(name.encode())
+    return (90 + (v & 63), 90 + ((v >> 6) & 63), 90 + ((v >> 12) & 63))
+
+
+def preview_tmap(mp):
+    m = parse_tmap(mp)
+    setname = slug(m["meta"].get("tileset", ""))
+    entries = tileset_entries(setname)
+    w, h = (int(x) for x in m["meta"]["size"].split()[:2])
+    W, H = w * TSET_TILE, h * TSET_TILE
+    img = [bytearray(b"\x20\x20\x28\xff" * W) for _ in range(H)]
+    atlas, arows = None, 0
+    if atlas_path(setname).exists():
+        aw, ah, ach, apx = read_png(atlas_path(setname))
+        atlas, arows = to_rgba(apx, aw, ah, ach), ah
+
+    def blit(index, cw, chh, px, py):
+        if px + cw * TSET_TILE > W or py + chh * TSET_TILE > H:
+            return True                              # a stamp hanging off the map: check reports it
+        for r in range(chh):
+            for c in range(cw):
+                cell = index + ATLAS_COLS * r + c
+                ax, ay = (cell % ATLAS_COLS) * TSET_TILE, (cell // ATLAS_COLS) * TSET_TILE
+                if atlas is None or ay + TSET_TILE > arows:
+                    return False
+                for y in range(TSET_TILE):
+                    src, dst = atlas[ay + y], img[py + r * TSET_TILE + y]
+                    if not any(src[(ax + x) * 4 + 3] for x in range(TSET_TILE)):
+                        continue
+                    for x in range(TSET_TILE):
+                        if src[(ax + x) * 4 + 3]:
+                            o = (px + c * TSET_TILE + x) * 4
+                            dst[o:o + 4] = src[(ax + x) * 4:(ax + x) * 4 + 4]
+        return True
+
+    def flat(name, px, py, cw, chh):
+        rgb = bytes(placeholder_rgb(name)) + b"\xff"
+        cw = min(cw, (W - px) // TSET_TILE)
+        chh = min(chh, (H - py) // TSET_TILE)
+        for y in range(chh * TSET_TILE):
+            row = img[py + y]
+            for x in range(cw * TSET_TILE):
+                edge = x < 1 or y < 1 or x >= cw * TSET_TILE - 1 or y >= chh * TSET_TILE - 1
+                row[(px + x) * 4:(px + x) * 4 + 4] = b"\x18\x18\x18\xff" if edge else rgb
+
+    miss = set()
+    for layer in ("ground", "objects"):
+        for y, line in enumerate(m[layer][:h]):
+            for x, c in enumerate(line[:w]):
+                if layer == "objects" and c in (".", "+", " "):
+                    continue
+                e = entries.get(m["legend"].get(c, ""))
+                if not e:
+                    continue
+                cw, chh = e["foot"]
+                if not blit(e["index"], cw, chh, x * TSET_TILE, y * TSET_TILE):
+                    flat(e["id"], x * TSET_TILE, y * TSET_TILE, cw, chh)
+                    miss.add(e["id"])
+    OUT.mkdir(exist_ok=True)
+    out = OUT / f"{slug(mp)}.tmap.png"
+    write_png(out, W, H, 4, img)
+    print(f"{m['path'].name}: {w}x{h} tiles -> {out.relative_to(ROOT.parent)}  {W}x{H}"
+          + (f"  ({len(miss)} tile(s) still flat placeholders: {', '.join(sorted(miss))})" if miss else ""))
+
+
+def all_tmaps():
+    return sorted(p.stem for p in TMAPS.glob("*.tmap")) if TMAPS.exists() else []
+
+
+def cmd_tmap(args):
+    sub = args[0] if args else ""
+    names = [a for a in args[1:] if not a.startswith("--")]
+    if sub not in ("check", "preview"):
+        die("usage: tmap check <map>|--all   |   tmap preview <map>")
+    names = names or (all_tmaps() if "--all" in args or not names else [])
+    if not names:
+        die(f"no .tmap files in {TMAPS.relative_to(ROOT.parent)}")
+    bad = 0
+    for mp in names:
+        if sub == "preview":
+            preview_tmap(mp)
+            continue
+        err, warn = check_tmap(mp)
+        for wmsg in warn:
+            print(f"warning: {wmsg}", file=sys.stderr)
+        for e in err:
+            print(f"ERROR: {e}", file=sys.stderr)
+        print(f"{tmap_path(mp).name}: " + (f"{len(err)} error(s)" if err else "ok"))
+        bad += 1 if err else 0
+    if bad:
+        sys.exit(f"story_prompt: {bad} map(s) rejected")
 
 
 # ───────────────────────── Painted screens: a top-down map and its walkable mask ─────────────────────────
@@ -4516,6 +5681,22 @@ def cmd_packages(args):
             failures.append((str(d.relative_to(ROOT.parent)), msg))
         index.append({"dir": d, "meta": meta, "ok": ok, **row})
 
+    # ── the tilesets: the tile field (D18), and the first thing on the page ──
+    # These come first because a tmap is walkable the moment its atlas has tiles in it, with no cast,
+    # no scenes and no maps drawn: it is the shortest route from nothing to a game you can walk around.
+    for setname in sorted({q.parent.name for q in TILESETS.glob("*/tiles.md")}):
+        try:
+            tset = tileset_entries(setname)
+            assign_indices(setname, tset)
+            plan = tileset_plan(setname, tset)
+        except SystemExit as exc:
+            failures.append((f"tileset {setname}", squash(str(exc.code))))
+            continue
+        write_tilesets_readme()
+        for d, meta, bargs in plan:
+            add(d, meta, cmd_tileset, bargs, group="tileset", tileset=setname)
+        write_atlas_json(setname, tset)
+
     # ── the cast: a reference sheet, then a walk sheet ──
     # A folder is named for what the character is called now, not for the '## handle' behind it, because
     # the map files name walkers the same way (`hart`, `falke`) and the owner reads the tree, not the code.
@@ -4654,7 +5835,7 @@ def cmd_packages(args):
     orphans = prune_packages(built)
     write_packages_readme(index, orphans, failures, notes, every, scenes, shared, all_maps, lead_map, cast)
     print(f"wrote {len(built)} package folder(s) under {PACKAGES.relative_to(ROOT.parent)}/")
-    for g, label in (("refsheet", "reference sheets"), ("walker", "walk sheets"),
+    for g, label in (("tileset", "tile sheets (tilesets)"), ("refsheet", "reference sheets"), ("walker", "walk sheets"),
                      ("screen", "painted screens"), ("tiles", "tile sheets"),
                      ("props", "prop sheets"), ("building", "building face sheets"),
                      ("view", "painted views"), ("scene", "scene shot sheets")):
@@ -4720,6 +5901,27 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
          f"Scenes come from `story/playlist.md`" + ("" if every else " — a scene file no chapter list names "
                                                     "gets no package") + f"; {len(scenes)} scene(s) selected.", ""]
 
+    # ── the tilesets, first on the page: this is the field now (TILES.md, D18) ──
+    tsets = [r for r in index if r["group"] == "tileset"]
+    L += ["## 1. Tilesets — the tile field", "",
+          "The field is tile sheets and grid walking (`TILES.md`). One sheet is one generation: the",
+          "template is drawn at 4x, so a 32x32 tile is a 128-px slot and every art pixel is a 4x4 block.",
+          "`ingest` snaps the return back onto that grid, keys the magenta on anything that is not opaque",
+          "ground, and packs each tile into its set's `atlas.png` at the index `tiles.md` gives it —",
+          "never disturbing a cell that belongs to another entry. A sheet that has been generated is",
+          "frozen; new tiles go into a fresh `<sheet>_2` beside it.", "",
+          "The fringe convention (which the engine rotates) is written out in",
+          "`story/field/tilesets/README.md`.", "",
+          "| set | sheet | tiles | folder | status | after downloading |",
+          "| --- | --- | --- | --- | --- | --- |"]
+    for r in tsets:
+        m = r["meta"]
+        L.append(f"| `{r['tileset']}` | `{m['sheet']}` | {len(m['ids'])} | "
+                 f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | {state(r)} | {cmd(r['dir'])} |")
+    if not tsets:
+        L.append("| — | | | | no `story/field/tilesets/<set>/tiles.md` yet | |")
+    L.append("")
+
     # ── the short path: the fewest generations that put something on the phone ──
     short, seen = [], set()
     def step(r, what):
@@ -4727,6 +5929,9 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
             seen.add(r["dir"])
             short.append((r, what))
     todo_first = lambda rs: sorted(rs, key=lambda r: pkg_state(r["dir"], r["meta"])[0] == "done")
+    for r in todo_first(rows("tileset")):
+        step(r, f"the `{r['meta']['sheet']}` sheet of the `{r['tileset']}` tileset — "
+                f"{len(r['meta']['ids'])} tile(s) into that set's atlas, which is what the map is made of")
     for r in todo_first(rows("refsheet")):       # what is left to do first, then the ones already cut
         step(r, f"{r['who']}'s reference sheet — the portrait, the walker and every panel come from it")
     for r in todo_first([x for x in rows("walker") if not x.get("blocked") and x["meta"].get("handle") in cast]):
@@ -4742,7 +5947,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
                                                       if part else ""))
     for r in [x for x in rows("scene") if x["map"] == lead_map]:
         step(r, f"the shot sheet for `{r['scene']['stem']}` — the first scene the game plays")
-    L += [f"## 1. The short path to something on the phone", "",
+    L += [f"## 2. The short path to something on the phone", "",
           "The fewest generations that put the first scene and the first map on screen, in the order they",
           "unblock each other. A checked box is already cut; everything below this section is the long tail.", ""]
     for n, (r, what) in enumerate(short, 1):
@@ -4754,7 +5959,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         L.append("- (nothing to generate: no cast and no field art in the selected scenes)")
     L += ["", f"Then `./story_prompt.py ingest` and `./fast_reload.sh`.", ""]
 
-    L += ["## 2. Character reference sheets", "",
+    L += ["## 3. Character reference sheets", "",
           "Do these first: the portrait beside the dialogue box, the walk sprite, and every scene panel",
           "are all drawn from this one image.", "",
           "| character | folder | status | after downloading |", "| --- | --- | --- | --- |"]
@@ -4763,7 +5968,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     if not rows("refsheet"):
         L.append("| — | | no cast in the selected scenes | |")
 
-    L += ["", "## 3. Walk sprites", "",
+    L += ["", "## 4. Walk sprites", "",
           "The 4x4 sheet the field renderer animates (rows S, W, E, N). A character's package is blocked",
           "until their reference sheet exists, because the walker must match it.", "",
           "| who | folder | status | after downloading |", "| --- | --- | --- | --- |"]
@@ -4775,7 +5980,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         L.append("| — | | | |")
 
     field = [r for r in index if r["group"] in ("tiles", "props", "building")]
-    L += ["", "## 4. Field art, by chapter and map", "",
+    L += ["", "## 5. Field art, by chapter and map", "",
           "A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,",
           "and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces",
           "the ground is made of; a building is map geometry wearing three textures (the front wall, a wall",
@@ -4828,7 +6033,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         L += ["(nothing in `story/field/tiles.md` or `story/field/props.md` yet)", ""]
 
     scene_rows = rows("scene")
-    L += ["## 5. Scene shot sheets, by chapter and map", "",
+    L += ["## 6. Scene shot sheets, by chapter and map", "",
           "One sheet per panel scene: all of its panels as separate white-bordered rectangles on black,",
           "cut apart into `story/panels/`. Talk and narration scenes need no art and are not listed.", ""]
     for key in sorted({(r["chapter"], r["map"]) for r in scene_rows}):
@@ -4900,7 +6105,7 @@ def ingest_one(d, meta, returned, extra=()):
         ok, msg = run_quiet(cmd_screen_cut, [str(d / "sheet.json"), str(d),
                                              *[a for a in extra if a == "--debug"]])
         return ok, (SCREEN_SUMMARY[0] if ok and SCREEN_SUMMARY else msg)
-    if kind in FIELD_KINDS or kind == "view":
+    if kind in FIELD_KINDS or kind in ("view", "tileset"):
         return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]
@@ -4925,10 +6130,10 @@ def cmd_ingest(args):
         if skip:
             extra.append(a)
             skip = False
-        elif a == "--fringe":
+        elif a in ("--fringe", "--palette"):
             extra.append(a)
             skip = True
-        elif a in ("--nearest", "--debug"):
+        elif a in ("--nearest", "--debug", "--heal-seams"):
             extra.append(a)
     roots = [Path(a).expanduser().resolve() for a in args
              if not a.startswith("--") and a not in extra] or [PACKAGES]
@@ -5120,6 +6325,10 @@ def main():
         cmd_building(args[1:])
     elif cmd == "view":
         cmd_view(args[1:])
+    elif cmd == "tileset":
+        cmd_tileset(args[1:])
+    elif cmd == "tmap":
+        cmd_tmap(args[1:])
     elif cmd == "screen":
         cmd_screen(args[1:])
     elif cmd == "cut":
