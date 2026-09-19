@@ -382,7 +382,9 @@ enum { TG_MESSAGE = 0, TG_EXIT, TG_DOOR, TG_ZONE, TG_TRAP, TG_SCENE, TG_NPC };
 // world-space swatch and a generated boundary mask), a DECAL (scattered by hash, no cell of its own
 // on the map), or an atlas tile/stamp exactly as before.
 enum { TK_TILE = 0, TK_TERRAIN, TK_DECAL };
-enum { ES_RAGGED = 0, ES_SMOOTH, ES_BANK, ES_COUNT };
+// `square` is a STRUCTURAL edge: no dual-grid mask at all, cell-aligned and hard, because a
+// bridge or a laid floor is built, not grown. The mask styles are the organic three.
+enum { ES_RAGGED = 0, ES_SMOOTH, ES_BANK, ES_COUNT, ES_SQUARE = ES_COUNT };
 
 struct TfTile {
     char name[24];
@@ -400,6 +402,8 @@ struct TfTile {
     unsigned char sw_w, sw_h;   // swatch size in TILES
     float drift;                // per-terrain macro drift strength
     char cycle[16];             // hands the terrain to a palette cycle in cycles.md
+    char trim_name[24];         // `trim:` — the rail/kerb tile laid along a square edge
+    short trim_def;
     GLuint swatch;              // R8 swatch texture, art or generated
     int swatch_px_w, swatch_px_h;
     bool swatch_art;            // true when the pixels came from swatches/<id>.png, not the placeholder
@@ -486,6 +490,7 @@ struct TileField {
     int gv_count, gv_cap;
     int gv_first[TF_TERR], gv_row[TF_TERR][TF_MAXH + 2];   // per terrain, per display row
     int dv_first, dv_count;                   // the decals, in the same buffer after the ground
+    int tv_first, tv_count;                   // and the square terrains' trim, after those
     int dv_row[TF_MAXH + 2];
     GLuint svbo;                              // the static VBO both live in
     float decal_density;                      // dev multiplier
@@ -587,6 +592,7 @@ struct TileField {
     GLuint cap_fbo, cap_tex;
     int cap_w, cap_h, cap_req, cap_scale;
     bool cap_ok, cap_walkers, cap_whole, hide_walkers;
+    int cap_face;
     char cap_out[300];
 
     // dev
@@ -1158,7 +1164,8 @@ static bool load_tileset(TileField *t, const char *set) {
         } else if (!strcmp(key, "priority")) {
             d->priority = (short)atoi(val);
         } else if (!strcmp(key, "edge_style")) {
-            d->edge_style = (unsigned char)(!strcmp(val, "smooth") ? ES_SMOOTH : !strcmp(val, "bank") ? ES_BANK : ES_RAGGED);
+            d->edge_style = (unsigned char)(!strcmp(val, "smooth") ? ES_SMOOTH : !strcmp(val, "bank") ? ES_BANK
+                                          : !strcmp(val, "square") ? ES_SQUARE : ES_RAGGED);
         } else if (!strcmp(key, "swatch")) {
             int a2 = 3, b2 = 3;
             if (sscanf(val, "%dx%d", &a2, &b2) < 2) b2 = a2;
@@ -1180,6 +1187,8 @@ static bool load_tileset(TileField *t, const char *set) {
         } else if (!strcmp(key, "border")) {
             char nm2[24] = ""; float bw = 0;
             if (sscanf(val, "%23s %f", nm2, &bw) >= 1) { snprintf(d->on[3], 24, "%s", nm2); d->border_w = bw; }
+        } else if (!strcmp(key, "trim")) {
+            snprintf(d->trim_name, sizeof(d->trim_name), "%s", val);   // an edge tile along a square border
         } else if (!strcmp(key, "tag")) {
             snprintf(d->tag, sizeof(d->tag), "%s", val);
         } else if (!strcmp(key, "pass")) {
@@ -1702,14 +1711,27 @@ static int art_get(TileField *t, const char *id) {
             a->nrows = nr; a->ncols = nc;
             a->fw = fw > 0 ? fw : w / nc;
             a->fh = fh > 0 ? fh : h / nr;
-            static const char *FACE_LETTER[4] = { "S", "W", "E", "N" };
-            for (int f = 0; f < 4; f++) {
-                a->row_of[f] = 0; a->flip[f] = false;
-                for (int i = 0; i < nr; i++) if (!SDL_strcasecmp(rows[i], FACE_LETTER[f])) { a->row_of[f] = i; goto got; }
-                if (mirror && f == 2)                                  // no E row: the W row, flipped
-                    for (int i = 0; i < nr; i++) if (!SDL_strcasecmp(rows[i], "W")) { a->row_of[f] = i; a->flip[f] = true; break; }
-            got: ;
+            // A row's name may be a letter or a word, and the sheets the tool cuts say "side" for the
+            // one profile row that serves BOTH W and E — matching only "W"/"E" sent every sideways
+            // step to the S row, which is why walking left or right showed the front frames.
+            int row_w = -1, row_e = -1, row_s = -1, row_n = -1;
+            for (int i = 0; i < nr; i++) {
+                const char *r2 = rows[i];
+                if (!SDL_strcasecmp(r2, "S") || !SDL_strcasecmp(r2, "south") || !SDL_strcasecmp(r2, "down") || !SDL_strcasecmp(r2, "front")) row_s = i;
+                else if (!SDL_strcasecmp(r2, "N") || !SDL_strcasecmp(r2, "north") || !SDL_strcasecmp(r2, "up") || !SDL_strcasecmp(r2, "back")) row_n = i;
+                else if (!SDL_strcasecmp(r2, "W") || !SDL_strcasecmp(r2, "west") || !SDL_strcasecmp(r2, "left")) row_w = i;
+                else if (!SDL_strcasecmp(r2, "E") || !SDL_strcasecmp(r2, "east") || !SDL_strcasecmp(r2, "right")) row_e = i;
+                else if (!SDL_strcasecmp(r2, "side") || !SDL_strcasecmp(r2, "profile")) { if (row_w < 0) row_w = i; }
             }
+            bool side_only = (row_e < 0 && row_w >= 0);
+            if (row_s < 0) row_s = 0;
+            if (row_n < 0) row_n = nr > 2 ? nr - 1 : row_s;
+            if (row_w < 0) row_w = row_s;
+            if (row_e < 0) row_e = row_w;
+            a->row_of[0] = row_s; a->flip[0] = false;
+            a->row_of[1] = row_w; a->flip[1] = false;
+            a->row_of[2] = row_e; a->flip[2] = side_only && mirror;      // E is the side row, mirrored
+            a->row_of[3] = row_n; a->flip[3] = false;
             a->col_stand = 0; a->col_a = nc > 1 ? 1 : 0; a->col_b = nc > 2 ? 2 : a->col_a;
             for (int i = 0; i < nc; i++) {           // "a"/"b" or the tool's "step-A"/"step-B"
                 const char *cn = cols[i];
@@ -1728,7 +1750,7 @@ static int art_get(TileField *t, const char *id) {
                 SDL_Log("tilefield: walker \"%s\" sidecar says %dx%d frames of %dx%d but the sheet is %dx%d",
                         id, nc, nr, a->fw, a->fh, w, h);
             SDL_Log("tilefield: walker \"%s\" layout from %s.json — %d rows x %d cols, frame %dx%d%s",
-                    id, id, nr, nc, a->fw, a->fh, a->flip[2] ? ", E mirrored from W" : "");
+                    id, id, nr, nc, a->fw, a->fh, a->flip[2] ? ", E mirrored from the side row" : "");
             a->has_sidecar = true;
         }
         SDL_free(js);
@@ -2046,6 +2068,20 @@ static void tf_build_ground(TileField *t) {
         TfTile *e = &t->tiles[ti];
         t->gv_first[n] = t->gv_count;
         float lit = (t->drift > 0.0f && e->drift > 0.0f) ? -3.0f : -1.0f;   // -3 = ground, takes the drift
+        if (e->edge_style == ES_SQUARE) {
+            // Structural: one quad per WORLD cell, hard edges, no mask — the bank's organic boundary
+            // runs on underneath, which is what makes planks read as laid across a stream.
+            int fullx = t->mask_slot[ES_RAGGED][MS_COUNT - 1][0], fully = t->mask_slot_y[ES_RAGGED][MS_COUNT - 1][0];
+            for (int j = 0; j <= t->mh; j++) {
+                t->gv_row[n][j] = t->gv_count;
+                if (j >= t->mh) continue;
+                for (int i = 0; i < t->mw; i++)
+                    if (terr_at(t, i, j) == ti)
+                        gv_quad(t, e, (float)(i * TS), (float)(j * TS), fullx + 8, fully + 8, 0, lit);
+            }
+            t->gv_row[n][t->mh + 1] = t->gv_count;
+            continue;
+        }
         for (int j = 0; j <= t->mh; j++) {
             t->gv_row[n][j] = t->gv_count;
             for (int i = 0; i <= t->mw; i++) {
@@ -2070,6 +2106,49 @@ static void tf_build_ground(TileField *t) {
 // Scattered by hash, never on a grid: the same arithmetic story_prompt.py's preview runs, so what the
 // owner judged on the Mac is what the phone draws. A decal is an object on nothing — no ground patch,
 // no shadow — and it never lands on a solid tile or under a stamp.
+// The trim of every `square` terrain: the named atlas tile laid along each side that borders another
+// terrain, rotated to face outwards. Emitted with the decals because it is atlas art, not a swatch.
+static void tf_build_trim(TileField *t) {
+    t->tv_first = t->gv_count;
+    t->tv_count = 0;
+    for (int n = 1; n < t->terr_count; n++) {
+        TfTile *e = &t->tiles[t->terr[n]];
+        if (e->edge_style != ES_SQUARE || !e->trim_name[0]) continue;
+        if (e->trim_def <= 0) e->trim_def = (short)tile_by_name(t, e->trim_name);
+        if (e->trim_def < 0) { SDL_Log("tilefield: \"%s\" asks for trim \"%s\", which the tileset has not",
+                                       e->name, e->trim_name); continue; }
+        TfTile *tr = &t->tiles[e->trim_def];
+        int ti = t->terr[n];
+        const int DXs[4] = { 0, -1, 1, 0 }, DYs[4] = { 1, 0, 0, -1 };     // S W E N, as rot 0..3 expects
+        for (int y = 0; y < t->mh; y++) for (int x = 0; x < t->mw; x++) {
+            if (terr_at(t, x, y) != ti) continue;
+            for (int d = 0; d < 4; d++) {
+                if (terr_at(t, x + DXs[d], y + DYs[d]) == ti) continue;   // an inside edge: nothing to trim
+                static const int ROT[4] = { 2, 3, 1, 0 };                 // the art's band is along the north
+                float cell = (float)t->cell, aw = (float)t->atlas_w, ah = (float)t->atlas_h;
+                float tx0 = (float)((tr->index % ATLAS_COLS) * cell), ty0 = (float)((tr->index / ATLAS_COLS) * cell);
+                float u0 = tx0 / aw, v0 = ty0 / ah, u1 = (tx0 + cell) / aw, v1 = (ty0 + cell) / ah;
+                float uvx[4] = { u0, u1, u1, u0 }, uvy[4] = { v0, v0, v1, v1 };
+                float qx[4] = { (float)(x * TS), (float)(x * TS + TS), (float)(x * TS + TS), (float)(x * TS) };
+                float qy[4] = { (float)(y * TS), (float)(y * TS), (float)(y * TS + TS), (float)(y * TS + TS) };
+                const int order[6] = { 0, 1, 2, 0, 2, 3 };
+                TfVert q[6];
+                for (int i2 = 0; i2 < 6; i2++) {
+                    int k = order[i2], sl = (k + 4 - ROT[d]) & 3;
+                    TfVert *o = &q[i2];
+                    o->x = qx[k]; o->y = qy[k]; o->u = uvx[sl]; o->v = uvy[sl];
+                    o->r = o->g = o->b = o->a = 255;
+                    o->rx0 = tx0; o->ry0 = ty0; o->rx1 = tx0 + cell; o->ry1 = ty0 + cell;
+                    o->lit = -1.0f; o->warm = 0;
+                }
+                gv_push(t, q);
+                t->tv_count += 6;
+            }
+        }
+    }
+    if (t->tv_count) SDL_Log("tilefield: %d trim quad(s) along square terrain edges", t->tv_count / 6);
+}
+
 static void tf_build_decals(TileField *t) {
     t->dv_first = t->gv_count;
     t->dv_count = 0;
@@ -2129,7 +2208,7 @@ static void tf_build_decals(TileField *t) {
             }
         }
     }
-    t->dv_row[t->mh] = t->gv_count;
+    for (int y2 = t->mh; y2 <= t->mh; y2++) t->dv_row[y2] = t->gv_count;
     t->decal_placed = placed;
     if (placed) SDL_Log("tilefield: %d decal(s) scattered, %d with no art yet (nothing drawn for those)",
                         placed, no_art);
@@ -2195,6 +2274,7 @@ bool tf_load_map(TileField *t, const char *name) {
     // them is recomputed per frame — the camera moves the geometry in the vertex shader.
     tf_build_ground(t);
     tf_build_decals(t);
+    tf_build_trim(t);        // after the decals: same buffer, same atlas draw
     tf_upload_static(t);
 
     t->party = 2;                                             // the party the intro leaves us with
@@ -2725,6 +2805,8 @@ static void draw_ground(TileField *t, int x0, int y0, int x1, int y1) {
         int d0 = t->dv_row[j0 < t->mh ? j0 : t->mh - 1], d1 = t->dv_row[j1 - 1 < t->mh ? j1 - 1 : t->mh];
         tf_draw_static(t, d0, d1 - d0, t->atlas, 1, t->atlas_w, t->atlas_h);
     }
+    // The trim is a handful of quads at map edges; it is drawn whole rather than row-sliced.
+    if (t->tv_count) tf_draw_static(t, t->tv_first, t->tv_count, t->atlas, 1, t->atlas_w, t->atlas_h);
     (void)x0; (void)x1;
 }
 
@@ -3444,6 +3526,7 @@ static void tf_do_capture(TileField *t) {
     t->hide_walkers = !t->cap_walkers;
     // At spawn the whole party stands on one tile, so a capture would show one sprite. Trail them out
     // behind the leader for the picture only: the point of the shot is to see everyone's art.
+    if (t->cap_face) for (int i = 0; i < TF_PARTY; i++) t->act[i].facing = t->cap_face - 1;
     if (t->cap_walkers) {
         for (int i = 1; i < t->party; i++) {
             int bx = t->act[i - 1].tx - DX[t->act[0].facing & 3], by = t->act[i - 1].ty - DY[t->act[0].facing & 3];
@@ -3513,6 +3596,10 @@ void tf_capture_to(TileField *t, const char *map, int scale, const char *out_pat
             t->ambient = lv < 0 ? 0 : lv > 1 ? 1 : lv;
         }
     }
+    const char *ot = SDL_getenv("TILE_ONETAP");        // measurement: skip the 4-tap blend
+    if (ot && ot[0] == '1') t->one_tap = true;
+    const char *fc = SDL_getenv("TILE_FACE");           // which way the party faces in the shot
+    if (fc && fc[0]) { int f = facing_of(fc); for (int i = 0; i < TF_PARTY; i++) t->act[i].facing = f; t->cap_face = f + 1; }
     const char *dc = SDL_getenv("TILE_DECALS");         // 0 while the decal art is being re-cut
     if (dc && dc[0]) t->decal_density = (float)atof(dc);
     const char *gm = SDL_getenv("TILE_GROUND");         // swatches | procedural | flat(= per terrain)

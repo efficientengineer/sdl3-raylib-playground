@@ -37,7 +37,7 @@ fi
 if [ "$1" = "--tiles" ]; then
     MAP=${2:-halm}
     shift 2 || true
-    WHOLE=0; NOWALK=0; SCALE=3; LIGHT=""; LANTERN=""; WEATHER=""; GROUND=""; DECALS=""; SUFFIX=""
+    WHOLE=0; NOWALK=0; SCALE=3; LIGHT=""; LANTERN=""; WEATHER=""; GROUND=""; DECALS=""; FACE=""; SUFFIX=""
     while [ $# -gt 0 ]; do
         case "$1" in
             --whole) WHOLE=1 ;;
@@ -47,6 +47,7 @@ if [ "$1" = "--tiles" ]; then
             --weather) WEATHER="$2"; SUFFIX="${SUFFIX}_w${2//:/-}"; shift ;;
             --ground) GROUND="$2"; SUFFIX="${SUFFIX}_$2"; shift ;;
             --decals) DECALS="$2"; shift ;;
+            --face) FACE="$2"; SUFFIX="${SUFFIX}_face$2"; shift ;;
             [0-9]*) SCALE="$1" ;;
         esac
         shift
@@ -56,7 +57,7 @@ if [ "$1" = "--tiles" ]; then
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
     cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -2
     cd "$ROOT"
-    TILE_LIGHT="$LIGHT" TILE_LANTERN="$LANTERN" TILE_WEATHER="$WEATHER" TILE_GROUND="$GROUND" TILE_DECALS="$DECALS" \
+    TILE_LIGHT="$LIGHT" TILE_LANTERN="$LANTERN" TILE_WEATHER="$WEATHER" TILE_GROUND="$GROUND" TILE_DECALS="$DECALS" TILE_FACE="$FACE" \
     TILE_CAPTURE_WHOLE="$WHOLE" TILE_CAPTURE_NO_WALKERS="$NOWALK" \
         TILE_CAPTURE="$MAP:$SCALE:$OUT" "$ROOT/build_desktop/quest_glory" || true
     if [ -f "$OUT" ]; then
