@@ -2,26 +2,26 @@
 
 ## What exists already
 
-- `story/field/tilesets/valley/decals/clover.png` — missing
-- `story/field/tilesets/valley/decals/crack.png` — missing
-- `story/field/tilesets/valley/decals/crack_moss.png` — missing
-- `story/field/tilesets/valley/decals/daisy_patch.png` — missing
-- `story/field/tilesets/valley/decals/flower_red.png` — missing
-- `story/field/tilesets/valley/decals/flower_white.png` — missing
-- `story/field/tilesets/valley/decals/grass_sprout.png` — missing
-- `story/field/tilesets/valley/decals/leaf_fall.png` — missing
-- `story/field/tilesets/valley/decals/lily_pad.png` — missing
-- `story/field/tilesets/valley/decals/mushroom.png` — missing
-- `story/field/tilesets/valley/decals/mushroom_pair.png` — missing
-- `story/field/tilesets/valley/decals/pebble.png` — missing
-- `story/field/tilesets/valley/decals/pebbles.png` — missing
-- `story/field/tilesets/valley/decals/reed.png` — missing
-- `story/field/tilesets/valley/decals/reed_clump.png` — missing
-- `story/field/tilesets/valley/decals/stone_flat.png` — missing
-- `story/field/tilesets/valley/decals/straw.png` — missing
-- `story/field/tilesets/valley/decals/tuft.png` — missing
-- `story/field/tilesets/valley/decals/tuft_tall.png` — missing
-- `story/field/tilesets/valley/decals/twig.png` — missing
+- `story/field/tilesets/valley/decals/clover.png` — **exists**
+- `story/field/tilesets/valley/decals/crack.png` — **exists**
+- `story/field/tilesets/valley/decals/crack_moss.png` — **exists**
+- `story/field/tilesets/valley/decals/daisy_patch.png` — **exists**
+- `story/field/tilesets/valley/decals/flower_red.png` — **exists**
+- `story/field/tilesets/valley/decals/flower_white.png` — **exists**
+- `story/field/tilesets/valley/decals/grass_sprout.png` — **exists**
+- `story/field/tilesets/valley/decals/leaf_fall.png` — **exists**
+- `story/field/tilesets/valley/decals/lily_pad.png` — **exists**
+- `story/field/tilesets/valley/decals/mushroom.png` — **exists**
+- `story/field/tilesets/valley/decals/mushroom_pair.png` — **exists**
+- `story/field/tilesets/valley/decals/pebble.png` — **exists**
+- `story/field/tilesets/valley/decals/pebbles.png` — **exists**
+- `story/field/tilesets/valley/decals/reed.png` — **exists**
+- `story/field/tilesets/valley/decals/reed_clump.png` — **exists**
+- `story/field/tilesets/valley/decals/stone_flat.png` — **exists**
+- `story/field/tilesets/valley/decals/straw.png` — **exists**
+- `story/field/tilesets/valley/decals/tuft.png` — **exists**
+- `story/field/tilesets/valley/decals/tuft_tall.png` — **exists**
+- `story/field/tilesets/valley/decals/twig.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 

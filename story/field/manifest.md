@@ -66,7 +66,7 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `falke` | walker | 384x576 | `walker_falke` | yes, 384x576 |
+| `falke` | walker | 384x576 | `story/packages/cast/falke/walker` | yes, 384x576 |
 | `ottilie` | walker | 384x576 | `story/packages/cast/ottilie/walker` | yes, 384x576 |
 | `villager_a` | walker | 512x768 | `story/packages/cast/villager_a/walker` | yes, 384x576 |
 | `villager_b` | walker | 512x768 | `story/packages/cast/villager_b/walker` | yes, 384x576 |

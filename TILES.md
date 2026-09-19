@@ -215,11 +215,20 @@ A decal is **an object on nothing**: no ground patch, no shadow, no base plate. 
 about twenty slots, is the entire variety budget, and it is what `grass_tuft` and `grass_flower` used
 to be — without a tile-shaped repeat.
 
+**A decal lives in the atlas**, like every other sprite: one cell each, its art in the cell's
+**top-left corner**, its real size in pixels under `px` in `atlas.json` along with its `on`,
+`density`, `cluster`, `edge_bias`, `sizes` and `flip`. It gets an `- index:` from the tool exactly as
+a tile does. One texture, one batch — a second texture of loose files would be a second draw call for
+the smallest thing on screen. `story/field/tilesets/<set>/decals/<id>.png` is still written beside
+the atlas, but that copy is for the preview and for looking at one; the game reads the atlas.
+A **terrain**, by contrast, has no atlas cell at all: it is a swatch, and `atlas.json` lists it under
+`terrains` with its priority, edge style, swatch size, border, drift and cycle.
+
 ### `tiles.md` and `.tmap`
 
 `tiles.md` gains `- kind: terrain|decal` (an entry with no `- kind:` is a tile or stamp, as before)
 and the keys listed at the top of `story/field/tilesets/valley/tiles.md`. Two more, optional, on any
-entry: **`- pass: NESW`** — which sides of a tile may be walked *through*, as the letters that are
+entry, and both are carried into `atlas.json`: **`- pass: NESW`** — which sides of a tile may be walked *through*, as the letters that are
 open (a counter you talk across, a one-way ledge); and **`- tag: <word>`** — what the entry is to the
 game (counter, bush, damage). Animated tiles stay `- frames: n`; water now uses `- cycle: water`
 instead, which hands it to the palette cycle in `story/palette/cycles.md` and costs no atlas cells.

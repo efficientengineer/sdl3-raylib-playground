@@ -116,6 +116,7 @@ walkable and readable with no art at all.
 ### Decals — scattered by hash, never on a grid
 
 ## tuft
+- index: 1
 - kind: decal
 - on: grass, grass_dry
 - density: 0.55
@@ -127,6 +128,7 @@ walkable and readable with no art at all.
 - desc: a standing tuft of longer grass, three or four blades leaning one way
 
 ## tuft_tall
+- index: 2
 - kind: decal
 - on: grass, grass_dry
 - density: 0.22
@@ -138,6 +140,7 @@ walkable and readable with no art at all.
 - desc: a taller clump of coarse grass, a hand's height, leaning one way
 
 ## clover
+- index: 3
 - kind: decal
 - on: grass
 - density: 0.3
@@ -148,6 +151,7 @@ walkable and readable with no art at all.
 - desc: a small low patch of round clover leaves
 
 ## flower_white
+- index: 4
 - kind: decal
 - on: grass
 - density: 0.25
@@ -158,6 +162,7 @@ walkable and readable with no art at all.
 - desc: three or four small pale field flowers on thin stems
 
 ## flower_red
+- index: 5
 - kind: decal
 - on: grass, grass_dry
 - density: 0.14
@@ -168,6 +173,7 @@ walkable and readable with no art at all.
 - desc: two small deep red field flowers on thin stems
 
 ## daisy_patch
+- index: 6
 - kind: decal
 - on: grass
 - density: 0.12
@@ -178,6 +184,7 @@ walkable and readable with no art at all.
 - desc: a loose scatter of seven or eight tiny white daisies
 
 ## pebble
+- index: 7
 - kind: decal
 - on: dirt, gravel, mud
 - density: 0.5
@@ -189,6 +196,7 @@ walkable and readable with no art at all.
 - desc: one small rounded grey stone
 
 ## pebbles
+- index: 8
 - kind: decal
 - on: dirt, gravel, water
 - density: 0.35
@@ -200,6 +208,7 @@ walkable and readable with no art at all.
 - desc: three or four small rounded stones lying close together
 
 ## stone_flat
+- index: 9
 - kind: decal
 - on: grass, dirt, gravel
 - density: 0.12
@@ -210,6 +219,7 @@ walkable and readable with no art at all.
 - desc: one flat weathered stone half sunk into the ground
 
 ## crack
+- index: 10
 - kind: decal
 - on: paving, dirt
 - density: 0.3
@@ -220,6 +230,7 @@ walkable and readable with no art at all.
 - desc: a thin dark crack running across the ground, branching once
 
 ## crack_moss
+- index: 11
 - kind: decal
 - on: paving
 - density: 0.18
@@ -230,6 +241,7 @@ walkable and readable with no art at all.
 - desc: a crack in laid stone with a thin line of moss grown along it
 
 ## grass_sprout
+- index: 12
 - kind: decal
 - on: paving, dirt, gravel
 - density: 0.2
@@ -240,6 +252,7 @@ walkable and readable with no art at all.
 - desc: a few blades of grass pushing up through a joint
 
 ## reed
+- index: 13
 - kind: decal
 - on: water, mud
 - density: 0.4
@@ -251,6 +264,7 @@ walkable and readable with no art at all.
 - desc: three tall thin reeds standing straight up, a dark seed head on each
 
 ## reed_clump
+- index: 14
 - kind: decal
 - on: water, mud
 - density: 0.2
@@ -262,6 +276,7 @@ walkable and readable with no art at all.
 - desc: a clump of eight or nine reeds of different heights
 
 ## lily_pad
+- index: 15
 - kind: decal
 - on: water
 - density: 0.3
@@ -272,6 +287,7 @@ walkable and readable with no art at all.
 - desc: two flat round lily pads, one notched
 
 ## mushroom
+- index: 16
 - kind: decal
 - on: grass, mud
 - density: 0.1
@@ -282,6 +298,7 @@ walkable and readable with no art at all.
 - desc: one small pale mushroom with a domed cap
 
 ## mushroom_pair
+- index: 17
 - kind: decal
 - on: grass, mud
 - density: 0.07
@@ -292,6 +309,7 @@ walkable and readable with no art at all.
 - desc: two small pale mushrooms of different heights, close together
 
 ## leaf_fall
+- index: 18
 - kind: decal
 - on: grass, grass_dry, dirt, paving
 - density: 0.3
@@ -302,6 +320,7 @@ walkable and readable with no art at all.
 - desc: two fallen leaves lying flat, dry and curled at one edge
 
 ## twig
+- index: 19
 - kind: decal
 - on: grass, dirt, gravel
 - density: 0.2
@@ -312,6 +331,7 @@ walkable and readable with no art at all.
 - desc: a short bare twig lying flat with one fork in it
 
 ## straw
+- index: 20
 - kind: decal
 - on: dirt, gravel, crop
 - density: 0.25

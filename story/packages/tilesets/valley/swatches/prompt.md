@@ -2,15 +2,15 @@
 
 ## What exists already
 
-- `story/field/tilesets/valley/swatches/grass.png` — missing
-- `story/field/tilesets/valley/swatches/grass_dry.png` — missing
-- `story/field/tilesets/valley/swatches/crop.png` — missing
-- `story/field/tilesets/valley/swatches/mud.png` — missing
-- `story/field/tilesets/valley/swatches/dirt.png` — missing
-- `story/field/tilesets/valley/swatches/gravel.png` — missing
-- `story/field/tilesets/valley/swatches/paving.png` — missing
-- `story/field/tilesets/valley/swatches/bridge_deck.png` — missing
-- `story/field/tilesets/valley/swatches/water.png` — missing
+- `story/field/tilesets/valley/swatches/grass.png` — **exists**
+- `story/field/tilesets/valley/swatches/grass_dry.png` — **exists**
+- `story/field/tilesets/valley/swatches/crop.png` — **exists**
+- `story/field/tilesets/valley/swatches/mud.png` — **exists**
+- `story/field/tilesets/valley/swatches/dirt.png` — **exists**
+- `story/field/tilesets/valley/swatches/gravel.png` — **exists**
+- `story/field/tilesets/valley/swatches/paving.png` — **exists**
+- `story/field/tilesets/valley/swatches/bridge_deck.png` — **exists**
+- `story/field/tilesets/valley/swatches/water.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 

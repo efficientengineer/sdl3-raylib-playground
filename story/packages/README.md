@@ -35,8 +35,8 @@ contract is `TILES.md`.
 
 | set | sheet | slots | folder | status | after downloading |
 | --- | --- | --- | --- | --- | --- |
-| `valley` | `swatches (the ground)` | 9 | [`tilesets/valley/swatches`](tilesets/valley/swatches/prompt.md) | to generate | `ingest tilesets/valley/swatches` |
-| `valley` | `decals (the variety)` | 20 | [`tilesets/valley/decals`](tilesets/valley/decals/prompt.md) | to generate | `ingest tilesets/valley/decals` |
+| `valley` | `swatches (the ground)` | 9 | [`tilesets/valley/swatches`](tilesets/valley/swatches/prompt.md) | done | `ingest tilesets/valley/swatches` |
+| `valley` | `decals (the variety)` | 20 | [`tilesets/valley/decals`](tilesets/valley/decals/prompt.md) | done | `ingest tilesets/valley/decals` |
 | `valley` | `objects` | 9 | [`tilesets/valley/objects`](tilesets/valley/objects/prompt.md) | done | `ingest tilesets/valley/objects` |
 | `valley` | `objects_2` | 6 | [`tilesets/valley/objects_2`](tilesets/valley/objects_2/prompt.md) | done | `ingest tilesets/valley/objects_2` |
 | `valley` | `objects_3` | 10 | [`tilesets/valley/objects_3`](tilesets/valley/objects_3/prompt.md) | done | `ingest tilesets/valley/objects_3` |
@@ -47,10 +47,10 @@ contract is `TILES.md`.
 The fewest generations that put the first scene and the first map on screen, in the order they
 unblock each other. A checked box is already cut; everything below this section is the long tail.
 
-- [ ] **1.** the `valley` ground swatches — 9 terrains in one image, and every edge between them is computed from it. This is the whole ground of the world.  
-      [`tilesets/valley/swatches`](tilesets/valley/swatches/prompt.md) · to generate · `ingest tilesets/valley/swatches`
-- [ ] **2.** the `valley` decals — 20 cut-outs the game scatters over the ground, which is what stops it looking like a sheet of one colour  
-      [`tilesets/valley/decals`](tilesets/valley/decals/prompt.md) · to generate · `ingest tilesets/valley/decals`
+- [x] **1.** the `valley` ground swatches — 9 terrains in one image, and every edge between them is computed from it. This is the whole ground of the world.  
+      [`tilesets/valley/swatches`](tilesets/valley/swatches/prompt.md) · done · `ingest tilesets/valley/swatches`
+- [x] **2.** the `valley` decals — 20 cut-outs the game scatters over the ground, which is what stops it looking like a sheet of one colour  
+      [`tilesets/valley/decals`](tilesets/valley/decals/prompt.md) · done · `ingest tilesets/valley/decals`
 - [x] **3.** the `objects` sheet of the `valley` tileset — 9 tile(s) into that set's atlas, which the map is built from  
       [`tilesets/valley/objects`](tilesets/valley/objects/prompt.md) · done · `ingest tilesets/valley/objects`
 - [x] **4.** the `objects_2` sheet of the `valley` tileset — 6 tile(s) into that set's atlas, which the map is built from  
