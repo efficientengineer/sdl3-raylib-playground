@@ -1805,7 +1805,15 @@ TILE_PX = 64                          # every tile is 64x64 and seamless
 # the engine's contract (src/FIELD_NOTES.md, "Face-texture contract"); change them there first.
 BUILDING_FACES = ("front", "side", "roof")
 FACE_PX = {"front": (128, 128), "side": (128, 128), "roof": (64, 64)}
-WALK_W, WALK_H = 32, 48               # one walker frame
+ATLAS_CELL = 128                      # ...but the atlas keeps the art at the 4x the sheet was drawn
+                                      # at. The owner compared the sheets with the cut and preferred
+                                      # the full-resolution art: nothing is thrown away here any
+                                      # more. --snap32 still writes the old 32-px atlas beside it.
+EXTRUDE_PX = 2                        # opaque colour bled outward under the transparent edge, so
+                                      # linear filtering never pulls black or magenta into a sprite
+WALK_W, WALK_H = 32, 48               # one walker frame as designed (the sheet's 4x4 grid)
+WALK_OUT_W, WALK_OUT_H = 256, 384     # ...and as cut: the art is kept, not reduced to the design
+WALK_FOOT = 8                         # the lowest opaque row sits this far above the frame's bottom
 WALK_FACINGS = ("S", "W", "E", "N")   # row order
 WALK_STEPS = ("stand", "step-left", "stand", "step-right")   # column order
 WALK_MIN_SCALE = 4                    # frames drawn at least 4x up so ChatGPT has pixels to work with
@@ -2324,7 +2332,7 @@ def cmd_walker(args):
             "and the whole template exactly as it is. <what was wrong>\"."],
             makes=f"`{out_file}`, the 4x4 walk sheet"),
         out_file=out_file, status=field_status("walker", slots, out_file))
-    report_field([{"id": ident, "kind": "walker", "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": package_label(name)}],
+    report_field([{"id": ident, "kind": "walker", "target": f"{WALK_OUT_W * 4}x{WALK_OUT_H * 4}", "package": package_label(name)}],
                  warn, md, template, f"16 frames at {s}x, {label}")
 
 
@@ -2522,7 +2530,7 @@ def write_field_manifest(new_rows=()):
         cw, chh = footprint_of(i, e, [])
         declared.append({"id": i, "kind": "prop", "target": f"{cw * CELL_PX}x{chh * CELL_PX}", "package": "-"})
     for i in walkers:
-        declared.append({"id": i, "kind": "walker", "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": "-"})
+        declared.append({"id": i, "kind": "walker", "target": f"{WALK_OUT_W * 4}x{WALK_OUT_H * 4}", "package": "-"})
     for i in builds:
         declared.append({"id": i, "kind": "building", "package": "-",
                          "target": " / ".join(f"{f} {FACE_PX[f][0]}" for f in BUILDING_FACES)})
@@ -2546,7 +2554,7 @@ def write_field_manifest(new_rows=()):
     for kind, title, note in (("tile", "Tiles", f"{TILE_PX}x{TILE_PX}, opaque, seamless on all four edges"),
                               ("prop", "Props", f"alpha, {CELL_PX} px to a map cell, standing on the bottom row"),
                               ("walker", "Walkers", f"alpha, 4 rows (S, W, E, N) x 4 columns of "
-                                                    f"{WALK_W}x{WALK_H} frames"),
+                                                    f"{WALK_OUT_W}x{WALK_OUT_H} frames"),
                               ("building", "Buildings", "opaque faces on map geometry: front stretched once "
                                                         "across the front wall, side and roof seamless")):
         group = sorted((r for (k, _), r in rows.items() if k == kind), key=lambda r: r["id"])
@@ -2894,6 +2902,69 @@ def resize_box(rows, w, h, ch, nw, nh):
     return out
 
 
+def resize_bilinear(rows, w, h, ch, nw, nh):
+    """Bilinear enlargement. Used where the return came back a little smaller than the target."""
+    out = []
+    for y in range(nh):
+        fy = (y + 0.5) * h / nh - 0.5
+        y0 = max(0, min(h - 1, int(fy // 1)))
+        y1 = min(h - 1, y0 + 1)
+        ty = max(0.0, fy - y0)
+        r0, r1 = rows[y0], rows[y1]
+        dst = bytearray(nw * ch)
+        for x in range(nw):
+            fx = (x + 0.5) * w / nw - 0.5
+            x0 = max(0, min(w - 1, int(fx // 1)))
+            x1 = min(w - 1, x0 + 1)
+            tx = max(0.0, fx - x0)
+            for c in range(ch):
+                a = r0[x0 * ch + c] * (1 - tx) + r0[x1 * ch + c] * tx
+                b = r1[x0 * ch + c] * (1 - tx) + r1[x1 * ch + c] * tx
+                dst[x * ch + c] = int(a * (1 - ty) + b * ty + 0.5)
+        out.append(dst)
+    return out
+
+
+def resample(rows, w, h, ch, nw, nh):
+    """To an exact size: area-average going down, bilinear going up. Never nearest.
+
+    A returned sheet is never an exact scale of the template, so every slot's art area has to be
+    brought onto the grid. Nearest at a non-integer ratio drops whole columns and tears the straight
+    edges; this keeps them."""
+    if (w, h) == (nw, nh):
+        return [bytearray(r) for r in rows]
+    if nw <= w and nh <= h:
+        return resize_box(rows, w, h, ch, nw, nh)
+    return resize_bilinear(rows, w, h, ch, nw, nh)
+
+
+def extrude_edges(px, w, h, n=EXTRUDE_PX):
+    """Bleed the colour of opaque pixels outward under the transparent ones. Alpha is not changed.
+
+    The engine filters the atlas linearly, so a texel just outside a sprite is still sampled at the
+    silhouette; if it is black or leftover magenta, that is what shows up as a dark or pink halo.
+    Giving it the colour of the art it borders makes the interpolation invisible."""
+    have = [[bool(px[y][x * 4 + 3]) for x in range(w)] for y in range(h)]
+    for _ in range(n):
+        add = []
+        for y in range(h):
+            for x in range(w):
+                if have[y][x]:
+                    continue
+                acc, k = [0, 0, 0], 0
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if 0 <= nx < w and 0 <= ny < h and have[ny][nx]:
+                        for c in range(3):
+                            acc[c] += px[ny][nx * 4 + c]
+                        k += 1
+                if k:
+                    add.append((x, y, bytes(v // k for v in acc)))
+        for x, y, c in add:
+            px[y][x * 4:x * 4 + 3] = c
+            have[y][x] = True
+    return px
+
+
 def cut_view(data, image, nearest=False):
     """The returned painting, fitted to the block-out's exact size. (printed, written)
 
@@ -3091,8 +3162,171 @@ def opaque_bounds(rows, w, h):
     return None if x1 < x0 else (x0, y0, x1 - x0 + 1, y1 - y0 + 1)
 
 
+# ── slot localisation: finding the border ChatGPT actually drew ──
+#
+# The returned sheet is never an exact scale of the template — it comes back at whatever size the app
+# felt like (about 1.5 megapixels), and the model redraws each slot's white border a few pixels off
+# where the scaled box says it is. Cutting on the scaled box therefore leaves a sliver of the white
+# border inside the art: thin white lines along tile edges in the atlas, and a seam metric that reads
+# the white row rather than the art. So every side of every slot is searched for the border line it
+# actually has, and the art area starts just inside it.
+
+NEAR_WHITE = 235                      # r,g,b all above this is "the template's white border"
+BORDER_RUN = 0.55                     # ...over this much of the side's length
+BORDER_RUN_LOW = 0.3                  # ...or this much, on a second pass, where the art overlaps it
+BORDER_REACH = 0.12                   # how far either side of the scaled edge the border is hunted
+BORDER_SKIRT = 200                    # the border's anti-aliased edge: bright, but not white
+SKIRT_FRAC, SKIRT_MAX = 0.3, 3        # how much of a line is skirt, and how far in to chase it
+
+
+def _bright_frac(rows, w, h, ch, pos, lo, hi, vertical, level=NEAR_WHITE):
+    """How much of a column (vertical) or row between lo and hi is brighter than `level`."""
+    n = hi - lo
+    if n <= 0 or pos < 0 or pos >= (w if vertical else h):
+        return 0.0
+    if vertical:
+        it = (rows[y][pos * ch:pos * ch + 3] for y in range(lo, hi))
+    else:
+        r = rows[pos]
+        it = (r[x * ch:x * ch + 3] for x in range(lo, hi))
+    return sum(1 for p in it if p[0] > level and p[1] > level and p[2] > level) / n
+
+
+def _white_frac(rows, w, h, ch, pos, lo, hi, vertical):
+    return _bright_frac(rows, w, h, ch, pos, lo, hi, vertical)
+
+
+def localise_slot(rows, w, h, ch, box):
+    """Refine a scaled slot box (x0, y0, x1, y1 exclusive) onto the border the sheet really has.
+
+    Each side is searched +-3% of the slot's size (at least 6 px) for the white border line, and the
+    art is taken to start just inside it. For a left or top edge the INNERMOST candidate wins, for a
+    right or bottom edge likewise, so a neighbouring slot's border across the gutter can never be
+    mistaken for this one's. A side with no border found falls back to the scaled edge inset by 2 px.
+    Returns (box, sides not found)."""
+    x0, y0, x1, y1 = box
+    rx, ry = max(24, int(round(BORDER_REACH * (x1 - x0)))), max(24, int(round(BORDER_REACH * (y1 - y0))))
+    ylo, yhi = y0 + (y1 - y0) // 10, y1 - (y1 - y0) // 10
+    xlo, xhi = x0 + (x1 - x0) // 10, x1 - (x1 - x0) // 10
+    miss = []
+
+    def side(name, cands, vertical, lo, hi, inner, default):
+        # The innermost candidate always wins, so searching generously outward can never pick up a
+        # neighbour's border across the gutter, and searching generously inward is what finds the one
+        # ChatGPT redrew forty pixels off. A second, slacker pass catches a border the art overlaps.
+        for level in (BORDER_RUN, BORDER_RUN_LOW):
+            found = [p for p in cands
+                     if _white_frac(rows, w, h, ch, p, lo, hi, vertical) >= level]
+            if found:
+                return inner(found)
+        miss.append(name)
+        return default
+
+    def skirt(pos, step, vertical, lo, hi):
+        """Step further in past the border's anti-aliased edge: bright, but never white.
+
+        Without this the cut keeps a half-lit row of the border, which the mode filter promotes to a
+        full art pixel on a sheet that came back at about 1:1 — the dashed white outlines that were
+        left around the trees and the barn when only the white line itself was skipped."""
+        for _ in range(SKIRT_MAX):
+            if _bright_frac(rows, w, h, ch, pos, lo, hi, vertical, BORDER_SKIRT) < SKIRT_FRAC:
+                break
+            pos += step
+        return pos
+
+    nx0 = side("left", range(x0 - rx, x0 + rx + 1), True, ylo, yhi, lambda f: max(f) + 1, x0 + 2)
+    nx1 = side("right", range(x1 - rx, x1 + rx + 1), True, ylo, yhi, min, x1 - 2)
+    ny0 = side("top", range(y0 - ry, y0 + ry + 1), False, xlo, xhi, lambda f: max(f) + 1, y0 + 2)
+    ny1 = side("bottom", range(y1 - ry, y1 + ry + 1), False, xlo, xhi, min, y1 - 2)
+    nx0 = skirt(nx0, 1, True, ylo, yhi)
+    nx1 = skirt(nx1 - 1, -1, True, ylo, yhi) + 1
+    ny0 = skirt(ny0, 1, False, xlo, xhi)
+    ny1 = skirt(ny1 - 1, -1, False, xlo, xhi) + 1
+    if nx1 - nx0 < 8 or ny1 - ny0 < 8:                   # nonsense: keep the scaled box, inset
+        return (x0 + 2, y0 + 2, x1 - 2, y1 - 2), ["left", "right", "top", "bottom"]
+    return (max(0, nx0), max(0, ny0), min(w, nx1), min(h, ny1)), miss
+
+
+def localise_slots(rows, w, h, ch, slots, sx, sy, label=""):
+    """Refine every slot of a template package in place, as `_art`. One warning per sheet."""
+    missed = 0
+    for s in slots:
+        ix, iy, iw, ih = s["inner"]
+        box = (int(round(ix * sx)), int(round(iy * sy)),
+               int(round((ix + iw) * sx)), int(round((iy + ih) * sy)))
+        if box[0] < 0 or box[1] < 0 or box[2] > w or box[3] > h:
+            die(f"slot {s['n']} falls outside the image; is this the right file for this package?")
+        s["_art"], miss = localise_slot(rows, w, h, ch, box)
+        missed += len(miss)
+    if missed:
+        print(f"  note: {missed} slot side(s) had no white border where one was expected; "
+              f"the scaled edge inset by 2 px was used there{label}", file=sys.stderr)
+    return missed
+
+
+def scrub_border(px, w, h, ch, keyed, ring=1):
+    """Wipe what is left of the template's white border from a cut image's outermost pixels.
+
+    Two things are residue, and nothing else is:
+
+    * a near-white STRAIGHT RUN along an edge, 60% of that edge's length or more — a border line the
+      cut kept whole; and
+    * a near-white edge pixel with nothing bright behind it — the DASHED remains of a border line on
+      a sheet that came back at about 1:1, where the mode filter promoted the border in some blocks
+      and not others. A border line is one pixel thin by construction; a headband, a flower, a
+      plaster wall or the white water foam is a body of white with more white just inside it, so the
+      support test leaves all of them alone.
+
+    Nothing in the interior is ever touched either way."""
+    def white(x, y, level=NEAR_WHITE):
+        r = px[y]
+        return r[x * ch] > level and r[x * ch + 1] > level and r[x * ch + 2] > level
+
+    def bright(x, y):
+        r = px[y]
+        return (r[x * ch] > BORDER_SKIRT and r[x * ch + 1] > BORDER_SKIRT
+                and r[x * ch + 2] > BORDER_SKIRT and (ch < 4 or r[x * ch + 3]))
+
+    def longest(flags):
+        best = run = 0
+        for f in flags:
+            run = run + 1 if f else 0
+            best = max(best, run)
+        return best
+
+    n = 0
+    for r in range(min(ring, (min(w, h) - 1) // 2), -1, -1):
+        for edge in ("top", "bottom", "left", "right"):
+            if edge in ("top", "bottom"):
+                y = r if edge == "top" else h - 1 - r
+                sy = y + 1 if edge == "top" else y - 1
+                cells = [(x, y, x, sy) for x in range(w)]
+            else:
+                x = r if edge == "left" else w - 1 - r
+                sx_ = x + 1 if edge == "left" else x - 1
+                cells = [(x, y, sx_, y) for y in range(h)]
+            # A whole white line has to be white; a dash of one only has to be pale, because a border
+            # that the keying caught half of comes back as a half-transparent pale pixel, and that is
+            # still a line on the phone. Either way it only goes if the art behind it is not pale too.
+            flags = [white(cx, cy) for cx, cy, _, _ in cells]
+            whole = longest(flags) >= BORDER_RUN * len(cells)
+            pale = [white(cx, cy, BORDER_SKIRT) for cx, cy, _, _ in cells]
+            for (cx, cy, ax, ay), f, pl in zip(cells, flags, pale):
+                if not ((f and whole) or (pl and not bright(ax, ay))):
+                    continue
+                if keyed:
+                    px[cy][cx * ch:cx * ch + ch] = b"\0" * ch
+                else:
+                    px[cy][cx * ch:(cx + 1) * ch] = px[ay][ax * ch:(ax + 1) * ch]
+                n += 1
+    return n
+
+
 def scaled_inner(slot, sx, sy, w, h):
     """A slot's inner box in the returned image, with a couple of pixels shaved off for soft borders."""
+    if slot.get("_art"):
+        x0, y0, x1, y1 = slot["_art"]
+        return x0, y0, x1 - x0, y1 - y0
     ix, iy, iw, ih = slot["inner"]
     x0 = int(round(ix * sx)) + CUT_PAD
     y0 = int(round(iy * sy)) + CUT_PAD
@@ -3101,6 +3335,88 @@ def scaled_inner(slot, sx, sy, w, h):
     if x0 < 0 or y0 < 0 or x1 > w or y1 > h or x1 - x0 < 8 or y1 - y0 < 8:
         die(f"slot {slot['n']} falls outside the image; is this the right file for this package?")
     return x0, y0, x1 - x0, y1 - y0
+
+
+def body_bounds(px, w, h, alpha=200, least=3):
+    """The silhouette's box, ignoring dust: a row or column counts only once `least` pixels in it are
+    solid. With a soft-keyed frame a single half-transparent speck in a corner would otherwise make
+    every frame's box the whole frame, and the anchoring would have nothing to work from."""
+    xs = [x for x in range(w) if sum(1 for y in range(h) if px[y][x * 4 + 3] >= alpha) >= least]
+    ys = [y for y in range(h) if sum(1 for x in range(w) if px[y][x * 4 + 3] >= alpha) >= least]
+    if not xs or not ys:
+        return None
+    return xs[0], ys[0], xs[-1] - xs[0] + 1, ys[-1] - ys[0] + 1
+
+
+def shift_frame(px, w, h, dx, dy):
+    """Move a frame's art by (dx, dy) inside its own box; what falls off the box is gone."""
+    out = [bytearray(w * 4) for _ in range(h)]
+    for y in range(h):
+        sy = y - dy
+        if not (0 <= sy < h):
+            continue
+        row, dst = px[sy], out[y]
+        if dx >= 0:
+            dst[dx * 4:w * 4] = row[0:(w - dx) * 4]
+        else:
+            dst[0:(w + dx) * 4] = row[-dx * 4:w * 4]
+    return out
+
+
+def cut_walker(data, slots, rows, w, h, ch, sx, sy, fringe=0):
+    """A returned walk sheet: one localised frame per slot, keyed soft, extruded, and ANCHORED.
+
+    Two things had to change here. The art is no longer reduced — a frame is WALK_OUT_W x WALK_OUT_H,
+    the size ChatGPT actually drew it at, because squeezing it down to the 32x48 design turned careful
+    work into mush. And every frame is placed rather than merely cut: ChatGPT draws each pose where it
+    likes inside its slot, so the character slid sideways and bobbed as the cycle played. Each frame is
+    centred horizontally on its own silhouette, and each DIRECTION takes one vertical offset, measured
+    from its two stand frames, so the steps may still lift a foot without the whole body hopping."""
+    FIELD_DIRS["walker"].mkdir(parents=True, exist_ok=True)
+    OW, OH = WALK_OUT_W, WALK_OUT_H
+    frames, boxes = {}, {}
+    for s in slots:
+        x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+        art = crop(rows, ch, x, y, bw, bh)
+        if (bw, bh) != (OW, OH):
+            art = resample(art, bw, bh, ch, OW, OH)
+        px = key_magenta(art, OW, OH, ch, fringe)
+        scrub_border(px, OW, OH, 4, True, EXTRUDE_PX * 2)
+        frames[(s["row"], s["col"])] = px
+        boxes[(s["row"], s["col"])] = body_bounds(px, OW, OH)
+
+    report = []
+    for r in range(4):
+        stand = [boxes[(r, c)] for c in (0, 2) if boxes.get((r, c))]
+        if stand:
+            low = max(b[1] + b[3] for b in stand)             # the lowest opaque row of the stands
+            dy = (OH - WALK_FOOT) - low
+        else:
+            dy = 0
+        for c in range(4):
+            b = boxes.get((r, c))
+            if not b:
+                report.append(f"{WALK_FACINGS[r]} frame {c} is empty")
+                continue
+            dx = (OW - b[2]) // 2 - b[0]
+            frames[(r, c)] = shift_frame(frames[(r, c)], OW, OH, dx, dy)
+            extrude_edges(frames[(r, c)], OW, OH)
+            nb = body_bounds(frames[(r, c)], OW, OH)
+            report.append(f"    {WALK_FACINGS[r]} {c}: bbox {b[2]}x{b[3]} at {b[0]},{b[1]} "
+                          f"-> {nb[0]},{nb[1]} (dx {dx:+d}, dy {dy:+d})")
+
+    sheet = [bytearray(OW * 4 * 4) for _ in range(OH * 4)]
+    for (r, c), px in frames.items():
+        ox, oy = c * OW, r * OH
+        for k in range(OH):
+            sheet[oy + k][ox * 4:(ox + OW) * 4] = px[k]
+    out = ROOT.parent / data["out"]
+    write_png(out, OW * 4, OH * 4, 4, sheet)
+    print(f"  16 frames of {OW}x{OH} -> {out.relative_to(ROOT.parent)}  {OW * 4}x{OH * 4} "
+          f"(rows {', '.join(WALK_FACINGS)})"
+          f"{check_alpha(sheet, OW * 4, OH * 4, out)}")
+    for l in report:
+        print(l)
 
 
 def cmd_cut(args):
@@ -3112,10 +3428,10 @@ def cmd_cut(args):
             palette = int(next(it, "0"))
         elif not a.startswith("--"):
             pos.append(a)
-    heal = "--heal-seams" in args
+    heal, snap = "--heal-seams" in args, "--snap32" in args
     if len(pos) != 2:
         die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] [--nearest] "
-            "[--palette N] [--heal-seams]")
+            "[--palette N] [--heal-seams] [--snap32]")
     data = json.loads(Path(pos[0]).read_text())
     image = Path(pos[1]).expanduser()
     kind = data.get("kind")
@@ -3148,15 +3464,17 @@ def cmd_cut(args):
             f"(rgb {tuple(bg)}); {off} of {len(pts)} sampled points differ. Either this is the wrong file for "
             f"this package, or the generator repainted the background. Nothing written.")
     print(f"{image.name}: {w}x{h}, template {tw}x{th} ({sx:.2f}x), {len(slots)} slot(s), kind {kind}")
+    localise_slots(rows, w, h, ch, slots, sx, sy, f" ({image.name})")
 
     if kind == "tileset":                                 # a tile sheet: snap, key, pack into the atlas
-        return cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette, heal)
+        return cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette, heal, snap)
     if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
         FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
         for s in slots:
             x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
             tw_, th_ = s["target"]
             px = resize_nn(crop(rows, ch, x, y, bw, bh), bw, bh, ch, tw_, th_)
+            scrub_border(px, tw_, th_, ch, False)
             if ch == 4:
                 px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
             out = ROOT.parent / s["out"]
@@ -3168,6 +3486,7 @@ def cmd_cut(args):
         for s in slots:
             x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
             px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
+            scrub_border(px, bw, bh, 4, True, max(2, int(round(2 * sx))))
             bounds = opaque_bounds(px, bw, bh)
             if not bounds:
                 print(f"  slot {s['n']} {s['id']}: nothing but background in the slot; not written", file=sys.stderr)
@@ -3182,22 +3501,10 @@ def cmd_cut(args):
             print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> trimmed {cw}x{chh} -> "
                   f"{out.relative_to(ROOT.parent)}  {nw}x{nh}{check_alpha(px, nw, nh, out)}")
     else:
-        FIELD_DIRS["walker"].mkdir(parents=True, exist_ok=True)
-        sheet = [bytearray(WALK_W * 4 * 4) for _ in range(WALK_H * 4)]
-        for s in slots:
-            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
-            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
-            px = resize_nn(px, bw, bh, 4, WALK_W, WALK_H)
-            ox, oy = s["col"] * WALK_W, s["row"] * WALK_H
-            for r in range(WALK_H):
-                sheet[oy + r][ox * 4:(ox + WALK_W) * 4] = px[r]
-        out = ROOT.parent / data["out"]
-        write_png(out, WALK_W * 4, WALK_H * 4, 4, sheet)
-        print(f"  16 frames -> {out.relative_to(ROOT.parent)}  {WALK_W * 4}x{WALK_H * 4} "
-              f"(rows {', '.join(WALK_FACINGS)}){check_alpha(sheet, WALK_W * 4, WALK_H * 4, out)}")
+        cut_walker(data, slots, rows, w, h, ch, sx, sy, fringe)
 
     rows_out = ([{"id": data["template"].split("_", 1)[1], "kind": "walker",
-                  "target": f"{WALK_W * 4}x{WALK_H * 4}", "package": data["template"]}]
+                  "target": f"{WALK_OUT_W * 4}x{WALK_OUT_H * 4}", "package": data["template"]}]
                 if kind == "walker" else kind_rows(KIND_DIR[kind], slots, data["template"]))
     write_field_manifest(rows_out)
     print(f"{FIELD_MANIFEST.relative_to(ROOT.parent)} updated")
@@ -3231,7 +3538,7 @@ def cmd_cut(args):
 
 TILESETS = FIELD / "tilesets"
 TMAPS = FIELD / "tmaps"
-TSET_TILE = 32                        # a tile is 32x32 px in game (TILES.md)
+TSET_TILE = 32                        # a tile is 32x32 map cells' worth of design (TILES.md)
 TSET_SCALE = 4                        # ...drawn at 4x on the sheet, so one art pixel is a 4x4 block
 TSET_SLOT = TSET_TILE * TSET_SCALE    # 128: one tile's slot on a template sheet
 ATLAS_COLS = 16                       # the atlas is 16 tiles wide; index 0 is the empty tile
@@ -3604,7 +3911,7 @@ def tileset_slots(ids, entries):
                       "cells": list(e["cells"]), "index": e["index"], "layer": e["layer"],
                       "frames": e["frames"], "opaque": e["opaque"],
                       "kind": ("ground" if e["opaque"] else "fringe" if is_fringe(i) else "stamp"),
-                      "target": [e["cells"][0] * TSET_TILE, e["cells"][1] * TSET_TILE]})
+                      "target": [e["cells"][0] * ATLAS_CELL, e["cells"][1] * ATLAS_CELL]})
     return W, H, label, slots
 
 
@@ -3879,19 +4186,42 @@ file is the part the art pipeline fixes so the engine can match it.
   `- desc:`. The art pipeline never changes a name, a size or a solid row. The one thing it writes
   back is a `- index:` line for an entry that has none, so the atlas position is recorded in the file
   the engine reads. An index already written is never moved.
-- `atlas.png` — {cols} tiles across, {tile}x{tile} each, RGBA. Index 0 is the empty tile. A stamp of
+- `atlas.png` — {cols} cells across, **{cell}x{cell} each**, RGBA. Index 0 is the empty tile. A stamp of
   `WxH` occupies a `WxH` rectangle of cells whose top-left is its index, row-major, and never wraps
   past the last column. A tile with `- frames: n` occupies `n` copies side by side starting at its
   index.
-- `atlas.json` — the same thing for humans and for tools: name to index, size and frame count.
+- `atlas.json` — the same thing for humans and for tools: name to index, size and frame count. Its
+  `cell` field is the atlas cell size in pixels; read it rather than assuming one.
+- `atlas32.png` — only when a sheet was cut with `--snap32`: the same atlas mode-snapped down to
+  {tile}x{tile} a cell, for comparing against the pixel-art reading of a sheet. Not shipped.
 - `cut/<sheet>.png` — what one returned sheet cut down to, kept so a sheet can be eyeballed.
 
-## Sizes
+## Sizes — the art is kept, not reduced
 
-A tile is **{tile}x{tile}**. On a ChatGPT sheet it is drawn at **{scale}x**, so one slot is
-**{slot}x{slot}** and a `4x3` stamp is a `{stamp_w}x{stamp_h}` slot. Every art pixel on a sheet is a
-{scale}x{scale} block aligned to the slot; the cut takes the mode colour of each block, so nothing is
-averaged and the hard edges survive.
+A tile is **{tile}x{tile}** as a unit of map design: that is what a cell of a `.tmap` means. The art
+is another matter. A sheet draws a tile at **{scale}x**, so one slot is **{slot}x{slot}** and a `4x3`
+stamp is a `{stamp_w}x{stamp_h}` slot — and the atlas keeps it at exactly that size, **{cell} px a
+cell**. The cut used to mode-snap each {scale}x{scale} block down to one art pixel; the owner compared
+the returns with the result and preferred the art as drawn, so nothing is thrown away here any more.
+`--snap32` still produces the old reading, into `atlas32.png` beside the atlas.
+
+What the cut does to a slot, in order:
+
+1. **Localise.** A return is never an exact scale of the template — it comes back at about 1.5
+   megapixels whatever was asked for, and the model redraws each white slot border a few pixels, or
+   a few tens of pixels, off. Every side is searched for the border that was actually drawn and the
+   art starts just inside it, past its anti-aliased skirt. Without this a sliver of white border is
+   cut into the tile: thin white lines all over the atlas, and a seam metric reading the white row.
+2. **Resample** the art area to exactly `cells x {cell}` — area-average going down, bilinear going
+   up. Never nearest: at a non-integer ratio nearest drops whole columns and tears straight edges.
+3. **Key** the magenta by its cast, on a keyed entry only. Alpha stays **soft** — the engine filters
+   linearly — and the colour is un-matted at that alpha so no pink shows through the edge. An opaque
+   ground tile is never keyed; background showing inside one is a hole and is filled from the nearest
+   painted pixel.
+4. **Scrub** what is left of the border: a near-white edge run, or a near-white edge pixel with no
+   bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
+5. **Extrude** the silhouette two pixels outward under the transparency, so linear sampling at the
+   edge of a sprite never pulls in black or magenta.
 
 ## Sheets — as few generations as possible
 
@@ -3933,15 +4263,17 @@ is not a straight line.
 `corner_in` is exactly the inverse of `corner_out` rotated 180 degrees, which is why three tiles cover
 a terrain instead of the forty-seven a full autotile needs.
 
-Alpha in a fringe is **hard**: the cut thresholds it at 0.5 and writes 0 or 255, because the engine
-alpha-tests rather than blends.
+Alpha in a fringe is **soft** and the colour under it is clean, because the engine filters the atlas
+linearly rather than alpha-testing. The silhouette is extruded outward so there is no dark or pink
+halo at a fringe's ragged boundary.
 """
 
 
 def write_tilesets_readme():
     TILESETS.mkdir(parents=True, exist_ok=True)
     (TILESETS / "README.md").write_text(TILESETS_README.format(
-        cols=ATLAS_COLS, tile=TSET_TILE, scale=TSET_SCALE, slot=TSET_SLOT, depth=FRINGE_DEPTH,
+        cols=ATLAS_COLS, tile=TSET_TILE, cell=ATLAS_CELL, scale=TSET_SCALE, slot=TSET_SLOT,
+        depth=FRINGE_DEPTH,
         stamp_w=4 * TSET_SLOT, stamp_h=3 * TSET_SLOT))
 
 
@@ -4049,34 +4381,27 @@ def seam_error(px, w, h):
     return hz, vt
 
 
-def heal_seams(px, w, h):
-    """A 2-px cross-blend at the wrap, so the last column reads as the neighbour of the first.
+def heal_seams(px, w, h, width=2):
+    """A cross-blend `width` pixels deep at the wrap, so a tile's last row reads as its own first.
 
-    The outer ring is averaged outright (the two pixels that actually sit next to each other in a
-    tiled field), the ring inside it is pulled a quarter of the way. Then the result is snapped back
-    onto the colours that were already in the tile, so the palette does not grow a blended tint."""
-    pal = {bytes(px[y][x * 4:x * 4 + 3]) for y in range(h) for x in range(w) if px[y][x * 4 + 3]}
-
-    def near(c):
-        return min(pal, key=lambda p: sum((a - b) ** 2 for a, b in zip(p, c))) if pal else bytes(c)
-
+    The outermost ring is averaged outright (the two pixels that actually sit next to each other in a
+    tiled field); each ring inside it is pulled towards that average by a share that falls off to
+    nothing, so the repair fades into the art instead of ending in a line of its own."""
     def blend(a, b, t):
-        return [int(round(a[i] * (1 - t) + b[i] * t)) for i in range(3)]
+        return bytes(int(round(a[i] * (1 - t) + b[i] * t)) for i in range(3))
 
     for y in range(h):
-        l0, r0 = px[y][0:3], px[y][(w - 1) * 4:(w - 1) * 4 + 3]
-        mid = blend(l0, r0, 0.5)
-        px[y][0:3], px[y][(w - 1) * 4:(w - 1) * 4 + 3] = near(mid), near(mid)
-        if w > 3:
-            px[y][4:7] = near(blend(px[y][4:7], mid, 0.25))
-            px[y][(w - 2) * 4:(w - 2) * 4 + 3] = near(blend(px[y][(w - 2) * 4:(w - 2) * 4 + 3], mid, 0.25))
+        mid = blend(px[y][0:3], px[y][(w - 1) * 4:(w - 1) * 4 + 3], 0.5)
+        for k in range(min(width, w // 2)):
+            t = 1.0 if k == 0 else 0.5 * (1 - k / width)
+            for x in (k, w - 1 - k):
+                px[y][x * 4:x * 4 + 3] = blend(px[y][x * 4:x * 4 + 3], mid, t)
     for x in range(w):
-        t0, b0 = px[0][x * 4:x * 4 + 3], px[h - 1][x * 4:x * 4 + 3]
-        mid = blend(t0, b0, 0.5)
-        px[0][x * 4:x * 4 + 3], px[h - 1][x * 4:x * 4 + 3] = near(mid), near(mid)
-        if h > 3:
-            px[1][x * 4:x * 4 + 3] = near(blend(px[1][x * 4:x * 4 + 3], mid, 0.25))
-            px[h - 2][x * 4:x * 4 + 3] = near(blend(px[h - 2][x * 4:x * 4 + 3], mid, 0.25))
+        mid = blend(px[0][x * 4:x * 4 + 3], px[h - 1][x * 4:x * 4 + 3], 0.5)
+        for k in range(min(width, h // 2)):
+            t = 1.0 if k == 0 else 0.5 * (1 - k / width)
+            for y in (k, h - 1 - k):
+                px[y][x * 4:x * 4 + 3] = blend(px[y][x * 4:x * 4 + 3], mid, t)
     return px
 
 
@@ -4131,31 +4456,34 @@ def apply_palette(tiles, n):
     return len(counts), len(pal)
 
 
-def load_atlas(setname, need_rows):
-    """The atlas as RGBA rows, grown to need_rows tiles tall. Existing cells are never touched."""
-    p, W = atlas_path(setname), ATLAS_COLS * TSET_TILE
+def load_atlas(setname, need_rows, cell=None):
+    """The atlas as RGBA rows, grown to need_rows cells tall. Existing cells are never touched."""
+    cell = cell or ATLAS_CELL
+    p = atlas_path(setname) if cell == ATLAS_CELL else atlas_path(setname).with_name("atlas32.png")
+    W = ATLAS_COLS * cell
     rows = []
     if p.exists():
         w, h, ch, px = read_png(p)
         if w != W:
             die(f"{p.relative_to(ROOT.parent)} is {w}px wide, expected {W} "
-                f"({ATLAS_COLS} columns of {TSET_TILE}). Delete it and recut every sheet.")
+                f"({ATLAS_COLS} columns of {cell}). Delete it and recut every sheet.")
         rows = to_rgba(px, w, h, ch)
-    while len(rows) < need_rows * TSET_TILE:
+    while len(rows) < need_rows * cell:
         rows.append(bytearray(W * 4))
     return rows
 
 
-def place_in_atlas(atlas, index, px, cw, chh):
-    """Write one entry's tiles into its own cells, and nobody else's."""
+def place_in_atlas(atlas, index, px, cw, chh, cell=None):
+    """Write one entry's cells into its own place in the atlas, and nobody else's."""
+    cell = cell or ATLAS_CELL
     for r in range(chh):
         for c in range(cw):
-            cell = index + ATLAS_COLS * r + c
-            ax, ay = (cell % ATLAS_COLS) * TSET_TILE, (cell // ATLAS_COLS) * TSET_TILE
-            for y in range(TSET_TILE):
-                sy = r * TSET_TILE + y
-                atlas[ay + y][ax * 4:(ax + TSET_TILE) * 4] = \
-                    px[sy][c * TSET_TILE * 4:(c + 1) * TSET_TILE * 4]
+            n = index + ATLAS_COLS * r + c
+            ax, ay = (n % ATLAS_COLS) * cell, (n // ATLAS_COLS) * cell
+            for y in range(cell):
+                sy = r * cell + y
+                atlas[ay + y][ax * 4:(ax + cell) * 4] = \
+                    px[sy][c * cell * 4:(c + 1) * cell * 4]
 
 
 def write_atlas_json(setname, entries):
@@ -4164,7 +4492,7 @@ def write_atlas_json(setname, entries):
     top = max((e["index"] or 0) + ATLAS_COLS * (e["cells"][1] - 1) + e["cells"][0] - 1
               for e in entries.values())
     (d / ATLAS_JSON).write_text(json.dumps({
-        "set": setname, "tile": TSET_TILE, "cols": ATLAS_COLS,
+        "set": setname, "tile": TSET_TILE, "cell": ATLAS_CELL, "cols": ATLAS_COLS,
         "rows": top // ATLAS_COLS + 1,
         "note": "generated by story_prompt.py tileset; tiles.md is the source of truth",
         "tiles": {i: {"index": e["index"], "w": e["w"], "h": e["h"], "frames": e["frames"],
@@ -4180,6 +4508,9 @@ def exact_inner(slot, sx, sy, w, h):
     that: the art area is exactly TSET_SCALE times the tile, and shaving two pixels would put every
     4x4 art block half a pixel out of step with the grid the cut reads it back on. The border is
     drawn outside the art area instead, so there is nothing to shave."""
+    if slot.get("_art"):                                 # localised against the border really drawn
+        x0, y0, x1, y1 = slot["_art"]
+        return x0, y0, x1 - x0, y1 - y0
     ix, iy, iw, ih = slot["inner"]
     x0, y0 = int(round(ix * sx)), int(round(iy * sy))
     x1, y1 = int(round((ix + iw) * sx)), int(round((iy + ih) * sy))
@@ -4231,8 +4562,39 @@ def fill_ground_magenta(px, w, h):
     return n, inner
 
 
-def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False):
-    """A returned tile sheet: snap to the art-pixel grid, key, harden, pack into the atlas.
+def snap32(px, w, h):
+    """The old 32-px tile: the mode colour of each 4x4 art block of the full-resolution one.
+
+    Kept behind --snap32 so the pixel-art reading of a sheet can still be produced and compared; the
+    atlas the game ships is the full-resolution one."""
+    k = ATLAS_CELL // TSET_TILE
+    ow, oh = w // k, h // k
+    out = []
+    for y in range(oh):
+        dst = bytearray(ow * 4)
+        for x in range(ow):
+            counts, best, bn = {}, None, 0
+            for yy in range(y * k, y * k + k):
+                for xx in range(x * k, x * k + k):
+                    q = bytes(px[yy][xx * 4:xx * 4 + 4])
+                    n = counts.get(q, 0) + 1
+                    counts[q] = n
+                    if n > bn:
+                        best, bn = q, n
+            dst[x * 4:x * 4 + 4] = best
+        out.append(dst)
+    return out
+
+
+def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False, snap=False):
+    """A returned tile sheet: localise, resample onto the atlas grid, key, pack into the atlas.
+
+    Nothing is thrown away here. The sheet is drawn at TSET_SCALE and the atlas keeps it at that
+    scale, so a slot's art is resampled to exactly its cells x ATLAS_CELL and no further: the owner
+    compared the returns with the old mode-snapped 32-px cut and preferred the art as drawn. The
+    keying therefore leaves alpha SOFT (the engine filters linearly), un-mattes the edge colour so no
+    pink shows through it, and the silhouette is extruded outward so linear sampling has clean colour
+    to pull from.
 
     A sheet carries one background colour but its entries are not all of one kind: a terrain sheet
     holds opaque ground tiles AND keyed fringes over the same magenta. So the keying is decided per
@@ -4240,41 +4602,47 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False):
     setname = data["set"]
     entries = tileset_entries(setname)
     keyed_bg = list(data.get("background") or MAGENTA) == list(MAGENTA)
-    cut, lines = [], []
+    ring = max(1, EXTRUDE_PX * 2)                        # the border residue at ATLAS_CELL, in pixels
+    cut, lines, scrubbed = [], [], 0
     for s in slots:
         x, y, bw, bh = exact_inner(s, sx, sy, w, h)
         cw, chh = s["cells"]
-        tw, th = cw * TSET_TILE, chh * TSET_TILE
-        small = mode_region(rows, ch, x, y, bw, bh, tw, th)
+        tw, th = cw * ATLAS_CELL, chh * ATLAS_CELL
+        art = resample(crop(rows, ch, x, y, bw, bh), bw, bh, ch, tw, th)
         if s["opaque"]:
-            px = to_rgba(small, tw, th, ch)
+            px = to_rgba(art, tw, th, ch)
             for r in px:
                 for i in range(3, len(r), 4):
                     r[i] = 255
-            if keyed_bg:                                 # ground on a magenta sheet: never keyed
+            scrubbed += scrub_border(px, tw, th, 4, False, ring)
+            if keyed_bg:                               # ground on a magenta sheet: never keyed
                 holes, inner = fill_ground_magenta(px, tw, th)
-                if inner:
+                if inner > tw:                         # a ring's worth is the border, not a hole
                     LOUD.append(f"{s['id']} is an opaque ground tile but came back with {holes} "
                                 f"background-coloured pixel(s) in it ({100 * holes // (tw * th)}%); "
                                 f"they were filled from the nearest painted pixel. Ask for that slot "
                                 f"again, painted edge to edge, if it shows.")
                     print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
         else:
-            px = key_magenta(small, tw, th, ch)
-            harden_alpha(px, tw, th)
+            px = key_magenta(art, tw, th, ch)
+            scrubbed += scrub_border(px, tw, th, 4, True, ring)
+            extrude_edges(px, tw, th)
         cut.append((px, tw, th, s))
+    if scrubbed:
+        print(f"  border scrub: {scrubbed} white edge-run pixel(s) removed")
     if palette:
         was, now = apply_palette(cut, palette)
         print(f"  palette: {was} colours -> {now}")
 
     atlas_rows = max((s["index"] + ATLAS_COLS * (s["cells"][1] - 1)) // ATLAS_COLS + 1 for s in slots)
     atlas = load_atlas(setname, atlas_rows)
+    small = load_atlas(setname, atlas_rows, ATLAS_CELL) if snap else None
     for px, tw, th, s in cut:
         cw, chh = s["cells"]
         note = ""
         if s["opaque"] and cw == chh == 1:
             if heal:
-                heal_seams(px, tw, th)
+                heal_seams(px, tw, th, ATLAS_CELL // TSET_TILE * 2)
             hz, vt = seam_error(px, tw, th)
             note = f"  seam h{hz:.0f}/v{vt:.0f}"
             if max(hz, vt) > SEAM_WARN:
@@ -4291,22 +4659,29 @@ def cut_tileset(data, slots, rows, w, h, ch, sx, sy, palette=0, heal=False):
                             f"painted over, so the game will draw a solid rectangle.")
                 print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
         place_in_atlas(atlas, s["index"], px, cw, chh)
-        lines.append(f"  slot {s['n']} {s['id']}: index {s['index']}, {cw}x{chh} tile(s){note}")
+        if small is not None:
+            place_in_atlas(small, s["index"], snap32(px, tw, th), cw, chh, TSET_TILE)
+        lines.append(f"  slot {s['n']} {s['id']}: index {s['index']}, {cw}x{chh} cell(s) "
+                     f"at {tw}x{th}{note}")
 
     ap = atlas_path(setname)
     ap.parent.mkdir(parents=True, exist_ok=True)
-    write_png(ap, ATLAS_COLS * TSET_TILE, len(atlas), 4, atlas)
+    write_png(ap, ATLAS_COLS * ATLAS_CELL, len(atlas), 4, atlas)
     strip = write_cut_sheet(setname, data["sheet"], cut)
     for l in lines:
         print(l)
-    print(f"  -> {ap.relative_to(ROOT.parent)}  {ATLAS_COLS * TSET_TILE}x{len(atlas)} "
+    print(f"  -> {ap.relative_to(ROOT.parent)}  {ATLAS_COLS * ATLAS_CELL}x{len(atlas)} "
           f"({len(slots)} entries placed), {strip.relative_to(ROOT.parent)}")
+    if small is not None:
+        sp = ap.with_name("atlas32.png")
+        write_png(sp, ATLAS_COLS * TSET_TILE, len(small), 4, small)
+        print(f"  -> {sp.relative_to(ROOT.parent)}  {ATLAS_COLS * TSET_TILE}x{len(small)} (--snap32)")
     write_atlas_json(setname, entries)
 
 
 def write_cut_sheet(setname, sheet, cut):
     """Every tile this sheet produced, laid out at 1:1 — the receipt the package's status reads."""
-    MAXW = ATLAS_COLS * TSET_TILE
+    MAXW = ATLAS_COLS * ATLAS_CELL
     lanes, x, lane = [[]], 0, 0
     for px, tw, th, s in cut:
         if x and x + tw > MAXW:
@@ -4314,7 +4689,7 @@ def write_cut_sheet(setname, sheet, cut):
             lane, x = lane + 1, 0
         lanes[lane].append((px, x, tw, th))
         x += tw
-    W = max((t[1] + t[2] for L in lanes for t in L), default=TSET_TILE)
+    W = max((t[1] + t[2] for L in lanes for t in L), default=ATLAS_CELL)
     out = []
     for L in lanes:
         if not L:
@@ -4547,7 +4922,12 @@ def preview_tmap(mp):
     atlas, arows = None, 0
     if atlas_path(setname).exists():
         aw, ah, ach, apx = read_png(atlas_path(setname))
-        atlas, arows = to_rgba(apx, aw, ah, ach), ah
+        apx = to_rgba(apx, aw, ah, ach)
+        if aw != ATLAS_COLS * TSET_TILE:               # the shipped atlas is at ATLAS_CELL; the
+            k = ATLAS_COLS * TSET_TILE                 # preview is a map at 32 px a cell
+            ah = max(1, round(ah * k / aw))
+            apx, aw = resize_box(apx, aw, len(apx), 4, k, ah), k
+        atlas, arows = apx, ah
 
     def blit(index, cw, chh, px, py):
         if px + cw * TSET_TILE > W or py + chh * TSET_TILE > H:
@@ -5096,7 +5476,7 @@ def comp_box(comp, w):
     return min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
 
 
-def reachable_walk(g, w, h, spawn, declared, report):
+def reachable_walk(g, w, h, spawn, declared, report, debug=False):
     """Only the ground the player can actually stand on: their own island, plus the ways out.
 
     The first real mask painted green on aqueduct arches on the skyline, on windows, on the inside of
@@ -5132,15 +5512,25 @@ def reachable_walk(g, w, h, spawn, declared, report):
     for n, comp in enumerate(comps):
         if len(comp) >= NAV_MIN_AREA and edge_of[n] & set(declared):
             keep.add(n)
+    dropped = []
     for n, comp in enumerate(comps):
         if n in keep:
             continue
         for i in comp:
             g[i] = 0
         if len(comp) >= NAV_MIN_AREA:
+            dropped.append(comp)
+    # One line per island is dozens of lines on a painted screen and says nothing the summary does
+    # not; the detail is there under --debug when an island is actually being hunted.
+    if dropped and debug:
+        for comp in dropped:
             x, y, bw, bh = comp_box(comp, w)
             report.append(f"dropped an unreachable walkable island of {len(comp)} px at "
                           f"{x},{y} {bw}x{bh} (nothing connects it to the ground the player stands on)")
+    elif dropped:
+        report.append(f"dropped {len(dropped)} unreachable walkable island(s), "
+                      f"{sum(len(c) for c in dropped)} px in all (nothing connects them to the ground "
+                      f"the player stands on); rerun with --debug for each one's box")
     return g, sorted(keep)
 
 
@@ -5685,7 +6075,7 @@ def cut_screen(data, folder, debug=False):
     walk = morph(walk, W, H, opening=WALK_OPEN, closing=WALK_CLOSE)
     filled = fill_pinholes(walk, W, H)
     print(f"  cleaned: open {WALK_OPEN}, close {WALK_CLOSE}, {filled} pinhole(s) filled -> {sum(walk)} px")
-    walk, kept = reachable_walk(walk, W, H, data.get("spawn"), data.get("exits") or {}, report)
+    walk, kept = reachable_walk(walk, W, H, data.get("spawn"), data.get("exits") or {}, report, debug)
     print(f"  reachable: {sum(walk)} px in {len(kept)} island(s)")
     if not sum(walk):
         die("nothing walkable survived the cleaning: the green was all outlines and unreachable "

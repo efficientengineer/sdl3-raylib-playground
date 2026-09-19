@@ -34,9 +34,9 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
 | `barrel` | prop | 64x64 | `story/packages/ch01/halm/props` | yes, 58x61 |
-| `bedroll` | prop | 128x64 | `props_bedroll-campfire-ridge_rock` | yes, 120x59 |
+| `bedroll` | prop | 128x64 | `props_bedroll-campfire-ridge_rock` | yes, 113x55 |
 | `bridge_rail` | prop | 128x64 | `props_bridge_rail` | yes, 128x51 |
-| `campfire` | prop | 64x64 | `props_bedroll-campfire-ridge_rock` | yes, 64x64 |
+| `campfire` | prop | 64x64 | `props_bedroll-campfire-ridge_rock` | yes, 64x57 |
 | `cart` | prop | 128x128 | `story/packages/ch01/halm/props` | yes, 127x128 |
 | `cave_mouth` | prop | 192x128 | `props_cave_mouth-slide_rubble` | yes, 192x123 |
 | `culvert` | prop | 192x128 | `props_culvert-milestone` | yes, 182x122 |
@@ -45,31 +45,31 @@ yet. Sizes are the target the pipeline writes; the last column is what is actual
 | `guild_hall` | prop | 256x192 | `props_barrel-cart-fence-plus10` | yes, 255x186 |
 | `house_a` | prop | 192x192 | `props_barrel-cart-fence-plus10` | yes, 177x185 |
 | `house_b` | prop | 128x192 | `props_barrel-cart-fence-plus10` | yes, 116x193 |
-| `milestone` | prop | 64x64 | `props_culvert-milestone` | yes, 35x54 |
+| `milestone` | prop | 64x64 | `props_culvert-milestone` | yes, 49x64 |
 | `practice_post` | prop | 64x128 | `props_practice_post` | yes, 54x118 |
-| `ridge_rock` | prop | 192x128 | `props_bedroll-campfire-ridge_rock` | yes, 192x127 |
-| `rubbing_stall` | prop | 128x128 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 127x127 |
+| `ridge_rock` | prop | 192x128 | `props_bedroll-campfire-ridge_rock` | yes, 184x115 |
+| `rubbing_stall` | prop | 128x128 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 126x127 |
 | `scale_bench` | prop | 128x64 | `story/packages/ch01/halm/props` | yes, 117x60 |
-| `shrine_house` | prop | 192x128 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 183x127 |
+| `shrine_house` | prop | 192x128 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 188x126 |
 | `sign` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 54x116 |
-| `sitter` | prop | 64x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 57x63 |
+| `sitter` | prop | 64x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 56x62 |
 | `slide_rubble` | prop | 192x128 | `props_cave_mouth-slide_rubble` | yes, 192x127 |
-| `step_rope` | prop | 64x192 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 20x199 |
-| `stone_shelf` | prop | 256x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 245x58 |
+| `step_rope` | prop | 64x192 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 20x194 |
+| `stone_shelf` | prop | 256x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 249x59 |
 | `tree_a` | prop | 128x192 | `story/packages/ch01/halm/props` | yes, 127x186 |
 | `tree_b` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 53x136 |
-| `water_jar` | prop | 64x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 48x58 |
+| `water_jar` | prop | 64x64 | `props_rubbing_stall-shrine_house-sitter-plus3` | yes, 47x57 |
 | `well` | prop | 64x128 | `story/packages/ch01/halm/props` | yes, 62x122 |
 | `yard_wall` | prop | 192x128 | `story/packages/ch01/halm/props` | yes, 186x97 |
 
-## Walkers — alpha, 4 rows (S, W, E, N) x 4 columns of 32x48 frames
+## Walkers — alpha, 4 rows (S, W, E, N) x 4 columns of 256x384 frames
 
 | id | kind | target | package | file |
 | --- | --- | --- | --- | --- |
-| `falke` | walker | 128x192 | `walker_falke` | yes, 128x192 |
-| `ottilie` | walker | 128x192 | `walker_ottilie` | yes, 128x192 |
-| `villager_a` | walker | 128x192 | `walker_villager_a` | yes, 128x192 |
-| `villager_b` | walker | 128x192 | `walker_villager_b` | yes, 128x192 |
+| `falke` | walker | 1024x1536 | `walker_falke` | yes, 1024x1536 |
+| `ottilie` | walker | 1024x1536 | `walker_ottilie` | yes, 1024x1536 |
+| `villager_a` | walker | 1024x1536 | `walker_villager_a` | yes, 1024x1536 |
+| `villager_b` | walker | 1024x1536 | `walker_villager_b` | yes, 1024x1536 |
 
 ## Buildings — opaque faces on map geometry: front stretched once across the front wall, side and roof seamless
 

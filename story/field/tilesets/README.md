@@ -11,19 +11,42 @@ file is the part the art pipeline fixes so the engine can match it.
   `- desc:`. The art pipeline never changes a name, a size or a solid row. The one thing it writes
   back is a `- index:` line for an entry that has none, so the atlas position is recorded in the file
   the engine reads. An index already written is never moved.
-- `atlas.png` — 16 tiles across, 32x32 each, RGBA. Index 0 is the empty tile. A stamp of
+- `atlas.png` — 16 cells across, **128x128 each**, RGBA. Index 0 is the empty tile. A stamp of
   `WxH` occupies a `WxH` rectangle of cells whose top-left is its index, row-major, and never wraps
   past the last column. A tile with `- frames: n` occupies `n` copies side by side starting at its
   index.
-- `atlas.json` — the same thing for humans and for tools: name to index, size and frame count.
+- `atlas.json` — the same thing for humans and for tools: name to index, size and frame count. Its
+  `cell` field is the atlas cell size in pixels; read it rather than assuming one.
+- `atlas32.png` — only when a sheet was cut with `--snap32`: the same atlas mode-snapped down to
+  32x32 a cell, for comparing against the pixel-art reading of a sheet. Not shipped.
 - `cut/<sheet>.png` — what one returned sheet cut down to, kept so a sheet can be eyeballed.
 
-## Sizes
+## Sizes — the art is kept, not reduced
 
-A tile is **32x32**. On a ChatGPT sheet it is drawn at **4x**, so one slot is
-**128x128** and a `4x3` stamp is a `512x384` slot. Every art pixel on a sheet is a
-4x4 block aligned to the slot; the cut takes the mode colour of each block, so nothing is
-averaged and the hard edges survive.
+A tile is **32x32** as a unit of map design: that is what a cell of a `.tmap` means. The art
+is another matter. A sheet draws a tile at **4x**, so one slot is **128x128** and a `4x3`
+stamp is a `512x384` slot — and the atlas keeps it at exactly that size, **128 px a
+cell**. The cut used to mode-snap each 4x4 block down to one art pixel; the owner compared
+the returns with the result and preferred the art as drawn, so nothing is thrown away here any more.
+`--snap32` still produces the old reading, into `atlas32.png` beside the atlas.
+
+What the cut does to a slot, in order:
+
+1. **Localise.** A return is never an exact scale of the template — it comes back at about 1.5
+   megapixels whatever was asked for, and the model redraws each white slot border a few pixels, or
+   a few tens of pixels, off. Every side is searched for the border that was actually drawn and the
+   art starts just inside it, past its anti-aliased skirt. Without this a sliver of white border is
+   cut into the tile: thin white lines all over the atlas, and a seam metric reading the white row.
+2. **Resample** the art area to exactly `cells x 128` — area-average going down, bilinear going
+   up. Never nearest: at a non-integer ratio nearest drops whole columns and tears straight edges.
+3. **Key** the magenta by its cast, on a keyed entry only. Alpha stays **soft** — the engine filters
+   linearly — and the colour is un-matted at that alpha so no pink shows through the edge. An opaque
+   ground tile is never keyed; background showing inside one is a hole and is filled from the nearest
+   painted pixel.
+4. **Scrub** what is left of the border: a near-white edge run, or a near-white edge pixel with no
+   bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
+5. **Extrude** the silhouette two pixels outward under the transparency, so linear sampling at the
+   edge of a sprite never pulls in black or magenta.
 
 ## Sheets — as few generations as possible
 
@@ -65,5 +88,6 @@ is not a straight line.
 `corner_in` is exactly the inverse of `corner_out` rotated 180 degrees, which is why three tiles cover
 a terrain instead of the forty-seven a full autotile needs.
 
-Alpha in a fringe is **hard**: the cut thresholds it at 0.5 and writes 0 or 255, because the engine
-alpha-tests rather than blends.
+Alpha in a fringe is **soft** and the colour under it is clean, because the engine filters the atlas
+linearly rather than alpha-testing. The silhouette is extruded outward so there is no dark or pink
+halo at a fringe's ragged boundary.

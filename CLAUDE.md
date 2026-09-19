@@ -460,11 +460,26 @@ leave the background untouched, no text.
   Falke was Bron) belongs on an `- alias:` line of the existing entry — never rename a handle — and
   the sprite is written under the name you typed. `story/field/walkers.md` is only for NPCs with no
   cast entry at all (the clerk, the villagers walking out of Halm).
-- **Cutting needs no border detection**, because the tool made the boxes: `cut <sheet.json> <image>`
-  scales them if ChatGPT returned a smaller image (it caps at ~1.5 MP), crops inside each border, keys
-  the magenta to alpha with a soft fringe, and writes 64x64 tiles, props trimmed and scaled back to
-  64 px per cell, one 128x192 walker sheet (rows S, W, E, N; columns stand, step-left, stand,
-  step-right), and building faces resized to the contract sizes with any alpha dropped. `slice`
+- **Cutting knows where the boxes should be, and then finds where they actually are.** The tool made
+  the template, so `cut <sheet.json> <image>` starts from the scaled slot boxes — but a return is
+  never an exact scale of the template (it caps at ~1.5 MP, and the model redraws each white border a
+  few px, sometimes a few tens of px, off), so each side of each slot is **localised**: the white
+  border line is hunted within 12% of the slot's size either way, the innermost candidate wins (a
+  neighbour's border across the gutter can therefore never be picked), and the art starts just inside
+  it, past its anti-aliased skirt. A side with no border found falls back to the scaled edge inset by
+  2 px and says so once per sheet. After cutting, a **border scrub** removes what is left: a
+  near-white edge run of 60% of an edge's length, or a near-white edge pixel with nothing bright
+  behind it — edges only, never the interior, so white headbands, flowers, plaster and water foam are
+  safe. Skipping this put thin white lines through most of the valley atlas and made `grass` report a
+  seam of 159. The cut then keys the magenta to alpha with a soft fringe, and writes 64x64 tiles,
+  props trimmed and scaled back to 64 px per cell, one **1024x1536 walker sheet** (16 frames of
+  **256x384**; rows S, W, E, N; columns stand, step-left, stand, step-right), and building faces
+  resized to the contract sizes with any alpha dropped. A walker is **anchored**, not merely cut:
+  ChatGPT draws each pose where it likes in its slot, so every frame is centred horizontally on its
+  own silhouette and each direction takes **one** vertical offset, measured from its two stand frames
+  (feet 8 px above the frame's bottom) and applied to all four, so a step may still lift a foot
+  without the body hopping. The frame size is the sheet divided by four; the engine reads it from
+  there. The art is no longer squeezed down to the 32x48 design — that turned careful work to mush. `slice`
   redirects to it when the JSON is a template package. Nothing is written if the image is the wrong
   shape, or if its margins are not the template's background colour — that is what a file from the
   wrong package looks like.
@@ -495,8 +510,9 @@ leave the background untouched, no text.
   more screen navmesh."*). `TILES.md` is the contract; **Screens and the 3D/painted-view field are
   parked** — the code stays, nothing new is built on them.
   A **tileset** is `story/field/tilesets/<set>/`: `tiles.md` (**the engine's file** — one `## <id>` per
-  tile or stamp with `- index:`, `- layer:`, `- solid:`, `- desc:`), `atlas.png` (16 columns of 32x32
-  tiles, index 0 empty), `atlas.json` and `cut/<sheet>.png`. The art pipeline never renames an entry,
+  tile or stamp with `- index:`, `- layer:`, `- solid:`, `- desc:`), `atlas.png` (16 columns of **128x128
+  cells**, index 0 empty), `atlas.json` (its `cell` field is the cell size — read it, don't assume)
+  and `cut/<sheet>.png`. The art pipeline never renames an entry,
   never changes a size or a solid row, and **never moves an index that is already written**; the one
   thing it writes back into `tiles.md` is a `- index:` line for an entry that has none.
   `./story_prompt.py tileset <set>` groups the entries into **as few sheets as it can** and writes one
@@ -514,17 +530,22 @@ leave the background untouched, no text.
   paragraph — is that every art pixel must be a 4x4 block aligned to the slot. The prompt lists the
   slots grouped by kind (ground / fringe / stamp) with each one's size in tiles and the rules for that
   kind restated. A drawn sheet is frozen; new ids go to a fresh `<sheet>_2`.
-  `ingest` cuts the return by taking each art pixel's **mode colour** over its exact region in the
-  returned image — never an average, and never a resize first, because the sheet comes back at
-  about 1.5 MP whatever was asked for and a non-integer resize puts the blocks half a pixel out of
-  step. Keying is decided **per entry, never per sheet** (a terrain sheet holds opaque ground and
+  `ingest` **keeps the art at the scale it was drawn**: a slot is localised (see the cut above),
+  resampled to exactly `cells x 128` — area-average going down, bilinear going up, never nearest —
+  and that is the atlas cell. The cut used to mode-snap each 4x4 block down to one 32-px art pixel;
+  the owner compared the returns with the result and preferred the art as drawn, so nothing is thrown
+  away any more. `--snap32` still writes the old reading to `atlas32.png` beside the atlas, for
+  comparison; it is not shipped. Keying is decided **per entry, never per sheet** (a terrain sheet holds opaque ground and
   keyed fringes over the same magenta): magenta is keyed on anything that is not opaque ground, and a
   ground tile that comes back with background showing through has those pixels filled from the nearest
   painted one — silently in the outermost ring, where it is only what a non-integer return does to a
-  slot edge, and loudly anywhere further in. The alpha is **hard-thresholded at 0.5** (a tile is on or off; the engine alpha-tests), and each entry is packed into `atlas.png` at
+  slot edge, and loudly anywhere further in. The alpha stays **soft** — the engine filters the atlas
+  linearly rather than alpha-testing — the colour is un-matted at that alpha so no pink shows through,
+  and the silhouette is **extruded 2 px outward** under the transparency so linear sampling at a
+  sprite's edge never pulls in black or magenta. Each entry is packed into `atlas.png` at
   its own index without disturbing a cell that belongs to anything else. Ground tiles get a **seam
   check** — the mean colour difference across the wrap, warned above 24 — with `--heal-seams` to
-  cross-blend two pixels at the edges, and `--palette N` to quantise a whole sheet by median cut.
+  cross-blend 8 px at the edges, and `--palette N` to quantise a whole sheet by median cut.
   On a synthetic sheet a 1:1 return cuts back **pixel-exact**, and an 0.82x return to a mean absolute
   error of 0.1/255.
   **The fringe convention is fixed here and the engine rotates it** (written out in full in
