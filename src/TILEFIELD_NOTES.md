@@ -159,6 +159,9 @@ NPCs carry their own `parity`.
 - **The atlas region is a vertex attribute** and the shader clamps its four taps to it. That REPLACED
   the half-texel UV inset for the indexed path: the inset moved the sample point, the clamp makes
   reaching into the neighbouring cell impossible.
+- **The colormap is v2** (256x256 RGBA, index 0 already clear, eight tables at the `row0`s
+  `colormap.json` gives). The loader never computes a row from `table_index * 32`, takes the pool
+  table from `"point_light_table"` (`lamp`), and logs loudly if index 0 ever comes back opaque.
 - **Palette cycling** comes from `story/palette/cycles.md` (`water: 115 116 117 118 @ 6`) and is a
   `glTexSubImage2D` of those columns across every colormap row, once per cycle step.
 - **Dev row**: a button per table (day/dusk/night/flash/poison/stone), an ambient slider, a lantern
@@ -194,6 +197,25 @@ Three changes make that permanent:
 
 After all three, with the indexed art: **APK 12 MB, assets 5.7 MB, `files/` 112 KB on a fresh
 install** (6.3 MB once `fast_reload.sh` has pushed the working copies of the art).
+
+## The dialogue box (`src/dialogue.h`), shared with the cutscene player
+
+One header, two users: `star_logic.cpp`'s cutscene box and this file's field message box.
+
+- **Pagination.** A line longer than the box is split into pages at word boundaries, preferring a
+  sentence end in the last quarter of a page. Before this a long line ran out of the bottom of the box
+  and could not be read at all — the tap went straight to the next line.
+- **The tap ladder**: typing → finish the page; page complete with more pages → turn the page; last
+  page → next line (or clear the field box). The typewriter runs per page.
+- **The marker** blinks in its own corner of the content rect: one white ▼ when the tap moves on, two
+  yellow ▼▼ when this line has more pages, so it is obvious whether a sentence is about to be lost.
+- **The content rect** is the box minus one uniform pad (0.6 of a line) on all four sides. The speaker
+  name sits at the top of it and the text under the name; a box with no name (Narrator, an examine
+  line) centres its text block vertically. The text width also leaves the marker its gutter.
+- The landscape cutscene box is **0.325 of the stage tall** (it was 0.22), which is a name plus three
+  lines at the current text size — the size the real lines actually need.
+- Panel reveal and mood change happen in `star_goto`, i.e. on a line's **first page only**, because
+  turning a page never goes through it. The page index rides the reload blob (`STR9`).
 
 ## Deviations from TILES.md, and why
 

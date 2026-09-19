@@ -19,11 +19,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "stb_image.h"
+#include "stb_image_write.h"   // the dialogue capture; the implementation lives in third_party_impl.c
 
 #include "game_api.h"
 #include "cutscene_data.h"
 #include "field.h"
 #include "tilefield.h"
+#include "dialogue.h"
 
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"   // host.cpp uses the same pref path for reload.flag and the .so
@@ -253,6 +255,11 @@ static Tex tex_load(const char *file) {
         snprintf(path, sizeof(path), "cutscenes/%s", file);
         data = SDL_LoadFile(path, &size);
     }
+    if (!data) {                      // desktop: straight out of the repo, which is what a capture run reads
+        if (!strncmp(file, "portrait_", 9)) snprintf(path, sizeof(path), "story/portraits/%s", file + 9);
+        else snprintf(path, sizeof(path), "story/panels/%s", file);
+        data = SDL_LoadFile(path, &size);
+    }
     if (!data) { SDL_Log("cutscene: %s not found", file); return t; }
     int n = 0;
     unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)size, &t.w, &t.h, &n, 4);
@@ -340,6 +347,7 @@ enum Screen { SCR_TITLE, SCR_INTRO, SCR_END, SCR_FIELD };
 
 struct Star {
     int screen, scene, line;
+    int line_page;                // which page of this line is on screen (long lines paginate)
     float line_t;                 // seconds since this line started
     float fade;                   // 1 = black, 0 = clear
     int fade_to_scene;            // scene to cut to once faded out (-1 = none, CS_INTRO_COUNT = the field)
@@ -364,6 +372,10 @@ struct Star {
     char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
     int cap_tiles;                // 1 = TILE_CAPTURE=<map>:<scale>:<out.png> instead: the tile field
     int cap_state;                // 0 idle, 1 asked, 2 done -> quit
+    char dlg_spec[160];           // DIALOG_CAPTURE=<scene>:<line>[:page][:n|:x], the box on the Mac
+    int dlg_frames;
+    int dlg_as_narr, dlg_no_port, dlg_small;  // capture-only: as a Narrator / no portrait / a short box
+                                   // (the short box is how the paginator and the ▼▼ marker are shown working)
 };
 
 static void star_free_textures(Star *st) {
@@ -443,6 +455,7 @@ static void star_goto(Star *st, int scene, int line, bool instant) {
     st->screen = SCR_INTRO;
     st->scene = scene;
     st->line = line;
+    st->line_page = 0;                     // a new line always starts at its first page
     st->line_t = instant ? 99.0f : 0.0f;
     if (!same_file(st->face_cur, sc->lines[line].portrait)) {              // a new speaker slides in
         st->face_cur = sc->lines[line].portrait;
@@ -497,7 +510,7 @@ static void draw_scene(Star *st, int w, int h, float dt) {
     ImFont *font = ImGui::GetFont();
     const CsScene *sc = &CS_INTRO[st->scene];
     const CsLine *ln = &sc->lines[st->line];
-    bool narr = line_is_narrator(ln);
+    bool narr = line_is_narrator(ln) || st->dlg_as_narr;   // dlg_* are set only by DIALOG_CAPTURE
     bool port = h > w;
     dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
 
@@ -514,8 +527,10 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         sh = h * 0.98f; sw = sh * 1.6f;
         if (sw > w * 0.98f) { sw = w * 0.98f; sh = sw / 1.6f; }
         sx = (w - sw) * 0.5f; sy = (h - sh) * 0.5f;
-        bx0 = sx + sw * 0.04f; bx1 = sx + sw * 0.96f; by0 = sy + sh * 0.765f; by1 = sy + sh * 0.985f;
-        text_size = sh * 0.052f;
+        // The box is deep enough for the speaker name and THREE lines of text; it was 0.22 of the
+        // stage, which fitted exactly one line under the name and paginated every long line to bits.
+        bx0 = sx + sw * 0.04f; bx1 = sx + sw * 0.96f; by0 = sy + sh * (st->dlg_small ? 0.80f : 0.66f); by1 = sy + sh * 0.985f;
+        text_size = sh * 0.047f;
     }
     float u = text_size * 0.12f;
 
@@ -545,28 +560,49 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         }
     }
 
-    // Text. A line waits for its panel to land before typing starts.
+    // Text. A line waits for its panel to land before typing starts. A line longer than the box is
+    // PAGINATED (dialogue.h): the typewriter runs per page, a tap turns the page, and the panel
+    // reveal and the mood change already happened in star_goto — that is, on the line's first page
+    // only, because turning a page never goes through star_goto.
     st->line_t += dt;
     float type_t = st->line_t - (ln->reveal && !sc->narration ? PANEL_IN * 0.8f : 0.0f);
-    int total = (int)strlen(ln->text);
-    int chars = type_t <= 0 ? 0 : (int)(type_t * TYPE_CPS);
-    bool typing = chars < total;
-    if (typing && chars > 0) {
-        static int last_blip = -1;
-        if (chars / 3 != last_blip && ln->text[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, (sc->narration || narr) ? 520.0f : 760.0f, 0.04f, 0.10f); }
-    }
+
     float arrow_x = bx1 - text_size * 1.1f;                                // moves in when a portrait sits on the right
+    float arrow_y = by1 - text_size * 0.95f;
+    bool typing = true, more_pages = false;
+
     if (sc->narration) {
         float a = ease_out(st->line_t / 0.6f);
         float size = text_size * 1.08f, width = (port ? w * 0.84f : w * 0.7f);
-        draw_typed(dl, font, size, ImVec2((w - width) * 0.5f, h * (port ? 0.36f : 0.34f)), width, with_alpha(IM_COL32(222, 226, 240, 255), a), ln->text, chars, true);
+        float top = h * (port ? 0.30f : 0.26f), bot = h * (port ? 0.74f : 0.72f);
+        DlgPages pg;
+        dlg_paginate(font, size, width, dlg_max_lines(bot - top, size), ln->text, &pg);
+        if (st->line_page >= pg.count) st->line_page = pg.count - 1;
+        const char *pb = pg.beg[st->line_page], *pe = pg.end[st->line_page];
+        int total = (int)(pe - pb);
+        int chars = type_t <= 0 ? 0 : (int)(type_t * TYPE_CPS);
+        typing = chars < total;
+        more_pages = st->line_page + 1 < pg.count;
+        float th = dlg_text_height(font, size, width, pb, pe);
+        float ty = top + ((bot - top) - th) * 0.5f;                        // narration centres in its band
+        dlg_draw_text(dl, font, size, ImVec2((w - width) * 0.5f, ty), width,
+                      with_alpha(IM_COL32(222, 226, 240, 255), a), pb, pe, chars, true);
+        arrow_x = (w + width) * 0.5f - size * 0.5f;
+        arrow_y = ty + th + size * 0.2f;
+        if (typing && chars > 0) {
+            static int last_blip = -1;
+            if (chars / 3 != last_blip && pb[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, 520.0f, 0.04f, 0.10f); }
+        }
     } else {
         draw_box(dl, ImVec2(bx0, by0), ImVec2(bx1, by1), u);
-        float pad = text_size * 0.75f;
-        float tx0 = bx0 + pad, tx1 = bx1 - pad;
+        // The content rect: the box minus one uniform pad on ALL FOUR sides. The name sits at its top
+        // and the text under the name. It used to be padded from the top only, which pushed the text
+        // onto the bottom edge with a band of empty blue above it.
+        DlgRect cr = dlg_content(bx0, by0, bx1, by1, text_size);
+        float pad = text_size * DLG_LINE_H * DLG_PAD_LINES;
         // Speaker portrait at one end of the box (Phantasy Star IV field talk), text narrowed to fit.
         // A Narrator line never has one: it is a document, not somebody speaking.
-        const Tex *fa = narr ? nullptr : face_tex(st, ln->portrait);
+        const Tex *fa = (narr || st->dlg_no_port) ? nullptr : face_tex(st, ln->portrait);
         if (fa) {
             st->face_t += dt;
             float inset = u * 2.0f, fh = (by1 - by0) - inset * 2.0f;
@@ -582,25 +618,43 @@ static void draw_scene(Star *st, int w, int h, float dt) {
             dl->AddRect(f0, f1, with_alpha(IM_COL32(225, 225, 235, 255), a), 0, 0, u * 0.7f);
             dl->AddRect(ImVec2(f0.x + u * 0.8f, f0.y + u * 0.8f), ImVec2(f1.x - u * 0.8f, f1.y - u * 0.8f),
                         with_alpha(IM_COL32(90, 100, 150, 255), a), 0, 0, u * 0.35f);
-            if (right) { tx1 = fx - pad * 0.6f; arrow_x = fx - text_size * 0.7f; }
-            else tx0 = fx + fw + pad * 0.6f;
+            if (right) cr.x1 = fx - pad * 0.6f;
+            else cr.x0 = fx + fw + pad * 0.6f;
         }
-        if (narr) {                                                        // no name line, so the text centres instead
-            draw_typed(dl, font, text_size, ImVec2(tx0, by0 + pad), tx1 - tx0, IM_COL32(230, 232, 245, 255), ln->text, chars, true);
+        float name_h = narr ? 0.0f : text_size * DLG_LINE_H;               // the yellow speaker line
+        float gutter = text_size * 1.1f;                                   // the marker's own corner
+        float tw = (cr.x1 - gutter) - cr.x0, th_avail = (cr.y1 - cr.y0) - name_h;
+        DlgPages pg;
+        dlg_paginate(font, text_size, tw, dlg_max_lines(th_avail, text_size), ln->text, &pg);
+        if (st->line_page >= pg.count) st->line_page = pg.count - 1;
+        const char *pb = pg.beg[st->line_page], *pe = pg.end[st->line_page];
+        int total = (int)(pe - pb);
+        int chars = type_t <= 0 ? 0 : (int)(type_t * TYPE_CPS);
+        typing = chars < total;
+        more_pages = st->line_page + 1 < pg.count;
+        if (typing && chars > 0) {
+            static int last_blip = -1;
+            if (chars / 3 != last_blip && pb[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, narr ? 520.0f : 760.0f, 0.04f, 0.10f); }
+        }
+        if (narr) {                                                        // no name line: the block centres
+            float th = dlg_text_height(font, text_size, tw, pb, pe);
+            float ty = cr.y0 + ((cr.y1 - cr.y0) - th) * 0.5f;
+            dlg_draw_text(dl, font, text_size, ImVec2(cr.x0, ty), tw, IM_COL32(230, 232, 245, 255), pb, pe, chars, true);
         } else {
-            dl->AddText(font, text_size * 0.92f, ImVec2(tx0, by0 + pad * 0.7f), IM_COL32(255, 216, 74, 255), ln->speaker);
-            draw_typed(dl, font, text_size, ImVec2(tx0, by0 + pad * 0.7f + text_size * 1.35f), tx1 - tx0, IM_COL32_WHITE, ln->text, chars, false);
+            dl->AddText(font, text_size * 0.92f, ImVec2(cr.x0, cr.y0), IM_COL32(255, 216, 74, 255), ln->speaker);
+            dlg_draw_text(dl, font, text_size, ImVec2(cr.x0, cr.y0 + name_h), tw, IM_COL32_WHITE, pb, pe, chars, false);
         }
+        arrow_x = cr.x1 - text_size * 0.45f;
+        arrow_y = cr.y1 - text_size * 0.45f;
     }
-    if (!typing && fmodf(st->line_t, 1.0f) < 0.6f) {                       // blinking "more" arrow
-        ImVec2 c = sc->narration ? ImVec2(w * 0.5f, h * (port ? 0.72f : 0.8f)) : ImVec2(arrow_x, by1 - text_size * 0.95f);
-        dl->AddTriangleFilled(ImVec2(c.x - text_size * 0.4f, c.y), ImVec2(c.x + text_size * 0.4f, c.y), ImVec2(c.x, c.y + text_size * 0.45f), IM_COL32_WHITE);
-    }
+    if (!typing) dlg_marker(dl, arrow_x, arrow_y, text_size, more_pages, st->line_t);
 
-    // Input: a tap finishes the typing, the next tap advances. Taps on the dev overlay don't count.
+    // Input: a tap finishes the typing, then turns the page, then moves to the next line.
+    // Taps on the dev overlay don't count.
     bool tap = ImGui::IsMouseClicked(0) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::GetIO().WantTextInput;
     if (tap && st->fade_to_scene < 0 && st->fade <= 0.01f) {
         if (typing) st->line_t = 99.0f;
+        else if (more_pages) { st->line_page++; st->line_t = 0.0f; au_play(V_BLIP, 640.0f, 0.05f, 0.12f); }
         else star_advance(st);
     }
 }
@@ -774,6 +828,11 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
 static void *game_create(float dpi_scale) {
     Star *st = (Star *)calloc(1, sizeof(Star));
     // Desktop capture: no window interaction, no phone. Android never sets this, so it is inert there.
+    // DIALOG_CAPTURE=<scene>:<line>[:page] — one dialogue box, rendered by the real player and written
+    // to build_desktop/dialog_<scene>_l<line>_p<page>.png, so the box can be judged on the longest
+    // real lines without a phone. <scene> is an index or a scene id from cutscene_data.h.
+    const char *dspec = SDL_getenv("DIALOG_CAPTURE");
+    if (dspec) snprintf(st->dlg_spec, sizeof(st->dlg_spec), "%s", dspec);
     const char *spec = SDL_getenv("FIELD_CAPTURE");
     if (spec) snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec);
     spec = SDL_getenv("TILE_CAPTURE");                 // <map>:<scale>:<out.png>, the whole map in one PNG
@@ -806,17 +865,17 @@ static int game_wants_quit(void *state) { return ((Star *)state)->cap_state == 2
 // judged on the exact line you were looking at, and the field keeps the map, the spot on the navmesh
 // and whatever camera the owner was tuning. Everything else is rebuilt from those few numbers.
 struct ReloadBlob {
-    uint32_t magic; int32_t screen, scene, line, to_field, has_field; FieldSave field;
+    uint32_t magic; int32_t screen, scene, line, line_page, to_field, has_field; FieldSave field;
     int32_t has_tf, old_field; TfSave tf;
 };
-#define RELOAD_MAGIC 0x38525453u   // 'STR8' — bumped as the tile field joined the blob
+#define RELOAD_MAGIC 0x39525453u   // 'STR9' — bumped as the dialogue page index joined the blob
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
     ReloadBlob b;
     memset(&b, 0, sizeof(b));
     b.magic = RELOAD_MAGIC;
-    b.screen = st->screen; b.scene = st->scene; b.line = st->line;
+    b.screen = st->screen; b.scene = st->scene; b.line = st->line; b.line_page = st->line_page;
     b.to_field = st->to_field ? 1 : 0;
     if (st->field) { b.has_field = 1; field_save(st->field, &b.field); }
     if (st->tf) { b.has_tf = 1; tf_save(st->tf, &b.tf); }
@@ -845,6 +904,10 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_INTRO_COUNT && CS_INTRO[b.scene].line_count > 0) {
         int line = b.line < 0 ? 0 : b.line >= CS_INTRO[b.scene].line_count ? CS_INTRO[b.scene].line_count - 1 : b.line;
         star_goto(st, b.scene, line, true);
+        // Keep the PAGE too, so a long line being edited comes back on the page you were reading.
+        // star_goto validated the line; the page is clamped when the box next paginates, which is the
+        // only place that knows how many pages the new text has.
+        st->line_page = b.line_page < 0 ? 0 : b.line_page;
         st->to_field = (b.to_field && (st->tf || st->field));
     } else if (b.screen == SCR_END) {
         st->screen = SCR_END;
@@ -860,6 +923,46 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     float dt = ImGui::GetIO().DeltaTime;
     if (dt > 0.1f) dt = 0.1f;
 
+    // The dialogue capture: hold one line on screen and read the frame back. The host renders after
+    // this returns, so the read is of the PREVIOUS frame — which is why it waits a few frames first
+    // and why nothing on this screen animates once the typewriter is done.
+    if (st->dlg_spec[0] && st->cap_state < 2) {
+        char id[96] = "", flag[8] = "";
+        int line = 0, page = 0;
+        sscanf(st->dlg_spec, "%95[^:]:%d:%d:%7s", id, &line, &page, flag);
+        st->dlg_as_narr = (flag[0] == 'n');            // the same line drawn with no name and no portrait
+        st->dlg_no_port = (flag[0] == 'x') || st->dlg_as_narr;
+        st->dlg_small = (flag[0] == 's');
+        int scene = -1;
+        for (int i = 0; i < CS_INTRO_COUNT; i++) if (!strcmp(CS_INTRO[i].id, id)) { scene = i; break; }
+        if (scene < 0) { scene = atoi(id); if (scene < 0 || scene >= CS_INTRO_COUNT) scene = 0; }
+        if (line < 0 || line >= CS_INTRO[scene].line_count) line = 0;
+        if (st->dlg_frames == 0) { star_goto(st, scene, line, true); SDL_Log("dialog capture: scene %d (%s) line %d page %d",
+                                                                            scene, CS_INTRO[scene].id, line, page); }
+        st->screen = SCR_INTRO;
+        st->fade = 0.0f; st->fade_to_scene = -1;
+        st->line = line; st->line_page = page; st->line_t = 99.0f;      // typing finished, marker steady
+        if (++st->dlg_frames >= 6) {
+            char out[320];
+            snprintf(out, sizeof(out), "build_desktop/dialog_%s_l%d_p%d%s.png", CS_INTRO[scene].id, line, page,
+                     st->dlg_as_narr ? "_narrator" : st->dlg_no_port ? "_noportrait" : st->dlg_small ? "_smallbox" : "");
+            unsigned char *px = (unsigned char *)malloc((size_t)w * h * 4);
+            unsigned char *row = (unsigned char *)malloc((size_t)w * 4);
+            if (px && row) {
+                glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+                for (int y = 0; y < h / 2; y++) {                        // GL reads bottom-up
+                    memcpy(row, px + (size_t)y * w * 4, (size_t)w * 4);
+                    memcpy(px + (size_t)y * w * 4, px + (size_t)(h - 1 - y) * w * 4, (size_t)w * 4);
+                    memcpy(px + (size_t)(h - 1 - y) * w * 4, row, (size_t)w * 4);
+                }
+                int ok = stbi_write_png(out, w, h, 4, px, w * 4);
+                SDL_Log("dialog capture: %s %dx%d %s", out, w, h, ok ? "written" : "FAILED");
+            }
+            free(px); free(row);
+            st->cap_state = 2;
+        }
+    }
     if (st->cap_spec[0] && st->cap_tiles && st->cap_state < 2) {
         if (!st->tf) st->tf = tf_create();
         st->screen = SCR_FIELD;

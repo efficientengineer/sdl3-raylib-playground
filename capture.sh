@@ -22,6 +22,18 @@
 #
 set -e
 
+# One dialogue box, drawn by the real player: ./capture.sh --dialog 0110_the_board 4 [page] [n|x]
+#   n = draw it as a Narrator line (no name, no portrait, centred), x = no portrait.
+if [ "$1" = "--dialog" ]; then
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    SPEC="$2:${3:-0}:${4:-0}${5:+:$5}"
+    DIALOG_CAPTURE="$SPEC" "$ROOT/build_desktop/quest_glory" 2>&1 | grep "dialog capture" || true
+    exit 0
+fi
+
 if [ "$1" = "--tiles" ]; then
     MAP=${2:-halm}
     shift 2 || true

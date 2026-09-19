@@ -18,6 +18,7 @@
 #include "stb_image.h"          // implementations live in star_logic.cpp / field.cpp
 #include "stb_image_write.h"
 #include "tilefield.h"
+#include "dialogue.h"
 #include "field_text.h"
 
 #define PREF_ORG "com.playground"
@@ -46,6 +47,7 @@
 #define RUN_STEP  0.10f
 #define TURN_HOLD 0.07f          // a press shorter than this turns in place and does not step
 #define FADE_FRAMES 8
+#define TF_TYPE_CPS 42.0f        // the typewriter, the same rate the cutscene box uses
 
 // ───────────────────────── little pixel press ─────────────────────────
 
@@ -479,6 +481,8 @@ struct TileField {
     // dialogue and events
     char msg[320], msg_who[48];
     float msg_t;
+    int msg_page;                            // long examine lines paginate, exactly as a cutscene line does
+    bool msg_typing, msg_more;
     int exam_trig, exam_npc;
 
     // map change
@@ -494,6 +498,7 @@ struct TileField {
     int cmap_rows, cmap_levels, cmap_tables;
     char cmap_name[TF_TABLES][16];
     int cmap_row0[TF_TABLES];                 // colormap.json's row0 per table
+    char cmap_point[16];                      // colormap.json's "point_light_table"
     int light_table;                          // which table the map's ambient is on
     int lamp_table;                           // and which one a point light's pool is lit from
     float ambient;                            // 0..1
@@ -770,6 +775,16 @@ static void tf_build_colormap(TileField *t) {
                 k++;
             }
             if (k) t->cmap_tables = k;
+            const char *pt = strstr(js, "\"point_light_table\"");
+            if (pt) {
+                const char *q = strchr(pt + 19, '"'), *e = q ? strchr(q + 1, '"') : nullptr;
+                if (q && e) {
+                    int len = (int)(e - q - 1);
+                    if (len > 15) len = 15;
+                    memcpy(t->cmap_point, q + 1, (size_t)len);
+                    t->cmap_point[len] = 0;
+                }
+            }
             SDL_free(js);
         }
         t->cmap_rows = fh;
@@ -777,10 +792,16 @@ static void tf_build_colormap(TileField *t) {
         t->cmap_px = (unsigned char *)malloc((size_t)256 * fh * 4);
         memcpy(t->cmap_px, file, (size_t)256 * fh * 4);
         stbi_image_free(file);
-        // Index 0 is transparent at every light level (PALETTE.md). The tool writes the colormap as an
-        // opaque picture — column 0 comes back as opaque black — and an opaque index 0 draws every
-        // sprite and every stamp inside a black rectangle.
-        for (int r = 0; r < fh; r++) memset(t->cmap_px + (size_t)r * 256 * 4, 0, 4);
+        // Index 0 must be transparent at every light level (PALETTE.md). colormap v2 writes it that
+        // way; v1 wrote the colormap as an opaque picture, and an opaque index 0 draws every sprite
+        // and every stamp inside a black rectangle — so this checks rather than assumes.
+        int opaque0 = 0;
+        for (int r = 0; r < fh; r++) if (t->cmap_px[(size_t)r * 256 * 4 + 3]) opaque0++;
+        if (opaque0) {
+            SDL_Log("tilefield: colormap.png has index 0 OPAQUE in %d of %d rows — forcing it clear "
+                    "(PALETTE.md: index 0 is transparent)", opaque0, fh);
+            for (int r = 0; r < fh; r++) memset(t->cmap_px + (size_t)r * 256 * 4, 0, 4);
+        }
         how = "story/palette/colormap.png";
     } else {
         t->cmap_rows = t->cmap_tables * t->cmap_levels;
@@ -803,9 +824,14 @@ static void tf_build_colormap(TileField *t) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
-    t->lamp_table = 0;                                   // `day` unless the tool ships a warm `lamp` one
+    // Which table a point light's pool is lit from. colormap.json names it (`"point_light_table"`);
+    // otherwise a table called `lamp` or `lantern`, otherwise `day` — full-strength true colour.
+    t->lamp_table = 0;
     for (int i = 0; i < t->cmap_tables && i < TF_TABLES; i++)
         if (!SDL_strcasecmp(t->cmap_name[i], "lamp") || !SDL_strcasecmp(t->cmap_name[i], "lantern")) t->lamp_table = i;
+    if (t->cmap_point[0])
+        for (int i = 0; i < t->cmap_tables && i < TF_TABLES; i++)
+            if (!SDL_strcasecmp(t->cmap_name[i], t->cmap_point)) t->lamp_table = i;
     SDL_Log("tilefield: colormap %s — %d tables x %d levels = %d rows (%.0f KB), lamp pools lit from \"%s\"",
             how, t->cmap_tables, t->cmap_levels, t->cmap_rows, (double)256 * t->cmap_rows * 4 / 1024,
             t->cmap_name[t->lamp_table]);
@@ -2144,12 +2170,16 @@ static void tf_say(TileField *t, const char *who, const char *id) {
     const char *speaker = (name && name[0]) ? name : who;
     snprintf(t->msg_who, sizeof(t->msg_who), "%s", speaker ? speaker : "");
     t->msg_t = 0;
+    t->msg_page = 0;
+    t->msg_typing = true;
 }
 
 void tf_message(TileField *t, const char *text) {
     snprintf(t->msg, sizeof(t->msg), "%s", text ? text : "");
     t->msg_who[0] = 0;
     t->msg_t = 0;
+    t->msg_page = 0;
+    t->msg_typing = true;
 }
 
 static void fire(TfEvent *ev, int kind, const char *arg) {
@@ -2284,6 +2314,9 @@ static void draw_touch_ui(TileField *t, int w, int h) {
     if (t->run) dl->AddText(ImGui::GetFont(), h * 0.05f, ImVec2(ax - h * 0.05f, ay - h * 0.025f), IM_COL32(255, 230, 150, 220), "RUN");
 }
 
+// The field's box is the cutscene box's twin: same content rect, same pagination, same typewriter and
+// the same marker (dialogue.h). An examine line longer than the box used to be unreadable — the tap
+// just cleared it.
 static void draw_msg_box(TileField *t, int w, int h) {
     if (!t->msg[0]) return;
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
@@ -2294,12 +2327,27 @@ static void draw_msg_box(TileField *t, int w, int h) {
     dl->AddRectFilledMultiColor(ImVec2(x0 + u, y0 + u), ImVec2(x1 - u, y1 - u),
         IM_COL32(24, 40, 150, 255), IM_COL32(24, 40, 150, 255), IM_COL32(8, 16, 84, 255), IM_COL32(8, 16, 84, 255));
     dl->AddRect(ImVec2(x0 + u * 0.5f, y0 + u * 0.5f), ImVec2(x1 - u * 0.5f, y1 - u * 0.5f), IM_COL32(225, 225, 235, 255), u * 1.4f, 0, u * 0.7f);
-    float ty = y0 + ts * 0.7f, tw = x1 - x0 - ts * 1.5f;
-    if (t->msg_who[0]) { dl->AddText(font, ts * 0.92f, ImVec2(x0 + ts * 0.75f, ty), IM_COL32(255, 216, 74, 255), t->msg_who); ty += ts * 1.35f; }
-    dl->AddText(font, ts, ImVec2(x0 + ts * 0.75f, ty), IM_COL32_WHITE, t->msg, nullptr, tw);
-    if (fmodf(t->msg_t, 1.0f) < 0.6f)
-        dl->AddTriangleFilled(ImVec2(x1 - ts * 1.5f, y1 - ts * 0.95f), ImVec2(x1 - ts * 0.7f, y1 - ts * 0.95f),
-                              ImVec2(x1 - ts * 1.1f, y1 - ts * 0.5f), IM_COL32_WHITE);
+
+    DlgRect cr = dlg_content(x0, y0, x1, y1, ts);
+    float name_h = t->msg_who[0] ? ts * DLG_LINE_H : 0.0f;
+    float tw = cr.x1 - cr.x0;
+    DlgPages pg;
+    dlg_paginate(font, ts, tw, dlg_max_lines((cr.y1 - cr.y0) - name_h, ts), t->msg, &pg);
+    if (t->msg_page >= pg.count) t->msg_page = pg.count - 1;
+    if (t->msg_page < 0) t->msg_page = 0;
+    const char *pb = pg.beg[t->msg_page], *pe = pg.end[t->msg_page];
+    int chars = (int)(t->msg_t * TF_TYPE_CPS);
+    t->msg_typing = chars < (int)(pe - pb);
+    t->msg_more = t->msg_page + 1 < pg.count;
+    if (t->msg_who[0]) {
+        dl->AddText(font, ts * 0.92f, ImVec2(cr.x0, cr.y0), IM_COL32(255, 216, 74, 255), t->msg_who);
+        dlg_draw_text(dl, font, ts, ImVec2(cr.x0, cr.y0 + name_h), tw, IM_COL32_WHITE, pb, pe, chars, false);
+    } else {                                     // no speaker: the block centres, as a Narrator line does
+        float th = dlg_text_height(font, ts, tw, pb, pe);
+        dlg_draw_text(dl, font, ts, ImVec2(cr.x0, cr.y0 + ((cr.y1 - cr.y0) - th) * 0.5f), tw,
+                      IM_COL32_WHITE, pb, pe, chars, true);
+    }
+    if (!t->msg_typing) dlg_marker(dl, cr.x1 - ts * 0.45f, cr.y1 - ts * 0.45f, ts, t->msg_more, t->msg_t);
 }
 
 // ───────────────────────── map.flag ─────────────────────────
@@ -2367,7 +2415,11 @@ void tf_tick(TileField *t, int w, int h, float dt, bool ui_blocked, TfEvent *ev)
         }
     }
     if (t->tapped && !t->fade_dir) {
-        if (t->msg[0]) { t->msg[0] = 0; t->msg_who[0] = 0; }
+        if (t->msg[0]) {
+            if (t->msg_typing) t->msg_t = 99.0f;                  // finish the page being typed
+            else if (t->msg_more) { t->msg_page++; t->msg_t = 0; }// then turn the page
+            else { t->msg[0] = 0; t->msg_who[0] = 0; t->msg_page = 0; }
+        }
         else if (t->exam_npc >= 0) {
             TfNpc *np = &t->npcs[t->exam_npc];
             static const int OPP[4] = { 3, 2, 1, 0 };            // the NPC turns to face the player

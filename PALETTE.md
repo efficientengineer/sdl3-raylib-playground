@@ -56,15 +56,15 @@ colour outside its palette.
 
 ### What the engine actually did (2026-09-19, tile field; `src/TILEFIELD_NOTES.md` has the detail)
 
-- **Index 0 must be transparent in the colormap, and the tool's `colormap.png` has it opaque black**
-  (it is written as an opaque picture). The engine zeroes column 0 in every row on load; without that
-  every sprite and stamp draws inside a black rectangle.
+- **Index 0 must be transparent in the colormap.** v2 writes it that way; v1 wrote the colormap as an
+  opaque picture and every sprite and stamp drew inside a black rectangle. The engine checks and says
+  so in the log rather than assuming either.
 - **The colormap's rows run bright to dark** (`colormap.json`: "level 0 is full light, 31 the
   darkest") and the engine's built-in fallback tables are generated in that same order, so there is
   one convention.
-- **A point light's pool is looked up in its own table**, `lamp` or `lantern` if the colormap has one,
-  otherwise `day`. A warm `lamp` table is the missing piece for a lantern that reads as firelight
-  rather than as restored daylight — it is the tool's to add.
+- **A point light's pool is looked up in its own table**: `colormap.json`'s `"point_light_table"`
+  (v2: `lamp`), else a table called `lamp`/`lantern`, else `day`. Row bases come from
+  `tables[].row0`, never from `table_index * levels`.
 - **Point lights are `lamp:` lines in a tmap's `## meta`**, not triggers, because `story_prompt.py`'s
   `TRIGGER_KINDS` rejects an unknown trigger kind and the engine does not edit the tool. A `light`
   trigger kind is parsed as well, for when the tool learns it.
