@@ -110,6 +110,14 @@ his workshop book of every dummy attempt — plant the book at dinner; the fathe
 get placeholder names as tokens; all proper names tokenised. Interludes remain OPEN (not chapter one).
 **Ottilie "feeling lacking"** — the writer must give her more of her own in this draft and offer options.
 
+**After "write it" (sent to the running writer once):** "Don't try to preserve boards. I don't care
+about any sunk cost fallacy. What we need, we need." — no chapter-one panel art is frozen; all of it may
+be regenerated. "Falke succeeds finally because he realizes something. He keeps getting hit by the
+dummies, but he finally learns to dodge out of the way, or parry, this is the key to success." — the
+last dummy cannot be beaten by attacking, only by parrying its swing and striking in the opening (the
+combat system's core lesson, learned by player and Falke together; Ottilie's calls were the hint all
+along; pays off in the first real fight with the road creature).
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
