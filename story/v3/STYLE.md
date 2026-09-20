@@ -76,6 +76,16 @@ Rule 14 is the owner's too, and rule 0 and rule 14 are the two that outrank ever
     own question is a line: let the hero ask what the thing is. If a fact is not needed in this
     scene, cut it; it can arrive later, or never. Before a clip is done, list every noun in it a
     first-time player could not point at, and either show it first or delete it.
+    **Understanding beats brevity** (owner, 2026-09-20): *"We want to maximize for understanding, so
+    don't take any shortcuts when talking about things."* When a clip is too dense the fix is **more
+    short lines, never denser ones** — six two-word taps beat one packed sentence, and rule 6's
+    "shorter" means shorter *lines*, not fewer of them. Name an object in full every time it is said:
+    it is a **job sheet**, not "a sheet"; it is the **guild book**, not "the book". Let the person who
+    does not know ask — the hero's "Out to where?" and "What for?" are lines, and they are the best
+    lines in the chapter. A rule the player has been told is not a rule the player has seen: state it
+    in one place and pay it off in another, so that "no sword, no signature" is recited at a counter
+    on day one and is what stops the argument on day two. The approved model of this register is the
+    dialogue of `story/scenes/0110_the_board.md`.
 
 ## Names are tokens
 

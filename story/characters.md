@@ -79,14 +79,14 @@ order: build and height, skin, hair, ears, eyes.
 - notes: Bron Sallow. Born Tellwater 1084; carried out of the street at nine and given stock template 4 plus two live sleeves drawn from Maren. Believes only what he can put his hands on, which is the one thing that was done to him. Ch.10 he learns his own past was erased, not stored. Ch.11 he takes Lyra's last hour. **Look and ref are approved art — do not change a character of either line.**
 
 ## Lyra
-- role: Attendance sister of the Order of the Late Hour, mace
+- role: apprentice healer of {{HOME_TOWN}}, mace; in v3, {{HEALER}}
 - alias: Ottilie
 - ref: story/refs/lyra.png
 - people: human
-- voice: Complete unhurried sentences; says the frightening thing plainly and quietly, asks one question too many, and never signals a joke.
+- voice: Complete unhurried sentences; teases the way you tease somebody you have known since he was small, corrects the number rather than the point, says the frightening thing plainly and quietly, and never signals a joke.
 - look: Lyra, a tall, slender young woman with very long straight pale-gold hair, long bangs parted in the center, a thin gold circlet with a small red gem on her forehead, calm grey eyes, a white high-collared long coat with gold trim and wide gold-edged shoulder pieces over a dark navy bodysuit, a short white half-cape, a gold sun medallion on her chest, long white gloves, white heeled boots, a slim silver mace at her hip.
 - status: alive ch.1-11; shot in the road at Tellwater in ch.11 and dies there
-- notes: Sister Lyra, of the Order of the Late Hour, posted to Sallowgate in 1106. Sits the last hour of the dying and asks the Tally, the Order's fifteen questions — which are a strand-integrity check written by the people who built the Seam, a fact she learns in ch.9 and decides makes the prayer better. The gold sun medallion is the Order's hour-token, marked with the fifteen points. **Look and ref are approved art — do not change a character of either line.**
+- notes: Sister Lyra, of the Order of the Late Hour, posted to Sallowgate in 1106. Sits the last hour of the dying and asks the Tally, the Order's fifteen questions — which are a strand-integrity check written by the people who built the Seam, a fact she learns in ch.9 and decides makes the prayer better. The gold sun medallion is the Order's hour-token, marked with the fifteen points. **Look and ref are approved art — do not change a character of either line.** **In v3 this entry is {{HEALER}}, Ottilie**, and nothing above the alias line carries over except the art. She is twenty-three, an *apprentice* healer under {{TOWN_HEALER}}, and lives in the house next door to {{MENTOR}}'s — alone in it since she was nine, when a fever took both her parents in one winter and she was not strong enough to close it. Not {{MENTOR}}'s student: the neighbour who sits on the wall between the two yards, calls {{HERO}}'s beatings before they land, patches him afterwards and eats at {{MENTOR}}'s table most nights. She knows the training machines' patterns better than {{HERO}} does and is better with the mace than she admits. Full standing comes after a season of work away from home and she has never been further than the bridge, which is why the water run is hers to want. Relaxed, capable, funny, never tragic. In v3 she is alive through chapter one and walks west with {{HERO}} at the end of it.
 
 ## Zeph
 - role: resonance reader, expelled annex scholar, staff
@@ -616,13 +616,13 @@ them outright. None of the four has a reference sheet yet; `./story_prompt.py re
 the package that produces one, and the middle panel of it becomes their dialogue portrait.
 
 ## Hart
-- role: the old hunter who posted the water run; guild ledger, bad knee
+- role: the old hunter who posted the water run; engineer, builds the training machines, bad knee
 - ref: story/refs/hart.png
 - people: human
-- voice: Orders and grumbles, never a question. Fragments with the subject dropped. Four words where most people use twelve, and a price on every favour.
-- look: Hart, a stocky broad-shouldered man of sixty with a straight back and a stiff left leg, iron-grey hair cropped short and brushed flat, deep-set brown eyes and a clean-shaven square jaw, a faded slate-blue work coat with the sleeves rolled to the elbow over a grey high-necked shirt, a wide brown tool belt with a claw hammer through it, grey cloth wrapped round the left knee over patched canvas trousers, heavy laced boots.
+- voice: Orders and grumbles, never a question. Fragments with the subject dropped. Four words where most people use twelve. Says "again" and means do it again, and shows care by making a thing and handing it over rather than by saying so.
+- look: Hart, a stocky broad-shouldered man of sixty with a straight back and a stiff left leg, iron-grey hair cropped short and pushed about, deep-set brown eyes and a clean-shaven square jaw, wire spectacles pushed up on his forehead, a hinged brace of dark leather and iron strapped over his left knee, a scorched leather apron with a folding rule and two pencils in the chest pocket over a faded slate-blue work coat with the sleeves rolled to the elbow, big worked hands with one finger bandaged, patched canvas trousers, heavy laced boots, a plain hunter's knife on the belt.
 - status: alive, ch.1; stays in {{HOME_TOWN}} when the party walks west
-- notes: {{MENTOR}} in `story/v3/NAMES.md`. Walked the water out with {{HERO}}'s father for twenty years until the road broke his knee; paid the eleven carters' receipts nailed inside the shrine door out of his own money and told no one. Posted the run with his own thirty coin this morning because no convoy came. Roofer's build and a roofer's habits: he is on the roof in half the scenes he is in, and will not come down to argue. Age is in the flat parting, the straight back and the kept-for-work coat, never in the face.
+- notes: {{MENTOR}} in `story/v3/NAMES.md`. Carried the water out with {{FATHER}} for twenty years until the road broke his knee; paid the eleven carters' receipts nailed inside the shrine door out of his own money and told no one. Posted the run with his own thirty coin and sent it down the hill in {{HERO}}'s hands because he was certain the boy could not take it. **The knee made him an engineer.** He builds with wood, iron, rope and counterweights and nothing else: the town's well winch, the bell works and its axles, and the four training machines in his own yard, one for each thing a hunter has to learn. He is at a workbench in half the scenes he is in and will not stop working to argue. The knee brace is his own work and is the centrepiece of the design; the knife on the belt is the one thing on him he did not make — it was his partner's. Age is in the straight back and the kept-for-work coat, never in the face.
 
 ## Stolz
 - role: hunter, nineteen, signed with the lord of the western city

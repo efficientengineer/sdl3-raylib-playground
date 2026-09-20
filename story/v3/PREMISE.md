@@ -29,7 +29,7 @@ those are the same thing.
 
 ## {{HERO}} — hunter's apprentice, seventeen
 
-Short, broad, red-haired, carrying an sword he paid for. His father was the best hunter in town, died
+Short, broad, red-haired, carrying the first sword his teacher made him. His father was the best hunter in town, died
 on a job no one will describe to him, and for twenty years carried the year's water out to the
 {{STAIR}} and sat under it talking to the woman who lives there.
 {{HERO}} has no gift and no destiny. What he has, and does not know he has, is an introduction.
@@ -37,10 +37,26 @@ on a job no one will describe to him, and for twenty years carried the year's wa
 
 ## {{HEALER}} — healer, twenty-three
 
-Tall, pale-gold hair, a gold sun medallion, a mace she is better with than she admits. {{MENTOR}}'s
-other student, three years ahead, and the first person who ever told {{HERO}} to his face that he'd
-be good. Kind and sharp, and willing to tell you the frightening thing over breakfast.
-**Wants:** to be asked along instead of followed.
+Tall, pale-gold hair, a gold sun medallion, a mace she is better with than she admits. She lives in
+the house next door to {{MENTOR}}'s and has lived in it on her own since she was nine, when a fever
+took her mother and her father in one winter. She tried to close it herself and was not strong
+enough; {{TOWN_HEALER}}, the healer of {{HOME_TOWN}}, saw what a nine-year-old had managed and came
+and got her. She has kept herself going since — the older kid next door, six years ahead of
+{{HERO}}, relaxed, capable, teasing, never condescending, and the first person who ever told him to
+his face that he would be good.
+
+She is an **apprentice** healer, not a finished one. Small hurts she closes in a minute; anything big
+takes everything she has and then she has to sit down, and that is the gap the player watches close
+over the game. {{TOWN_HEALER}} gives full standing after a season of work away from home, and
+{{HEALER}} has never been further than the bridge in her life. That is why the water run is hers to
+want, and she wants it for herself before {{HERO}} ever opens his mouth.
+
+**Wants:** people she chooses to be her family. She never says it. It is in the behaviour: she is
+always already there, she sits on the wall between the houses instead of knocking, she eats at
+{{MENTOR}}'s table most nights, she has {{HERO}}'s bandages rolled before he knows he is going
+anywhere, and when he finally asks her to come west her yes is instant and she covers it with a joke.
+Being asked matters because being asked means being chosen. Her own family is one plain fact, said
+once, by somebody else; she is the warm steady one and she is never tragic about it.
 
 ## {{SCHOLAR}} — reads a third of their marks (joins chapter two)
 
@@ -57,16 +73,28 @@ on that shore, and a caretaker comes twice a year to keep it going.
 
 ## {{MENTOR}} — the old hunter
 
-Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. He and the father were hunting partners for
+Trained {{HERO}}'s father, then {{HERO}}. {{HEALER}} is the neighbour's girl who patches his knee and
+his hunters; she is not his student. He and the father were hunting partners for
 twenty years and the water run was theirs together: two men and one sealed jar, every year, on the
 same day, off the road and across two days of empty country they had to fight their way over. A pair
 cut each other loose and patch each other up; a man on his own fights everything alone, which is what
 killed {{HERO}}'s father the year he walked it by himself.
 In the twentieth year {{MENTOR}}'s knee was broken on that road. The next year the father
 walked it alone and did not come back. Since then {{MENTOR}} has paid a carter out of his own pocket
-every year to put the jar on the convoy, because it is still his run in his head and money is the only way he
-knows to say so — and it is why he sells {{HERO}} the sword instead of giving it. {{HERO}} knows they
-were partners. He does not know about the money, and will not hear it from {{MENTOR}}.
+every year to put the jar on the convoy, because it is still his run in his head and money is the only
+way he knows to say so. {{HERO}} knows they were partners. He does not know about the money, and will
+not hear it from {{MENTOR}}.
+
+**He is an engineer now.** The knee ended the hunting and he builds instead: ordinary craft only —
+wood, iron, rope and counterweights, and nothing of the ancients in any of it. The town uses him for
+the well winch, the bell works and its axles, and the four training machines in his yard are his, one
+for each thing a hunter has to learn, every one of them built to imitate something that is out on the
+road. He keeps a canvas workshop book with one line a day in it: the machine, the date, and how it
+went, four years of {{HERO}} losing. He shows care by making things and handing them over, and he
+**gives** {{HERO}} his first sword — made the winter before last, finished and hanging on its hook
+since, because a hunter's first sword comes from his teacher and it is the sign the guild looks for.
+He hands it over the afternoon the boy finally stops swinging, which is the afternoon he is surprised
+to find him ready.
 **Wants:** the house to have {{HERO}} in it; calls that his safety for as long as it works.
 
 ## {{RIVAL}} — the rival
@@ -82,13 +110,17 @@ Sells his coast escort on and takes {{VILLAIN}}'s coin in chapter one.
 Every region is a station on the same road: {{VILLAIN}} is walking to the door, and so are you.
 Beats marked **[non-default]** say how the writing avoids the version the genre reaches for first.
 
-1. **Carry the jar to the {{STAIR}}.** Once a year {{HOME_TOWN}} sends a sealed jar of water from its
-   own well, carried unopened, and no one alive knows why. It normally travels on the carters'
-   convoy; this year every carter has walked west for {{VILLAIN}}'s wages, so it needs a hunter and
-   it leaves at dawn. You see the first work of the ancients and cannot get within
-   thirty feet of the bottom step. The woman who has taken that water every year is gone, there is a
-   rope on the step that should have slid off, and the {{SECOND_MOON}} moves again while you watch.
-   (Chapter one.)
+1. **Carry the jar to the {{STAIR}}.** Two days in the yard first: {{HERO}} loses to the last of
+   {{MENTOR}}'s training machines over and over because he only ever attacks, and beats it the moment
+   he waits for the swing and turns it aside instead. {{MENTOR}} gives him the sword, which is what
+   the guild looks for before an apprentice may sign, and the evening bell is already ringing. Once a
+   year {{HOME_TOWN}} sends a sealed jar of water from its own well, carried unopened, and no one
+   alive knows why. It normally travels on the carters' convoy; this year every carter has walked
+   west for {{VILLAIN}}'s wages, so it needs a hunter and it is the one sheet left — posted and paid
+   for by {{MENTOR}}, who sent it down the hill in {{HERO}}'s own hands because he was sure the boy
+   could not take it. You see the first work of the ancients and cannot get within thirty feet of the
+   bottom step. The woman who has taken that water every year is gone, there is a rope on the step
+   that should have slid off, and the {{SECOND_MOON}} moves again while you watch. (Chapter one.)
 2. **Walk west in the crowd.** Join the pilgrim road: thousands of ordinary people walking toward the
    rain with handcarts, and the party is four more of them.
 3. **Pick up two.** {{SCHOLAR}} attaches himself because the road is full of people who have seen the
@@ -110,7 +142,8 @@ Beats marked **[non-default]** say how the writing avoids the version the genre 
 10. **The edge of the sea.** {{MENTOR}} dies at the wall where the water stops.
    **[non-default]** It proves nothing about {{HERO}}. He is there because he took a wrong turning,
    he knows it, and he spends his last minute furious about the cart fare. The party is a mile off
-   and only hears it. What {{HERO}} inherits is the ledger with his own name in it.
+   and only hears it. What {{HERO}} inherits is the canvas workshop book, four years of one line a
+   day, with his own name on nearly every line.
 11. **Take a vehicle.** One of theirs, found upright and patient, that goes where it used to go and
    nowhere else. It joins the party as a set piece, it opens four regions, and it will never once go
    where you want.

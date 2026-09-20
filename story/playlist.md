@@ -6,31 +6,37 @@ safe to list scenes whose art is not generated yet.
 
 ## intro
 
-The v3 chapter one, in clip order: `story/v3/chapter01.md`. Seven clips, four of them panel scenes
-and three field conversations. There is no narration prologue — the chapter opens cold at the board,
-the way Phantasy Star IV opens on a job. Until the sheets are generated the four panel scenes are
-skipped by `export` (warning each) and the intro plays as the three talk scenes; art priority is
-0110, then 0120, then 0150, then 0170.
+What plays on the phone **today**, in chapter order: every talk scene, plus the two panel scenes whose
+sheets are already cut (`0110`, `0150`). Those two sheets are stale — they were drawn before the Hart
+redesign and before {{HERO}} had a sword on his back — and are queued for regeneration; they are here
+because a stale picture plays better than a black screen while the new sheets are made. `0101`, `0107` and `0170` are left out on purpose: `0101` and `0107` have no art at all and `0170` has three new
+panels, so `export` would skip them and warn. Add each one to this list the moment its sheet is cut.
 
+- 0102_the_errand
+- 0103_the_counter
+- 0104_the_table
+- 0105_the_night
 - 0110_the_board
-- 0120_youre_not_ready
-- 0130_he_signs
-- 0140_the_sword
+- 0120_what_the_road_is
+- 0130_asking_her
 - 0150_the_road_west
 - 0160_the_fire
-- 0170_the_jar
 
 ## chapter01
 
-*The Jar Run* — 8 scenes, one per clip of `story/v3/chapter01.md`. Maps in order: hart_yard, halm,
-hart_yard, hart_yard, hart_yard, bridge, ridge_camp, stair_shrine.
+*The Jar Run* — 12 scenes, one per clip of `story/v3/chapter01.md`. Five panel scenes (`0101`, `0107`,
+`0110`, `0150`, `0170`) and seven talk scenes. Maps in order: hart_yard, hart_yard, halm, hart_yard,
+hart_yard, hart_yard, halm, hart_yard, hart_yard, bridge, ridge_camp, stair_shrine.
 
-- 0105_bandages
+- 0101_the_dummies
+- 0102_the_errand
+- 0103_the_counter
+- 0104_the_table
+- 0105_the_night
+- 0107_the_sword
 - 0110_the_board
-- 0120_youre_not_ready
-- 0130_he_signs
-- 0140_the_sword
+- 0120_what_the_road_is
+- 0130_asking_her
 - 0150_the_road_west
 - 0160_the_fire
 - 0170_the_jar
-

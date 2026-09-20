@@ -10,11 +10,12 @@
 ## Beat
 Half a day out of the valley, at the one bridge everybody has to use, {{HERO}} and {{HEALER}} are in
 the queue with the jar and {{RIVAL}} is standing on the wall above them in a coat that cost more than
-the job they are walking. He is not sorry and he is not lying: he sold the coast escort on and signed
-with the lord of the western city the same morning for eighty coin a week. Then he says what the lord
-is paying for — a walk west to the mountain to ask the ancients for rain — and that he has someone who
-can make them answer, which is the first time in a thousand years anyone has said that out of an open
-mouth in daylight. {{HERO}} is carrying a sealed jar. {{RIVAL}} is riding.
+the job they are walking. He is not sorry and he is not lying. He signed the {{COAST_ROAD}} job at
+noon and sold it on to another hunter the same morning, because the lord of the {{DRY_CITY}} is
+paying hunters eighty coin a week to walk west with him. Then he says what the walk is for — the
+mountain, and rain asked of the ancients — and that the lord has someone with him who can make them
+answer, which is the first time in a thousand years anyone has said that out of an open mouth in
+daylight. {{HERO}} is carrying a sealed jar. {{RIVAL}} is riding.
 
 ## Panels
 1. establishing_wide | the stone bridge over the river packed with handcarts and families, {{RIVAL}} standing up on the parapet wall at the right against the sky, {{HERO}} and {{HEALER}} small in the queue below him
@@ -26,7 +27,7 @@ mouth in daylight. {{HERO}} is carrying a sealed jar. {{RIVAL}} is riding.
 3. portrait_inset | {{HEALER}} close up in the queue, asking a flat question
    - {{HEALER}}: eyes up and right on {{RIVAL}}, level and unblinking, brows slightly down, mouth set
 ---
-4. over_shoulder | the dark back of {{HERO}}'s head and shoulder at the left edge, {{RIVAL}} beyond him up on the parapet, carts and the far bank behind
+4. over_shoulder | the dark back of {{HERO}}'s head and shoulder and the hilt of his sword at the left edge, {{RIVAL}} beyond him up on the parapet, carts and the far bank behind
    - {{HERO}}: seen from behind, head turned up and right, facing {{RIVAL}}, shoulders raised
    - {{RIVAL}}: looking down at {{HERO}}, delighted, one hand out palm up, head tilted
 5. eyes_slit | {{HERO}}'s eyes and brow filling the panel edge to edge, hard midday light across them
@@ -35,9 +36,19 @@ mouth in daylight. {{HERO}} is carrying a sealed jar. {{RIVAL}} is riding.
    - {{RIVAL}}: looking down past the camera at {{HERO}}, grinning, eyes narrowed, chin lifted, enjoying it
 
 ## Dialogue
-- {{HERO}} [1] {tense}: Where'd you get that coat?
-- {{RIVAL}} [2]: Did you honestly think he'd sign for you? The lord of the western city is paying hunters — eighty coin a week. I sold the coast escort on to another hunter and signed with him the same morning.
+- {{HERO}} [1] {tense}: Where did you get that coat?
+- {{RIVAL}} [2]: The lord of the {{DRY_CITY}} bought it for me.
+- {{HERO}}: You signed for the {{COAST_ROAD}} job. I watched the clerk write your name down.
+- {{RIVAL}}: I did, and I sold it on to another hunter the same morning.
+- {{HERO}}: You sold a guild job the day you signed it?
+- {{RIVAL}}: For eighty coin a week. That is what the lord pays a hunter.
 - {{HEALER}} [3]: Paying you to do what, exactly?
-- {{RIVAL}} [4] {wonder}: To walk west with him! He wants rain on his city every year for the rest of his life, and he's going to the mountain to ask the ancients for it.
-- {{HERO}} [5]: Ask them? People have asked the ancients for a thousand years and they've never answered anyone!
-- {{RIVAL}} [6] {dread}: He's got someone who can make them answer. You're carrying a sealed jar of water and I'm riding in a cart. Enjoy the walk!
+- {{RIVAL}} [4] {wonder}: To walk west with him. He is going to the mountain.
+- {{HEALER}}: What is at the mountain?
+- {{RIVAL}}: The ancients are. He means to ask them for rain on his city.
+- {{HERO}} [5]: People have asked the ancients for a thousand years! They have never answered anyone.
+- {{RIVAL}} [6] {dread}: He has someone with him who can make them answer.
+- {{HEALER}}: Who has he got?
+- {{RIVAL}}: He did not say, and at eighty coin a week I did not ask.
+- {{RIVAL}}: You're carrying a sealed jar and I'm riding in a cart. Enjoy the walk!
+- {{HERO}}: Thirty coin, and I signed for mine myself!

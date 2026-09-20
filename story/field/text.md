@@ -25,12 +25,12 @@ unwritten line shows up in the game as an obvious bracket rather than as silence
 line, brackets and all.
 
 ## halm.guild_hall_door
-One job sheet left on the board inside, and the bell is still going. The water run out to the {{STAIR}}, thirty coin, leaves at dawn.
-- what: the shut guild hall door, the message trigger at 20 15 on halm
+The board outside is bare and the hall is shut. The clerk puts the job sheets up at dawn.
+- what: the shut guild hall door on day one, the message trigger at 20 15 on halm
 
 ## halm.board
-Sheets all over it, and the good ones go first. Put your name on one and the guild pays you when you walk back in.
-- what: the job board outside the guild hall, before the bell, the message trigger at 20 14 on halm
+Bare planks and a lot of old nail holes. Sheets go up at dawn and the board closes on the last ring of the evening bell.
+- what: the job board outside the guild hall, day one, the message trigger at 20 14 on halm
 
 ## halm.paid_hunter
 Four days on the coast road, and he counts it out a coin at a time. Thirty of them will keep me a month.
@@ -47,13 +47,13 @@ We fill it, we rope the lid down, and it goes west before the week is out. Don't
 - what: two men filling and sealing the year's jar at the well, npc at 18 16 on halm
 
 ## halm.moonwatcher
-The small moon has moved. It sat over that roof since I was a boy and now it sits over the next one.
+That small moon has not moved once in my life. It stood over the same roof when I was a boy and it stands over it now.
 - name: Old man in the square
-- what: an old man in the square looking up at the {{SECOND_MOON}}, npc at 16 18 on halm
+- what: an old man in the square looking up at the {{SECOND_MOON}}; the plain statement the ending pays off, npc at 16 18 on halm
 
 ## halm.gate_post
 A strip of pale blue skin nailed to the post, dry as paper. The pack in the ditch under it was opened from the outside.
-- what: the west gatepost on the way out of town, the message trigger at 8 18 on halm
+- what: the west gatepost, the evidence of the {{ROAD_CREATURE_PL}} before anyone names them, the message trigger at 8 18 on halm
 
 ## halm.baker
 Bread is a coin. A cart out of this town is thirty, if you can find a carter, and you can't.
@@ -63,6 +63,10 @@ Bread is a coin. A cart out of this town is thirty, if you can find a carter, an
 ## halm.well
 Capped, roped, and the rope is new. One sealed jar of this water goes west to the {{STAIR}} every year, and the town has never been told what it is for.
 - what: the capped well in the middle of the town, the message trigger at 17 16 on halm
+
+## halm.well_winch
+The winch over the well is {{MENTOR}}'s work, and so is the catch you are carrying to the guild hall. He made the bell works too.
+- what: the winch on the capped well, where the player sees what {{MENTOR}} does now, the message trigger at 17 15 on halm
 
 ## halm.marta
 My sister went west in the spring and sends eighty coin a week to a house with no one in it. I'm not walking that far to watch it rain.
@@ -77,30 +81,81 @@ Eleven carts used to stand in that yard and I had work on every one of them. Ask
 ## halm.grainwife
 Something's in the shed again and it eats the sacks as well as the grain. If you're going in there, go in loud.
 - name: Woman at the grain gate
-- what: at the grain yard gate, points the player at the shortcut and the lids, npc at 9 16 on halm
+- what: at the grain yard gate, points the player at the shortcut and the {{GRAIN_CREATURE_PL}}, npc at 9 16 on halm
 
 ## halm.gate_watch
-{{MENTOR}} is up on his own roof with that knee and he will not be told. Go up if you like; he'll shout at you from there.
+You're {{MENTOR}}'s boy. Tell him the hinge he cut for this gate has outlasted the gate.
 - name: Watch at the hill gate
 - what: at the hill gate on the way up to {{MENTOR}}'s, npc at 22 6 on halm
 
+## halm.healer_door
+{{TOWN_HEALER}}'s room, and a bench outside it with three people waiting on it.
+- what: the town healer's door on the square, the message trigger at 14 16 on halm
+
+## halm.healer_bench
+Is {{HEALER}} in today? I would rather wait for her — she is quick, and she tells you what she is doing while she does it.
+- name: Woman on the bench
+- what: outside {{TOWN_HEALER}}'s room; the town asks for {{HEALER}} by name, npc at 14 17 on halm
+
+## halm.town_healer
+She has closed more in this room than I did at her age. She has never worked a day outside this valley, and that is the only thing standing between her and full standing.
+- name: {{TOWN_HEALER}}
+- what: {{TOWN_HEALER}} in her room, day one afternoon, npc at 13 16 on halm
+
+## halm.fathers_step
+The step of the house your father rented. Somebody else's boots are by that door now.
+- what: the one place in the town that holds {{FATHER}}, the message trigger at 11 18 on halm
+
+## halm.old_hunter
+{{FATHER}}'s son. He could put a jar of water on that shelf and be home before the week turned, and he never once was.
+- name: Old hunter on the porch
+- what: an old hunter outside the guild hall who knew {{FATHER}}, npc at 19 14 on halm
+
 ## hart_yard.coat_hook
-A hunter's coat on the hook by the door, cut for a bigger man than {{MENTOR}}. It was your father's.
-- what: the hook inside {{MENTOR}}'s door, the one place in town that holds the father, the message trigger at 6 11 on hart_yard
+A hunter's coat on the hook by the door, cut for a bigger man than {{MENTOR}}. It was {{FATHER}}'s.
+- what: the hook inside {{MENTOR}}'s door, the one place in the house that holds the father, the message trigger at 6 11 on hart_yard
+
+## hart_yard.bundle
+A new iron catch for the well winch, and a letter under it with {{MENTOR}}'s seal pressed into the wax. Sealed, and not your business.
+- what: the bundle on the workbench before the errand, the message trigger at 12 9 on hart_yard
+
+## hart_yard.practice_posts
+Four machines in a row, wood and iron and rope, and {{MENTOR}} built every one of them. The first is a split post on a spring that hits back.
+- what: the row of training machines in {{MENTOR}}'s yard, the message trigger at 16 3 on hart_yard
+
+## hart_yard.machine_two
+A barrel on a rope down the slope. It comes at you in a straight line and it cannot turn, and so does the thing in the grain shed.
+- what: the second training machine, the message trigger at 16 4 on hart_yard
+
+## hart_yard.machine_three
+A sprung arm that closes on your wrist and holds it until the cord is cut. {{MENTOR}} built it to teach you how to get somebody else loose.
+- what: the third training machine, the message trigger at 16 5 on hart_yard
+
+## hart_yard.machine_four
+Every hit you land winds the weight up, and the weight brings the arm back. The rope is set a little lower than your shoulder, because {{HEALER}} uses it when the yard is empty.
+- what: the last training machine, the one the chapter turns on, the message trigger at 16 6 on hart_yard
+
+## hart_yard.workshop_book
+A canvas-bound book on the bench, one line a day: the machine, the date, and how it went. Four years of them, and your name is on nearly every line.
+- what: {{MENTOR}}'s workshop book, the message trigger at 12 10 on hart_yard
+
+## hart_yard.workshop_door
+Wood, iron, rope and counterweights, and a hook on the back wall with nothing hanging on it.
+- what: the workshop door, shut until the sword comes out of it, the message trigger at 8 10 on hart_yard
 
 ## hart_yard.ottilie
 Take a job that pays and come back in one piece, and I will not have to do anything about either of you.
 - name: {{HEALER}}
-- what: {{HEALER}} on the water barrel with her bandages, before and after the Bandages clip, npc at 13 8 on hart_yard
+- what: {{HEALER}} on the wall with her bandages, npc at 13 8 on hart_yard
 
-## hart_yard.practice_posts
-Six posts, all split at the same height, and that height is your shoulder. The sixth one has been moved since yesterday.
-- what: the row of practice posts in {{MENTOR}}'s yard, the message trigger at 16 3 on hart_yard
+## hart_yard.healer_house
+One room, swept, everything put away, and one chair at the table. She eats next door most nights.
+- what: {{HEALER}}'s house through the open door, the message trigger at 18 8 on hart_yard
 
 ## hart_yard.hart
-Hand me the short nails and don't start. Whatever you came up here to ask, the answer is the same as it was at the bell.
+Hand me the short nails and don't start. Whatever you came up here to ask, the answer is the same as it was at breakfast.
 - name: {{MENTOR}}
-- what: {{MENTOR}} on his roof, before the You're Not Ready clip, npc at 10 9 on hart_yard
+- what: {{MENTOR}} at his workbench, npc at 10 9 on hart_yard
 
 ## west_road.culvert
 The road drops into the gap where the spring took the culvert out. Everyone ahead of you is walking the long way round it.
@@ -108,5 +163,4 @@ The road drops into the gap where the spring took the culvert out. Everyone ahea
 
 ## west_road.west_end
 The road keeps going west with the carts on it, down to the river bridge. That is a day's walk and you are not going that way.
-
 - what: the west end of the road, where the map stops and the bridge is not built yet, the message trigger at 0 8 on west_road
