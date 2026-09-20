@@ -933,7 +933,7 @@ struct ReloadBlob {
     int32_t has_tf, old_field; TfSave tf;
     int32_t has_vx, tile_field; VxSave vx;
 };
-#define RELOAD_MAGIC 0x42525453u   // 'STRB' — bumped for the half-size voxels and the sun knobs
+#define RELOAD_MAGIC 0x43525453u   // 'STRC' — bumped for the Perf HUD mode in VxSave
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;

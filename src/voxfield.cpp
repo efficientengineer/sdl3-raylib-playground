@@ -16,6 +16,7 @@
 #include "voxfield.h"
 #include "dialogue.h"
 #include "field_text.h"
+#include "vxperf.h"             // named CPU/GPU scopes, the HUD and the benchmark's numbers
 
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"
@@ -377,6 +378,25 @@ struct VoxField {
     bool selfchecked;
     double frame_ms_sum; int frame_n;
     int reach_missing, shaped, houses, ramps;
+
+    // ── performance (VOXFIELD_NOTES.md "Performance") ──
+    // perf_hud: 0 off, 1 compact, 2 full. It rides the reload blob so a hot reload keeps it up.
+    int perf_hud;
+    // The quality knobs below exist so the BENCHMARK can turn one thing off at a time. Every default
+    // is the shipping look; nothing here is a setting the owner is meant to find.
+    float q_pattern;      // 1 = the procedural block patterns, 0 = a flat mid step
+    float q_pcf;          // shadow taps: 4 (default) or 1
+    float q_water;        // 1 = water animates, 0 = frozen
+    float q_cloud;        // sky cloud strength multiplier
+    // The benchmark state machine. It only ever runs when the owner asks for it.
+    int bench_on, bench_cfg, bench_frame;
+    double bench_sum, bench_gpu[VXP_COUNT];
+    double bench_hist[256]; int bench_hist_n;
+    char bench_map[32];
+    VxSave bench_saved; bool bench_have_saved;
+    char bench_rows[64][320]; int bench_row_n;
+    double bench_base_ms;
+    float bench_poll;
 };
 
 static int vx_max_tex = 0;
@@ -1903,6 +1923,9 @@ static void vx_mesh_all(VoxField *v) {
     for (int cz = 0; cz * VX_CHV < v->vd; cz++) for (int cx = 0; cx * VX_CHV < v->vw; cx++) vx_mesh_chunk(v, cx, cz);
     v->mesh_ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
     v->built = true;
+    // Load-time cost, reported once in the HUD's mesh/upload row and in the benchmark header.
+    vxp.s[VXP_MESH].cpu_ms = vxp.s[VXP_MESH].cpu_avg = v->mesh_ms;
+    vxp.c.vbo_mb = (double)v->vert_total * sizeof(VxVert) / (1024.0 * 1024.0);
 }
 
 // ───────────────────────── shaders ─────────────────────────
@@ -1917,6 +1940,25 @@ static const char *VX_PREFIX = "#version 330 core\n";
 
 // Depth-only, for the sun's view of the static world. Rendered at map load and again only when the
 // sun moves; it is the whole of the cast shadow.
+// Uniform locations, cached. glGetUniformLocation is a driver-side string lookup and the render path
+// made about forty of them a frame; they are the same forty every frame. Keyed by program id and by
+// the ADDRESS of the name, which works because every name here is a string literal in this file — and
+// if two identical literals are not pooled we simply get two entries holding the same answer, so the
+// result is correct either way. Reset whenever the programs are rebuilt (a hot reload re-inits GL),
+// because a fresh program can be handed a recycled id.
+#define VX_UNI_CACHE 256
+static struct { GLuint prog; const char *name; GLint loc; } vx_uni_c[VX_UNI_CACHE];
+static int vx_uni_n = 0;
+static void vx_uni_reset(void) { vx_uni_n = 0; }
+static GLint vx_uni(GLuint prog, const char *name) {
+    for (int i = 0; i < vx_uni_n; i++)
+        if (vx_uni_c[i].prog == prog && vx_uni_c[i].name == name) return vx_uni_c[i].loc;
+    GLint l = glGetUniformLocation(prog, name);
+    if (vx_uni_n < VX_UNI_CACHE) { vx_uni_c[vx_uni_n].prog = prog; vx_uni_c[vx_uni_n].name = name;
+                                   vx_uni_c[vx_uni_n].loc = l; vx_uni_n++; }
+    return l;
+}
+
 static const char *VX_SHADOW_VS =
     "layout(location=0) in vec3 a_pos;\n"
     "uniform mat4 u_lmvp;\n"
@@ -1981,12 +2023,16 @@ static const char *VX_FS =
     "uniform vec3 u_sundir;\n"
     "uniform vec3 u_sky;\n"
     "uniform vec4 u_player;\n"                 // screen x, y, view z, cutaway radius in px
+    // The benchmark's knobs. All three are uniform branches — one value for the whole draw, so the
+    // wavefront never diverges — and all three sit at the shipping look unless a benchmark moved them.
+    "uniform float u_qpattern, u_qpcf, u_qwater;\n"
     "out vec4 o;\n"
     // Four rotated-poisson taps, UNROLLED (this repo has been bitten by a driver miscompiling a
     // GLSL loop), each one hardware-PCF'd, so the edge is soft without being mush.
     "float shadow_at(vec3 lp, float soft){\n"
     "  if (lp.z > 1.0 || lp.x < 0.0 || lp.x > 1.0 || lp.y < 0.0 || lp.y > 1.0) return 1.0;\n"
     "  float r = u_shtexel * soft;\n"
+    "  if (u_qpcf < 1.5) return texture(u_shadow, vec3(lp.xy, lp.z));\n"
     "  float s = texture(u_shadow, vec3(lp.xy + vec2( 0.94, 0.34) * r, lp.z));\n"
     "  s += texture(u_shadow, vec3(lp.xy + vec2(-0.85, 0.52) * r, lp.z));\n"
     "  s += texture(u_shadow, vec3(lp.xy + vec2(-0.20,-0.98) * r, lp.z));\n"
@@ -1999,8 +2045,15 @@ static const char *VX_FS =
     "  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }\n"
     "vec3 look(float idx, float row){ return texture(u_cmap, vec2((idx+0.5)/256.0, (row+0.5)/u_cmaph)).rgb; }\n"
     "void main(){\n"
+    // The cutaway comes FIRST. It used to sit after the whole pattern had been evaluated, which meant
+    // every discarded fragment still paid for ten hash evaluations and a LUT fetch. Same pixels out.
+    "  if (u_player.w > 0.5 && v_viewz < u_player.z - 0.6) {\n"
+    "    float dsc = length(gl_FragCoord.xy - u_player.xy) / u_player.w;\n"
+    "    if (dsc < 1.0) { if (dsc < 0.76 || h21(floor(gl_FragCoord.xy / 3.0)) > (dsc - 0.76) / 0.24) discard; }\n"
+    "  }\n"
     "  int ty = int(v_type);\n"
     "  int pat = int(texelFetch(u_lut, ivec2(12, ty), 0).r * 255.0 + 0.5);\n"
+    "  if (u_qpattern < 0.5) pat = 99;\n"
     "  bool top = (v_face == 0u || v_face == 1u);\n"
     "  vec2 P = v_uw;\n"
     "  float vfrac = top ? 1.0 : fract(v_world.y * 2.0 + 0.0001);\n"
@@ -2048,7 +2101,7 @@ static const char *VX_FS =
     "    else if (lp < 1.8) s += 0.22;\n"
     "    if (mod(T.x + ox, 4.0) < 1.0) s -= 0.16;\n"
     "  } else if (pat == 5) {\n"                 // water: bands quantised to 6 fps, with hard glints
-    "    float tq = floor(u_time * 6.0) / 6.0;\n"
+    "    float tq = floor(u_time * 6.0) / 6.0 * u_qwater;\n"
     "    float a = vn(vec2(P.x * 1.4 - tq * 0.7, P.y * 0.8));\n"
     "    float b = vn(vec2(P.x * 3.1 - tq * 1.3, P.y * 1.9 + tq * 0.2));\n"
     "    s = 0.18;\n"
@@ -2096,17 +2149,12 @@ static const char *VX_FS =
     "  }\n"
     "  int step6 = int(clamp(floor(s * 5.0 + 0.5), 0.0, 5.0));\n"
     "  float idx = texelFetch(u_lut, ivec2(step6 + (use_top ? 0 : 6), ty), 0).r * 255.0;\n"
-    // the cutaway: anything nearer than the party inside a circle round them is taken away, dithered
-    "  if (u_player.w > 0.5 && v_viewz < u_player.z - 0.6) {\n"
-    "    float dsc = length(gl_FragCoord.xy - u_player.xy) / u_player.w;\n"
-    "    if (dsc < 1.0) { if (dsc < 0.76 || h21(floor(gl_FragCoord.xy / 3.0)) > (dsc - 0.76) / 0.24) discard; }\n"
-    "  }\n"
     "  float ao = 1.0 - (1.0 - v_ao) * u_ao;\n"
     "  float lamp = v_light.y;\n"
     // The cast shadow is a LIGHT LEVEL, not a multiply toward black: it pulls the colormap lookup
     // down the table, so shade stays a cool palette colour (PALETTE.md / D19).
     "  float ndl = clamp(dot(v_nrm, u_sundir), 0.0, 1.0);\n"
-    "  float sh = ndl > 0.02 ? shadow_at(v_lpos, u_shsoft) : 1.0;\n"
+    "  float sh = (ndl > 0.02 && u_shstr > 0.002) ? shadow_at(v_lpos, u_shsoft) : 1.0;\n"
     "  float shk = 1.0 - (1.0 - sh) * u_shstr * 0.55;\n"
     "  float lv = clamp(u_amb * v_light.x * ao * shk, 0.0, 1.0);\n"
     "  float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
@@ -2173,7 +2221,7 @@ static const char *VX_SPR_FS =
     "    float idx = t.r * 255.0;\n"
     "    if (idx < 0.5) discard;\n"
     "    float lamp = v_par.y;\n"
-    "    float sh = spr_shadow(v_lpos);\n"
+    "    float sh = u_shstr > 0.002 ? spr_shadow(v_lpos) : 1.0;\n"
     "    float shk = 1.0 - (1.0 - sh) * u_shstr * 0.55;\n"
     "    float lv = max(clamp(u_amb * v_par.x * shk, 0.0, 1.0), lamp);\n"
     "    float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
@@ -2194,7 +2242,7 @@ static const char *VX_QUAD_VS =
     "void main(){\n"
     "  vec2 p = vec2((gl_VertexID == 2) ? 3.0 : -1.0, (gl_VertexID == 1) ? 3.0 : -1.0);\n"
     "  v_uv = (p + 1.0) * 0.5;\n"
-    "  gl_Position = vec4(p, 0.0, 1.0); }\n";
+    "  gl_Position = vec4(p, 1.0, 1.0); }\n";
 
 static const char *VX_BLUR_FS =
     "in vec2 v_uv;\n"
@@ -2293,6 +2341,7 @@ static GLuint vx_program(const char *vs_src, const char *fs_src, const char *wha
 
 static void vx_gl_init(VoxField *v) {
     vx_probe_limits();
+    vx_uni_reset();          // fresh programs may be handed recycled ids: the cache must not survive
     v->prog = vx_program(VX_VS, VX_FS, "world");
     v->spr_prog = vx_program(VX_SPR_VS, VX_SPR_FS, "sprite");
     v->blur_prog = vx_program(VX_QUAD_VS, VX_BLUR_FS, "blur");
@@ -3052,6 +3101,7 @@ static void vx_draw_sprite_batch(VoxField *v, const VxSprVert *vert, int n) {
     glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)12);
     glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)20);
     glDrawArrays(GL_TRIANGLES, 0, n);
+    vxp_draw(n / 3);
 }
 
 static void vx_camera(VoxField *v, int w, int h, float *proj) {
@@ -3090,15 +3140,15 @@ static void vx_camera(VoxField *v, int w, int h, float *proj) {
 static void vx_set_common(VoxField *v, GLuint prog, float sky[3]) {
     int rowa = v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0];
     int rowb = v->cmap_lamp_row0;
-    glUniform1f(glGetUniformLocation(prog, "u_amb"), v->amb);
-    glUniform1f(glGetUniformLocation(prog, "u_levels"), (float)v->cmap_levels);
-    glUniform1f(glGetUniformLocation(prog, "u_cmaph"), (float)v->cmap_h);
-    glUniform1f(glGetUniformLocation(prog, "u_rowa"), (float)rowa);
-    glUniform1f(glGetUniformLocation(prog, "u_rowb"), (float)rowb);
-    glUniform1f(glGetUniformLocation(prog, "u_fog"), v->fog);
-    glUniform1f(glGetUniformLocation(prog, "u_fognear"), v->view_h * 1.1f);
-    glUniform1f(glGetUniformLocation(prog, "u_fogfar"), v->view_h * 4.2f);
-    glUniform3f(glGetUniformLocation(prog, "u_sky"), sky[0], sky[1], sky[2]);
+    glUniform1f(vx_uni(prog, "u_amb"), v->amb);
+    glUniform1f(vx_uni(prog, "u_levels"), (float)v->cmap_levels);
+    glUniform1f(vx_uni(prog, "u_cmaph"), (float)v->cmap_h);
+    glUniform1f(vx_uni(prog, "u_rowa"), (float)rowa);
+    glUniform1f(vx_uni(prog, "u_rowb"), (float)rowb);
+    glUniform1f(vx_uni(prog, "u_fog"), v->fog);
+    glUniform1f(vx_uni(prog, "u_fognear"), v->view_h * 1.1f);
+    glUniform1f(vx_uni(prog, "u_fogfar"), v->view_h * 4.2f);
+    glUniform3f(vx_uni(prog, "u_sky"), sky[0], sky[1], sky[2]);
 }
 
 // ───────────────────────── the sun, and its shadow map ─────────────────────────
@@ -3132,6 +3182,7 @@ static void vx_sun_matrix(VoxField *v) {
 static void vx_render_shadow(VoxField *v) {
     if (!v->gl_ready || !v->built) return;
     uint64_t t0 = SDL_GetTicksNS();
+    vxp_begin(VXP_SHADOW);
     vx_sun_matrix(v);
     glBindFramebuffer(GL_FRAMEBUFFER, v->shadow_fbo);
     glViewport(0, 0, v->shadow_dim, v->shadow_dim);
@@ -3148,7 +3199,7 @@ static void vx_render_shadow(VoxField *v) {
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.4f, 4.0f);
     glUseProgram(v->shadow_prog);
-    glUniformMatrix4fv(glGetUniformLocation(v->shadow_prog, "u_lmvp"), 1, GL_FALSE, v->lmvp);
+    glUniformMatrix4fv(vx_uni(v->shadow_prog, "u_lmvp"), 1, GL_FALSE, v->lmvp);
     glBindVertexArray(v->vao);
     for (int i = 0; i < VX_CHUNKS; i++) {
         VxChunk *ch = &v->chunks[i];
@@ -3163,17 +3214,18 @@ static void vx_render_shadow(VoxField *v) {
     glCullFace(GL_BACK);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    vxp_end(VXP_SHADOW);
     v->shadow_dirty = false;
     v->shadow_ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
 }
 
 static void vx_set_shadow_uniforms(VoxField *v, GLuint prog, int unit) {
-    glUniform1i(glGetUniformLocation(prog, "u_shadow"), unit);
-    glUniformMatrix4fv(glGetUniformLocation(prog, "u_lmvp"), 1, GL_FALSE, v->lmvp);
-    glUniform1f(glGetUniformLocation(prog, "u_shstr"), v->sh_str);
-    glUniform1f(glGetUniformLocation(prog, "u_shsoft"), v->sh_soft);
-    glUniform1f(glGetUniformLocation(prog, "u_shtexel"), 1.0f / (float)v->shadow_dim);
-    glUniform3f(glGetUniformLocation(prog, "u_sundir"), v->sundir[0], v->sundir[1], v->sundir[2]);
+    glUniform1i(vx_uni(prog, "u_shadow"), unit);
+    glUniformMatrix4fv(vx_uni(prog, "u_lmvp"), 1, GL_FALSE, v->lmvp);
+    glUniform1f(vx_uni(prog, "u_shstr"), v->sh_str);
+    glUniform1f(vx_uni(prog, "u_shsoft"), v->sh_soft);
+    glUniform1f(vx_uni(prog, "u_shtexel"), 1.0f / (float)v->shadow_dim);
+    glUniform3f(vx_uni(prog, "u_sundir"), v->sundir[0], v->sundir[1], v->sundir[2]);
     glActiveTexture((GLenum)(GL_TEXTURE0 + unit));
     glBindTexture(GL_TEXTURE_2D, v->shadow_tex);
     glActiveTexture(GL_TEXTURE0);
@@ -3198,6 +3250,54 @@ static bool vx_box_visible(const float pl[6][4], const float *lo, const float *h
     return true;
 }
 
+// The sky, drawn AFTER the opaque world and depth-rejected against it.
+//
+// It used to be drawn first, with the depth test off, which shaded every one of the 2.59 M pixels on
+// the phone — two octaves of value noise, eight hash evaluations a pixel — and then had almost all of
+// them painted over by the town. The benchmark put that at 2.5 ms of the 12.6 ms frame. Now the quad
+// is emitted at the far plane (VX_QUAD_VS writes z = 1.0) with GL_LEQUAL and no depth write, so every
+// pixel the world already covers is rejected before the fragment shader runs. The pixels that DO
+// survive are exactly the ones that were visible before, shaded by the same code, so nothing moves.
+//
+// It is drawn before the blended pass (blob shadows, lamp glows) and after the opaque one, which is
+// the only order that is also correct: a glow over open sky would be overwritten if the sky came last.
+static void vx_draw_sky(VoxField *v, const float *sky) {
+    (void)sky;
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
+    glBindVertexArray(v->quad_vao);
+    glUseProgram(v->sky_prog);
+    glUniform1i(vx_uni(v->sky_prog, "u_cmap"), 1);
+    glUniform1f(vx_uni(v->sky_prog, "u_levels"), (float)v->cmap_levels);
+    glUniform1f(vx_uni(v->sky_prog, "u_cmaph"), (float)v->cmap_h);
+    glUniform1f(vx_uni(v->sky_prog, "u_rowa"), (float)v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0]);
+    glUniform1f(vx_uni(v->sky_prog, "u_amb"), v->amb * 0.9f + 0.1f);
+    glUniform1f(vx_uni(v->sky_prog, "u_time"), v->anim_t);
+    glUniform1f(vx_uni(v->sky_prog, "u_horizon"), 0.30f);
+    glUniform1f(vx_uni(v->sky_prog, "u_cloud"), 0.75f * v->q_cloud);
+    glUniform1f(vx_uni(v->sky_prog, "u_iz"), 143.0f);
+    glUniform1f(vx_uni(v->sky_prog, "u_ih"), 141.0f);
+    // the cloud colour is the top of the plaster ramp, looked up by NAME — never a number typed here
+    {
+        int r = vx_ramp_by_name(v, "neutral warm (plaster, cloth)");
+        float ci = 141.0f;
+        if (r >= 0 && v->ramp_len[r] > 0) ci = (float)v->ramp_idx[r][v->ramp_len[r] - 1];
+        glUniform1f(vx_uni(v->sky_prog, "u_ic"), ci);
+    }
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->cmap);
+    glActiveTexture(GL_TEXTURE0);
+    vxp_begin(VXP_SKY);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    vxp_end(VXP_SKY);
+    vxp_draw(1);
+    glBindVertexArray(0);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+}
+
 static void vx_render(VoxField *v, int w, int h) {
     float proj[16];
     vx_camera(v, w, h, proj);
@@ -3212,33 +3312,6 @@ static void vx_render(VoxField *v, int w, int h) {
     glClearColor(sky[0], sky[1], sky[2], 1.0f);
     glClearDepthf(1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // the sky: a gradient from the horizon colour (which the fog also uses) up to a deeper zenith,
-    // with a slow cloud band, drawn before anything and with no depth
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glBindVertexArray(v->quad_vao);
-    glUseProgram(v->sky_prog);
-    glUniform1i(glGetUniformLocation(v->sky_prog, "u_cmap"), 1);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_levels"), (float)v->cmap_levels);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_cmaph"), (float)v->cmap_h);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_rowa"), (float)v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0]);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_amb"), v->amb * 0.9f + 0.1f);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_time"), v->anim_t);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_horizon"), 0.30f);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_cloud"), 0.75f);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_iz"), 143.0f);
-    glUniform1f(glGetUniformLocation(v->sky_prog, "u_ih"), 141.0f);
-    // the cloud colour is the top of the plaster ramp, looked up by NAME — never a number typed here
-    {
-        int r = vx_ramp_by_name(v, "neutral warm (plaster, cloth)");
-        float ci = 141.0f;
-        if (r >= 0 && v->ramp_len[r] > 0) ci = (float)v->ramp_idx[r][v->ramp_len[r] - 1];
-        glUniform1f(glGetUniformLocation(v->sky_prog, "u_ic"), ci);
-    }
-    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->cmap);
-    glActiveTexture(GL_TEXTURE0);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -3248,16 +3321,19 @@ static void vx_render(VoxField *v, int w, int h) {
     glFrontFace(GL_CCW);
 
     glUseProgram(v->prog);
-    glUniformMatrix4fv(glGetUniformLocation(v->prog, "u_mvp"), 1, GL_FALSE, v->mvp);
-    glUniformMatrix4fv(glGetUniformLocation(v->prog, "u_view"), 1, GL_FALSE, v->view);
-    glUniform1i(glGetUniformLocation(v->prog, "u_lut"), 0);
-    glUniform1i(glGetUniformLocation(v->prog, "u_cmap"), 1);
-    glUniform1f(glGetUniformLocation(v->prog, "u_ao"), v->ao_str);
-    glUniform1f(glGetUniformLocation(v->prog, "u_time"), v->anim_t);
-    glUniform4f(glGetUniformLocation(v->prog, "u_player"), v->player_screen[0], v->player_screen[1],
+    glUniformMatrix4fv(vx_uni(v->prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glUniformMatrix4fv(vx_uni(v->prog, "u_view"), 1, GL_FALSE, v->view);
+    glUniform1i(vx_uni(v->prog, "u_lut"), 0);
+    glUniform1i(vx_uni(v->prog, "u_cmap"), 1);
+    glUniform1f(vx_uni(v->prog, "u_ao"), v->ao_str);
+    glUniform1f(vx_uni(v->prog, "u_time"), v->anim_t);
+    glUniform4f(vx_uni(v->prog, "u_player"), v->player_screen[0], v->player_screen[1],
                 v->player_screen[2], v->cutaway ? (float)h * 0.16f : 0.0f);
-    glUniform1f(glGetUniformLocation(v->prog, "u_snap"), v->sh_snap ? 1.0f : 0.0f);
-    glUniform1f(glGetUniformLocation(v->prog, "u_noff"), 0.055f);
+    glUniform1f(vx_uni(v->prog, "u_snap"), v->sh_snap ? 1.0f : 0.0f);
+    glUniform1f(vx_uni(v->prog, "u_noff"), 0.055f);
+    glUniform1f(vx_uni(v->prog, "u_qpattern"), v->q_pattern);
+    glUniform1f(vx_uni(v->prog, "u_qpcf"), v->q_pcf);
+    glUniform1f(vx_uni(v->prog, "u_qwater"), v->q_water);
     vx_set_common(v, v->prog, sky);
     vx_set_shadow_uniforms(v, v->prog, 2);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, v->lut);
@@ -3269,11 +3345,15 @@ static void vx_render(VoxField *v, int w, int h) {
     glBindVertexArray(v->vao);
     int draws = 0;
     v->chunks_drawn = 0;
+    vxp_begin(VXP_WORLD);
+    int chunks_total = 0;
     for (int i = 0; i < VX_CHUNKS; i++) {
         VxChunk *ch = &v->chunks[i];
         if (!ch->verts) continue;
+        chunks_total++;
         if (!vx_box_visible(planes, ch->lo, ch->hi)) continue;
         v->chunks_drawn++;
+        vxp_draw(ch->verts / 3);
         glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
         glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)0);
         glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)12);
@@ -3283,18 +3363,22 @@ static void vx_render(VoxField *v, int w, int h) {
         glDrawArrays(GL_TRIANGLES, 0, ch->verts);
         draws++;
     }
+    vxp_end(VXP_WORLD);
+    vxp.c.chunks_drawn = v->chunks_drawn;
+    vxp.c.chunks_total = chunks_total;
 
     // Billboards. Alpha-tested with depth write, so they sort against the blocks for nothing.
     vx_collect_sprites(v);
+    vxp_begin(VXP_SPRITES);
     static VxSprVert *sv = nullptr;
     static int sv_cap = 0;
     if (sv_cap < VX_SPRITES * 6) { sv_cap = VX_SPRITES * 6; sv = (VxSprVert *)realloc(sv, sizeof(VxSprVert) * (size_t)sv_cap); }
     glUseProgram(v->spr_prog);
-    glUniformMatrix4fv(glGetUniformLocation(v->spr_prog, "u_mvp"), 1, GL_FALSE, v->mvp);
-    glUniformMatrix4fv(glGetUniformLocation(v->spr_prog, "u_view"), 1, GL_FALSE, v->view);
-    glUniform1i(glGetUniformLocation(v->spr_prog, "u_tex"), 0);
-    glUniform1i(glGetUniformLocation(v->spr_prog, "u_cmap"), 1);
-    glUniform1f(glGetUniformLocation(v->spr_prog, "u_indexed"), v->pal_ok ? 1.0f : 0.0f);
+    glUniformMatrix4fv(vx_uni(v->spr_prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glUniformMatrix4fv(vx_uni(v->spr_prog, "u_view"), 1, GL_FALSE, v->view);
+    glUniform1i(vx_uni(v->spr_prog, "u_tex"), 0);
+    glUniform1i(vx_uni(v->spr_prog, "u_cmap"), 1);
+    glUniform1f(vx_uni(v->spr_prog, "u_indexed"), v->pal_ok ? 1.0f : 0.0f);
     vx_set_common(v, v->spr_prog, sky);
     vx_set_shadow_uniforms(v, v->spr_prog, 2);
     // one batch per texture, in the order they were pushed
@@ -3311,7 +3395,14 @@ static void vx_render(VoxField *v, int w, int h) {
         glBindTexture(GL_TEXTURE_2D, tex);
         while ((n = vx_emit_sprites(v, sv, sv_cap, 0, tex, from, &from)) > 0) { vx_draw_sprite_batch(v, sv, n); draws++; }
     }
+    // The sky now, into the pixels the world did not cover, and before anything blended. The sprite
+    // scope is closed around it so the sky gets a GPU timer query of its own — a query cannot nest.
+    vxp_end(VXP_SPRITES);
+    vx_draw_sky(v, sky);
+    vxp_begin(VXP_SPRITES);
+
     // shadows, then the additive lamp glows
+    glUseProgram(v->spr_prog);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
@@ -3322,6 +3413,11 @@ static void vx_render(VoxField *v, int w, int h) {
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(0);
+    vxp_end(VXP_SPRITES);
+    vxp.c.sprites = v->spr_count;
+    vxp.c.detail = v->det_count;
+    vxp.c.fbo_w = w; vxp.c.fbo_h = h;
+    vxp.c.shadow_dim = v->shadow_dim;
 
     if (!v->selfchecked) { vx_selfcheck(v, w, h, draws, v->spr_count); v->selfchecked = true; }
 }
@@ -3334,52 +3430,61 @@ static GLuint vx_post(VoxField *v, int w, int h) {
     glDisable(GL_BLEND);
     glBindVertexArray(v->quad_vao);
     glUseProgram(v->blur_prog);
-    glUniform1i(glGetUniformLocation(v->blur_prog, "u_tex"), 0);
+    glUniform1i(vx_uni(v->blur_prog, "u_tex"), 0);
     glActiveTexture(GL_TEXTURE0);
     float hw = (float)v->half_w, hh = (float)v->half_h;
     // scene -> half[0] (horizontal) -> half[1] (vertical): the blurred copy the tilt-shift mixes in
+    vxp_begin(VXP_POST_DOWN);
     glBindFramebuffer(GL_FRAMEBUFFER, v->half_fbo[0]);
     glViewport(0, 0, v->half_w, v->half_h);
     glBindTexture(GL_TEXTURE_2D, v->fbo_tex);
-    glUniform2f(glGetUniformLocation(v->blur_prog, "u_dir"), 1.4f / hw, 0.0f);
-    glUniform1f(glGetUniformLocation(v->blur_prog, "u_thresh"), 0.0f);
+    glUniform2f(vx_uni(v->blur_prog, "u_dir"), 1.4f / hw, 0.0f);
+    glUniform1f(vx_uni(v->blur_prog, "u_thresh"), 0.0f);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindFramebuffer(GL_FRAMEBUFFER, v->half_fbo[1]);
     glBindTexture(GL_TEXTURE_2D, v->half_tex[0]);
-    glUniform2f(glGetUniformLocation(v->blur_prog, "u_dir"), 0.0f, 1.4f / hh);
+    glUniform2f(vx_uni(v->blur_prog, "u_dir"), 0.0f, 1.4f / hh);
     glDrawArrays(GL_TRIANGLES, 0, 3);
+    vxp_draw(2);
+    vxp_end(VXP_POST_DOWN);
     // half[1] -> half[2]: the same blur again, thresholded — the bloom
+    vxp_begin(VXP_POST_BLOOM);
     if (v->bloom > 0.0f) {
         glBindFramebuffer(GL_FRAMEBUFFER, v->half_fbo[2]);
         glBindTexture(GL_TEXTURE_2D, v->half_tex[1]);
-        glUniform2f(glGetUniformLocation(v->blur_prog, "u_dir"), 2.6f / hw, 2.6f / hh);
-        glUniform1f(glGetUniformLocation(v->blur_prog, "u_thresh"), 0.66f);
+        glUniform2f(vx_uni(v->blur_prog, "u_dir"), 2.6f / hw, 2.6f / hh);
+        glUniform1f(vx_uni(v->blur_prog, "u_thresh"), 0.66f);
         glDrawArrays(GL_TRIANGLES, 0, 3);
+        vxp_draw(1);
     }
+    vxp_end(VXP_POST_BLOOM);
+    vxp_begin(VXP_POST_COMP);
     glBindFramebuffer(GL_FRAMEBUFFER, v->out_fbo);
     glViewport(0, 0, w, h);
     glUseProgram(v->post_prog);
-    glUniform1i(glGetUniformLocation(v->post_prog, "u_scene"), 0);
-    glUniform1i(glGetUniformLocation(v->post_prog, "u_blur"), 1);
-    glUniform1i(glGetUniformLocation(v->post_prog, "u_bloom"), 2);
-    glUniform1i(glGetUniformLocation(v->post_prog, "u_depth"), 3);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_dof"), v->dof);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_bloom_k"), v->bloom);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_vig"), v->vignette);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_grade"), v->grade);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_pdepth"), v->player_screen[2]);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_near"), v->ortho ? 0.5f : 0.5f);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_far"), v->ortho ? 140.0f : 200.0f);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_band"), v->view_h * 0.42f);
-    glUniform1f(glGetUniformLocation(v->post_prog, "u_ortho"), v->ortho ? 1.0f : 0.0f);
+    glUniform1i(vx_uni(v->post_prog, "u_scene"), 0);
+    glUniform1i(vx_uni(v->post_prog, "u_blur"), 1);
+    glUniform1i(vx_uni(v->post_prog, "u_bloom"), 2);
+    glUniform1i(vx_uni(v->post_prog, "u_depth"), 3);
+    glUniform1f(vx_uni(v->post_prog, "u_dof"), v->dof);
+    glUniform1f(vx_uni(v->post_prog, "u_bloom_k"), v->bloom);
+    glUniform1f(vx_uni(v->post_prog, "u_vig"), v->vignette);
+    glUniform1f(vx_uni(v->post_prog, "u_grade"), v->grade);
+    glUniform1f(vx_uni(v->post_prog, "u_pdepth"), v->player_screen[2]);
+    glUniform1f(vx_uni(v->post_prog, "u_near"), v->ortho ? 0.5f : 0.5f);
+    glUniform1f(vx_uni(v->post_prog, "u_far"), v->ortho ? 140.0f : 200.0f);
+    glUniform1f(vx_uni(v->post_prog, "u_band"), v->view_h * 0.42f);
+    glUniform1f(vx_uni(v->post_prog, "u_ortho"), v->ortho ? 1.0f : 0.0f);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, v->fbo_tex);
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->half_tex[1]);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, v->bloom > 0.0f ? v->half_tex[2] : v->half_tex[1]);
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, v->fbo_depth);
     glDrawArrays(GL_TRIANGLES, 0, 3);
+    vxp_draw(1);
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    vxp_end(VXP_POST_COMP);
     return v->out_tex;
 }
 
@@ -3460,15 +3565,283 @@ static void vx_poll_map_flag(VoxField *v, float dt) {
 
 // ───────────────────────── tick ─────────────────────────
 
+// ───────────────────────── the A/B benchmark ─────────────────────────
+// Triggered by the Dev panel's "Run benchmark" or by a `perf.flag` in the pref dir (its contents, if
+// any, name the map). It parks the party on a fixed heavy view, runs every configuration for
+// VXB_WARM + VXB_MEAS frames, and writes perf_report.md / perf_report.csv next to the flag. The
+// owner's own settings are saved on the way in and put back on the way out.
+//
+// Wall clock is vsync-bound, so it cannot separate two configurations that both beat the refresh
+// period. The column that CAN is the GPU total from the timer queries; where those are unavailable
+// the benchmark — and only the benchmark — falls back to a glFinish after the post pass.
+
+#define VXB_WARM 30
+#define VXB_MEAS 240
+
+enum { VXB_BASE = 0, VXB_HD2D, VXB_DOF, VXB_BLOOM, VXB_GRADE, VXB_SHADOW, VXB_PCF1, VXB_PATTERN,
+       VXB_AO, VXB_CUT, VXB_DETAIL, VXB_WATER, VXB_CLOUD, VXB_FOG,
+       VXB_R100, VXB_R85, VXB_R75, VXB_R66, VXB_R50, VXB_ALLOFF, VXB_COUNT };
+
+static const char *VXB_NAME[VXB_COUNT] = {
+    "baseline", "hd2d off", "dof off", "bloom off", "grade+vignette off", "shadows off",
+    "shadow pcf 1", "pattern detail off", "ao off", "cutaway off", "detail sprites off",
+    "water anim off", "sky clouds off", "fog off",
+    "res 100%", "res 85%", "res 75%", "res 66%", "res 50%", "everything off",
+};
+
+// The two parked views. A map with no entry uses its own spawn for both.
+static const struct { const char *map; int ax, az; const char *an; int bx, bz; const char *bn; }
+VXB_VIEWS[] = { { "halm", 21, 21, "square", 27, 7, "stream" } };
+
+static void vx_place_party(VoxField *v, int x, int z, int f);   // defined above; used by the bench
+
+static void vx_bench_view(VoxField *v, int view) {
+    for (size_t i = 0; i < sizeof VXB_VIEWS / sizeof VXB_VIEWS[0]; i++) {
+        if (strcmp(VXB_VIEWS[i].map, v->map_name)) continue;
+        int x = view ? VXB_VIEWS[i].bx : VXB_VIEWS[i].ax;
+        int z = view ? VXB_VIEWS[i].bz : VXB_VIEWS[i].az;
+        if (vx_can_stand(v, x, z)) { vx_place_party(v, x, z, 3); return; }
+    }
+    // no entry, or the cell has moved: the map's own spawn is the fixed view
+    vx_place_party(v, v->spawn_x, v->spawn_z, 3);
+}
+
+static const char *vx_bench_view_name(VoxField *v, int view) {
+    for (size_t i = 0; i < sizeof VXB_VIEWS / sizeof VXB_VIEWS[0]; i++)
+        if (!strcmp(VXB_VIEWS[i].map, v->map_name)) return view ? VXB_VIEWS[i].bn : VXB_VIEWS[i].an;
+    return view ? "spawn(b)" : "spawn";
+}
+
+// Put the owner's look back, then turn off exactly one thing.
+static void vx_bench_apply(VoxField *v, int cfg) {
+    const VxSave *s = &v->bench_saved;
+    v->hd2d = s->hd2d; v->dof = s->dof; v->bloom = s->bloom;
+    v->vignette = s->vignette; v->grade = s->grade;
+    v->sh_str = s->sh_str; v->ao_str = s->ao; v->cutaway = s->cutaway;
+    v->detail = s->detail; v->fog = s->fog; v->res_pct = s->res_scale_pct;
+    v->q_pattern = 1.0f; v->q_pcf = 4.0f; v->q_water = 1.0f; v->q_cloud = 1.0f;
+    switch (cfg) {
+    case VXB_BASE:    break;
+    case VXB_HD2D:    v->hd2d = 0; break;
+    case VXB_DOF:     v->dof = 0; break;
+    case VXB_BLOOM:   v->bloom = 0; break;
+    case VXB_GRADE:   v->grade = 0; v->vignette = 0; break;
+    case VXB_SHADOW:  v->sh_str = 0; break;
+    case VXB_PCF1:    v->q_pcf = 1.0f; break;
+    case VXB_PATTERN: v->q_pattern = 0.0f; break;
+    case VXB_AO:      v->ao_str = 0; break;
+    case VXB_CUT:     v->cutaway = 0; break;
+    case VXB_DETAIL:  v->detail = 0; break;
+    case VXB_WATER:   v->q_water = 0.0f; break;
+    case VXB_CLOUD:   v->q_cloud = 0.0f; break;
+    case VXB_FOG:     v->fog = 0; break;
+    case VXB_R100:    v->res_pct = 100; break;
+    case VXB_R85:     v->res_pct = 85; break;
+    case VXB_R75:     v->res_pct = 75; break;
+    case VXB_R66:     v->res_pct = 66; break;
+    case VXB_R50:     v->res_pct = 50; break;
+    case VXB_ALLOFF:
+        v->hd2d = 0; v->dof = 0; v->bloom = 0; v->vignette = 0; v->grade = 0;
+        v->sh_str = 0; v->ao_str = 0; v->cutaway = 0; v->detail = 0; v->fog = 0;
+        v->q_pattern = 0.0f; v->q_pcf = 1.0f; v->q_water = 0.0f; v->q_cloud = 0.0f;
+        break;
+    }
+}
+
+static void vx_bench_start(VoxField *v, const char *map) {
+    if (v->bench_on) return;
+    if (map && map[0] && strcmp(map, v->map_name)) vx_load_map(v, map);
+    vx_save(v, &v->bench_saved);
+    v->bench_have_saved = true;
+    v->bench_on = 1;                     // 1 = view A, 2 = view B
+    v->bench_cfg = 0; v->bench_frame = 0;
+    v->bench_row_n = 0; v->bench_base_ms = 0;
+    snprintf(v->bench_map, sizeof v->bench_map, "%s", v->map_name);
+    vx_bench_view(v, 0);
+    vx_bench_apply(v, 0);
+    SDL_Log("PERF start: map=%s configs=%d frames=%d+%d per config, two views", v->map_name, VXB_COUNT, VXB_WARM, VXB_MEAS);
+}
+
+static void vx_bench_write_report(VoxField *v) {
+    char path[768];
+    const char *gl_ver = (const char *)glGetString(GL_VERSION);
+    const char *gl_ren = (const char *)glGetString(GL_RENDERER);
+    char date[32];
+    { SDL_Time t = 0; SDL_DateTime dt2;
+      if (SDL_GetCurrentTime(&t) && SDL_TimeToDateTime(t, &dt2, true))
+          snprintf(date, sizeof date, "%04d-%02d-%02d %02d:%02d", dt2.year, dt2.month, dt2.day, dt2.hour, dt2.minute);
+      else snprintf(date, sizeof date, "unknown"); }
+
+    snprintf(path, sizeof path, "%sperf_report.md", vx_pref());
+    SDL_IOStream *io = SDL_IOFromFile(path, "w");
+    if (io) {
+        char hdr[1024];
+        int n = snprintf(hdr, sizeof hdr,
+            "# voxfield perf report\n\n"
+            "- date: %s\n- map: %s\n- platform: %s\n- GL: %s\n- renderer: %s\n"
+            "- drawable: %dx%d\n- refresh: %.0f Hz\n- %s\n- mesh: %.1f ms, %d tris\n\n"
+            "| view | config | wall ms | p99 ms | fps | gpu ms | cpu ms | delta gpu |\n"
+            "|---|---|---|---|---|---|---|---|\n",
+            date, v->bench_map, SDL_GetPlatform(), gl_ver ? gl_ver : "?", gl_ren ? gl_ren : "?",
+            vxp.c_shown.fbo_w, vxp.c_shown.fbo_h, vxp.refresh_hz, vxp.gpu_note, v->mesh_ms, v->tris);
+        SDL_WriteIO(io, hdr, (size_t)n);
+        for (int i = 0; i < v->bench_row_n; i++) SDL_WriteIO(io, v->bench_rows[i], strlen(v->bench_rows[i]));
+        // Where the frame actually goes, as the last configuration left it. The scope table is the
+        // thing to read first: the A/B rows say what a feature costs, this says what a PASS costs.
+        char tail[1024];
+        int m = snprintf(tail, sizeof tail,
+            "\n## scopes, last configuration (1 s average)\n\n| scope | cpu ms | gpu ms |\n|---|---|---|\n");
+        SDL_WriteIO(io, tail, (size_t)m);
+        for (int i = 0; i < VXP_COUNT; i++) {
+            m = snprintf(tail, sizeof tail, "| %s | %.2f | %.2f |\n", VXP_NAME[i], vxp.s[i].cpu_avg, vxp.s[i].gpu_avg);
+            SDL_WriteIO(io, tail, (size_t)m);
+        }
+        m = snprintf(tail, sizeof tail,
+            "\n## counters\n\n- draws %d, triangles %d\n- chunks %d/%d drawn, sprites %d, detail %d\n"
+            "- fbo %dx%d, drawable %dx%d, shadow %d px\n- gpu memory estimate %.1f MB (%.1f tex + %.1f vbo)\n"
+            "- vsync buckets 1x/2x/3x/4x+/off: %d/%d/%d/%d/%d\n",
+            vxp.c_shown.draws, vxp.c_shown.tris, vxp.c_shown.chunks_drawn, vxp.c_shown.chunks_total,
+            vxp.c_shown.sprites, vxp.c_shown.detail, vxp.c_shown.fbo_w, vxp.c_shown.fbo_h,
+            vxp.c_shown.out_w, vxp.c_shown.out_h, vxp.c_shown.shadow_dim,
+            vxp.c_shown.tex_mb + vxp.c_shown.vbo_mb, vxp.c_shown.tex_mb, vxp.c_shown.vbo_mb,
+            vxp.bucket[0], vxp.bucket[1], vxp.bucket[2], vxp.bucket[3], vxp.bucket[4]);
+        SDL_WriteIO(io, tail, (size_t)m);
+        SDL_CloseIO(io);
+    }
+    snprintf(path, sizeof path, "%sperf_report.csv", vx_pref());
+    io = SDL_IOFromFile(path, "w");
+    if (io) {
+        char hdr[512];
+        int n = snprintf(hdr, sizeof hdr, "# %s,%s,%s,%s,%dx%d\nview,config,wall_ms,p99_ms,fps,gpu_ms,cpu_ms\n",
+                         date, v->bench_map, gl_ren ? gl_ren : "?", gl_ver ? gl_ver : "?",
+                         vxp.c_shown.fbo_w, vxp.c_shown.fbo_h);
+        SDL_WriteIO(io, hdr, (size_t)n);
+        for (int i = 0; i < v->bench_row_n; i++) {
+            // the markdown row, turned back into csv
+            // "| a | b |\n" -> "a,b\n": drop the leading and trailing bars and the padding spaces
+            char line[320]; int k = 0;
+            for (const char *c = v->bench_rows[i]; *c && k < 318; c++) {
+                if (*c == '|') { if (k && line[k - 1] != ',') line[k++] = ','; continue; }
+                if (*c == ' ') continue;
+                line[k++] = *c;
+            }
+            while (k && (line[k - 1] == ',' || line[k - 1] == '\n')) k--;
+            line[k++] = '\n';
+            SDL_WriteIO(io, line + (line[0] == ',' ? 1 : 0), (size_t)(k - (line[0] == ',' ? 1 : 0)));
+        }
+        SDL_CloseIO(io);
+    }
+    SDL_Log("PERF done: %s", path);
+}
+
+// One frame of the benchmark, called after the frame has been presented. Returns true while running.
+static void vx_bench_frame(VoxField *v) {
+    if (!v->bench_on) return;
+    v->bench_frame++;
+    if (v->bench_frame > VXB_WARM) {
+        double ms = vxp.frame_ms;
+        v->bench_sum += ms;
+        if (v->bench_hist_n < 256) v->bench_hist[v->bench_hist_n++] = ms;
+        for (int i = 0; i < VXP_COUNT; i++) v->bench_gpu[i] += vxp.s[i].gpu_ms;
+    }
+    if (v->bench_frame < VXB_WARM + VXB_MEAS) return;
+
+    int meas = VXB_MEAS;
+    double wall = v->bench_sum / meas;
+    double gpu = 0, cpu = 0;
+    for (int i = VXP_SHADOW; i <= VXP_UI; i++) gpu += v->bench_gpu[i] / meas;
+    for (int i = 0; i < VXP_COUNT; i++) if (i != VXP_MESH) cpu += vxp.s[i].cpu_avg;
+    // p99 over the sampled history
+    double srt[256]; int n = v->bench_hist_n;
+    for (int i = 0; i < n; i++) srt[i] = v->bench_hist[i];
+    for (int i = 1; i < n; i++) { double x = srt[i]; int j = i - 1;
+        while (j >= 0 && srt[j] < x) { srt[j + 1] = srt[j]; j--; } srt[j + 1] = x; }
+    double p99 = n ? srt[n / 100] : 0;
+
+    if (v->bench_cfg == VXB_BASE) v->bench_base_ms = gpu;
+    const char *vn = vx_bench_view_name(v, v->bench_on - 1);
+    char row[320];
+    snprintf(row, sizeof row, "| %s | %s | %.2f | %.2f | %.1f | %.2f | %.2f | %+.2f |\n",
+             vn, VXB_NAME[v->bench_cfg], wall, p99, wall > 0 ? 1000.0 / wall : 0.0,
+             gpu, cpu, gpu - v->bench_base_ms);
+    if (v->bench_row_n < 64) snprintf(v->bench_rows[v->bench_row_n++], 320, "%s", row);
+    SDL_Log("PERF %-8s %-20s wall %6.2f ms  p99 %6.2f  %5.1f fps  gpu %6.2f  cpu %6.2f  d %+6.2f",
+            vn, VXB_NAME[v->bench_cfg], wall, p99, wall > 0 ? 1000.0 / wall : 0.0, gpu, cpu, gpu - v->bench_base_ms);
+
+    v->bench_sum = 0; v->bench_hist_n = 0; v->bench_frame = 0;
+    for (int i = 0; i < VXP_COUNT; i++) v->bench_gpu[i] = 0;
+    v->bench_cfg++;
+    if (v->bench_cfg >= VXB_COUNT) {
+        v->bench_cfg = 0;
+        v->bench_base_ms = 0;
+        v->bench_on++;
+        if (v->bench_on > 2) {                       // both views done
+            v->bench_on = 0;
+            if (v->bench_have_saved) vx_restore(v, &v->bench_saved);
+            v->q_pattern = 1.0f; v->q_pcf = 4.0f; v->q_water = 1.0f; v->q_cloud = 1.0f;
+            vx_bench_write_report(v);
+            return;
+        }
+        vx_bench_view(v, v->bench_on - 1);
+    }
+    vx_bench_apply(v, v->bench_cfg);
+}
+
+// `perf.flag` in the pref dir: the Mac's way in (perf.sh writes it). Contents = a map name, or empty.
+static void vx_poll_perf_flag(VoxField *v, float dt) {
+    if (v->bench_on) return;
+    v->bench_poll -= dt;
+    if (v->bench_poll > 0) return;
+    v->bench_poll = 0.5f;
+    char path[768];
+    snprintf(path, sizeof path, "%sperf.flag", vx_pref());
+    size_t sz = 0;
+    void *d = SDL_LoadFile(path, &sz);
+    if (!d) return;
+    // A consumed flag is TRUNCATED, not deleted, exactly as reload.flag is — and SDL_LoadFile hands
+    // back a valid (empty) buffer for a 0-byte file, so without this the benchmark would restart
+    // itself forever half a second after finishing.
+    if (sz == 0) { SDL_free(d); return; }
+    char map[32] = { 0 };
+    if (sz) { size_t n = sz < 31 ? sz : 31; memcpy(map, d, n);
+              for (char *c = map; *c; c++) if (*c == '\n' || *c == '\r' || *c == ' ') { *c = 0; break; } }
+    SDL_free(d);
+    SDL_IOStream *io = SDL_IOFromFile(path, "w");        // consume it, as the reload flag is consumed
+    if (io) SDL_CloseIO(io);
+    vx_bench_start(v, map);
+}
+
+static double vx_refresh_hz(void) {
+    const SDL_DisplayMode *m = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+    return (m && m->refresh_rate > 1.0f) ? (double)m->refresh_rate : 60.0;
+}
+
+// A rough GPU memory estimate: the render targets, the shadow map, the atlas and the decals. It is
+// an estimate and is labelled as one — no GL query for this exists on GLES.
+static double vx_tex_mb(VoxField *v, int rw, int rh) {
+    double b = 0;
+    b += (double)rw * rh * 8.0;                                  // scene colour + depth24
+    b += (double)v->half_w * v->half_h * 4.0 * 3.0;              // the three half-res targets
+    b += (double)rw * rh * 4.0;                                  // the post output
+    b += (double)v->shadow_dim * v->shadow_dim * 4.0;            // depth24
+    b += (double)v->atlas_w * v->atlas_h;                        // R8
+    for (int i = 0; i < v->decal_count; i++) b += (double)v->decal_w[i] * v->decal_h[i];
+    return b / (1024.0 * 1024.0);
+}
+
 void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) {
     ev->kind = VXE_NONE; ev->arg[0] = 0;
     if (!v->gl_ready) vx_gl_init(v);
+    vxp_init();
+    vxp_frame_begin(vx_refresh_hz());
+    vxp_begin(VXP_TICK);
     if (!v->built) {
         vx_load_map(v, v->map_name[0] ? v->map_name : "halm");
         const char *b = SDL_getenv("VOX_HD2D");            // a measuring switch, not a setting
         if (b && b[0]) v->hd2d = atoi(b) ? 1 : 0;
     }
     vx_poll_map_flag(v, dt);
+    vx_poll_perf_flag(v, dt);
     v->anim_t += dt;
     v->msg_t += dt;
 
@@ -3515,26 +3888,46 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
         }
     }
 
+    vxp_end(VXP_TICK);
+
     int rw = (int)(w * (v->res_pct / 100.0f) + 0.5f), rh = (int)(h * (v->res_pct / 100.0f) + 0.5f);
     if (rw < 64) rw = 64;
     if (rh < 64) rh = 64;
     while (vx_max_tex > 0 && (rw > vx_max_tex || rh > vx_max_tex)) { rw /= 2; rh /= 2; }
     vx_fbo_size(v, rw, rh);
-    uint64_t t0 = SDL_GetTicksNS();
     vx_render(v, rw, rh);
     GLuint shown = vx_post(v, rw, rh);
-    glFinish();
-    double ms = (double)(SDL_GetTicksNS() - t0) / 1e6;
-    v->frame_ms_sum += ms; v->frame_n++;
+    // NO glFinish HERE. One used to sit on this line to make the CPU timer below mean something; on
+    // a tile-based mobile GPU it flushed and waited inside every frame, which is exactly the stall
+    // this instrumentation exists to find. Per-pass GPU cost now comes from timer queries instead.
+    // The benchmark is the one caller allowed to stall, and only when the queries are unavailable.
+    if (v->bench_on && !vxp.gpu_proven) glFinish();
+    vxp.c.tex_mb = vx_tex_mb(v, rw, rh);
+    vxp.c.out_w = w; vxp.c.out_h = h;
+    v->frame_n++;
     if (v->frame_n >= 300) {
-        SDL_Log("voxfield: %d frames, world+post %.2f ms/frame at %dx%d (hd2d %s, dof %.2f bloom %.2f) — %s",
-                v->frame_n, v->frame_ms_sum / v->frame_n, rw, rh, v->hd2d ? "on" : "off",
-                v->dof, v->bloom, v->ortho ? "ortho" : "perspective");
-        v->frame_ms_sum = 0; v->frame_n = 0;
+        // The periodic line: wall clock (the honest frame interval), the GPU total, and the three
+        // most expensive scopes, so a logcat tail alone tells you where the time went.
+        int o[VXP_COUNT];
+        for (int i = 0; i < VXP_COUNT; i++) o[i] = i;
+        for (int i = 1; i < VXP_COUNT; i++) { int x = o[i]; int j = i - 1;
+            double kx = vxp.s[x].gpu_avg > 0 ? vxp.s[x].gpu_avg : vxp.s[x].cpu_avg;
+            while (j >= 0) { double kj = vxp.s[o[j]].gpu_avg > 0 ? vxp.s[o[j]].gpu_avg : vxp.s[o[j]].cpu_avg;
+                             if (kj >= kx) break; o[j + 1] = o[j]; j--; }
+            o[j + 1] = x; }
+        SDL_Log("voxfield perf: %.1f fps  wall %.2f ms (1%%w %.2f, max %.2f)  gpu %.2f  cpu %.2f  "
+                "at %dx%d (hd2d %s res %d%%)  top: %s %.2f | %s %.2f | %s %.2f",
+                vxp.fps, vxp.frame_avg, vxp.frame_p99, vxp.frame_max, vxp_gpu_total(), vxp_cpu_total(),
+                rw, rh, v->hd2d ? "on" : "off", v->res_pct,
+                VXP_NAME[o[0]], vxp.s[o[0]].gpu_avg > 0 ? vxp.s[o[0]].gpu_avg : vxp.s[o[0]].cpu_avg,
+                VXP_NAME[o[1]], vxp.s[o[1]].gpu_avg > 0 ? vxp.s[o[1]].gpu_avg : vxp.s[o[1]].cpu_avg,
+                VXP_NAME[o[2]], vxp.s[o[2]].gpu_avg > 0 ? vxp.s[o[2]].gpu_avg : vxp.s[o[2]].cpu_avg);
+        v->frame_n = 0;
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDisable(GL_DEPTH_TEST);
 
+    vxp_begin(VXP_UI);
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
     dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
     dl->AddImage((ImTextureID)(intptr_t)shown, ImVec2(0, 0), ImVec2((float)w, (float)h),
@@ -3551,6 +3944,16 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
                  FACE_NAME[v->act[0].facing & 3], (int)v->act[0].y, v->steps, v->tris);
         dl->AddText(ImGui::GetFont(), h * 0.04f, ImVec2(12, 12), IM_COL32(255, 240, 160, 230), lbl);
     }
+    vxp_hud(v->perf_hud, w, h);
+    if (v->bench_on) {
+        char bl[128];
+        snprintf(bl, sizeof bl, "BENCHMARK  view %d/2  %s  %d/%d", v->bench_on, VXB_NAME[v->bench_cfg],
+                 v->bench_frame, VXB_WARM + VXB_MEAS);
+        ImGui::GetForegroundDrawList()->AddText(ImGui::GetFont(), h * 0.045f, ImVec2(w * 0.04f, h * 0.06f),
+                                                IM_COL32(255, 200, 120, 240), bl);
+    }
+    vxp_end(VXP_UI);
+    vx_bench_frame(v);
 }
 
 // ───────────────────────── capture ─────────────────────────
@@ -3712,6 +4115,28 @@ bool vx_dev_ui(VoxField *v, char *out, int cap) {
     { bool sn = v->sh_snap != 0; if (ImGui::Checkbox("Snapped", &sn)) v->sh_snap = sn; }
     ImGui::SameLine();
     if (ImGui::Button("Sun default")) vx_sun_defaults(v);
+    // Performance. The HUD is always available and rides the reload blob; the benchmark is explicit,
+    // takes a few minutes, and puts the owner's settings back when it is done.
+    ImGui::Separator();
+    ImGui::TextUnformatted("Perf HUD");
+    for (int m = 0; m < 3; m++) {
+        static const char *MODE[3] = { "off", "compact", "full" };
+        ImGui::SameLine();
+        bool cur = v->perf_hud == m;
+        if (cur) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.55f, 0.3f, 1));
+        if (ImGui::Button(MODE[m])) v->perf_hud = m;
+        if (cur) ImGui::PopStyleColor();
+    }
+    ImGui::SameLine();
+    if (v->bench_on) {
+        if (ImGui::Button("Stop benchmark")) {
+            v->bench_on = 0;
+            if (v->bench_have_saved) vx_restore(v, &v->bench_saved);
+            v->q_pattern = 1.0f; v->q_pcf = 4.0f; v->q_water = 1.0f; v->q_cloud = 1.0f;
+        }
+    } else if (ImGui::Button("Run benchmark")) {
+        vx_bench_start(v, v->map_name);
+    }
     if (ImGui::Button("Print cell")) {
         int x = v->act[0].tx, z = v->act[0].tz;
         unsigned char top = get_blk(v, x * VX_VPC, v->hgt[z][x], z * VX_VPC);
@@ -3738,6 +4163,9 @@ VoxField *vx_create() {
     v->ao_str = 0.85f; v->detail = 1.0f; v->fog = 0.65f;
     v->dof = 0.75f; v->bloom = 0.55f; v->vignette = 0.45f; v->grade = 0.6f;
     v->motes = 0; v->res_pct = 100;
+    // the benchmark's knobs, at the shipping look
+    v->q_pattern = 1.0f; v->q_pcf = 4.0f; v->q_water = 1.0f; v->q_cloud = 1.0f;
+    v->perf_hud = 0;
     for (int i = 0; i < 256; i++) { v->pal[i][0] = (unsigned char)i; v->pal[i][1] = (unsigned char)i; v->pal[i][2] = (unsigned char)i; }
     return v;
 }
@@ -3780,6 +4208,7 @@ void vx_save(VoxField *v, VxSave *s) {
     s->motes = v->motes; s->res_scale_pct = v->res_pct;
     s->sun_az = v->sun_az; s->sun_el = v->sun_el;
     s->sh_str = v->sh_str; s->sh_soft = v->sh_soft; s->sh_snap = v->sh_snap;
+    s->perf_hud = v->perf_hud;
 }
 
 void vx_restore(VoxField *v, const VxSave *s) {
@@ -3801,6 +4230,7 @@ void vx_restore(VoxField *v, const VxSave *s) {
     if (s->grade >= 0.0f && s->grade <= 1.0f) v->grade = s->grade;
     v->ortho = s->ortho ? 1 : 0; v->hd2d = s->hd2d ? 1 : 0; v->cutaway = s->cutaway ? 1 : 0;
     v->res_pct = (s->res_scale_pct >= 40 && s->res_scale_pct <= 100) ? s->res_scale_pct : 100;
+    v->perf_hud = (s->perf_hud >= 0 && s->perf_hud <= 2) ? s->perf_hud : 0;
     vx_load_map(v, map[0] ? map : "halm");
     v->party = s->party < 1 ? 1 : s->party > VX_PARTY ? VX_PARTY : s->party;
     v->steps = s->steps < 0 ? 0 : s->steps;

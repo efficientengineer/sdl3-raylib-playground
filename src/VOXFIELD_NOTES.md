@@ -260,6 +260,112 @@ panel's **res %** slider renders the 3D at a fraction of the drawable and upscal
 reload blob. Both `voxfield.cpp` and `star_logic.cpp` were compiled for `aarch64-none-linux-android24`
 with the NDK and `-DIMGUI_IMPL_OPENGL_ES3` to prove the GLES 3 path builds.
 
+## Performance
+
+The owner, 2026-09-19: *"It looks amazing! It does feel slow. I need better tools to analyse what is
+making it slow."* `src/vxperf.h` is those tools — header-only, included by `voxfield.cpp` alone, so
+nothing in `CMakeLists.txt` or `fast_reload.sh` had to change to carry it.
+
+**The first thing it found was a `glFinish()` in the frame path.** It had been left in to make a
+CPU-side timer around `vx_render` + `vx_post` mean something, and it cost the phone a third of its
+frame rate: on a tile-based GPU it flushes and waits inside every frame, so the CPU and the GPU never
+overlap. Removing it took halm from **~47 fps / 21 ms to a vsync-locked 60 fps**. Per-pass GPU cost
+now comes from timer queries, which do not stall. **Do not put a `glFinish` back on that line.** The
+benchmark is the one caller allowed to stall, and only when the timer queries are unavailable.
+
+### The instrumentation
+
+- **Named scopes**, flat by construction: `tick/logic`, `mesh/upload`, `shadow map`, `sky`,
+  `world opaque`, `sprites+detail`, `post: blur`, `post: bloom`, `post: composite`, `ui/dialogue`.
+  Each one is timed on the CPU with `SDL_GetPerformanceCounter` and on the GPU with a timer query.
+  Water is **not** a scope: water voxels live in the chunk meshes and are shaded by the world program,
+  so their cost is inside `world opaque`. Saying so beats a scope that would always read 0.
+- **GPU timers**: `GL_EXT_disjoint_timer_query` on GLES, `GL_TIME_ELAPSED` on desktop GL. Every entry
+  point is fetched through `SDL_GL_GetProcAddress` (EXT name first, then core), because macOS's
+  `gl3.h` does not declare `glGetQueryObjectui64v` and the GLES3 headers declare none of the EXT
+  ones. Results are read **three frames late** out of a four-deep ring and the AVAILABLE flag is
+  checked before the value is taken, so a query never blocks. `GL_GPU_DISJOINT` is read every frame
+  and its samples thrown away. If anything is missing it falls back to CPU only and the HUD says
+  `gpu timers unavailable`. **`GL_TIME_ELAPSED` cannot nest**: a scope opened inside another is timed
+  on the CPU alone and its GPU column reads `-`.
+- **TOTAL is wall clock, tick entry to tick entry** — the honest frame interval including the host's
+  swap. That needed no hook in `host.cpp`, so none of this costs a `./deploy.sh`.
+- **Counters**: draw calls, triangles after frustum culling, chunks drawn/total, sprites, detail
+  billboards, FBO and drawable size, shadow size, and a GPU memory estimate (an estimate, and
+  labelled one — GLES has no query for it).
+- **Frame pacing**: the display's refresh rate from `SDL_GetCurrentDisplayMode`, the swap interval,
+  and a histogram of frame intervals in vsync buckets (1x, 2x, 3x, 4x+, off-grid). A run that is
+  missing vsync is visible as weight in the 2x bucket rather than as a worse average.
+
+### The HUD
+
+Dev panel → **Perf HUD: off / compact / full**. It rides the reload blob (`VxSave.perf_hud`), so a hot
+reload keeps it up. Compact is fps, frame ms average / 1% worst / max and a 120-sample graph with the
+16.7 and 33.3 ms lines on it. Full adds the per-scope CPU and GPU table sorted by cost, the counters,
+the refresh rate and swap interval, the vsync buckets and the timer-query note. It is drawn into the
+foreground draw list with no windows and one `snprintf` a line.
+
+### The benchmark
+
+Dev panel → **Run benchmark**, or a `perf.flag` in the pref dir (its contents name the map). It saves
+the owner's settings, parks the party on a fixed view, and runs **20 configurations** for 30 warm-up
+plus 240 measured frames at **two views** (halm: the square and the stream), then puts the settings
+back. Configurations: baseline, HD-2D master, DoF, bloom, grade+vignette, shadows, shadow PCF 1 tap,
+procedural pattern detail, AO, cutaway, detail sprites, water animation, sky clouds, fog, resolution
+scale 100/85/75/66/50 %, and everything off. Output is a `PERF` line per configuration in the log and
+`perf_report.md` / `perf_report.csv` in the pref dir, with the device and GL strings, the resolution
+and the date, the per-scope table and the counters.
+
+**Wall clock is vsync-bound and cannot separate two configurations that both beat the refresh period.
+The column that can is `gpu ms`.** Read that one.
+
+The `u_qpattern`, `u_qpcf`, `u_qwater` uniforms and the `q_*` fields exist **only** so the benchmark
+can turn one thing off at a time. All three are uniform branches — one value for the whole draw — and
+all three sit at the shipping look unless a benchmark moved them. They are not settings.
+
+```
+./perf.sh [map]        the phone: writes perf.flag, waits for `PERF done`, pulls the report, prints it
+./perf.sh --desktop    the same benchmark in the desktop build
+./perf.sh --watch      tail the periodic `voxfield perf:` lines from the phone
+```
+
+The periodic log line (every 300 frames) is now wall-clock ms with the 1% worst and the max, the GPU
+total, the CPU total, and the three most expensive scopes, so a `logcat` tail alone says where the
+time went.
+
+### What was optimised, and what was measured
+
+Measured on the phone (Adreno 650, 2400x1080, 60 Hz), halm, at the square:
+
+| | GPU ms | wall ms | fps |
+|---|---|---|---|
+| before | 12.62 | 17.98 | 55.6 |
+| after | see `build_desktop/perf/` | | |
+
+1. **The `glFinish` is gone** from the non-capture path. The single biggest win, and it cost nothing.
+2. **The sky is drawn after the opaque world, depth-rejected against it.** It used to be drawn first
+   with the depth test off, shading all 2.59 M pixels — two octaves of value noise, eight hash
+   evaluations each — and then being painted over by the town. The benchmark put `sky clouds off` at
+   **-1.71 ms**, which is what that pass was worth. Now `VX_QUAD_VS` emits the quad at the far plane
+   (`z = 1.0`) and the sky is drawn with `GL_LEQUAL` and no depth write, so every pixel the world
+   already covers is rejected before the fragment shader runs. The pixels that survive are exactly
+   the ones that were visible before, shaded by the same code. It is drawn **after the opaque pass and
+   before the blended one** — the only order that is also correct, since a lamp glow over open sky
+   would be overwritten if the sky came last.
+3. **The cutaway `discard` is the first thing in the world fragment shader**, not the last. It used to
+   sit after the whole pattern had been evaluated, so every discarded fragment paid for ten hash
+   evaluations and a LUT fetch first. Same pixels out.
+4. **A shadow strength of 0 now really skips the taps** in both the world and the sprite shader, which
+   is what makes the benchmark's `shadows off` row mean anything.
+5. **Uniform locations are cached** (`vx_uni`). The render path made about forty
+   `glGetUniformLocation` string lookups a frame and they are the same forty every frame. The cache is
+   keyed by program id and the name's address and is **reset in `vx_gl_init`**, because a fresh
+   program can be handed a recycled id.
+
+None of these changes the look; the captures (`--vox halm`, `--viewh 24`, `--light night`) were
+compared before and after. **No default visual quality or resolution scale was changed.** The
+resolution rows in the report are there so the owner can make that call with numbers.
+
 ## Dev panel
 
 Sun / shadow: azimuth and elevation (each re-renders the shadow map), strength, softness, a
@@ -278,6 +384,9 @@ Above them, **Old 3D field** and **Old tile field**.
 ./capture.sh --vox halm --light night:0.30 --name night   the same colormap the phone uses
 ./capture.sh --vox halm --pitch 40 --fov 32 --viewh 11 --face N --size 2400x1080
 ./capture.sh --vox halm --cut 0 --fog 0                   the diagnostics
+./perf.sh halm                                            the A/B benchmark on the phone, table + report
+./perf.sh --desktop halm                                  the same on the Mac
+./perf.sh --watch                                         tail the periodic frame lines
 ```
 `run_desktop.sh` runs the same binary; `files/map.flag` still drives it to a map with no taps.
 
@@ -302,10 +411,15 @@ non-zero. All three pass.
 
 ## Known issues, in the order they matter
 
-1. **Still not on the phone.** 192.168.1.217:5555 timed out again this round, so there are no device
-   numbers and no device SELFCHECK. Both `voxfield.cpp` and `star_logic.cpp` were compiled for
-   `aarch64-linux-android24` with the NDK and `-DIMGUI_IMPL_OPENGL_ES3` to prove the GLES 3 path
-   builds, which is all that could be proved. **Measure the shadow taps first** when it is reachable.
+1. **~~Still not on the phone.~~ It is on the phone and measured** (2026-09-19). Adreno 650,
+   2400x1080, 60 Hz, halm: 60 fps once the `glFinish` came out, GPU ~9-10 ms of a 16.7 ms budget. The
+   shadow taps turned out **not** to be the thing to fear — `shadows off` is worth only 0.47 ms and
+   `shadow pcf 1` 0.53 ms. `world opaque` is the frame, at 6.5-7.3 ms, and resolution is the only big
+   lever (res 66% is -4.5 ms). See "Performance" above and `build_desktop/perf/`.
+   **The remaining problem is not the average, it is the 1% worst**: the wall clock's p99 sits at
+   33-45 ms against an average of 17, so roughly one frame in a hundred misses vsync outright. That is
+   what still reads as "slow" and it is the next thing to chase — the frame-interval histogram in the
+   HUD's full mode and the vsync buckets in the report are the tools for it.
 2. **The map edge is a visible diorama cliff** where the world stops against the sky. The fog only
    fades by view distance, so an edge eight cells from the party is sharp. A one-cell skirt of ground
    dropped to the bottom of the world, or a ground plane under the whole map, would fix it.

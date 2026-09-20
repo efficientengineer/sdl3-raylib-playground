@@ -39,6 +39,7 @@ struct VxSave {
     int32_t motes, res_scale_pct;
     float sun_az, sun_el, sh_str, sh_soft;
     int32_t sh_snap;
+    int32_t perf_hud;                 // the Perf HUD mode: 0 off, 1 compact, 2 full
 };
 
 VoxField *vx_create();
