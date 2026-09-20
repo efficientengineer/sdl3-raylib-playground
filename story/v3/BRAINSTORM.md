@@ -20,6 +20,12 @@ to be family. She could have lost her own early on and has been working to keep 
 "She could have tried to heal her parents, but wasn't strong enough. The town healer could have
 noticed her potential." (Replaces "Hart's other student" and "asked along instead of followed".)
 
+"I think Ottilie would like to watch Falke get beaten up, finding it funny." She watches the morning
+training from the wall between the houses, laughing, calling the hits before they land (doubles as
+tutorial feedback), and patches him afterwards anyway; at night she comes for the usual show and he
+beats the last dummy — she goes quiet for one beat, then ruins it with a line. (Answers "is she
+watching": yes, she has watched him lose to it a hundred times.)
+
 **{{MENTOR}} (Hart).** "Hart seems pretty uninteresting as a character right now, he doesn't have a
 life. I think it would be cool if he was an engineer, he could create the test dummies that Falke
 uses to train." Confirmed ("That sounds much better"): after his knee broke he builds — ordinary
@@ -59,4 +65,4 @@ areas in the world are hurting" — via an interlude played OUTSIDE the main par
 - What stands between Ottilie and "full-fledged" (orchestrator's suggestion: strength/stamina for big healing, echoing "wasn't strong enough", so the player sees it grow).
 - Does Hart die mid-game (PREMISE beat 10)?
 - The "one or two other things" in Falke's day (owner liked: the resented errand to the guild hall; the town healer as a second elder beside Hart).
-- Is Ottilie watching when he beats the last dummy? Does Falke have any knack for the workshop?
+- Does Falke have any knack for the workshop?
