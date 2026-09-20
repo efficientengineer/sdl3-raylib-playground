@@ -67,6 +67,18 @@ Replaces "running to the board" as the start, and last round's explore block + B
    board?" — "You did. It came in yesterday, with Hart's post." (replaces "Hart carried it in himself
    this morning"; apply when writing). Open: how much the player sees of the letter (proposal: sealed,
    Hart's mark, one examine line; the reveal is saved for the board).
+   *Owner, on Hart's motive:* "I think Hart sends it because he thinks Falke isn't ready. Then the next
+   day, seeing how he finally masters the dummies he's surprised that he is in fact ready. They talk
+   about this after Falke discovers it was Hart's posting." So: Hart mails the water run through
+   {{HERO}} precisely BECAUSE he is sure the boy can't take it; next day he is genuinely surprised,
+   says "ready", gives the sword, not thinking of the envelope; {{HERO}} learns at the board that it
+   was Hart's posting ("You did. It came in yesterday, with Hart's post."); the scene after is the two
+   of them talking about exactly that — Hart: I sent it with you because you weren't ready; then you
+   were. (This replaces a plain "not that one" objection: he can't forbid what he made, handed over,
+   and unlocked.) Orchestrator's proposal, owner not yet answered: an apprentice cannot sign for a job
+   until his teacher says he is ready, and the SWORD is the visible sign — clerk on day one: "No sword,
+   no signature." — so giving the sword is Hart unlocking the door himself. Open: does Hart also admit
+   paying the carters for eleven years in that talk (proposal: no — save it).
 3. *Sundown, dinner at Hart's.* {{HERO}} excited about the guild's jobs opening tomorrow. Hart reminds
    him he isn't ready. A moment to explore {{HEALER}}'s life (plain fact from Hart/the town healer,
    not a speech from her).
