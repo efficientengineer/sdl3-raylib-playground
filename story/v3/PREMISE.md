@@ -1,5 +1,9 @@
 # PREMISE
 
+> **Status (D23, 2026-09-20): not a plan.** The owner writes the story as we go. Everything below is a pool of
+> ideas to draw from or ignore; only finished chapters are canon. See `story/DECISIONS.md` D23.
+
+
 All names are tokens. See `NAMES.md`.
 
 ## The world

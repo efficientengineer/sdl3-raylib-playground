@@ -240,3 +240,31 @@ clustered decals; macro light drift and cloud shadows through the colormap; per-
 biome instead of matched transition tiles. Sizes: atlas cell 128, walker frame 128x192 in a 3x3 sheet
 (side row mirrored), portraits 288 tall, panels at display size. Grid walking, collision, stamps and the
 text maps are unchanged. To reverse: the v1 atlas and fringe code are in git at 3bd149c.
+
+## D21. Building kits and square structural terrain (parked with the tile field)
+
+Designed 2026-09-19 for the tile field; the half-built work is on branch `parked/tiles2-wip`. Superseded by D22.
+
+## D22. The field is a voxel world with sprites
+
+Owner (2026-09-19, after a day of TILES2 bugs): "Let's try a completely different system, a voxel and
+sprite approach. World mostly rendered like Minecraft, but we have sprites for characters and detail."
+Then: Octopath-style look; half-size voxels ("4 blocks should fit into the smallest block size"); shadow
+map; generated navmesh with fully free analog movement and jumping. Engine: `src/voxfield.*`,
+`src/VOXFIELD_NOTES.md`. The world is generated at load from the `.tmap` text maps (terrain → blocks,
+rule-based houses, trees, water channel, reach proof). Flat palette colours + procedural shader detail;
+D19's palette still rules. Nothing is pushed to the owner's phone unless they ask. To reverse: the tile
+field is still in the build behind a Dev button.
+
+## D23. The story is written as we go
+
+Owner (2026-09-20): "I want to write as we go and explore what feels natural instead of trying to
+follow a prescribed story." So `story/v3/PREMISE.md`'s fifteen beats stop being a plan. They are a pool
+of ideas the owner may draw from or ignore. **Canon is only what is on screen in a finished chapter**
+(plus `NAMES.md` and the character entries those chapters rely on). Process per chapter: talk it through
+with the owner (ideas collected in `story/v3/BRAINSTORM.md`, no agents) → one writer pass when the owner
+says write → cold read by an agent who knows nothing → owner reads `chapterNN_script.md` → revise.
+No planting for a future that is not decided (e.g. Hart's death, the workshop book as inheritance): a
+detail stays if it is good in its own scene. `story/v3/THREADS.md` keeps the short list of what finished
+chapters have promised the player, so discovery writing does not drop its own setups. Art, maps and
+level generators are only built for chapters that are written. To reverse: PREMISE.md is untouched.
