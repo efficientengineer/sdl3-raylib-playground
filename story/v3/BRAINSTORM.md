@@ -34,6 +34,14 @@ brings out the sword he made. Knock-ons to settle when writing: PREMISE's "sells
 beat 10's "ledger with his own name in it" (proposal: it becomes Hart's workshop book of every dummy
 attempt); frozen panels of 0120/0140 must be checked against the new action before any rewrite.
 
+"Hart is going to need a portrait redesign for sure." Cost checked: he is in ONE panel scene with art
+(`0120_youre_not_ready`, 6 panels — regenerate, it moves to the workshop/yard anyway); 0130 and 0140
+are talk scenes (portrait only). Needs: new `look` line → new reference sheet (portrait cut from it) →
+0120 shot sheet → later a walker (none exists). Orchestrator's look ideas (owner to edit): self-built
+hinged knee brace as the centrepiece, scorched leather apron with rule and pencils, wire spectacles
+pushed up, worked hands with a bandaged finger, hair less tidy; keep the build, stiff leg, slate-blue
+coat; one hunter's keepsake he did not make.
+
 **The opening.** "Starting the game with running to the board for a quest is too much. That should be
 the second or third thing. We should start getting to know Falke, what his daily routine is like.
 Perhaps he starts by training, maybe he injures himself and goes to see Ottilie, and one or two other
