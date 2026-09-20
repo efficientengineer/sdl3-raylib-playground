@@ -98,6 +98,18 @@ Replaces "running to the board" as the start, and last round's explore block + B
 areas in the world are hurting" — via an interlude played OUTSIDE the main party, whose protagonist
 "join[s] later as a full member" (pitches: `sidestories/PITCHES.md`).
 
+## WRITE IT (owner, 2026-09-20): "Do all your recommendations. Make sure that when Hart gives Falke the sword it is apparent to the player it is a sign of being ready for the guild. Go ahead and write this, I think we have enough ideas for a first draft, although Ottilie is feeling lacking."
+
+Recommendations thereby accepted: "No sword, no signature" (an apprentice cannot sign until his
+teacher says he is ready; a hunter's first sword comes from his teacher and is the visible sign — said
+plainly by the clerk on day one, seen by the player at the board on day two); the eleven years of
+paying the carters STAYS HIDDEN in the talk after the board; the letter is sealed with Hart's mark, one
+examine line, reveal saved for the board; Ottilie's gap to "full-fledged" is strength for big healing
+(she patches the wrist and has to sit down); Hart still dies mid-game (beat 10) and the ledger becomes
+his workshop book of every dummy attempt — plant the book at dinner; the father and the road creature
+get placeholder names as tokens; all proper names tokenised. Interludes remain OPEN (not chapter one).
+**Ottilie "feeling lacking"** — the writer must give her more of her own in this draft and offer options.
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
