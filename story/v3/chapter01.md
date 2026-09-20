@@ -114,19 +114,19 @@ before he will speak to you.
 
 [The guild hall. The bell has stopped. One sheet is left on the board.]
 
-CLERK: You made the bell. The board closed all the same.
+CLERK: You made it on the last ring of the bell.
 
-{{HERO}}: All the same? I went over the grain-yard wall for that bell!
+{{HERO}}: The last ring? I went over the grain-yard wall for that!
 
-CLERK: There is one sheet left on it.
+CLERK: Then look at the board. There is one job sheet left.
 
-{{HERO}}: One sheet? It was covered this morning!
+{{HERO}}: One? It was covered in job sheets this morning!
 
-CLERK: {{RIVAL}} signed for the coast road an hour before the bell.
+CLERK: The others went early. {{RIVAL}} signed for the coast road job an hour ago.
 
-{{HERO}}: An hour before? I was still running!
+{{HERO}}: An hour ago? I was still running!
 
-CLERK: What is left is the water run. Thirty coin, two days out and two days back.
+CLERK: The last job sheet is the water run. Thirty coin, two days out and two days back.
 
 {{HERO}}: Out to where?
 

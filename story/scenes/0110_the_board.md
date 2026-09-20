@@ -8,7 +8,7 @@
 - dialogue_box: no
 
 ## Beat
-The bell has stopped. {{HERO}} has run the whole width of the town and come in a minute late to find the board stripped: {{RIVAL}} signed the good job an hour before the bell and left at noon. The clerk is closing the ledger for the day and is not hurrying for anybody. One sheet is left, a water run nobody wanted, and when {{HERO}} hears who paid for it and what the road is, he takes it standing at the counter, out of breath and furious about being beaten by an hour.
+The bell has stopped. {{HERO}} has run the whole width of the town and come in on the last ring of the bell to find the board stripped: {{RIVAL}} signed the good job an hour before the bell and left at noon. The clerk is closing the ledger for the day and is not hurrying for anybody. One sheet is left, a water run nobody wanted, and when {{HERO}} hears who paid for it and what the road is, he takes it standing at the counter, out of breath and furious about being beaten by an hour.
 
 ## Panels
 1. establishing_tall | the guild hall porch seen from the street at a low angle, double doors standing open on darkness, a bare plank board on the wall beside them with one sheet left hanging on it, no people
@@ -26,13 +26,13 @@ The bell has stopped. {{HERO}} has run the whole width of the town and come in a
    - {{HERO}}: eyes fixed on the Guildclerk, narrowed, brows low and level, jaw set, decided
 
 ## Dialogue
-- Clerk [1] {tense}: You made the bell. The board closed all the same.
-- {{HERO}} [2]: All the same? I went over the grain-yard wall for that bell!
-- Clerk: There is one sheet left on it.
-- {{HERO}} [3]: One sheet? It was covered this morning!
-- Clerk: {{RIVAL}} signed for the coast road an hour before the bell.
-- {{HERO}} [4] {confront}: An hour before? I was still running!
-- Clerk [5] {wonder}: What is left is the water run. Thirty coin, two days out and two days back.
+- Clerk [1] {tense}: You made it on the last ring of the bell.
+- {{HERO}} [2]: The last ring? I went over the grain-yard wall for that!
+- Clerk: Then look at the board. There is one job sheet left.
+- {{HERO}} [3]: One? It was covered in job sheets this morning!
+- Clerk: The others went early. {{RIVAL}} signed for the coast road job an hour ago.
+- {{HERO}} [4] {confront}: An hour ago? I was still running!
+- Clerk [5] {wonder}: The last job sheet is the water run. Thirty coin, two days out and two days back.
 - {{HERO}}: Out to where?
 - Clerk: The {{STAIR}}. A jar of our well water goes there sealed, every year.
 - {{HERO}}: What for?

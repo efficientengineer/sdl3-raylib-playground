@@ -25,7 +25,7 @@ unwritten line shows up in the game as an obvious bracket rather than as silence
 line, brackets and all.
 
 ## halm.guild_hall_door
-One sheet left on the board inside, and the bell is still going. The water run out to the {{STAIR}}, thirty coin, leaves at dawn.
+One job sheet left on the board inside, and the bell is still going. The water run out to the {{STAIR}}, thirty coin, leaves at dawn.
 - what: the shut guild hall door, the message trigger at 20 15 on halm
 
 ## halm.board
