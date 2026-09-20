@@ -225,7 +225,7 @@ for d in $DEV_FIELD; do
     if [ "$d" = "tilesets" ]; then
         for sub in $("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/tilesets && ls -d */ 2>/dev/null'" | tr -d '\r/'); do
             for n in $("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/tilesets/$sub 2>/dev/null" | tr -d '\r'); do
-                [ "$n" = "swatches" ] && continue        # a folder, and its files are listed by path
+                { [ "$n" = "swatches" ] || [ "$n" = "decals" ]; } && continue        # a folder, and its files are listed by path
                 grep -qx "tilesets/$sub/$n" "$SHIP_FIELD" && continue
                 echo "  prune field/tilesets/$sub/$n"
                 "$ADB" -s "$DEVICE" shell "run-as $PKG rm -f files/field/tilesets/$sub/$n"
