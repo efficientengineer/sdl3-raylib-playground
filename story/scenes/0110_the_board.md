@@ -30,7 +30,7 @@ The bell has stopped. {{HERO}} has run the whole width of the town and come in o
 - {{HERO}} [2]: The last ring? I went over the grain-yard wall for that!
 - Clerk: Then look at the board. There is one job sheet left.
 - {{HERO}} [3]: One? It was covered in job sheets this morning!
-- Clerk: The others went early. {{RIVAL}} signed for the coast road job an hour ago.
+- Clerk: The others went early. {{RIVAL}} signed for the {{COAST_ROAD}} job an hour ago.
 - {{HERO}} [4] {confront}: An hour ago? I was still running!
 - Clerk [5] {wonder}: The last job sheet is the water run. Thirty coin, two days out and two days back.
 - {{HERO}}: Out to where?

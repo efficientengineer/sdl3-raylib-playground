@@ -37,10 +37,23 @@ on a job no one will describe to him, and for twenty years carried the year's wa
 
 ## {{HEALER}} — healer, twenty-three
 
-Tall, pale-gold hair, a gold sun medallion, a mace she is better with than she admits. {{MENTOR}}'s
-other student, three years ahead, and the first person who ever told {{HERO}} to his face that he'd
-be good. Kind and sharp, and willing to tell you the frightening thing over breakfast.
-**Wants:** to be asked along instead of followed.
+Tall, pale-gold hair, a gold sun medallion, a mace she is better with than she admits. She lives in
+the house next door to {{MENTOR}}'s, and she has lived in it on her own since she was nine, when a
+fever took her mother and her father in the same winter. She has kept herself going since: working,
+learning healing, six years ahead of {{HERO}} and the older kid next door he has looked up to his
+whole life. Relaxed, capable, teasing, never condescending, and the first person who ever told
+{{HERO}} to his face that he'd be good.
+
+She is an **apprentice** healer, not a finished one. A healer is given full standing after a season
+of work away from home, and she has never had one — two walks west and back is not a season. That is
+the whole of what stands between her and "full", and it is why the water run is hers to want.
+
+**Wants:** people she chooses to be her family. She never says it. It is in the behaviour: she is
+always already there, she comes over the wall instead of knocking, she eats at {{MENTOR}}'s table,
+she has {{HERO}}'s bandages rolled before he knows he is going anywhere, and when he finally asks her
+to come west her yes is instant and she covers it with a joke. Being asked matters because being
+asked means being chosen. Her own family is one plain fact, said once, late and lightly; she is the
+warm steady one and she is never tragic about it.
 
 ## {{SCHOLAR}} — reads a third of their marks (joins chapter two)
 
@@ -57,7 +70,9 @@ on that shore, and a caretaker comes twice a year to keep it going.
 
 ## {{MENTOR}} — the old hunter
 
-Trained {{HERO}}'s father, then {{HEALER}}, then {{HERO}}. He and the father were hunting partners for
+Trained {{HERO}}'s father, then {{HERO}}. {{HEALER}} is the neighbour's girl who patches his knee and
+his hunters — he showed her how to hold the mace and that is the end of it, she is not his student.
+He and the father were hunting partners for
 twenty years and the water run was theirs together: two men and one sealed jar, every year, on the
 same day, off the road and across two days of empty country they had to fight their way over. A pair
 cut each other loose and patch each other up; a man on his own fights everything alone, which is what

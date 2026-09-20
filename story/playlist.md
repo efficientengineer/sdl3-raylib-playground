@@ -22,10 +22,10 @@ skipped by `export` (warning each) and the intro plays as the three talk scenes;
 
 ## chapter01
 
-*The Jar Run* — 8 scenes, one per clip of `story/v3/chapter01.md`. Maps in order: hart_yard, halm,
-hart_yard, hart_yard, hart_yard, bridge, ridge_camp, stair_shrine.
+*The Jar Run* — 8 scenes, one per clip of `story/v3/chapter01.md`. Maps in order: halm,
+halm, hart_yard, hart_yard, hart_yard, bridge, ridge_camp, stair_shrine.
 
-- 0105_bandages
+- 0105_the_wrist
 - 0110_the_board
 - 0120_youre_not_ready
 - 0130_he_signs

@@ -8,7 +8,7 @@
 - dialogue_box: no
 
 ## Beat
-{{HERO}} has come up the hill to stop {{MENTOR}} pulling the water run back off the board before dark, and {{MENTOR}} will not come down off his roof to have the argument, so the whole thing is shouted upward while he goes on nailing tiles. {{HEALER}} has the ladder and will not let {{HERO}} climb it, and she is enjoying this. It is funny until {{MENTOR}} says why: he and the father walked that water out together for twenty years, the road took his knee, and the year the father walked it alone he did not come back. Then he goes back to his tiles.
+{{HERO}} has come up the hill to stop {{MENTOR}} pulling the water run back off the board before dark, and {{MENTOR}} will not come down off his roof to have the argument, so the whole thing is shouted upward while he goes on nailing tiles. {{HEALER}} came over the wall from next door, set the ladder up herself and will not let {{HERO}} climb it, and she is enjoying this. It is funny until {{MENTOR}} says why: he and the father walked that water out together for twenty years, the road took his knee, and the year the father walked it alone he did not come back. Then he goes back to his tiles.
 
 ## Panels
 1. establishing_wide | the yard on the hill at last light, a squat house with half its roof tiles laid, a long ladder to the eaves, {{MENTOR}} small up on the roof, {{HERO}} and {{HEALER}} at the ladder foot
@@ -28,9 +28,24 @@
    - {{HEALER}}: seen from above, looking up at the camera, both hands still on the ladder rails, half a smile
 
 ## Dialogue
-- {{HERO}} [1] {tense}: You put the water run on the board this morning and you never said a word to me!
+- {{HERO}} [1] {tense}: You put the water run on the board this morning and you never told me!
 - {{MENTOR}} [2]: Taking it back down before dark. Forget you saw it.
-- {{HERO}} [3]: It goes out tomorrow or it doesn't go at all, and there's no convoy left to put it on! Who else is going to walk it — you, on that knee?
-- {{MENTOR}} [4] {sorrow}: Your father and I walked that water out together for twenty years. Twentieth year the road broke my knee. Next year he walked it on his own and didn't come back. Eleven years ago. Not putting you on it.
-- {{HERO}} [5]: You haven't even told me I'm not ready yet. You're saving it.
-- {{MENTOR}} [6] {hope}: I'm saving it. Hold the ladder.
+- {{HERO}}: You can't take it down. I signed for it an hour ago!
+- {{MENTOR}}: I paid for it out of my own pocket. I can pull it back until dawn.
+- {{HERO}}: It goes out tomorrow or it doesn't go at all!
+- {{MENTOR}}: Then it doesn't go.
+- {{HERO}}: Come down and say that to my face. I'm climbing up there!
+- {{HEALER}} [3]: You are not climbing this ladder. I set it up and I am holding it.
+- {{HERO}}: {{HEALER}}! Whose side are you on?
+- {{HEALER}}: His roof, his ladder. And I am the one who puts him back together.
+- {{MENTOR}}: Eats at my table four nights a week. She gets a say.
+- {{HERO}}: Then who is going to carry that jar west — you, on that knee?
+- {{MENTOR}} [4] {sorrow}: That road broke my knee. I have not walked it since.
+- {{HERO}}: Broke it how?
+- {{MENTOR}}: {{FATHER}} and I carried that water out together for twenty years.
+- {{MENTOR}}: The twentieth year my knee went on the way home.
+- {{MENTOR}}: The year after that, your father walked it on his own.
+- {{HERO}} [5]: And he didn't come back. I was six years old!
+- {{MENTOR}}: Eleven years, and I have not put anyone on that road since.
+- {{HERO}} [6]: You haven't even told me I'm not ready yet. You're saving it.
+- {{MENTOR}} {hope}: I'm saving it. Hold the ladder.
