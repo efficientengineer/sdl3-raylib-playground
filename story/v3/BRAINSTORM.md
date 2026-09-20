@@ -48,10 +48,31 @@ hinged knee brace as the centrepiece, scorched leather apron with rule and penci
 pushed up, worked hands with a bandaged finger, hair less tidy; keep the build, stiff leg, slate-blue
 coat; one hunter's keepsake he did not make.
 
-**The opening.** "Starting the game with running to the board for a quest is too much. That should be
-the second or third thing. We should start getting to know Falke, what his daily routine is like.
-Perhaps he starts by training, maybe he injures himself and goes to see Ottilie, and one or two other
-things."
+**The opening — SETTLED (owner, "All day version. I like all the changes thus far.").**
+Replaces "running to the board" as the start, and last round's explore block + Bandages.
+1. *Midday, Hart's yard.* The game opens on {{HERO}} finishing a training session on Hart's dummies
+   and losing. {{HEALER}} on the wall laughing. Hart: not quite ready yet. {{HERO}} has NO knack for
+   the workshop — he can't see why the dummy beat him; Hart can. (First control + tutorial; the small
+   injury and her patching it belong here.)
+2. *Afternoon errand* (the "one or two other things"): Hart invites {{HEALER}} to dinner at his place
+   with him and {{HERO}}, and sends {{HERO}} into town — bread for three, a repaired part to the guild
+   hall. The player passes the well and the jar, the Stair on the horizon, the board being readied:
+   the guild's job sheets open TOMORROW. {{HEALER}} meanwhile at the town healer's; her own house at
+   dinner time: dark, tidy, one chair — she walks next door to the lit one.
+3. *Sundown, dinner at Hart's.* {{HERO}} excited about the guild's jobs opening tomorrow. Hart reminds
+   him he isn't ready. A moment to explore {{HEALER}}'s life (plain fact from Hart/the town healer,
+   not a speech from her).
+4. *Night.* {{HERO}} alone: he will make sure he's ready.
+5. *Before dawn → all day.* He is at the dummies from before first light and it takes ALL DAY (the
+   player fails with him, {{HEALER}} comes for the usual show). He beats the last dummy; Hart sees;
+   Hart gives him the sword he made: "You're ready." — and the evening bell is already ringing: the
+   board has been open all day while he was in the yard. The run for the bell is CAUSED by the win;
+   only the water run is left because everyone else signed hours ago.
+6. *The Board* (`0110`, approved dialogue) follows. Afterwards Hart's objection is no longer "you're
+   not ready" (he has just said ready) but "NOT THAT ONE": the road that broke his knee and killed his
+   partner, posted by himself with his own money, never imagining {{HERO}} would take it.
+   The old `0120_youre_not_ready` moves to the opening (midday); its 6 panels are regenerated anyway
+   for Hart's redesign. `0140_the_sword` (talk scene, no art) becomes the giving.
 
 **The world.** "I still don't think we've explored the world enough." "We need a bit more about how
 areas in the world are hurting" — via an interlude played OUTSIDE the main party, whose protagonist
@@ -64,5 +85,3 @@ areas in the world are hurting" — via an interlude played OUTSIDE the main par
 - The road creature's new name.
 - What stands between Ottilie and "full-fledged" (orchestrator's suggestion: strength/stamina for big healing, echoing "wasn't strong enough", so the player sees it grow).
 - Does Hart die mid-game (PREMISE beat 10)?
-- The "one or two other things" in Falke's day (owner liked: the resented errand to the guild hall; the town healer as a second elder beside Hart).
-- Does Falke have any knack for the workshop?
