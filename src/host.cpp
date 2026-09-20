@@ -53,6 +53,15 @@ struct HotReloader {
             return false;
         }
         api = get_api();
+        // Desktop watches the .dylib's mtime. Record it HERE, at the moment it is loaded, or
+        // last_mod_time is 0 and the very first check — about a second after startup — sees a
+        // "change" and reloads a library that was never rebuilt. That cost a free game_create on
+        // every desktop launch, and it silently killed anything the first second had set up: the
+        // benchmark started from perf.flag was wiped by it, which is why `perf.sh --desktop` used to
+        // log "PERF start" twice and could hang with no rows at all.
+#ifndef __ANDROID__
+        { struct stat st; if (stat(path, &st) == 0) last_mod_time = st.st_mtime; }
+#endif
         LOGI("Hot reload: loaded %s\n", path);
         return true;
     }

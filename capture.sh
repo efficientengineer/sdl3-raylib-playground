@@ -22,6 +22,11 @@
 #
 set -e
 
+# Every Mac run of the game is a TEST run, so it is silent by default: STAR_MUTE forces mute at
+# startup whatever settings.ini says, and the forced state is never written back to the file.
+# The Settings window shows "muted by STAR_MUTE" and the owner can still untick it for the session.
+export STAR_MUTE=1
+
 # One dialogue box, drawn by the real player: ./capture.sh --dialog 0110_the_board 4 [page] [n|x]
 #   n = draw it as a Narrator line (no name, no portrait, centred), x = no portrait.
 if [ "$1" = "--dialog" ]; then
@@ -84,7 +89,7 @@ if [ "$1" = "--vox" ]; then
     cd "$ROOT"
     VOX_AT="$AT" VOX_ORTHO="$ORTHO" VOX_HD2D="$HD2D" VOX_LIGHT="$LIGHT" VOX_PITCH="$PITCH" \
     VOX_FOV="$FOV" VOX_VIEWH="$VIEWH" VOX_FACE="$FACE" VOX_CUT="$CUT" VOX_FOG="$FOG" VOX_TILT="$TILT" \
-        VOX_CAPTURE="$MAP:$W:$H:$OUT" "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "SELFCHECK|voxfield: (capture|walker|[0-9]+ cells)" || true
+        VOX_CAPTURE="$MAP:$W:$H:$OUT" "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "SELFCHECK|OVERDRAW|voxfield: (capture|walker|[0-9]+ cells)" || true
     if [ -f "$OUT" ]; then
         echo "wrote $OUT"
         exit 0

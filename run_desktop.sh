@@ -5,6 +5,10 @@
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT" || exit 1
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# Every Mac run of the game is a TEST run, so it is silent by default: STAR_MUTE forces mute at
+# startup whatever settings.ini says, and the forced state is never written back to the file.
+# The Settings window shows "muted by STAR_MUTE" and the owner can still untick it for the session.
+export STAR_MUTE=1
 LOG="$ROOT/build_desktop/run_desktop.log"
 mkdir -p "$ROOT/build_desktop"
 {

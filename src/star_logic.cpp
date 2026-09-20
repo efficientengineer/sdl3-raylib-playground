@@ -203,6 +203,89 @@ static float mus_sample(float dt) {
     return mus.volume;
 }
 
+// ───────────────────────── Settings (the player's, not the dev's) ─────────────────────────
+// Volume and mute, in `settings.ini` in the pref dir: a plain two-line text file, deliberately NOT
+// part of save.dat — that blob is a raw memcpy of Game, and adding a field to it changes the layout
+// and invalidates every existing save (see CLAUDE.md, "Diagnosing crashes"). A separate file also
+// survives a save being deleted, which is what a settings file should do.
+//
+// STAR_MUTE=1 in the environment forces mute for the session whatever the file says, and the forced
+// state is NEVER written back. That is what every Mac test path sets: run_desktop.sh, capture.sh and
+// perf.sh --desktop all export it, so no automated run can make noise in the owner's room. The
+// Settings window shows why it is muted and still lets the owner untick it for that session.
+struct StarSettings {
+    float volume;          // 0..1
+    bool muted;
+    bool env_forced;       // STAR_MUTE was set at startup
+    bool dirty;            // a change is waiting to be written
+    float save_t;          // debounce
+    float gain;            // the ramped gain the mixer actually applies
+    bool open;             // the window
+};
+static StarSettings g_set;
+
+static const char *pref_path();                 // defined with the other file helpers, below
+
+static const char *settings_path() {
+    static char p[640];
+    if (!p[0]) snprintf(p, sizeof p, "%ssettings.ini", pref_path());
+    return p;
+}
+
+static void settings_save(void) {
+    // The forced-mute state is a property of the run, not of the owner's preference, so it is never
+    // persisted: what goes in the file is the mute the owner actually chose.
+    char buf[128];
+    int n = snprintf(buf, sizeof buf, "volume=%.3f\nmuted=%d\n", g_set.volume,
+                     (g_set.muted && !g_set.env_forced) ? 1 : 0);
+    SDL_IOStream *io = SDL_IOFromFile(settings_path(), "w");
+    if (!io) return;
+    SDL_WriteIO(io, buf, (size_t)n);
+    SDL_CloseIO(io);
+    g_set.dirty = false;
+}
+
+static void settings_load(void) {
+    const char *e = SDL_getenv("STAR_MUTE");
+    g_set.env_forced = e && e[0] && e[0] != '0';
+    // Defaults: the phone ships unmuted at 80 %. The Mac ships MUTED, because every desktop run here
+    // is a test run and the owner should never be startled by one.
+#ifdef __ANDROID__
+    g_set.volume = 0.80f; g_set.muted = false;
+#else
+    g_set.volume = 0.80f; g_set.muted = true;
+#endif
+    size_t sz = 0;
+    char *text = (char *)SDL_LoadFile(settings_path(), &sz);
+    if (text) {
+        for (char *line = text; line && *line; ) {
+            char *nl = strchr(line, '\n');
+            if (nl) *nl = 0;
+            if (!strncmp(line, "volume=", 7)) {
+                float f = (float)atof(line + 7);
+                if (f >= 0.0f && f <= 1.0f) g_set.volume = f;
+            } else if (!strncmp(line, "muted=", 6)) {
+                g_set.muted = atoi(line + 6) != 0;
+            }
+            line = nl ? nl + 1 : nullptr;
+        }
+        SDL_free(text);
+    }
+    if (g_set.env_forced) g_set.muted = true;
+    g_set.gain = (g_set.muted ? 0.0f : g_set.volume);     // no ramp at startup: start where we are
+    g_set.dirty = false; g_set.save_t = 0;
+    SDL_Log("audio: volume=%.0f%% muted=%s%s", g_set.volume * 100.0f, g_set.muted ? "yes" : "no",
+            g_set.env_forced ? " (forced by env STAR_MUTE)" : "");
+}
+
+// Debounced write, called once a frame. A slider drag is dozens of changes a second; one file write
+// half a second after the last of them is the whole point.
+static void settings_tick(float dt) {
+    if (!g_set.dirty) return;
+    g_set.save_t += dt;
+    if (g_set.save_t >= 0.5f) { g_set.save_t = 0; settings_save(); }
+}
+
 static void au_init() {
     memset(au_voices, 0, sizeof(au_voices));
     SDL_AudioSpec spec = { SDL_AUDIO_F32, 1, AU_RATE };
@@ -215,8 +298,15 @@ static void au_update() {
     static float buf[512];
     const float dt = 1.0f / AU_RATE;
     const int want = (int)(AU_RATE * 0.10f * sizeof(float));                // keep ~100 ms queued
+    // The player's master gain, ramped over ~20 ms. Jumping it would click, and a click is the one
+    // thing a mute button must not do. Music and effects both go through it — it is the LAST thing
+    // applied, after the limiter, so muting is silence and not a quieter limiter.
+    const float target = g_set.muted ? 0.0f : g_set.volume;
+    const float ramp = 1.0f / (AU_RATE * 0.020f);
     while (SDL_GetAudioStreamQueued(au_stream) < want) {
         for (int i = 0; i < 512; i++) {
+            if (g_set.gain < target) { g_set.gain += ramp; if (g_set.gain > target) g_set.gain = target; }
+            else if (g_set.gain > target) { g_set.gain -= ramp; if (g_set.gain < target) g_set.gain = target; }
             float music_gain = mus_sample(dt), m = 0.0f, fx = 0.0f;
             for (int v = 0; v < AU_VOICES; v++) {
                 Voice *vo = &au_voices[v];
@@ -226,7 +316,7 @@ static void au_update() {
                 vo->t += dt;
                 if (vo->t >= vo->dur) vo->type = V_OFF;
             }
-            buf[i] = tanhf((m * music_gain * 0.8f + fx) * 1.1f);            // soft limiter
+            buf[i] = tanhf((m * music_gain * 0.8f + fx) * 1.1f) * g_set.gain;   // soft limiter, then master
         }
         SDL_PutAudioStreamData(au_stream, buf, sizeof(buf));
     }
@@ -818,12 +908,46 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     if (dev.poll_t > (dev.open ? 0.5f : 3.0f)) { dev.poll_t = 0; dev_load(); }
 
     ImGuiWindowFlags bare = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground;
+    // The two corner buttons: Settings (the player's) and Dev (the owner's). Settings is drawn first
+    // so it sits to the LEFT of Dev, and it is here rather than inside the Dev panel on purpose —
+    // it belongs to whoever is holding the phone, on the title, in a cutscene and in the field alike.
     ImGui::SetNextWindowPos(ImVec2(w - 4 * k, 4 * k), ImGuiCond_Always, ImVec2(1, 0));
     ImGui::Begin("##devbtn", nullptr, bare | ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.30f, 0.28f, 0.18f, g_set.open ? 0.9f : 0.35f));
+    if (ImGui::Button("Settings")) g_set.open = !g_set.open;
+    ImGui::PopStyleColor();
+    ImGui::SameLine();
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.25f, 0.5f, dev.open ? 0.9f : 0.35f));
     if (ImGui::Button(dev.open ? "Close" : "Dev")) { dev.open = !dev.open; dev.scroll = true; }
     ImGui::PopStyleColor();
     ImGui::End();
+
+    if (g_set.open) {
+        ImGui::SetNextWindowPos(ImVec2(w * 0.5f, h * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(w * (w > h ? 0.46f : 0.86f), 0));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.06f, 0.06f, 0.10f, 0.97f));
+        ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove |
+                                          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                                          ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::TextUnformatted("Audio");
+        int pct = (int)(g_set.volume * 100.0f + 0.5f);
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+        if (ImGui::SliderInt("Master volume", &pct, 0, 100, "%d %%")) {
+            g_set.volume = pct / 100.0f;
+            g_set.dirty = true; g_set.save_t = 0;
+        }
+        bool mute = g_set.muted;
+        if (ImGui::Checkbox("Mute", &mute)) { g_set.muted = mute; g_set.dirty = true; g_set.save_t = 0; }
+        if (g_set.env_forced) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.95f, 0.80f, 0.45f, 1.0f), "muted by STAR_MUTE");
+        }
+        ImGui::Separator();
+        if (ImGui::Button("Close")) g_set.open = false;
+        ImGui::End();
+        ImGui::PopStyleColor();
+    }
+
     if (!dev.open) return;
 
     ImGui::SetNextWindowPos(ImVec2(w * 0.02f, h * 0.06f));
@@ -907,6 +1031,8 @@ static void *game_create(float dpi_scale) {
     st->fade = 1.0f;                                   // open from black
     memset(&dev, 0, sizeof(dev));
     memset(&mus, 0, sizeof(mus));
+    memset(&g_set, 0, sizeof(g_set));
+    settings_load();                  // before au_init: the gain starts where the file says it is
     au_init();
     dev_load();
     return st;
@@ -1147,6 +1273,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     }
 
     draw_dev(st, w, h, dt, dpi_scale);
+    settings_tick(dt);
     au_update();
 }
 

@@ -12,6 +12,11 @@
 # It takes a few minutes and moves the camera, so it only ever runs when it is asked for.
 set -e
 
+# Every Mac run of the game is a TEST run, so it is silent by default: STAR_MUTE forces mute at
+# startup whatever settings.ini says, and the forced state is never written back to the file.
+# The Settings window shows "muted by STAR_MUTE" and the owner can still untick it for the session.
+export STAR_MUTE=1
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 ADB="$HOME/Library/Android/sdk/platform-tools/adb"
 DEVICE="192.168.1.217:5555"

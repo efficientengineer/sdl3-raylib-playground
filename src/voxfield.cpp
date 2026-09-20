@@ -340,6 +340,8 @@ struct VoxField {
     // gl
     bool gl_ready;
     GLuint prog, vao, spr_prog, spr_vao, spr_vbo, post_prog, blur_prog, quad_vao, quad_vbo;
+    GLuint prog_cut;                  // the world shader WITH the cutaway's discard (see VX_FS_CUT)
+    GLuint od_prog;                   // the overdraw probe: one constant step a depth-passing fragment
     GLuint fbo, fbo_tex, fbo_depth; int fbo_w, fbo_h;
     GLuint half_fbo[3], half_tex[3]; int half_w, half_h;
     GLuint out_fbo, out_tex;
@@ -397,6 +399,17 @@ struct VoxField {
     char bench_rows[64][320]; int bench_row_n;
     double bench_base_ms;
     float bench_poll;
+    // Overdraw (the orchestrator's question: would a deferred pass pay for itself?). od_view turns
+    // the Dev panel's false-colour debug view on; od_avg is the last measurement — the mean number of
+    // times a pixel of the opaque world was written, i.e. how much shading a perfect depth prepass
+    // would have saved. It is measured by a readback, so it happens in the capture and benchmark
+    // paths and (at most once a second) in the debug view. Never in normal play.
+    int od_view;
+    double od_avg, od_cut_frac;
+    int od_chunks_cut;
+    // The order vx_render last drew the visible chunks in. The probe replays exactly that, so the
+    // number it reports is the real pass's overdraw and not some other order's.
+    VxChunk *od_order[VX_CHUNKS]; int od_nord;
 };
 
 static int vx_max_tex = 0;
@@ -2003,7 +2016,7 @@ static const char *VX_VS =
     "  gl_Position = u_mvp * vec4(a_pos, 1.0);\n"
     "}\n";
 
-static const char *VX_FS =
+static const char *VX_FS_HEAD =
     "in vec3 v_world;\n"
     "flat in uint v_type;\n"
     "flat in uint v_face;\n"
@@ -2044,13 +2057,26 @@ static const char *VX_FS =
     "  float a = h21(i), b = h21(i+vec2(1,0)), c = h21(i+vec2(0,1)), d = h21(i+vec2(1,1));\n"
     "  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }\n"
     "vec3 look(float idx, float row){ return texture(u_cmap, vec2((idx+0.5)/256.0, (row+0.5)/u_cmaph)).rgb; }\n"
-    "void main(){\n"
-    // The cutaway comes FIRST. It used to sit after the whole pattern had been evaluated, which meant
-    // every discarded fragment still paid for ten hash evaluations and a LUT fetch. Same pixels out.
+    "void main(){\n";
+
+// The cutaway, and it is a SEPARATE PROGRAM. It used to sit inside the one world shader under a
+// uniform branch — but a fragment shader that contains `discard` anywhere is a shader the GPU cannot
+// assume writes depth at the rasterized value, so Adreno turns LRZ (its early-Z / hidden-surface
+// removal) OFF for the whole draw. Every chunk of the town was then shaded in full — ten hash
+// evaluations and four shadow taps a fragment — for pixels a nearer wall went on to cover.
+//
+// So: two programs from the same source, one with this block and one without, and the cutaway one is
+// used only for the chunks that could actually hold the fragments it discards (nearer than the party
+// and overlapping the cutaway circle on screen — vx_chunk_needs_cut). Everything else runs the
+// discard-free variant and keeps early-Z. The pixels that come out are identical either way, because
+// a chunk that fails that test has no fragment the block would have discarded.
+static const char *VX_FS_CUT =
     "  if (u_player.w > 0.5 && v_viewz < u_player.z - 0.6) {\n"
     "    float dsc = length(gl_FragCoord.xy - u_player.xy) / u_player.w;\n"
     "    if (dsc < 1.0) { if (dsc < 0.76 || h21(floor(gl_FragCoord.xy / 3.0)) > (dsc - 0.76) / 0.24) discard; }\n"
-    "  }\n"
+    "  }\n";
+
+static const char *VX_FS_BODY =
     "  int ty = int(v_type);\n"
     "  int pat = int(texelFetch(u_lut, ivec2(12, ty), 0).r * 255.0 + 0.5);\n"
     "  if (u_qpattern < 0.5) pat = 99;\n"
@@ -2315,6 +2341,31 @@ static const char *VX_SKY_FS =
     "    c = mix(c, look(u_ic), k); }\n"
     "  o = vec4(c, 1.0); }\n";
 
+// The overdraw probe. One constant 1/255 a fragment, blended ONE/ONE with the ordinary depth test
+// and depth write, so what accumulates in a pixel is the number of times the opaque world WROTE
+// that pixel — which is exactly the shading a perfect depth prepass (or a deferred pass) would have
+// saved. It shares VX_VS, so it rasterizes the same triangles in the same places; it has no discard,
+// so it does not itself defeat early-Z.
+// u_step is 1/255 when the number is being measured (so the byte in the pixel IS the write count)
+// and something visible when the debug view is being looked at.
+static const char *VX_OD_FS =
+    "uniform float u_step;\n"
+    "out vec4 o;\n"
+    "void main(){ o = vec4(u_step, u_step * 0.55, u_step * 0.25, 1.0); }\n";
+
+static GLuint vx_shader_n(GLenum type, const char **src, int n, const char *what) {
+    GLuint s = glCreateShader(type);
+    const char *parts[6] = { VX_PREFIX };
+    if (n > 5) n = 5;
+    for (int i = 0; i < n; i++) parts[i + 1] = src[i];
+    glShaderSource(s, n + 1, parts, nullptr);
+    glCompileShader(s);
+    GLint ok = 0;
+    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    if (!ok) { char log[2048] = ""; glGetShaderInfoLog(s, sizeof(log) - 1, nullptr, log); SDL_Log("voxfield %s shader: %s", what, log); }
+    return s;
+}
+
 static GLuint vx_shader(GLenum type, const char *src, const char *what) {
     GLuint s = glCreateShader(type);
     const char *parts[2] = { VX_PREFIX, src };
@@ -2337,12 +2388,32 @@ static GLuint vx_program(const char *vs_src, const char *fs_src, const char *wha
     return p;
 }
 
+// Same, with the fragment source assembled from several pieces — which is how the world's two
+// variants (with and without the cutaway's `discard`) are built from one body of code.
+static GLuint vx_program_n(const char *vs_src, const char **fs, int n, const char *what) {
+    GLuint v_ = vx_shader(GL_VERTEX_SHADER, vs_src, what), f_ = vx_shader_n(GL_FRAGMENT_SHADER, fs, n, what);
+    GLuint p = glCreateProgram();
+    glAttachShader(p, v_); glAttachShader(p, f_);
+    glLinkProgram(p);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { char log[2048] = ""; glGetProgramInfoLog(p, sizeof(log) - 1, nullptr, log); SDL_Log("voxfield %s link: %s", what, log); }
+    glDeleteShader(v_); glDeleteShader(f_);
+    return p;
+}
+
 // ───────────────────────── GL objects ─────────────────────────
 
 static void vx_gl_init(VoxField *v) {
     vx_probe_limits();
     vx_uni_reset();          // fresh programs may be handed recycled ids: the cache must not survive
-    v->prog = vx_program(VX_VS, VX_FS, "world");
+    {   // the world, twice: without the cutaway's discard (early-Z lives) and with it
+        const char *plain[2] = { VX_FS_HEAD, VX_FS_BODY };
+        const char *cut[3]   = { VX_FS_HEAD, VX_FS_CUT, VX_FS_BODY };
+        v->prog     = vx_program_n(VX_VS, plain, 2, "world");
+        v->prog_cut = vx_program_n(VX_VS, cut,   3, "world cutaway");
+    }
+    v->od_prog = vx_program(VX_VS, VX_OD_FS, "overdraw");
     v->spr_prog = vx_program(VX_SPR_VS, VX_SPR_FS, "sprite");
     v->blur_prog = vx_program(VX_QUAD_VS, VX_BLUR_FS, "blur");
     v->post_prog = vx_program(VX_QUAD_VS, VX_POST_FS, "post");
@@ -3092,14 +3163,20 @@ static int vx_emit_sprites(VoxField *v, VxSprVert *out, int cap, int kind, GLuin
     return n;
 }
 
-static void vx_draw_sprite_batch(VoxField *v, const VxSprVert *vert, int n) {
-    if (n <= 0) return;
+// Upload a whole sprite vertex array in one go and point the attributes at it. Callers then draw
+// ranges out of it — one upload a pass, not one an object.
+static void vx_sprite_upload(VoxField *v, const VxSprVert *vert, int n) {
     glBindVertexArray(v->spr_vao);
     glBindBuffer(GL_ARRAY_BUFFER, v->spr_vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(VxSprVert) * (size_t)n, vert, GL_STREAM_DRAW);
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)0);
     glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)12);
     glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(VxSprVert), (void *)20);
+}
+
+static void vx_draw_sprite_batch(VoxField *v, const VxSprVert *vert, int n) {
+    if (n <= 0) return;
+    vx_sprite_upload(v, vert, n);
     glDrawArrays(GL_TRIANGLES, 0, n);
     vxp_draw(n / 3);
 }
@@ -3298,6 +3375,53 @@ static void vx_draw_sky(VoxField *v, const float *sky) {
     glDepthMask(GL_TRUE);
 }
 
+// Can this chunk hold a fragment the cutaway would discard? The shader's test is
+// `v_viewz < u_player.z - 0.6` AND inside a circle of radius `rad` px around u_player.xy, so a chunk
+// that is entirely behind the party, or whose screen box misses that circle's box, has no such
+// fragment and can be drawn with the discard-free program. The pixels are identical; only early-Z
+// changes. Conservative everywhere it is unsure (a corner behind the near plane → yes).
+static bool vx_chunk_needs_cut(VoxField *v, const float *lo, const float *hi,
+                               int w, int h, float rad) {
+    if (rad <= 0.0f) return false;
+    float minz = 1e30f, sx0 = 1e30f, sy0 = 1e30f, sx1 = -1e30f, sy1 = -1e30f;
+    for (int c = 0; c < 8; c++) {
+        float p[3] = { (c & 1) ? hi[0] : lo[0], (c & 2) ? hi[1] : lo[1], (c & 4) ? hi[2] : lo[2] };
+        float vz = -(v->view[2] * p[0] + v->view[6] * p[1] + v->view[10] * p[2] + v->view[14]);
+        if (vz < minz) minz = vz;
+        float cw = v->mvp[3] * p[0] + v->mvp[7] * p[1] + v->mvp[11] * p[2] + v->mvp[15];
+        if (cw <= 1e-4f) return true;                       // crosses the near plane — don't guess
+        float cx = v->mvp[0] * p[0] + v->mvp[4] * p[1] + v->mvp[8]  * p[2] + v->mvp[12];
+        float cy = v->mvp[1] * p[0] + v->mvp[5] * p[1] + v->mvp[9]  * p[2] + v->mvp[13];
+        float x = (cx / cw * 0.5f + 0.5f) * (float)w, y = (cy / cw * 0.5f + 0.5f) * (float)h;
+        if (x < sx0) sx0 = x; if (x > sx1) sx1 = x;
+        if (y < sy0) sy0 = y; if (y > sy1) sy1 = y;
+    }
+    if (minz >= v->player_screen[2] - 0.6f) return false;   // all of it is at or behind the party
+    float px = v->player_screen[0], py = v->player_screen[1];
+    return !(sx1 < px - rad || sx0 > px + rad || sy1 < py - rad || sy0 > py + rad);
+}
+
+// Both world variants take the same uniforms; this sets them on whichever is handed in and leaves
+// it bound. Only the variant actually used pays for the calls.
+static void vx_set_world_uniforms(VoxField *v, GLuint prog, float sky[3], float cut_rad) {
+    glUseProgram(prog);
+    glUniformMatrix4fv(vx_uni(prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glUniformMatrix4fv(vx_uni(prog, "u_view"), 1, GL_FALSE, v->view);
+    glUniform1i(vx_uni(prog, "u_lut"), 0);
+    glUniform1i(vx_uni(prog, "u_cmap"), 1);
+    glUniform1f(vx_uni(prog, "u_ao"), v->ao_str);
+    glUniform1f(vx_uni(prog, "u_time"), v->anim_t);
+    glUniform4f(vx_uni(prog, "u_player"), v->player_screen[0], v->player_screen[1],
+                v->player_screen[2], cut_rad);
+    glUniform1f(vx_uni(prog, "u_snap"), v->sh_snap ? 1.0f : 0.0f);
+    glUniform1f(vx_uni(prog, "u_noff"), 0.055f);
+    glUniform1f(vx_uni(prog, "u_qpattern"), v->q_pattern);
+    glUniform1f(vx_uni(prog, "u_qpcf"), v->q_pcf);
+    glUniform1f(vx_uni(prog, "u_qwater"), v->q_water);
+    vx_set_common(v, prog, sky);
+    vx_set_shadow_uniforms(v, prog, 2);
+}
+
 static void vx_render(VoxField *v, int w, int h) {
     float proj[16];
     vx_camera(v, w, h, proj);
@@ -3320,22 +3444,8 @@ static void vx_render(VoxField *v, int w, int h) {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
-    glUseProgram(v->prog);
-    glUniformMatrix4fv(vx_uni(v->prog, "u_mvp"), 1, GL_FALSE, v->mvp);
-    glUniformMatrix4fv(vx_uni(v->prog, "u_view"), 1, GL_FALSE, v->view);
-    glUniform1i(vx_uni(v->prog, "u_lut"), 0);
-    glUniform1i(vx_uni(v->prog, "u_cmap"), 1);
-    glUniform1f(vx_uni(v->prog, "u_ao"), v->ao_str);
-    glUniform1f(vx_uni(v->prog, "u_time"), v->anim_t);
-    glUniform4f(vx_uni(v->prog, "u_player"), v->player_screen[0], v->player_screen[1],
-                v->player_screen[2], v->cutaway ? (float)h * 0.16f : 0.0f);
-    glUniform1f(vx_uni(v->prog, "u_snap"), v->sh_snap ? 1.0f : 0.0f);
-    glUniform1f(vx_uni(v->prog, "u_noff"), 0.055f);
-    glUniform1f(vx_uni(v->prog, "u_qpattern"), v->q_pattern);
-    glUniform1f(vx_uni(v->prog, "u_qpcf"), v->q_pcf);
-    glUniform1f(vx_uni(v->prog, "u_qwater"), v->q_water);
-    vx_set_common(v, v->prog, sky);
-    vx_set_shadow_uniforms(v, v->prog, 2);
+    float cut_rad = v->cutaway ? (float)h * 0.16f : 0.0f;
+    vx_set_world_uniforms(v, v->prog, sky, cut_rad);
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, v->lut);
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, v->cmap);
     glActiveTexture(GL_TEXTURE0);
@@ -3346,12 +3456,50 @@ static void vx_render(VoxField *v, int w, int h) {
     int draws = 0;
     v->chunks_drawn = 0;
     vxp_begin(VXP_WORLD);
-    int chunks_total = 0;
+
+    // ── the visible chunks, front to back, and only the ones that need it under the cutaway ──
+    // Front to back is what lets early-Z do its work at all: a back-to-front order shades every
+    // hidden pixel first and then paints over it. The sort is over at most VX_CHUNKS boxes, which is
+    // nothing; the win is in the fragments it never has to shade.
+    struct VxDrawChunk { VxChunk *ch; float key; bool cut; };
+    VxDrawChunk order[VX_CHUNKS];
+    int nord = 0, chunks_total = 0, cut_n = 0;
     for (int i = 0; i < VX_CHUNKS; i++) {
         VxChunk *ch = &v->chunks[i];
         if (!ch->verts) continue;
         chunks_total++;
         if (!vx_box_visible(planes, ch->lo, ch->hi)) continue;
+        float cx = (ch->lo[0] + ch->hi[0]) * 0.5f, cy = (ch->lo[1] + ch->hi[1]) * 0.5f,
+              cz = (ch->lo[2] + ch->hi[2]) * 0.5f;
+        order[nord].ch = ch;
+        order[nord].key = -(v->view[2] * cx + v->view[6] * cy + v->view[10] * cz + v->view[14]);
+        order[nord].cut = vx_chunk_needs_cut(v, ch->lo, ch->hi, w, h, cut_rad);
+        if (order[nord].cut) cut_n++;
+        nord++;
+    }
+    // VOX_CHUNKSORT=0 leaves the chunks in index order and =-1 draws them back to front; both exist
+    // only so the overdraw measurement can say what the sort is worth. The shipping path is 1.
+    static int sort_dir = 2;
+    if (sort_dir == 2) { const char *e = SDL_getenv("VOX_CHUNKSORT"); sort_dir = e && e[0] ? atoi(e) : 1; }
+    if (sort_dir) for (int i = 1; i < nord; i++) {          // insertion sort, nearest first
+        VxDrawChunk t = order[i]; int j = i - 1;
+        while (j >= 0 && (sort_dir > 0 ? order[j].key > t.key : order[j].key < t.key)) { order[j + 1] = order[j]; j--; }
+        order[j + 1] = t;
+    }
+    v->od_chunks_cut = cut_n;
+    v->od_cut_frac = nord ? (double)cut_n / (double)nord : 0.0;
+    v->od_nord = nord;
+    for (int i = 0; i < nord; i++) v->od_order[i] = order[i].ch;
+    bool cut_ready = false;
+    GLuint cur = v->prog;
+    for (int i = 0; i < nord; i++) {
+        VxChunk *ch = order[i].ch;
+        GLuint want = order[i].cut ? v->prog_cut : v->prog;
+        if (want != cur) {
+            if (want == v->prog_cut && !cut_ready) { vx_set_world_uniforms(v, v->prog_cut, sky, cut_rad); cut_ready = true; }
+            else glUseProgram(want);
+            cur = want;
+        }
         v->chunks_drawn++;
         vxp_draw(ch->verts / 3);
         glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
@@ -3363,6 +3511,7 @@ static void vx_render(VoxField *v, int w, int h) {
         glDrawArrays(GL_TRIANGLES, 0, ch->verts);
         draws++;
     }
+    if (cur != v->prog) glUseProgram(v->prog);
     vxp_end(VXP_WORLD);
     vxp.c.chunks_drawn = v->chunks_drawn;
     vxp.c.chunks_total = chunks_total;
@@ -3381,7 +3530,15 @@ static void vx_render(VoxField *v, int w, int h) {
     glUniform1f(vx_uni(v->spr_prog, "u_indexed"), v->pal_ok ? 1.0f : 0.0f);
     vx_set_common(v, v->spr_prog, sky);
     vx_set_shadow_uniforms(v, v->spr_prog, 2);
-    // one batch per texture, in the order they were pushed
+    // One batch per texture, in the order they were pushed — but ONE buffer upload for all of them.
+    // This used to call glBufferData once per texture (a walker sheet each, the atlas, and ten
+    // decals = fourteen orphan-and-upload round trips a frame). Every one of those is a driver
+    // allocation the GPU may still be reading from, which is exactly the kind of call that blocks on
+    // a tile-based mobile driver. Now the whole kind-0 vertex array is built first, uploaded once,
+    // and drawn with fourteen glDrawArrays offsets into it.
+    struct VxSprBatch { GLuint tex; int first, count; };
+    VxSprBatch batch[64];
+    int nb = 0, total = 0;
     GLuint done[32];
     int done_n = 0;
     for (int i = 0; i < v->spr_count; i++) {
@@ -3392,8 +3549,19 @@ static void vx_render(VoxField *v, int w, int h) {
         if (seen || done_n >= 32) continue;
         done[done_n++] = tex;
         int from = 0, n;
-        glBindTexture(GL_TEXTURE_2D, tex);
-        while ((n = vx_emit_sprites(v, sv, sv_cap, 0, tex, from, &from)) > 0) { vx_draw_sprite_batch(v, sv, n); draws++; }
+        while (nb < 64 && (n = vx_emit_sprites(v, sv + total, sv_cap - total, 0, tex, from, &from)) > 0) {
+            batch[nb].tex = tex; batch[nb].first = total; batch[nb].count = n; nb++;
+            total += n;
+        }
+    }
+    if (total > 0) {
+        vx_sprite_upload(v, sv, total);
+        for (int b = 0; b < nb; b++) {
+            glBindTexture(GL_TEXTURE_2D, batch[b].tex);
+            glDrawArrays(GL_TRIANGLES, batch[b].first, batch[b].count);
+            vxp_draw(batch[b].count / 3);
+            draws++;
+        }
     }
     // The sky now, into the pixels the world did not cover, and before anything blended. The sprite
     // scope is closed around it so the sky gets a GPU timer query of its own — a query cannot nest.
@@ -3424,6 +3592,67 @@ static void vx_render(VoxField *v, int w, int h) {
 
 // The HD-2D pass: tilt-shift, bloom, vignette and a gentle grade. Everything but the composite runs
 // at half resolution. With `hd2d` off nothing here runs and the scene texture is shown as it is.
+// ───────────────────────── overdraw ─────────────────────────
+// How many times, on average, does a pixel of the opaque world get written? 1.0 means a perfect
+// front-to-back order with early-Z doing its job; 3.0 means two thirds of the shading is thrown away
+// and a depth prepass or a deferred pass would be worth arguing about.
+//
+// It is measured, not modelled: the same chunks are rasterized in the same order into the scene FBO
+// with the constant-colour probe, blending ONE/ONE against a fresh depth buffer, and the result is
+// read back. That readback is a full pipeline stall, which is why this is only ever called from the
+// capture path, the benchmark, and the debug view — never from a frame the owner is playing.
+static void vx_overdraw_pass(VoxField *v, int w, int h, float step) {
+    glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
+    glViewport(0, 0, w, h);
+    glClearColor(0, 0, 0, 0);
+    glClearDepthf(1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE); glCullFace(GL_BACK); glFrontFace(GL_CCW);
+    glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE);
+    glUseProgram(v->od_prog);
+    glUniformMatrix4fv(vx_uni(v->od_prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glUniformMatrix4fv(vx_uni(v->od_prog, "u_view"), 1, GL_FALSE, v->view);
+    glUniform1f(vx_uni(v->od_prog, "u_step"), step);
+    glBindVertexArray(v->vao);
+    for (int i = 0; i < v->od_nord; i++) {                 // the order the real pass just used
+        VxChunk *ch = v->od_order[i];
+        if (!ch || !ch->verts) continue;
+        glBindBuffer(GL_ARRAY_BUFFER, ch->vbo);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)0);
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VxVert), (void *)12);
+        glEnableVertexAttribArray(2); glVertexAttribIPointer(2, 4, GL_UNSIGNED_BYTE, sizeof(VxVert), (void *)20);
+        glEnableVertexAttribArray(3); glVertexAttribPointer(3, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(VxVert), (void *)24);
+        glEnableVertexAttribArray(4); glVertexAttribPointer(4, 3, GL_BYTE, GL_TRUE, sizeof(VxVert), (void *)28);
+        glDrawArrays(GL_TRIANGLES, 0, ch->verts);
+    }
+    glDisable(GL_BLEND);
+    glBindVertexArray(0);
+}
+
+static double vx_measure_overdraw(VoxField *v, int w, int h) {
+    vx_overdraw_pass(v, w, h, 1.0f / 255.0f);
+
+    // Read back a stride of rows rather than the whole frame: a 1-in-4 row sample of a two-megapixel
+    // buffer is well over a hundred thousand pixels and the mean is stable to three decimals.
+    int step = 4, rows = 0;
+    size_t rowbytes = (size_t)w * 4;
+    unsigned char *px = (unsigned char *)malloc(rowbytes);
+    if (!px) return 0.0;
+    double sum = 0; long covered = 0, total = 0;
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    for (int y = 0; y < h; y += step) {
+        glReadPixels(0, y, w, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        for (int x = 0; x < w; x++) { int c = px[x * 4]; sum += c; total++; if (c) covered++; }
+        rows++;
+    }
+    free(px);
+    (void)rows;
+    // The colour is the count, one step of 1/255 a write; the mean is over the COVERED pixels, so the
+    // sky's empty half of the screen does not flatter the number.
+    return covered ? sum / (double)covered : 0.0;
+}
+
 static GLuint vx_post(VoxField *v, int w, int h) {
     if (!v->hd2d) return v->fbo_tex;
     glDisable(GL_DEPTH_TEST);
@@ -3543,8 +3772,12 @@ static void draw_msg_box(VoxField *v, int w, int h) {
 }
 
 static void vx_poll_map_flag(VoxField *v, float dt) {
+    // Once a second, not 2.5x. This is a blocking open() on the render thread; on Android's F2FS,
+    // with the app's data dir possibly cold, a miss is not free and lands squarely in a frame. The
+    // perf flag is polled on the same period but offset half a second (see vx_poll_perf_flag), so
+    // the two can never charge the same frame.
     v->map_poll += dt;
-    if (v->map_poll < 0.4f) return;
+    if (v->map_poll < 1.0f) return;
     v->map_poll = 0;
     char path[600];
     snprintf(path, sizeof(path), "%smap.flag", vx_pref());
@@ -3680,8 +3913,8 @@ static void vx_bench_write_report(VoxField *v) {
             "# voxfield perf report\n\n"
             "- date: %s\n- map: %s\n- platform: %s\n- GL: %s\n- renderer: %s\n"
             "- drawable: %dx%d\n- refresh: %.0f Hz\n- %s\n- mesh: %.1f ms, %d tris\n\n"
-            "| view | config | wall ms | p99 ms | fps | gpu ms | cpu ms | delta gpu |\n"
-            "|---|---|---|---|---|---|---|---|\n",
+            "| view | config | wall ms | p99 ms | fps | gpu ms | cpu ms | delta gpu | overdraw |\n"
+            "|---|---|---|---|---|---|---|---|---|\n",
             date, v->bench_map, SDL_GetPlatform(), gl_ver ? gl_ver : "?", gl_ren ? gl_ren : "?",
             vxp.c_shown.fbo_w, vxp.c_shown.fbo_h, vxp.refresh_hz, vxp.gpu_note, v->mesh_ms, v->tris);
         SDL_WriteIO(io, hdr, (size_t)n);
@@ -3759,14 +3992,19 @@ static void vx_bench_frame(VoxField *v) {
     double p99 = n ? srt[n / 100] : 0;
 
     if (v->bench_cfg == VXB_BASE) v->bench_base_ms = gpu;
+    // One overdraw measurement a configuration, at the end of its measured window. It costs a
+    // readback and corrupts the one frame it is taken in, which is what a benchmark is for.
+    if (vxp.c_shown.fbo_w > 0 && vxp.c_shown.fbo_h > 0)
+        v->od_avg = vx_measure_overdraw(v, vxp.c_shown.fbo_w, vxp.c_shown.fbo_h);
     const char *vn = vx_bench_view_name(v, v->bench_on - 1);
     char row[320];
-    snprintf(row, sizeof row, "| %s | %s | %.2f | %.2f | %.1f | %.2f | %.2f | %+.2f |\n",
+    snprintf(row, sizeof row, "| %s | %s | %.2f | %.2f | %.1f | %.2f | %.2f | %+.2f | %.2f |\n",
              vn, VXB_NAME[v->bench_cfg], wall, p99, wall > 0 ? 1000.0 / wall : 0.0,
-             gpu, cpu, gpu - v->bench_base_ms);
+             gpu, cpu, gpu - v->bench_base_ms, v->od_avg);
     if (v->bench_row_n < 64) snprintf(v->bench_rows[v->bench_row_n++], 320, "%s", row);
-    SDL_Log("PERF %-8s %-20s wall %6.2f ms  p99 %6.2f  %5.1f fps  gpu %6.2f  cpu %6.2f  d %+6.2f",
-            vn, VXB_NAME[v->bench_cfg], wall, p99, wall > 0 ? 1000.0 / wall : 0.0, gpu, cpu, gpu - v->bench_base_ms);
+    SDL_Log("PERF %-8s %-20s wall %6.2f ms  p99 %6.2f  %5.1f fps  gpu %6.2f  cpu %6.2f  d %+6.2f  od %.2f",
+            vn, VXB_NAME[v->bench_cfg], wall, p99, wall > 0 ? 1000.0 / wall : 0.0, gpu, cpu,
+            gpu - v->bench_base_ms, v->od_avg);
 
     v->bench_sum = 0; v->bench_hist_n = 0; v->bench_frame = 0;
     for (int i = 0; i < VXP_COUNT; i++) v->bench_gpu[i] = 0;
@@ -3792,7 +4030,7 @@ static void vx_poll_perf_flag(VoxField *v, float dt) {
     if (v->bench_on) return;
     v->bench_poll -= dt;
     if (v->bench_poll > 0) return;
-    v->bench_poll = 0.5f;
+    v->bench_poll = 1.0f;                                // offset from map.flag's by vx_create/vx_restore
     char path[768];
     snprintf(path, sizeof path, "%sperf.flag", vx_pref());
     size_t sz = 0;
@@ -3811,9 +4049,19 @@ static void vx_poll_perf_flag(VoxField *v, float dt) {
     vx_bench_start(v, map);
 }
 
+// Cached: SDL_GetPrimaryDisplay + SDL_GetCurrentDisplayMode takes the display lock and, on Android,
+// walks the display list. The refresh rate does not change between frames; re-reading it 60 times a
+// second was pure per-frame overhead on the render thread. Once a second is plenty.
 static double vx_refresh_hz(void) {
-    const SDL_DisplayMode *m = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
-    return (m && m->refresh_rate > 1.0f) ? (double)m->refresh_rate : 60.0;
+    static double cached = 60.0;
+    static uint64_t next_at = 0;
+    uint64_t now = SDL_GetTicks();
+    if (now >= next_at) {
+        next_at = now + 1000;
+        const SDL_DisplayMode *m = SDL_GetCurrentDisplayMode(SDL_GetPrimaryDisplay());
+        if (m && m->refresh_rate > 1.0f) cached = (double)m->refresh_rate;
+    }
+    return cached;
 }
 
 // A rough GPU memory estimate: the render targets, the shadow map, the atlas and the decals. It is
@@ -3833,6 +4081,8 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
     ev->kind = VXE_NONE; ev->arg[0] = 0;
     if (!v->gl_ready) vx_gl_init(v);
     vxp_init();
+    // The GPU timer queries are only armed when somebody is reading them. See vxp_want_gpu.
+    vxp_want_gpu(v->perf_hud > 0 || v->bench_on != 0);
     vxp_frame_begin(vx_refresh_hz());
     vxp_begin(VXP_TICK);
     if (!v->built) {
@@ -3897,12 +4147,24 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
     vx_fbo_size(v, rw, rh);
     vx_render(v, rw, rh);
     GLuint shown = vx_post(v, rw, rh);
+    // The Overdraw debug view (Dev panel). It replaces the picture with the write count, one warm
+    // step a write, and re-measures the number at most once a second — the readback is a stall, so
+    // it is rate-limited even here and never runs with the view off.
+    if (v->od_view) {
+        static uint64_t od_next = 0;
+        uint64_t nowt = SDL_GetTicks();
+        if (nowt >= od_next) { od_next = nowt + 1000; v->od_avg = vx_measure_overdraw(v, rw, rh); }
+        vx_overdraw_pass(v, rw, rh, 0.20f);
+        shown = v->fbo_tex;
+    }
     // NO glFinish HERE. One used to sit on this line to make the CPU timer below mean something; on
     // a tile-based mobile GPU it flushed and waited inside every frame, which is exactly the stall
     // this instrumentation exists to find. Per-pass GPU cost now comes from timer queries instead.
     // The benchmark is the one caller allowed to stall, and only when the queries are unavailable.
     if (v->bench_on && !vxp.gpu_proven) glFinish();
-    vxp.c.tex_mb = vx_tex_mb(v, rw, rh);
+    // Only the HUD shows this, and it loops over every decal to work it out. Don't pay for it when
+    // nobody is looking.
+    if (v->perf_hud > 0) vxp.c.tex_mb = vx_tex_mb(v, rw, rh);
     vxp.c.out_w = w; vxp.c.out_h = h;
     v->frame_n++;
     if (v->frame_n >= 300) {
@@ -3964,6 +4226,19 @@ static void vx_do_capture(VoxField *v) {
     while (vx_max_tex > 0 && (w > vx_max_tex || h > vx_max_tex)) { w /= 2; h /= 2; }
     vx_fbo_size(v, w, h);
     vx_render(v, w, h);
+    // VOX_OVERDRAW=1 measures the opaque world's overdraw for this exact view and says so. It
+    // scribbles on the scene FBO, so the real render is simply done again afterwards — this is the
+    // capture path, where one extra frame costs nothing and the picture must come out unchanged.
+    {
+        const char *od = SDL_getenv("VOX_OVERDRAW");
+        if (od && od[0] && od[0] != '0') {
+            v->od_avg = vx_measure_overdraw(v, w, h);
+            SDL_Log("voxfield: OVERDRAW %s %dx%d  world opaque = %.3f writes per covered pixel  "
+                    "(cutaway program on %d of %d visible chunks)",
+                    v->map_name, w, h, v->od_avg, v->od_chunks_cut, v->chunks_drawn);
+            vx_render(v, w, h);
+        }
+    }
     GLuint shown = vx_post(v, w, h);
     GLuint src_fbo = (shown == v->out_tex) ? v->out_fbo : v->fbo;
     unsigned char *px = (unsigned char *)malloc((size_t)w * h * 4);
@@ -4137,6 +4412,14 @@ bool vx_dev_ui(VoxField *v, char *out, int cap) {
     } else if (ImGui::Button("Run benchmark")) {
         vx_bench_start(v, v->map_name);
     }
+    // Overdraw: the picture replaced by how many times each pixel of the opaque world was written.
+    // Dark warm = 1 (early-Z did its job), bright = the shading a depth prepass would have saved.
+    {
+        bool od = v->od_view != 0;
+        if (ImGui::Checkbox("Overdraw view", &od)) v->od_view = od;
+        ImGui::SameLine();
+        ImGui::Text("avg %.2f  cutaway on %d/%d chunks", v->od_avg, v->od_chunks_cut, v->chunks_drawn);
+    }
     if (ImGui::Button("Print cell")) {
         int x = v->act[0].tx, z = v->act[0].tz;
         unsigned char top = get_blk(v, x * VX_VPC, v->hgt[z][x], z * VX_VPC);
@@ -4166,6 +4449,7 @@ VoxField *vx_create() {
     // the benchmark's knobs, at the shipping look
     v->q_pattern = 1.0f; v->q_pcf = 4.0f; v->q_water = 1.0f; v->q_cloud = 1.0f;
     v->perf_hud = 0;
+    v->bench_poll = 0.5f;          // half a period out of phase with map.flag's poll
     for (int i = 0; i < 256; i++) { v->pal[i][0] = (unsigned char)i; v->pal[i][1] = (unsigned char)i; v->pal[i][2] = (unsigned char)i; }
     return v;
 }
@@ -4246,6 +4530,7 @@ void vx_restore(VoxField *v, const VxSave *s) {
     }
     v->shadow_dirty = true;
     v->map_poll = 1.0f;
+    v->bench_poll = 0.5f;          // half a period out of phase with map.flag's, so never the same frame
     int lx = s->tx[0], lz = s->ty[0];
     if (lx < 0 || lz < 0 || lx >= v->mw || lz >= v->md) { SDL_Log("voxfield: restored cell %d,%d is off %s", lx, lz, map); return; }
     vx_place_party(v, lx, lz, s->facing[0] & 3);

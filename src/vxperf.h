@@ -109,6 +109,13 @@ struct VxpState {
     VxpScope s[VXP_COUNT];
     VxpCounters c, c_shown;
 
+    // GPU timers are only ARMED when somebody is looking (the HUD, the benchmark, or VXPERF_GPU=1).
+    // Left on all the time they cost a glGetIntegerv(GL_GPU_DISJOINT_EXT) and VXP_COUNT
+    // glGetQueryObjectuiv a frame; on Adreno a glGet* can flush the command stream, so the
+    // instrumentation would be measuring itself. CPU scopes are two SDL_GetPerformanceCounter calls
+    // and stay on always — they are what the spike recorder needs.
+    bool gpu_want;
+
     // wall clock
     uint64_t last_tick;             // tick entry to tick entry: the real frame interval
     double freq;
@@ -118,6 +125,11 @@ struct VxpState {
     double acc_sum; int acc_n; uint64_t acc_t0;
     double acc_max;
     uint64_t frames;
+
+    // the spike recorder: one line naming every scope's cost in the frame that went long
+    double spike_ms;                // log a frame that took longer than this (0 = off)
+    uint64_t spike_last;            // rate limit, in performance counter ticks
+    int spike_n;                    // how many have been seen since the last reset
 
     // vsync buckets: how many intervals land near 1x, 2x, 3x the display period, and how many are
     // off the grid entirely. That is the frame-pacing check.
@@ -146,6 +158,11 @@ static void vxp_init(void) {
     vxp.freq = (double)SDL_GetPerformanceFrequency();
     vxp.gpu_active = -1;
     vxp.refresh_hz = 60.0;
+    vxp.spike_ms = 25.0;
+    {   // VXPERF_GPU=1 arms the timer queries from the first frame, for a run with no HUD open
+        const char *e = SDL_getenv("VXPERF_GPU");
+        vxp.gpu_want = e && e[0] && e[0] != '0';
+    }
 
     // EXT first (that is what GLES exposes), then the core names (desktop GL 3.3).
     vxp.gen      = (VxpGenQueries)SDL_GL_GetProcAddress("glGenQueriesEXT");
@@ -182,7 +199,7 @@ static inline void vxp_begin(int id) {
     s->t0 = SDL_GetPerformanceCounter();
     s->open = true;
     s->gpu_open = false;
-    if (vxp.gpu_ok && vxp.gpu_active < 0 && !s->gpu_taken) {
+    if (vxp.gpu_ok && vxp.gpu_want && vxp.gpu_active < 0 && !s->gpu_taken) {
         s->gpu_taken = true;
         vxp.gpu_active = id;
         s->gpu_open = true;
@@ -219,6 +236,11 @@ struct VxpZone {
 static void vxp_collect(void) {
     if (!vxp.gpu_ok) return;
     int slot = (vxp.ring + 1) % VXP_RING;
+    // Nothing was queried into this slot — take the glGet path only when there is something to read.
+    // That is what keeps the instrumentation free while the HUD is closed.
+    bool any = false;
+    for (int i = 0; i < VXP_COUNT; i++) if (vxp.q_used[i][slot]) { any = true; break; }
+    if (!any) return;
     GLint disjoint = 0;
     glGetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint);
     for (int i = 0; i < VXP_COUNT; i++) {
@@ -272,10 +294,41 @@ static void vxp_frame_begin(double refresh_hz) {
 
     for (int i = 0; i < VXP_COUNT; i++) {
         VxpScope *s = &vxp.s[i];
-        if (s->cpu_frame > 0.0) { s->cpu_ms = s->cpu_frame; s->cpu_acc += s->cpu_frame; s->acc_n++; }
+        // cpu_ms is THIS frame's, zero included: the spike recorder below reads it, and a stale value
+        // (mesh/upload's 70 ms from load time) would be read as a cause forever after.
+        s->cpu_ms = s->cpu_frame;
+        if (s->cpu_frame > 0.0) { s->cpu_acc += s->cpu_frame; s->acc_n++; }
         s->cpu_frame = 0.0;
         s->gpu_taken = false;
     }
+
+    // ── the spike recorder ──
+    // The interval just measured is the PREVIOUS frame's, and the per-scope cpu_ms folded in above is
+    // that same frame's, so the two line up. One line names every scope, which is the whole point:
+    // a 40 ms frame whose scopes add up to 3 ms was not the game's doing (scheduler, GPU queue,
+    // another process); one whose "tick/logic" reads 20 ms is. Rate-limited to one a second so a bad
+    // stretch cannot turn into logcat spam — and the count says how many were swallowed.
+    if (vxp.spike_ms > 0.0 && vxp.frame_ms > vxp.spike_ms && vxp.frames > 10) {
+        vxp.spike_n++;
+        double since_log = vxp.spike_last ? (double)(now - vxp.spike_last) / vxp.freq : 1e9;
+        if (since_log >= 1.0) {
+            vxp.spike_last = now;
+            char line[512];
+            int p = snprintf(line, sizeof line, "VXSPIKE %.1f ms (frame %llu, %d since last)",
+                             vxp.frame_ms, (unsigned long long)vxp.frames, vxp.spike_n);
+            double sum = 0;
+            for (int i = 0; i < VXP_COUNT && p > 0 && p < (int)sizeof line - 1; i++) {
+                sum += vxp.s[i].cpu_ms;
+                p += snprintf(line + p, sizeof line - (size_t)p, "  %s=%.2f", VXP_NAME[i], vxp.s[i].cpu_ms);
+            }
+            if (p > 0 && p < (int)sizeof line - 1)
+                snprintf(line + p, sizeof line - (size_t)p, "  | scopes=%.2f unaccounted=%.2f",
+                         sum, vxp.frame_ms - sum);
+            SDL_Log("%s", line);
+            vxp.spike_n = 0;
+        }
+    }
+
     vxp.ring = (int)(vxp.frames % VXP_RING);
     vxp_collect();
     vxp.c.draws = vxp.c.tris = vxp.c.sprites = vxp.c.detail = vxp.c.chunks_drawn = 0;
@@ -304,6 +357,14 @@ static void vxp_frame_begin(double refresh_hz) {
 }
 
 static inline void vxp_draw(int tris) { vxp.c.draws++; vxp.c.tris += tris; }
+
+// Arm or disarm the GPU timer queries. Call it once a frame with (hud open || benchmark running).
+// Disarming leaves the CPU scopes and the spike recorder alone; those cost nothing measurable.
+static inline void vxp_want_gpu(bool on) {
+    if (vxp.gpu_want == on) return;
+    vxp.gpu_want = on;
+    if (!on) for (int i = 0; i < VXP_COUNT; i++) { vxp.s[i].gpu_ms = vxp.s[i].gpu_avg = 0; }
+}
 
 static inline double vxp_gpu_total(void) {
     double t = 0;

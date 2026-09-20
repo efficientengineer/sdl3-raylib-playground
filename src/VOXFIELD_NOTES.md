@@ -284,8 +284,9 @@ benchmark is the one caller allowed to stall, and only when the timer queries ar
   point is fetched through `SDL_GL_GetProcAddress` (EXT name first, then core), because macOS's
   `gl3.h` does not declare `glGetQueryObjectui64v` and the GLES3 headers declare none of the EXT
   ones. Results are read **three frames late** out of a four-deep ring and the AVAILABLE flag is
-  checked before the value is taken, so a query never blocks. `GL_GPU_DISJOINT` is read every frame
-  and its samples thrown away. If anything is missing it falls back to CPU only and the HUD says
+  checked before the value is taken, so a query never blocks. `GL_GPU_DISJOINT` is read only when a
+  slot actually holds a query and its samples are thrown away. The queries are **armed only when
+  somebody is reading them** — `vxp_want_gpu(perf_hud > 0 || bench_on)`, or `VXPERF_GPU=1`. If anything is missing it falls back to CPU only and the HUD says
   `gpu timers unavailable`. **`GL_TIME_ELAPSED` cannot nest**: a scope opened inside another is timed
   on the CPU alone and its GPU column reads `-`.
 - **TOTAL is wall clock, tick entry to tick entry** — the honest frame interval including the host's
@@ -362,9 +363,72 @@ Measured on the phone (Adreno 650, 2400x1080, 60 Hz), halm, at the square:
    keyed by program id and the name's address and is **reset in `vx_gl_init`**, because a fresh
    program can be handed a recycled id.
 
+6. **The world shader is two programs, and only the chunks that need it get the one with `discard`.**
+   A fragment shader that contains `discard` anywhere is one the GPU cannot assume writes depth at the
+   rasterized value, so Adreno turns **LRZ — its early-Z / hidden-surface removal — off for the whole
+   draw**. The cutaway's `discard` sat under a uniform branch in the one world shader, so the entire
+   town was shaded with no early-Z: ten hash evaluations and four shadow taps a fragment, for pixels a
+   nearer wall went on to cover. `VX_FS_HEAD` + `VX_FS_BODY` is now compiled twice, once with
+   `VX_FS_CUT` between them and once without, and `vx_chunk_needs_cut` picks per chunk: a chunk
+   entirely at or behind the party, or whose screen box misses the cutaway circle, has no fragment the
+   block could discard and gets the discard-free program. On halm that is **6 of 7 visible chunks at
+   the square and 2 of 5 at the stream**. The test is conservative everywhere it is unsure (a corner
+   across the near plane → use the cutaway variant). Verified by forcing every chunk to the cutaway
+   program and diffing five views: four byte-identical, one with 210 differing bytes of 8.29 M at a
+   maximum of 1/255 — post-pass rounding from a different draw order, not a selection error.
+7. **The visible chunks are drawn front to back.** An insertion sort over at most `VX_CHUNKS` boxes by
+   view-space distance, which is free; without it early-Z has nothing to work with. Measured on the
+   overdraw probe: square **1.747 → 1.645** writes per covered pixel, stream **1.939 → 1.910**.
+   `VOX_CHUNKSORT=0` (index order) and `=-1` (back to front) exist only so that number can be taken.
+8. **The GPU timer queries are only armed when somebody is reading them** (`vxp_want_gpu`, called with
+   `perf_hud > 0 || bench_on`; `VXPERF_GPU=1` forces them on). Left on all the time they cost a
+   `glGetIntegerv(GL_GPU_DISJOINT_EXT)` and up to `VXP_COUNT` `glGetQueryObjectuiv` a frame, and on
+   Adreno a `glGet*` can flush the command stream — the instrumentation would be measuring itself.
+   The CPU scopes and the spike recorder stay on always; they are two counter reads.
+9. **The sprite vertex data is uploaded once a frame, not once a texture.** The kind-0 pass called
+   `glBufferData` per texture — four walker sheets, the atlas and ten decals, fourteen orphan-and-
+   upload round trips, each one a driver allocation the GPU may still be reading from. The whole array
+   is now built first, uploaded once, and drawn with fourteen `glDrawArrays` offsets into it.
+10. **Per-frame odds and ends that were pure overhead**: `SDL_GetCurrentDisplayMode` was called every
+    frame for a refresh rate that never changes (now cached for a second); the GPU memory estimate
+    looped over every decal every frame for a HUD that was closed (now only when it is open);
+    `map.flag` and `perf.flag` were opened 2.5 and 2 times a second on the render thread (now once a
+    second each, half a period out of phase so they can never charge the same frame).
+
 None of these changes the look; the captures (`--vox halm`, `--viewh 24`, `--light night`) were
 compared before and after. **No default visual quality or resolution scale was changed.** The
 resolution rows in the report are there so the owner can make that call with numbers.
+
+### The spike recorder
+
+`p99` on the phone sat at 33-45 ms in almost every configuration — regular missed vsyncs — while the
+averages were fine, and no average can tell you what happened in the one frame that went long. So:
+when the frame interval exceeds `vxp.spike_ms` (25 ms), one `VXSPIKE` line is logged naming **every
+scope's CPU time for that frame**, plus the total those scopes account for and what is left over.
+It is rate-limited to one a second and says how many it swallowed. Read it like this:
+
+- scopes add up to roughly the frame → the game did it, and the line names which pass;
+- `unaccounted` is nearly the whole frame → the game did **not** do it. The time went somewhere the
+  render thread was not running: the scheduler, a GPU queue the driver blocked on, or another process.
+
+`cpu_ms` is this frame's, **zero included**, precisely so a stale number (`mesh/upload`'s 70 ms from
+load time) can never be read as a cause forever after.
+
+### Overdraw, and whether a deferred pass would pay
+
+`vx_measure_overdraw` replays the visible chunks **in the order the real pass just drew them** with a
+constant-colour probe blended `ONE/ONE` against a fresh depth buffer, then reads back a 1-in-4 row
+sample. The byte in a pixel is the number of times the opaque world wrote it; the mean is over the
+covered pixels, so the sky's empty half of the screen does not flatter it. It is a full pipeline
+stall, so it runs only in the capture path (`VOX_OVERDRAW=1`), once a configuration in the benchmark
+(the `overdraw` column), and at most once a second in the Dev panel's **Overdraw view**.
+
+On halm at 1920x1080: **square 1.65, stream 1.91**. So a perfect depth prepass or a deferred pass
+could save at most a third to a half of the world's shading — and would pay for it with a G-buffer
+write and read of every pixel, which on a tile-based mobile GPU is the expensive half. **It does not
+justify a deferred renderer.** The win was never the overdraw count: it was that `discard` had
+switched early-Z off altogether, so the GPU was shading every rasterized fragment rather than the
+1.65 that survive. Items 6 and 7 above are that fix. Re-measure on the phone before revisiting this.
 
 ## Dev panel
 
