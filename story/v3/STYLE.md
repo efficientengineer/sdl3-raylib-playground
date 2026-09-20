@@ -4,8 +4,9 @@ Game form, not book form. If a page could be read aloud as a novel, it is wrong.
 
 ## The checklist
 
-Run every scene against all sixteen before it is written, and again before it is done.
+Run every scene against all seventeen before it is written, and again before it is done.
 Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game Storytelling*.
+Rule 14 is the owner's too, and rule 0 and rule 14 are the two that outrank everything else.
 
 0. **Plain.** After every clip a twelve-year-old could say what just happened, why, and what happens
    next. Lines state facts and intentions directly. No line that works only by implication: not
@@ -65,6 +66,16 @@ Rule 0 and rule 11 are the owner's; 1-10 are after Evan Skolnick, *Video Game St
     `LOOT.md` before it appears in a chapter.
 13. **One beat per clip.** If a clip contains two discoveries, one of them belongs in the Play block
     or in the next clip.
+14. **The new player rule.** The player knows nothing. At most **one** new name or idea per dialogue
+    line, and a line carries **one fact**. An idea is **shown** — walked past, looked at, played —
+    before any line leans on it. Never refer to a person the player has not met by a pronoun at a
+    turn: name them. No jargon whose meaning is not on screen: no "guarantor", no "coast escort"
+    unless the player saw the sheet. **A dialogue line is at most 100 characters after token
+    substitution**, and several short exchanges always beat one briefing — rule 12's "three to six
+    lines" counts *beats*, not boxes, so one beat may be three taps of two words each. The player's
+    own question is a line: let the hero ask what the thing is. If a fact is not needed in this
+    scene, cut it; it can arrive later, or never. Before a clip is done, list every noun in it a
+    first-time player could not point at, and either show it first or delete it.
 
 ## Names are tokens
 

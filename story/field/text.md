@@ -28,6 +28,38 @@ line, brackets and all.
 One sheet left on the board inside, and the bell is still going. The water run out to the {{STAIR}}, thirty coin, leaves at dawn.
 - what: the shut guild hall door, the message trigger at 20 15 on halm
 
+## halm.board
+Sheets all over it, and the good ones go first. Put your name on one and the guild pays you when you walk back in.
+- what: the job board outside the guild hall, before the bell, the message trigger at 20 14 on halm
+
+## halm.paid_hunter
+Four days on the coast road, and he counts it out a coin at a time. Thirty of them will keep me a month.
+- name: Hunter at the counter
+- what: inside the guild hall, a hunter taking his pay at the plank counter, npc at 21 13 on halm
+
+## halm.stair_view
+Out west past everything, a stair of grey steps comes down out of the cloud and stops in the air.
+- what: the view west from the hill gate, the only place the {{STAIR}} is visible, the message trigger at 23 7 on halm
+
+## halm.jarmen
+We fill it, we rope the lid down, and it goes west before the week is out. Don't ask me, I only carry it.
+- name: Man roping the jar
+- what: two men filling and sealing the year's jar at the well, npc at 18 16 on halm
+
+## halm.moonwatcher
+The small moon has moved. It sat over that roof since I was a boy and now it sits over the next one.
+- name: Old man in the square
+- what: an old man in the square looking up at the {{SECOND_MOON}}, npc at 16 18 on halm
+
+## halm.gate_post
+A strip of pale blue skin nailed to the post, dry as paper. The pack in the ditch under it was opened from the outside.
+- what: the west gatepost on the way out of town, the message trigger at 8 18 on halm
+
+## halm.baker
+Bread is a coin. A cart out of this town is thirty, if you can find a carter, and you can't.
+- name: Baker on the square
+- what: the bread stall, the only price the player sees in town, npc at 15 17 on halm
+
 ## halm.well
 Capped, roped, and the rope is new. One sealed jar of this water goes west to the {{STAIR}} every year, and the town has never been told what it is for.
 - what: the capped well in the middle of the town, the message trigger at 17 16 on halm
@@ -52,6 +84,15 @@ Something's in the shed again and it eats the sacks as well as the grain. If you
 - name: Watch at the hill gate
 - what: at the hill gate on the way up to {{MENTOR}}'s, npc at 22 6 on halm
 
+## hart_yard.coat_hook
+A hunter's coat on the hook by the door, cut for a bigger man than {{MENTOR}}. It was your father's.
+- what: the hook inside {{MENTOR}}'s door, the one place in town that holds the father, the message trigger at 6 11 on hart_yard
+
+## hart_yard.ottilie
+Take a job that pays and come back in one piece, and I will not have to do anything about either of you.
+- name: {{HEALER}}
+- what: {{HEALER}} on the water barrel with her bandages, before and after the Bandages clip, npc at 13 8 on hart_yard
+
 ## hart_yard.practice_posts
 Six posts, all split at the same height, and that height is your shoulder. The sixth one has been moved since yesterday.
 - what: the row of practice posts in {{MENTOR}}'s yard, the message trigger at 16 3 on hart_yard
@@ -62,9 +103,10 @@ Hand me the short nails and don't start. Whatever you came up here to ask, the a
 - what: {{MENTOR}} on his roof, before the You're Not Ready clip, npc at 10 9 on hart_yard
 
 ## west_road.culvert
-[west_road.culvert: TODO]
+The road drops into the gap where the spring took the culvert out. Everyone ahead of you is walking the long way round it.
 - what: the washed-out culvert where the road pinches to one cart's width, the message trigger at 13 7 on west_road
 
 ## west_road.west_end
-[west_road.west_end: TODO]
+The road keeps going west with the carts on it, down to the river bridge. That is a day's walk and you are not going that way.
+
 - what: the west end of the road, where the map stops and the bridge is not built yet, the message trigger at 0 8 on west_road

@@ -4,6 +4,89 @@ All names are tokens. See `NAMES.md`. Party this chapter: {{HERO}} and {{HEALER}
 {{SCHOLAR}} and {{THIEF}} arrive in chapter two.
 
 ## Goal
+Get down to the guild hall and find out what a job pays.
+
+## Play: explore — {{HOME_TOWN}}, the afternoon before the bell (12 min)
+
+The first twelve minutes of the game and the player learns everything by walking into it. No clip in
+this block, one talk, and the town says the rest in one- and two-sentence examine lines. Nothing here
+is a lecture and nothing here is compulsory except the last fight.
+
+**Map.** (1) **{{MENTOR}}'s house on the hill.** You start in it, alone, boots by the door and a
+hunter's coat on the hook beside them that is a size too big for the man who owns the house. Out in
+the yard {{HEALER}} is rolling bandages into a medicine roll and will talk to you — the game's first
+NPC, and the game teaches talking on the person the player will travel with. (2) **The hill gate.**
+The watch is leaning on it. From this one step the country west is open: the {{STAIR}} stands on the
+horizon, too big and too far, and it is an examine point. (3) **The square and the well.** Two men
+are filling a jar at the capped well and roping the lid down. The whole town walks past them without
+looking. (4) **The guild hall porch, and the board with sheets still on it.** Inside, a hunter is
+being paid at the counter: the clerk counts coin onto the plank one piece at a time and the hunter
+picks it up and goes. {{RIVAL}} is at the board, takes the good sheet down in front of you and walks
+out past you with it. (5) **The west gate and the grain yard.** The fork, and the last place you can
+be when the bell starts.
+
+**Encounters.** One, and it is the tutorial: a **lid** out in the open grain yard, alone, tipping up
+on its rim and rolling at you in a straight line, with the woman at the grain gate shouting at you
+over the wall the whole time. It cannot turn once it rolls and it stands up on its rim first — the
+guard-break window, taught once here on a single slow enemy before the shed has three of them.
+It drops two coin, which the player has now seen a clerk count out.
+
+**Hazards / events.** **The bell.** It starts while you are on the far side of town with the lid
+still in front of you, and it does not wait. From the first stroke the game is a run: the goal line
+changes to *Sign before the bell stops*, and the next block is that run. The player is late because
+of where he was standing, which is the point.
+
+**Optional.** None. The teaching find stays where it is — **the weight**, on the scale bench inside
+the grain shed, in the bell run, in the block below (`LOOT.md`, row 1). This block is deliberately
+the one map in the game with nothing hidden on it; it is teaching a different lesson.
+
+**Find:** four coin under the well bucket. That, and the lid's two, is your money.
+
+**What the player learns, in order, and where.**
+- Walking, and that people talk: {{HEALER}} in the yard, and she is named, and she says what she is
+  to him — {{MENTOR}} taught her three years before he taught you, and she patches up whoever comes
+  back. (Clip: *Bandages*, below.)
+- What a hunter is: you watch one get paid at the counter before anyone says the word.
+- That jobs are sheets of paper on a board, that you sign for one, and that {{RIVAL}} can take the
+  one you wanted while you stand there.
+- That the well water goes west in a sealed jar every year, and that the town does not know why. The
+  town's own shrug is the explanation, and it is said by the well line and by the two men roping it.
+- That the {{STAIR}} exists, from the hill gate, before anybody in a cutscene says the word.
+- That there is a second moon, because an old man in the square looks up at it and says one line
+  about it. It is not a plot point yet and nothing draws a box round it.
+- That the roads have something on them: a strip of pale blue skin is nailed to the west gatepost
+  where the watch put it, and a carter's pack in the ditch below it has been opened from the outside.
+  No one uses the word "sheet" in this chapter until {{MENTOR}} does over the sword.
+- That his father existed and is dead: the coat on the hook inside the door (`hart_yard.coat_hook`),
+  and nothing else. One place in the town holds him and that is all. **New token proposed:
+  `{{FATHER}}`** — the father has been "my father" nine times across the chapter and a player cannot
+  hold a person with no name. Until `NAMES.md` has the row, no scene file or field line may use the
+  token; the coat line says "your father's" and the name waits.
+- That fighting is a thing you do, and how the guard-break window works.
+
+**What failing costs.** Dawdle and the bell starts earlier in your afternoon than it would have. You
+cannot miss it and you cannot skip the lid.
+
+**Feel.** A small town on an ordinary hot afternoon, with one loaded cart going the wrong way out of
+it every few minutes and no one saying why.
+
+## Clip: Bandages
+
+[{{MENTOR}}'s yard. {{HEALER}} is rolling bandages. {{HERO}} has his boots in his hand.]
+
+{{HEALER}}: There you are. They put the jobs up on the guild board this morning.
+
+{{HERO}}: Jobs? Is there one I could sign for?
+
+{{HEALER}}: Whatever the clerk has left. Sign your name before the bell stops.
+
+{{HERO}}: And then what — I walk out of the valley on my own?
+
+{{HEALER}}: You walk it, you come back, he counts out your coin. I patch up whoever needs it.
+
+{{HERO}}: {{MENTOR}} keeps telling me I'm not ready. Watch me sign anyway!
+
+## Goal
 Sign for work before the bell stops.
 
 ## Play: Across town to the guild hall (6 min)
@@ -31,22 +114,45 @@ before he will speak to you.
 
 [The guild hall. The bell has stopped. One sheet is left on the board.]
 
-CLERK: You made the bell. The rule is that you sign before the bell, and {{RIVAL}} signed for the
-coast escort an hour before it and left at noon.
+CLERK: You made the bell. The board closed all the same.
 
-{{HERO}}: An hour before? I went over the grain-yard wall for that bell! What's the last sheet, then?
+{{HERO}}: All the same? I went over the grain-yard wall for that bell!
 
-CLERK: The water run out to the {{STAIR}}. {{MENTOR}} carried it in himself this morning. Thirty
-coin, two days out, two days back, and it leaves at dawn.
+CLERK: There is one sheet left on it.
 
-{{HERO}}: {{MENTOR}} posted it? So where's the carters' convoy that takes the jar every year?
+{{HERO}}: One sheet? It was covered this morning!
 
-CLERK: There is no convoy. Every carter in the valley has walked west to the lord's city for eighty
-coin a week. This is not a guild job and it needs no guarantor — {{MENTOR}} is paying the thirty coin
-out of his own pocket.
+CLERK: {{RIVAL}} signed for the coast road an hour before the bell.
 
-{{HERO}}: Out of his own — and a man who walks that road alone dies! The last hunter who walked it
-alone died on it eleven years ago, and he was my father. I'll take it!
+{{HERO}}: An hour before? I was still running!
+
+CLERK: What is left is the water run. Thirty coin, two days out and two days back.
+
+{{HERO}}: Out to where?
+
+CLERK: The {{STAIR}}. A jar of our well water goes there sealed, every year.
+
+{{HERO}}: What for?
+
+CLERK: No one has ever told me. It goes all the same.
+
+{{HERO}}: Who put it on the board?
+
+CLERK: {{MENTOR}} carried it in himself this morning.
+
+{{HERO}}: {{MENTOR}}? The carters take the jar out. They take it every year.
+
+CLERK: There is no convoy this year. Every carter in the valley has walked west.
+
+{{HERO}}: Then who is paying the thirty coin?
+
+CLERK: {{MENTOR}} is. His own money.
+
+{{HERO}}: A man walking that road alone dies out there.
+
+{{HERO}}: He was my father.
+
+{{HERO}}: I'll take it! Write my name down now!
 
 ## Goal
 Stop {{MENTOR}} pulling the job back off the board.

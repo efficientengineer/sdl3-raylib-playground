@@ -26,9 +26,23 @@ The bell has stopped. {{HERO}} has run the whole width of the town and come in a
    - {{HERO}}: eyes fixed on the Guildclerk, narrowed, brows low and level, jaw set, decided
 
 ## Dialogue
-- Clerk [1] {tense}: You made the bell. The rule is that you sign before the bell, and {{RIVAL}} signed for the coast escort an hour before it and left at noon.
-- {{HERO}} [2]: An hour before? I went over the grain-yard wall for that bell! What's the last sheet, then?
-- Clerk [3] {wonder}: The water run out to the {{STAIR}}. {{MENTOR}} carried it in himself this morning. Thirty coin, two days out, two days back, and it leaves at dawn.
-- {{HERO}} [4]: {{MENTOR}} posted it? So where's the carters' convoy that takes the jar every year?
-- Clerk [5] {dread}: There is no convoy. Every carter in the valley has walked west to the lord's city for eighty coin a week. This is not a guild job and it needs no guarantor — {{MENTOR}} is paying the thirty coin out of his own pocket.
-- {{HERO}} [6] {confront}: Out of his own — and a man who walks that road alone dies! The last hunter who walked it alone died on it eleven years ago, and he was my father. I'll take it!
+- Clerk [1] {tense}: You made the bell. The board closed all the same.
+- {{HERO}} [2]: All the same? I went over the grain-yard wall for that bell!
+- Clerk: There is one sheet left on it.
+- {{HERO}} [3]: One sheet? It was covered this morning!
+- Clerk: {{RIVAL}} signed for the coast road an hour before the bell.
+- {{HERO}} [4] {confront}: An hour before? I was still running!
+- Clerk [5] {wonder}: What is left is the water run. Thirty coin, two days out and two days back.
+- {{HERO}}: Out to where?
+- Clerk: The {{STAIR}}. A jar of our well water goes there sealed, every year.
+- {{HERO}}: What for?
+- Clerk: No one has ever told me. It goes all the same.
+- {{HERO}}: Who put it on the board?
+- Clerk: {{MENTOR}} carried it in himself this morning.
+- {{HERO}}: {{MENTOR}}? The carters take the jar out. They take it every year.
+- Clerk {dread}: There is no convoy this year. Every carter in the valley has walked west.
+- {{HERO}}: Then who is paying the thirty coin?
+- Clerk: {{MENTOR}} is. His own money.
+- {{HERO}} [6] {confront}: A man walking that road alone dies out there.
+- {{HERO}}: He was my father.
+- {{HERO}}: I'll take it! Write my name down now!
