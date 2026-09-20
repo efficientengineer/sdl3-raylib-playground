@@ -40,6 +40,11 @@ struct VxSave {
     float sun_az, sun_el, sh_str, sh_soft;
     int32_t sh_snap;
     int32_t perf_hud;                 // the Perf HUD mode: 0 off, 1 compact, 2 full
+    // Free movement (VOXFIELD_NOTES.md "Movement"). The position is a FLOAT now; facing survives,
+    // and the body is always put back on the ground — a reload never lands you mid-jump.
+    float px[VX_PARTY], pz[VX_PARTY];
+    float agent_r, sp_walk, sp_run, jump_apex, gravity;
+    int32_t nav_view;
 };
 
 VoxField *vx_create();
@@ -57,8 +62,9 @@ bool vx_capture_done(VoxField *v);
 // The desktop self-test (capture.sh --vox-selftest): loads every map once and fails loudly.
 int vx_selftest(VoxField *v);
 
-// The desktop self-test (capture.sh --vox-selftest): loads every map once and fails loudly.
-int vx_selftest(VoxField *v);
+// The movement bot (capture.sh --vox-walktest [map|all]): drives the real movement code against
+// walls, path-walks to every exit/door/NPC and jumps 200 times. Non-zero means a real failure.
+int vx_walktest(VoxField *v, const char *one_map);
 
 void vx_save(VoxField *v, VxSave *s);
 void vx_restore(VoxField *v, const VxSave *s);

@@ -52,6 +52,35 @@
 #define FADE_FRAMES 8
 #define VX_TYPE_CPS 42.0f
 
+// ── free movement on a generated navmesh (VOXFIELD_NOTES.md "Movement") ──
+// The owner, 2026-09-20: "we need to use a navmesh for movement… 8 directional movement instead of
+// the 4 we have now, and jumping", then "fully free is better for touch". So the party is a POINT
+// with a radius, not a cell, and the nav data is generated from the voxel grid at load.
+//
+// VX_AGENT_R is the one number everything else is proved against. A nav voxel is VOX_S (0.5 cells)
+// across, so the centre of one is 0.25 cells from each of its own edges. Keeping the radius UNDER
+// 0.25 means the circle at any free nav voxel's centre can never reach a blocked voxel, and the
+// straight segment between two 4-adjacent free centres runs down the middle of a 0.5-wide strip —
+// so walk connectivity on the nav grid ALWAYS survives erosion, and the reachability proof and the
+// collision can never disagree. That is the whole reason for the value; do not raise the default
+// above 0.24 without re-reading "Movement" in the notes.
+#define VX_AGENT_R    0.24f      // walk cells
+#define VX_SP_WALK    4.4f       // cells/second
+#define VX_SP_RUN     7.2f
+#define VX_GRAVITY    40.0f      // cells/second^2
+#define VX_JUMP_APEX  1.25f      // cells (= one walk-cell height and a quarter)
+#define VX_COYOTE     0.080f
+#define VX_JUMPBUF    0.100f
+#define VX_AIR_CTRL   0.40f      // of the ground acceleration
+#define VX_BODY_H     1.6f       // the party sprite's height, in cells
+#define VX_STEP_UP    (VOX_S + 0.001f)   // one voxel of rise is a free, smooth step
+#define VX_FACE_HYST  55.0f      // degrees off the current facing's axis before it flips
+#define VX_TRAIL      512        // breadcrumbs the followers walk
+#define VX_TRAIL_DS   0.06f      // cells between breadcrumbs
+#define VX_FOLLOW_D   1.15f      // cells behind, per party slot
+#define VX_NPC_R      0.28f      // an NPC's soft push-out circle
+#define VX_MAX_SUBSTEP (VOX_S * 0.5f)    // never tunnel: half a nav voxel a sub-step
+
 static const int DX[4] = { 0, -1, 1, 0 }, DZ[4] = { 1, 0, 0, -1 };
 static const char *FACE_NAME[4] = { "S", "W", "E", "N" };
 static int facing_of(const char *s) { return s[0] == 'W' ? 1 : s[0] == 'E' ? 2 : s[0] == 'N' ? 3 : 0; }
@@ -177,6 +206,9 @@ static bool blk_opaque(unsigned char b) { return b != B_AIR && b != B_WATER; }  
 enum { SH_CUBE = 0, SH_SLOPE, SH_SLOPE_OUT, SH_SLOPE_IN, SH_SLAB, SH_STAIRS, SH_POST, SH_PANE, SH_COUNT };
 enum { D_S = 0, D_N, D_E, D_W };                    // +z, -z, +x, -x
 static const int DIRV[4][2] = { {0,1}, {0,-1}, {1,0}, {-1,0} };   // x, z
+// The six faces, in the order shape_covers() and the mesher both use. Declared here rather than in
+// the meshing section because the navmesh asks "does this shape cover its top?" long before then.
+enum { F_TOP = 0, F_BOT, F_SOUTH, F_NORTH, F_EAST, F_WEST };
 static int dir_cw(int d)  { return d == D_S ? D_W : d == D_W ? D_N : d == D_N ? D_E : D_S; }
 static int dir_opp(int d) { return d == D_S ? D_N : d == D_N ? D_S : d == D_E ? D_W : D_E; }
 
@@ -244,6 +276,7 @@ struct VxNpc {
     float t, wait, y, py_;
     int facing, wander, art, parity;
     char walker[24], text[48];
+    float x, z, gx, gz, phase;         // free movement: world position and the current wander goal
 };
 struct VxArt {                                  // a walker sheet, indexed on the master palette
     char id[24];
@@ -252,7 +285,14 @@ struct VxArt {                                  // a walker sheet, indexed on th
     int row_of[4]; bool flip[4];
     int col_stand, col_a, col_b;
 };
-struct VxActor { short tx, tz, px, pz; int facing; float y, y0; };
+// An actor is a POINT now. `x/z/y` are world units and are the truth; `tx/tz` are floor(x),floor(z)
+// and exist only so the cell-based things (triggers, the Dev readout, the reload blob) keep working.
+// `px/pz/y0` are what is left of the grid walk and are kept so a saved blob still loads.
+struct VxActor { short tx, tz, px, pz; int facing; float y, y0; float x, z, ang, phase; };
+
+// One breadcrumb of the leader's path. The followers walk this, so they reproduce a jump at exactly
+// the spot the leader jumped, with no second simulation to get wrong.
+struct VxCrumb { float x, z, y, s; unsigned char air; };
 struct VxLight { float x, z, y, r, level; int flicker; };
 
 // One tiles.md entry, only what the voxel builder needs: how big a stamp is and what it is.
@@ -329,6 +369,39 @@ struct VoxField {
     int step_parity;
     bool run;
 
+    // ── the navmesh, generated from the voxel grid at load (VOXFIELD_NOTES.md "Movement") ──
+    // One entry per NAV VOXEL, which is one voxel = half a walk cell, so 2x2 to the cell.
+    unsigned char nav_ok[VX_VD][VX_VW];     // 1 = a body's centre may be here
+    unsigned char nav_reg[VX_VD][VX_VW];    // 0 none, 1 walk-reachable from spawn, 2.. jump-only
+    unsigned char nav_clr[VX_VD][VX_VW];    // clearance to the nearest blocked voxel, 1/32 cell, saturating
+    float nav_h[VX_VD][VX_VW];              // the walking surface at the voxel's centre, world y
+    int nav_regions, nav_jump_vox, nav_widened, nav_bad;
+    int nav_reg_size[16];
+    double nav_ms;
+
+    // the leader, as a point
+    float pvx, pvz, pvy;                    // velocity, cells/second
+    int airborne;
+    float coyote, jump_buf, tko_x, tko_z, tko_y;
+    float move_in_x, move_in_z, move_mag;   // this frame's desired direction and 0..1 magnitude
+    int want_jump, jump_held;
+    float speed_now;
+    int invalid_logged, land_fails;
+    // tunables (Dev sliders; they ride the reload blob)
+    float agent_r, sp_walk, sp_run, jump_apex, gravity;
+    int nav_view;
+
+    // breadcrumbs: the leader's path, which the followers walk
+    VxCrumb trail[VX_TRAIL]; int trail_n, trail_head; float trail_s;
+    float follow_warp_t[VX_PARTY], follow_stuck[VX_PARTY];
+
+    // the walktest bot (capture.sh --vox-walktest): drives the same movement code with no input
+    int bot_on, bot_jump, bot_run; float bot_mx, bot_mz;
+    float cam_y;                            // the camera's own softened height, so a jump does not bob it
+    bool cam_y_init;
+    // the Nav view overlay (Dev): its own flat-colour program and a VBO rebuilt when the map changes
+    GLuint nav_prog, nav_vao, nav_vbo; int nav_verts, nav_cap; float *nav_buf; bool nav_dirty;
+
     // art
     VxArt art[VX_ART]; int art_count;
     GLuint atlas; int atlas_w, atlas_h, atlas_cell;
@@ -372,7 +445,7 @@ struct VoxField {
     char to_map[32]; int to_x, to_z, to_f, fade, fade_dir;
     float anim_t, map_poll;
     int dbg_solid, dbg_trig, dbg_coord, noclip;
-    bool stick_on, act_on; SDL_FingerID stick_id, act_id;
+    bool stick_on, act_on; SDL_FingerID stick_id, act_id, jump_id;
     float stick_x, stick_y, stick_ox, stick_oy, act_t;
 
     // capture / selfcheck
@@ -1503,9 +1576,13 @@ static bool vx_can_stand(VoxField *v, int x, int z) {
     for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++)
         for (int k = 1; k <= 4; k++) {
             int vx = x * VX_VPC + dx, vy = y + k, vz = z * VX_VPC + dz;
+            // A ramp cell's own first two voxels ARE the surface you walk on, whatever shape they
+            // happen to be: the generator fills the far row with a solid CUBE and puts the slope on
+            // top of it, so testing for a ramp shape here failed every ramp cell in the game and the
+            // reach pass then flattened all of them away. (halm lost both, west_road all thirteen.)
+            if (v->ramp[z][x] && k <= 2) continue;
             if (get_blk(v, vx, vy, vz) == B_AIR) continue;
             unsigned char sp = get_shp(v, vx, vy, vz);
-            if (v->ramp[z][x] && k <= 2 && shape_is_ramp(sp)) continue;
             if (k == 4 && SH_OF(sp) == SH_SLAB && OR_OF(sp) == SL_TOP) continue;
             return false;
         }
@@ -1613,6 +1690,296 @@ static float vx_gy(VoxField *v, int x, int z) {
     return ((float)v->hgt[z][x] + 1.0f) * VOX_S;
 }
 
+// ───────────────────────── the navmesh ─────────────────────────
+// Generated from the voxel grid at load; nothing is hand-authored. One entry per VOXEL (half a walk
+// cell), which is finer than the .tmap and is what lets a fence post block half a cell without the
+// whole cell going solid.
+//
+// A nav voxel is walkable when: the tile map calls its cell walkable, the voxel column's top is the
+// cell's own walking surface (so nothing is built on it), that top face is something you can stand
+// on, and four voxels of headroom are clear above it — the same rule vx_can_stand enforces for the
+// houses, applied per voxel instead of per cell.
+//
+// Connectivity is decided by height: a difference of one voxel or less is a WALK edge, anything more
+// is a LEDGE — you may drop or jump off it, you may not walk up it. That test is done live against
+// the body's own height rather than baked, because after a jump the body can be anywhere.
+//
+// EROSION is exact and continuous, not a second grid: the body is a circle of radius `agent_r` and
+// every move is resolved out of the square of any blocked nav voxel it overlaps. That is the
+// Minkowski erosion of the walkable region by the radius, computed per move, with no quantisation —
+// which is the "buffer" the old 3D field was missing when the party clipped into fences.
+
+static bool vx_stand_solid(VoxField *v, int x, int y, int z) {
+    unsigned char b = get_blk(v, x, y, z);
+    return b != B_AIR && b != B_WATER;
+}
+
+// The highest voxel at or below `lim` you could put a foot on in this column, or -1.
+static int vx_col_top(VoxField *v, int ix, int iz, int lim) {
+    for (int y = lim; y >= 0; y--) if (vx_stand_solid(v, ix, y, iz)) return y;
+    return -1;
+}
+
+// Four voxels clear above `top`, with the same two exemptions vx_can_stand grants: a ramp's own
+// slope voxels are what you walk on, and the fourth voxel may hold a top slab so a sill, an eave or
+// a rail can oversail a lane.
+static bool vx_head_clear(VoxField *v, int ix, int iz, int top, bool on_ramp) {
+    for (int k = 1; k <= 4; k++) {
+        int y = top + k;
+        if (y >= VX_VY) return true;
+        if (get_blk(v, ix, y, iz) == B_AIR) continue;
+        unsigned char sp = get_shp(v, ix, y, iz);
+        if (on_ramp && k <= 2 && shape_is_ramp(sp)) continue;
+        if (k == 4 && SH_OF(sp) == SH_SLAB && OR_OF(sp) == SL_TOP) continue;
+        return false;
+    }
+    return true;
+}
+
+static void vx_nav_cells(VoxField *v) {
+    memset(v->nav_ok, 0, sizeof(v->nav_ok));
+    for (int iz = 0; iz < v->vd; iz++) for (int ix = 0; ix < v->vw; ix++) {
+        int cx = ix / VX_VPC, cz = iz / VX_VPC;
+        if (cx >= v->mw || cz >= v->md) continue;
+        if (!v->walk[cz][cx]) continue;
+        int base = v->hgt[cz][cx];
+        bool ramp = v->ramp[cz][cx] != 0;
+        float fx = (float)(ix % VX_VPC) * VOX_S + VOX_S * 0.5f;
+        float fz = (float)(iz % VX_VPC) * VOX_S + VOX_S * 0.5f;
+        float sv = vx_surface_v(v, cx, cz, fx, fz);            // the surface, in voxels
+        int top = vx_col_top(v, ix, iz, ramp ? base + 2 : base);
+        if (ramp) {
+            if (top < base) continue;                          // a hole in the ramp
+        } else {
+            if (top != base) continue;                         // a hole, or something built on it
+            unsigned char sp = get_shp(v, ix, top, iz);
+            // a post, a pane or an upside-down slab is not a floor
+            if (!shape_covers(sp, F_TOP) && !shape_is_ramp(sp)) continue;
+        }
+        if (!vx_head_clear(v, ix, iz, top, ramp)) continue;
+        v->nav_ok[iz][ix] = 1;
+        v->nav_h[iz][ix] = sv * VOX_S;
+    }
+}
+
+// A two-pass chamfer distance transform over the blocked set. This is for the overlay and for the
+// corridor-width log ONLY — the collision uses the exact circle-vs-square test. Stored in 1/32 of a
+// walk cell, saturating at 255 (about 8 cells).
+static void vx_nav_clearance(VoxField *v) {
+    static float d[VX_VD][VX_VW];
+    const float A = 1.0f, B = 1.41421356f;
+    for (int z = 0; z < v->vd; z++) for (int x = 0; x < v->vw; x++) d[z][x] = v->nav_ok[z][x] ? 1e9f : 0.0f;
+    for (int z = 0; z < v->vd; z++) for (int x = 0; x < v->vw; x++) {
+        float m = d[z][x];
+        if (z > 0) { if (d[z-1][x] + A < m) m = d[z-1][x] + A;
+                     if (x > 0 && d[z-1][x-1] + B < m) m = d[z-1][x-1] + B;
+                     if (x + 1 < v->vw && d[z-1][x+1] + B < m) m = d[z-1][x+1] + B; }
+        if (x > 0 && d[z][x-1] + A < m) m = d[z][x-1] + A;
+        d[z][x] = m;
+    }
+    for (int z = v->vd - 1; z >= 0; z--) for (int x = v->vw - 1; x >= 0; x--) {
+        float m = d[z][x];
+        if (z + 1 < v->vd) { if (d[z+1][x] + A < m) m = d[z+1][x] + A;
+                             if (x > 0 && d[z+1][x-1] + B < m) m = d[z+1][x-1] + B;
+                             if (x + 1 < v->vw && d[z+1][x+1] + B < m) m = d[z+1][x+1] + B; }
+        if (x + 1 < v->vw && d[z][x+1] + A < m) m = d[z][x+1] + A;
+        d[z][x] = m;
+        // d is in nav voxels from centre to centre; the free space from the centre to the blocked
+        // SQUARE's face is half a voxel less. In walk cells that is (d - 0.5) * VOX_S.
+        float world = (m - 0.5f) * VOX_S;
+        if (world < 0) world = 0;
+        int q = (int)(world * 32.0f + 0.5f);
+        v->nav_clr[z][x] = (unsigned char)(q > 255 ? 255 : q);
+    }
+}
+
+// Walk connectivity: a height difference of one voxel or less. The flood from the spawn is region 1;
+// every other component is a "jump-only" region — somewhere you can only get to by dropping or
+// jumping, which is where the hidden loot goes later.
+static void vx_nav_regions(VoxField *v) {
+    memset(v->nav_reg, 0, sizeof(v->nav_reg));
+    memset(v->nav_reg_size, 0, sizeof(v->nav_reg_size));
+    static short qx[VX_VW * VX_VD], qz[VX_VW * VX_VD];
+    int reg = 0;
+    // The spawn is seeded first, so what you can walk to from where the party starts is ALWAYS
+    // region 1 and every other component is by definition jump-only.
+    int seed_x = -1, seed_z = -1;
+    for (int dz = 0; dz < VX_VPC && seed_x < 0; dz++) for (int dx = 0; dx < VX_VPC && seed_x < 0; dx++) {
+        int i = v->spawn_x * VX_VPC + dx, j = v->spawn_z * VX_VPC + dz;
+        if (i < v->vw && j < v->vd && v->nav_ok[j][i]) { seed_x = i; seed_z = j; }
+    }
+    // -1 is the seed pass; then every remaining free voxel in reading order.
+    for (int start = -1; start < v->vw * v->vd; start++) {
+        int bx, bz;
+        if (start < 0) { if (seed_x < 0) continue; bx = seed_x; bz = seed_z; }
+        else { bx = start % v->vw; bz = start / v->vw; }
+        if (!v->nav_ok[bz][bx] || v->nav_reg[bz][bx]) continue;
+        if (reg >= 250) continue;
+        reg++;
+        int head = 0, tail = 0, size = 0;
+        v->nav_reg[bz][bx] = (unsigned char)reg;
+        qx[tail] = (short)bx; qz[tail++] = (short)bz;
+        while (head < tail) {
+            int x = qx[head], z = qz[head]; head++;
+            size++;
+            for (int d = 0; d < 4; d++) {
+                int nx = x + DX[d], nz = z + DZ[d];
+                if (nx < 0 || nz < 0 || nx >= v->vw || nz >= v->vd) continue;
+                if (!v->nav_ok[nz][nx] || v->nav_reg[nz][nx]) continue;
+                float dh = v->nav_h[nz][nx] - v->nav_h[z][x];
+                if (dh > VX_STEP_UP || dh < -VX_STEP_UP) continue;      // a ledge, not a walk edge
+                v->nav_reg[nz][nx] = (unsigned char)reg;
+                qx[tail] = (short)nx; qz[tail++] = (short)nz;
+            }
+        }
+        if (reg < 16) v->nav_reg_size[reg] = size;
+    }
+    v->nav_regions = reg;
+    v->nav_jump_vox = 0;
+    for (int z = 0; z < v->vd; z++) for (int x = 0; x < v->vw; x++)
+        if (v->nav_ok[z][x] && v->nav_reg[z][x] != 1) v->nav_jump_vox++;
+}
+
+// Is any of this cell's four nav voxels in region 1 — i.e. can you WALK there from the spawn?
+static bool vx_cell_reachable(VoxField *v, int cx, int cz) {
+    if (cx < 0 || cz < 0 || cx >= v->mw || cz >= v->md) return false;
+    for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++)
+        if (v->nav_reg[cz * VX_VPC + dz][cx * VX_VPC + dx] == 1) return true;
+    return false;
+}
+
+// Remove decoration from a cell: anything above the walking surface that is not a full cube, plus
+// any loose single voxel. Structure (a wall, a house, a fence POST line) is cube-shaped and stays;
+// this is the "widen the corridor and log it" escape hatch of brief item 8.
+static int vx_nav_widen_cell(VoxField *v, int cx, int cz) {
+    if (cx < 0 || cz < 0 || cx >= v->mw || cz >= v->md) return 0;
+    int removed = 0, base = v->hgt[cz][cx];
+    for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++)
+        for (int k = 1; k <= 4; k++) {
+            int ix = cx * VX_VPC + dx, iz = cz * VX_VPC + dz, y = base + k;
+            if (y >= VX_VY) continue;
+            if (get_blk(v, ix, y, iz) == B_AIR) continue;
+            unsigned char sp = get_shp(v, ix, y, iz);
+            int sh = SH_OF(sp);
+            if (sh == SH_CUBE) continue;               // structure: leave it alone
+            set_blk(v, ix, y, iz, B_AIR);
+            v->shp[y][iz][ix] = 0;
+            removed++;
+        }
+    return removed;
+}
+
+// Everything the story needs to be able to reach on foot: every exit, door and message trigger, and
+// the cell next to every NPC.
+static int vx_nav_check_targets(VoxField *v, short *bad_x, short *bad_z, int cap) {
+    int n = 0;
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        bool any = false;
+        for (int z = g->z; z < g->z + g->d && !any; z++) for (int x = g->x; x < g->x + g->w && !any; x++)
+            if (vx_cell_reachable(v, x, z)) any = true;
+        if (any) continue;
+        // a door in a wall is reached from the cell in front of it, not from its own cell
+        for (int d = 0; d < 4 && !any; d++) if (vx_cell_reachable(v, g->x + DX[d], g->z + DZ[d])) any = true;
+        if (any) continue;
+        if (n < cap) { bad_x[n] = g->x; bad_z[n] = g->z; }
+        n++;
+    }
+    for (int i = 0; i < v->npc_count; i++) {
+        VxNpc *np = &v->npcs[i];
+        bool any = vx_cell_reachable(v, np->tx, np->tz);
+        for (int d = 0; d < 4 && !any; d++) any = vx_cell_reachable(v, np->tx + DX[d], np->tz + DZ[d]);
+        if (any) continue;
+        if (n < cap) { bad_x[n] = np->tx; bad_z[n] = np->tz; }
+        n++;
+    }
+    return n;
+}
+
+static void vx_build_nav(VoxField *v) {
+    uint64_t t0 = SDL_GetPerformanceCounter();
+    v->nav_widened = 0;
+    short bx[64], bz[64];
+    int bad = 0;
+    for (int round = 0; round < 4; round++) {
+        vx_nav_cells(v);
+        vx_nav_regions(v);
+        bad = vx_nav_check_targets(v, bx, bz, 64);
+        if (!bad) break;
+        int did = 0;
+        for (int i = 0; i < bad && i < 64; i++)
+            for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++)
+                did += vx_nav_widen_cell(v, bx[i] + dx, bz[i] + dz);
+        v->nav_widened += did;
+        SDL_Log("voxfield nav: %d target%s unreachable on foot — removed %d decoration voxels around "
+                "them and rebuilding", bad, bad == 1 ? "" : "s", did);
+        if (!did) break;                                    // nothing left to remove; report it
+    }
+    v->nav_bad = bad;
+    vx_nav_clearance(v);
+    v->nav_ms = (double)(SDL_GetPerformanceCounter() - t0) * 1000.0 / (double)SDL_GetPerformanceFrequency();
+    int freev = 0;
+    for (int z = 0; z < v->vd; z++) for (int x = 0; x < v->vw; x++) if (v->nav_ok[z][x]) freev++;
+    { char rl[160]; rl[0] = 0;                      // where the ramps are, so a capture can be aimed at one
+      for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) if (v->ramp[z][x]) {
+          char one[16]; snprintf(one, sizeof one, "%s%d,%d", rl[0] ? " " : "", x, z);
+          if (strlen(rl) + strlen(one) < sizeof(rl) - 1) strcat(rl, one); }
+      if (rl[0]) SDL_Log("voxfield nav: %s ramps at %s", v->map_name, rl); }
+    SDL_Log("voxfield nav: %s %dx%d voxels, %d walkable (%d walk-reachable, %d jump-only in %d region%s), "
+            "radius %.2f, %.2f ms%s", v->map_name, v->vw, v->vd, freev, freev - v->nav_jump_vox,
+            v->nav_jump_vox, v->nav_regions > 1 ? v->nav_regions - 1 : 0, v->nav_regions == 2 ? "" : "s",
+            v->agent_r, v->nav_ms, bad ? "  TARGETS UNREACHABLE" : "");
+}
+
+// ── queries ──
+
+static bool vx_nav_at(VoxField *v, float x, float z) {
+    int ix = (int)floorf(x / VOX_S), iz = (int)floorf(z / VOX_S);
+    if (ix < 0 || iz < 0 || ix >= v->vw || iz >= v->vd) return false;
+    return v->nav_ok[iz][ix] != 0;
+}
+
+// The walking surface at a continuous position: bilinear over the four nearest nav-voxel CENTRES,
+// dropping any that is not walkable so a ledge never drags the surface down with it.
+static float vx_nav_y(VoxField *v, float x, float z) {
+    float gx = x / VOX_S - 0.5f, gz = z / VOX_S - 0.5f;
+    int i0 = (int)floorf(gx), j0 = (int)floorf(gz);
+    float fx = gx - i0, fz = gz - j0;
+    float sum = 0, wsum = 0, best = 0; bool any = false;
+    for (int dj = 0; dj < 2; dj++) for (int di = 0; di < 2; di++) {
+        int i = i0 + di, j = j0 + dj;
+        if (i < 0 || j < 0 || i >= v->vw || j >= v->vd || !v->nav_ok[j][i]) continue;
+        float w = (di ? fx : 1 - fx) * (dj ? fz : 1 - fz);
+        sum += v->nav_h[j][i] * w; wsum += w;
+        if (!any || v->nav_h[j][i] > best) { best = v->nav_h[j][i]; any = true; }
+    }
+    if (wsum > 1e-4f) return sum / wsum;
+    if (any) return best;
+    int cx = (int)floorf(x), cz = (int)floorf(z);
+    return vx_gy(v, cx < 0 ? 0 : cx >= v->mw ? v->mw - 1 : cx, cz < 0 ? 0 : cz >= v->md ? v->md - 1 : cz);
+}
+
+// The nearest valid nav point to (x,z), searched outward a ring at a time. `limit` is in cells; -1
+// means the whole map. Returns false when there is nowhere to stand at all.
+static bool vx_nav_snap(VoxField *v, float *x, float *z, float limit) {
+    if (vx_nav_at(v, *x, *z)) return true;
+    int ix = (int)floorf(*x / VOX_S), iz = (int)floorf(*z / VOX_S);
+    int maxr = limit < 0 ? (v->vw > v->vd ? v->vw : v->vd) : (int)(limit / VOX_S) + 1;
+    for (int r = 1; r <= maxr; r++) {
+        int bi = -1, bj = -1; float bd = 1e9f;
+        for (int dj = -r; dj <= r; dj++) for (int di = -r; di <= r; di++) {
+            if (abs(di) != r && abs(dj) != r) continue;             // the ring only
+            int i = ix + di, j = iz + dj;
+            if (i < 0 || j < 0 || i >= v->vw || j >= v->vd || !v->nav_ok[j][i]) continue;
+            float cx = (i + 0.5f) * VOX_S, cz = (j + 0.5f) * VOX_S;
+            float d = (cx - *x) * (cx - *x) + (cz - *z) * (cz - *z);
+            if (d < bd) { bd = d; bi = i; bj = j; }
+        }
+        if (bi >= 0) { *x = (bi + 0.5f) * VOX_S; *z = (bj + 0.5f) * VOX_S; return true; }
+    }
+    return false;
+}
+
 // ───────────────────────── meshing ─────────────────────────
 // Once, at load, into one static VBO per 16x16 chunk. Hidden faces are culled; every vertex carries
 // its baked ambient occlusion, the sun term for its face, whether a column shadows it, and the lamp
@@ -1620,7 +1987,6 @@ static float vx_gy(VoxField *v, int x, int z) {
 // lighting) — the ambient level and the AO strength stay live because they are applied in the shader
 // to numbers that were baked.
 
-enum { F_TOP = 0, F_BOT, F_SOUTH, F_NORTH, F_EAST, F_WEST };
 static const int FN[6][3] = { {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1}, {1,0,0}, {-1,0,0} };
 static const int F_OPP[6] = { F_BOT, F_TOP, F_NORTH, F_SOUTH, F_WEST, F_EAST };
 
@@ -2348,6 +2714,16 @@ static const char *VX_SKY_FS =
 // so it does not itself defeat early-Z.
 // u_step is 1/255 when the number is being measured (so the byte in the pixel IS the write count)
 // and something visible when the debug view is being looked at.
+// The Nav view (Dev toggle): flat translucent colour in world space. Debug only, one draw call.
+static const char *VX_NAV_VS =
+    "layout(location=0) in vec3 a_pos;\n"
+    "layout(location=1) in vec4 a_col;\n"
+    "uniform mat4 u_mvp;\n"
+    "out vec4 v_col;\n"
+    "void main(){ v_col = a_col; gl_Position = u_mvp * vec4(a_pos,1.0); }\n";
+static const char *VX_NAV_FS =
+    "in vec4 v_col;\nout vec4 o_col;\nvoid main(){ o_col = v_col; }\n";
+
 static const char *VX_OD_FS =
     "uniform float u_step;\n"
     "out vec4 o;\n"
@@ -2414,6 +2790,9 @@ static void vx_gl_init(VoxField *v) {
         v->prog_cut = vx_program_n(VX_VS, cut,   3, "world cutaway");
     }
     v->od_prog = vx_program(VX_VS, VX_OD_FS, "overdraw");
+    v->nav_prog = vx_program(VX_NAV_VS, VX_NAV_FS, "nav view");
+    glGenVertexArrays(1, &v->nav_vao);
+    glGenBuffers(1, &v->nav_vbo);
     v->spr_prog = vx_program(VX_SPR_VS, VX_SPR_FS, "sprite");
     v->blur_prog = vx_program(VX_QUAD_VS, VX_BLUR_FS, "blur");
     v->post_prog = vx_program(VX_QUAD_VS, VX_POST_FS, "post");
@@ -2684,24 +3063,37 @@ static void vx_scatter_detail(VoxField *v) {
 
 // ───────────────────────── load ─────────────────────────
 
-static void vx_place_party(VoxField *v, int x, int z, int facing) {
-    if (!v->noclip && !vx_can_stand(v, x, z)) {
-        int bx = x, bz = z, best = 1 << 30;
-        for (int sz2 = 0; sz2 < v->md; sz2++) for (int sx = 0; sx < v->mw; sx++) {
-            if (!vx_can_stand(v, sx, sz2)) continue;
-            int d = (sx - x) * (sx - x) + (sz2 - z) * (sz2 - z);
-            if (d < best) { best = d; bx = sx; bz = sz2; }
-        }
-        SDL_Log("voxfield: spawn %d,%d is not standable — moved to %d,%d", x, z, bx, bz);
-        x = bx; z = bz;
-    }
+// Every spawn, teleport and door arrival goes through here, and every one of them SNAPS to the
+// nearest valid nav point. The old 3D field's second reported bug was the party not landing on a
+// walkable poly at spawn; a spiral search that always terminates is the fix.
+static void vx_place_party_at(VoxField *v, float wx, float wz, int facing) {
+    float sx = wx, sz = wz;
+    if (!v->noclip && !vx_nav_snap(v, &sx, &sz, -1.0f))
+        SDL_Log("voxfield: nowhere to stand on %s at all — leaving the party at %.2f,%.2f", v->map_name, wx, wz);
+    float moved = sqrtf((sx - wx) * (sx - wx) + (sz - wz) * (sz - wz));
+    if (moved > 0.5f)
+        SDL_Log("voxfield: spawn %.2f,%.2f is not on the navmesh — snapped %.2f cells to %.2f,%.2f",
+                wx, wz, moved, sx, sz);
+    float y = vx_nav_y(v, sx, sz);
     for (int i = 0; i < VX_PARTY; i++) {
-        v->act[i].tx = v->act[i].px = (short)x;
-        v->act[i].tz = v->act[i].pz = (short)z;
-        v->act[i].facing = facing;
-        v->act[i].y = v->act[i].y0 = vx_gy(v, x, z);
+        VxActor *a = &v->act[i];
+        a->x = sx; a->z = sz; a->y = a->y0 = y;
+        a->tx = a->px = (short)floorf(sx);
+        a->tz = a->pz = (short)floorf(sz);
+        a->facing = facing;
+        a->ang = facing == 3 ? -1.57079633f : facing == 2 ? 0.0f : facing == 1 ? 3.14159265f : 1.57079633f;
+        a->phase = 0;
     }
+    v->pvx = v->pvz = v->pvy = 0;
+    v->airborne = 0; v->coyote = VX_COYOTE; v->jump_buf = 0;
+    v->tko_x = sx; v->tko_z = sz; v->tko_y = y;
+    v->trail_n = 0; v->trail_head = 0; v->trail_s = 0;
+    v->invalid_logged = 0;
     v->moving = false; v->move_t = 0;
+}
+
+static void vx_place_party(VoxField *v, int x, int z, int facing) {
+    vx_place_party_at(v, x + 0.5f, z + 0.5f, facing);
 }
 
 static const char *PARTY_ART[VX_PARTY] = { "falke", "ottilie", "party_c", "party_d" };
@@ -2733,6 +3125,8 @@ bool vx_load_map(VoxField *v, const char *name) {
 
     vx_build_world(v);
     v->reach_missing = vx_verify_reach(v);
+    vx_build_nav(v);                       // the navmesh, generated from the voxel grid; may widen
+    v->nav_dirty = true; v->nav_verts = 0;
     vx_load_atlas(v);
     vx_load_decals(v);
     vx_scatter_detail(v);
@@ -2742,7 +3136,12 @@ bool vx_load_map(VoxField *v, const char *name) {
     for (int i = 0; i < v->npc_count; i++) {
         VxNpc *np = &v->npcs[i];
         np->art = vx_art_get(v, np->walker);
-        np->y = np->py_ = vx_gy(v, np->tx, np->tz);
+        np->x = np->gx = np->tx + 0.5f;
+        np->z = np->gz = np->tz + 0.5f;
+        vx_nav_snap(v, &np->x, &np->z, 2.0f);
+        np->gx = np->x; np->gz = np->z;
+        np->y = np->py_ = vx_nav_y(v, np->x, np->z);
+        np->phase = 0; np->wait = vx_rnd(i, 3, 11) * 2.0f;
     }
     vx_place_party(v, v->spawn_x, v->spawn_z, v->spawn_f);
     v->steps = 0;
@@ -2766,13 +3165,36 @@ static void vx_selfcheck(VoxField *v, int dw, int dh, int draws, int sprites) {
             v->reach_missing ? "FAIL" : "ok", v->mesh_ms, v->shadow_dim, v->shadow_ms, dw, dh, vx_max_tex,
             v->light_count, v->npc_count, v->det_count, v->off_pal);
     if (v->reach_missing) SDL_Log("SELFCHECK vox: %d cells the tile map can reach are unreachable here", v->reach_missing);
+    // The navmesh's own verdict. `jumponly` is where hidden loot goes later, so it is a number to
+    // read and not a failure; `navreach` is the failure.
+    {
+        int freev = 0;
+        for (int z = 0; z < v->vd; z++) for (int x = 0; x < v->vw; x++) if (v->nav_ok[z][x]) freev++;
+        char sizes[160]; sizes[0] = 0;
+        for (int r = 2; r < v->nav_regions + 1 && r < 16; r++) {
+            char one[24];
+            snprintf(one, sizeof one, "%s%d", sizes[0] ? "," : "", v->nav_reg_size[r]);
+            if (strlen(sizes) + strlen(one) < sizeof(sizes) - 1) strcat(sizes, one);
+        }
+        SDL_Log("SELFCHECK vox: nav map=%s r=%.2f  walkable=%d vox  walk-reachable=%d  jumponly=%d in %d region(s)"
+                "%s%s  widened=%d  navreach=%s  nav=%.2fms",
+                v->map_name, v->agent_r, freev, freev - v->nav_jump_vox, v->nav_jump_vox,
+                v->nav_regions > 1 ? v->nav_regions - 1 : 0, sizes[0] ? " sizes " : "", sizes,
+                v->nav_widened, v->nav_bad ? "FAIL" : "ok", v->nav_ms);
+    }
 }
 
 // ───────────────────────── walking ─────────────────────────
 
-static int npc_at(VoxField *v, int x, int z) {
-    for (int i = 0; i < v->npc_count; i++) if (v->npcs[i].tx == x && v->npcs[i].tz == z) return i;
-    return -1;
+// The NPC nearest to a point, within `r` cells. NPCs are circles now, not cells.
+static int npc_near(VoxField *v, float x, float z, float r) {
+    int best = -1; float bd = r * r;
+    for (int i = 0; i < v->npc_count; i++) {
+        float dx = v->npcs[i].x - x, dz = v->npcs[i].z - z;
+        float d = dx * dx + dz * dz;
+        if (d < bd) { bd = d; best = i; }
+    }
+    return best;
 }
 
 static void vx_say(VoxField *v, const char *who, const char *id) {
@@ -2812,7 +3234,112 @@ static void start_map_change(VoxField *v, const char *map, int x, int z, int f) 
     v->fade = 1; v->fade_dir = 1;
 }
 
-static void on_enter_cell(VoxField *v, VxEvent *ev) {
+// ───────────────────────── free movement on the navmesh ─────────────────────────
+// The owner, 2026-09-20: 8-directional, fully free, with jumping. The leader is a POINT with a
+// radius; nothing about a cell survives except the trigger grid, which is deliberately still
+// cell-based so the .tmap keeps meaning what it meant.
+//
+// Rules, in one place:
+//   * ground move  = desired velocity * dt, sub-stepped so no step exceeds half a nav voxel, each
+//     sub-step resolved out of every blocked nav voxel square the body's circle overlaps. That is
+//     exact Minkowski erosion by the radius, so the body's centre can never come closer than
+//     `agent_r` to a wall, a fence, water or a ledge that steps UP more than one voxel.
+//   * a ledge that steps DOWN is not a wall: you walk off it and fall.
+//   * airborne the body is off the navmesh entirely and is tested against voxel SOLIDS instead,
+//     the same circle against any column with something in the band from the feet to head height.
+//   * every frame ends with the centre inside the region. If it ever does not (a bug), the body is
+//     put back where it last was valid and one line is logged.
+
+// Anything solid in this voxel column between world heights y0 and y1.
+static bool vx_solid_band(VoxField *v, int ix, int iz, float y0, float y1) {
+    if (ix < 0 || iz < 0 || ix >= v->vw || iz >= v->vd) return true;       // off the map is a wall
+    int a = (int)floorf(y0 / VOX_S), b = (int)floorf((y1 - 0.0001f) / VOX_S);
+    if (a < 0) a = 0;
+    if (b >= VX_VY) b = VX_VY - 1;
+    for (int y = a; y <= b; y++) if (blk_solid(get_blk(v, ix, y, iz))) return true;
+    return false;
+}
+
+// A walking blocker: off the navmesh, or a surface more than one voxel above the feet.
+static bool vx_ground_block(VoxField *v, int ix, int iz, float feet) {
+    if (ix < 0 || iz < 0 || ix >= v->vw || iz >= v->vd) return true;
+    if (!v->nav_ok[iz][ix]) return true;
+    return v->nav_h[iz][ix] > feet + VX_STEP_UP;
+}
+
+static bool vx_air_block(VoxField *v, int ix, int iz, float feet) {
+    if (ix < 0 || iz < 0 || ix >= v->vw || iz >= v->vd) return true;
+    return vx_solid_band(v, ix, iz, feet + 0.12f, feet + VX_BODY_H);
+}
+
+// Push the circle at (*x,*z) out of every blocker it overlaps, deepest first. Up to `iters` passes,
+// which is what makes a corner between two blockers converge instead of oscillating.
+static int vx_depenetrate(VoxField *v, float *x, float *z, float feet, bool air, float r, int iters) {
+    int moved = 0;
+    for (int it = 0; it < iters; it++) {
+        int i0 = (int)floorf((*x - r) / VOX_S), i1 = (int)floorf((*x + r) / VOX_S);
+        int j0 = (int)floorf((*z - r) / VOX_S), j1 = (int)floorf((*z + r) / VOX_S);
+        float bestpen = 0, bnx = 0, bnz = 0;
+        for (int j = j0; j <= j1; j++) for (int i = i0; i <= i1; i++) {
+            bool blocked = air ? vx_air_block(v, i, j, feet) : vx_ground_block(v, i, j, feet);
+            if (!blocked) continue;
+            float qx0 = i * VOX_S, qz0 = j * VOX_S, qx1 = qx0 + VOX_S, qz1 = qz0 + VOX_S;
+            float cx = *x < qx0 ? qx0 : *x > qx1 ? qx1 : *x;     // the closest point on the square
+            float cz = *z < qz0 ? qz0 : *z > qz1 ? qz1 : *z;
+            float dx = *x - cx, dz = *z - cz;
+            float d2 = dx * dx + dz * dz;
+            float pen, nx, nz;
+            if (d2 > 1e-8f) {
+                float d = sqrtf(d2);
+                if (d >= r) continue;
+                pen = r - d; nx = dx / d; nz = dz / d;
+            } else {
+                // the centre is inside the square: leave by the nearest face
+                float dl = *x - qx0, dr = qx1 - *x, dn = *z - qz0, ds = qz1 - *z;
+                float m = dl; nx = -1; nz = 0;
+                if (dr < m) { m = dr; nx = 1; nz = 0; }
+                if (dn < m) { m = dn; nx = 0; nz = -1; }
+                if (ds < m) { m = ds; nx = 0; nz = 1; }
+                pen = m + r;
+            }
+            if (pen > bestpen) { bestpen = pen; bnx = nx; bnz = nz; }
+        }
+        if (bestpen <= 0) break;
+        *x += bnx * (bestpen + 0.0005f);
+        *z += bnz * (bestpen + 0.0005f);
+        moved++;
+    }
+    return moved;
+}
+
+// One move-and-slide. Sub-stepped so a single step can never exceed half a nav voxel — the body
+// cannot tunnel through a one-voxel-thick fence however large dt is.
+static void vx_move_slide(VoxField *v, float *x, float *z, float dx, float dz, float feet, bool air, float r) {
+    float len = sqrtf(dx * dx + dz * dz);
+    int steps = (int)(len / VX_MAX_SUBSTEP) + 1;
+    if (steps > 64) steps = 64;
+    for (int s = 0; s < steps; s++) {
+        *x += dx / steps;
+        *z += dz / steps;
+        vx_depenetrate(v, x, z, feet, air, r, 3);
+    }
+    float w = v->vw * VOX_S, d = v->vd * VOX_S;
+    if (*x < r) *x = r;
+    if (*z < r) *z = r;
+    if (*x > w - r) *x = w - r;
+    if (*z > d - r) *z = d - r;
+}
+
+// ── triggers, still cell-based ──
+// A trigger is a rectangle of CELLS in the .tmap and stays one: the story reads them that way. They
+// fire when the leader's cell changes on the ground; an exit whose rectangle touches the map border
+// fires in the air too, so a jump off the edge of the map still takes you to the next one.
+
+static bool vx_trig_at_edge(VoxField *v, const VxTrig *g) {
+    return g->x <= 0 || g->z <= 0 || g->x + g->w >= v->mw || g->z + g->d >= v->md;
+}
+
+static void on_enter_cell(VoxField *v, VxEvent *ev, bool grounded) {
     v->steps++;
     int x = v->act[0].tx, z = v->act[0].tz;
     for (int i = 0; i < v->trig_count; i++) {
@@ -2821,6 +3348,7 @@ static void on_enter_cell(VoxField *v, VxEvent *ev) {
         bool was = g->inside;
         g->inside = in;
         if (!in || was) continue;
+        if (!grounded && !(g->kind == TG_EXIT && vx_trig_at_edge(v, g))) { g->inside = false; continue; }
         if (g->kind == TG_EXIT) { start_map_change(v, g->map, g->ax, g->az, g->af); return; }
         if (g->kind == TG_DOOR && v->act[0].facing == 3) { start_map_change(v, g->map, g->ax, g->az, g->af); return; }
         if (g->kind == TG_ZONE) fire(ev, VXE_ZONE, g->arg);
@@ -2829,45 +3357,153 @@ static void on_enter_cell(VoxField *v, VxEvent *ev) {
     }
 }
 
+// ── facing, with hysteresis ──
+// Four rows of art (S, side, N; side mirrored for E) and eight directions of movement, so a diagonal
+// sits exactly on the boundary between two rows and flickers if you take the nearest one every
+// frame. The facing is KEPT until the move vector is more than VX_FACE_HYST degrees off its axis.
+
+static int vx_face_pick(int cur, float mx, float mz) {
+    float len = sqrtf(mx * mx + mz * mz);
+    if (len < 1e-4f) return cur;
+    mx /= len; mz /= len;
+    if (cur >= 0 && cur < 4) {
+        float c = mx * DX[cur] + mz * DZ[cur];
+        if (c > cosf(VX_FACE_HYST * 3.14159265f / 180.0f)) return cur;
+    }
+    int best = cur < 0 ? 0 : cur; float bd = -2;
+    for (int d = 0; d < 4; d++) {
+        float c = mx * DX[d] + mz * DZ[d];
+        if (c > bd) { bd = c; best = d; }
+    }
+    return best;
+}
+
+static float vx_face_ang(float mx, float mz, float cur) {
+    if (mx * mx + mz * mz < 1e-6f) return cur;
+    return atan2f(mz, mx);
+}
+
+// ── the breadcrumb trail the followers walk ──
+
+static void vx_trail_push(VoxField *v, float x, float z, float y, bool air) {
+    int last = (v->trail_head - 1 + VX_TRAIL) % VX_TRAIL;
+    if (v->trail_n > 0) {
+        float dx = x - v->trail[last].x, dz = z - v->trail[last].z;
+        float d = sqrtf(dx * dx + dz * dz);
+        if (d < VX_TRAIL_DS) return;
+        v->trail_s += d;
+    }
+    VxCrumb *c = &v->trail[v->trail_head];
+    c->x = x; c->z = z; c->y = y; c->s = v->trail_s; c->air = air ? 1 : 0;
+    v->trail_head = (v->trail_head + 1) % VX_TRAIL;
+    if (v->trail_n < VX_TRAIL) v->trail_n++;
+}
+
+// The point `back` cells behind the head of the trail. Returns false when the trail is too short,
+// which is the only case the follower has to teleport for.
+static bool vx_trail_sample(VoxField *v, float back, float *x, float *z, float *y, float *mx, float *mz, unsigned char *air) {
+    if (v->trail_n < 2) return false;
+    float want = v->trail_s - back;
+    int newer = (v->trail_head - 1 + VX_TRAIL) % VX_TRAIL;
+    for (int k = 1; k < v->trail_n; k++) {
+        int older = (v->trail_head - 1 - k + 2 * VX_TRAIL) % VX_TRAIL;
+        VxCrumb *a = &v->trail[older], *b = &v->trail[newer];
+        if (a->s <= want) {
+            float span = b->s - a->s;
+            float t = span > 1e-5f ? (want - a->s) / span : 0.0f;
+            *x = a->x + (b->x - a->x) * t;
+            *z = a->z + (b->z - a->z) * t;
+            *y = a->y + (b->y - a->y) * t;
+            float dx = b->x - a->x, dz = b->z - a->z;
+            float l = sqrtf(dx * dx + dz * dz);
+            *mx = l > 1e-5f ? dx / l : 0; *mz = l > 1e-5f ? dz / l : 0;
+            *air = (a->air || b->air) ? 1 : 0;
+            return true;
+        }
+        newer = older;
+    }
+    return false;
+}
+
+// ── NPCs ──
+// They wander freely inside their home radius: pick a nearby target, walk straight at it, and give
+// up on it if the straight line leaves the region. They push the player out of the way SOFTLY —
+// both bodies are moved, the NPC taking the larger share, so a wedged player is never trapped.
+
 static void npc_step(VoxField *v, float dt) {
+    const float SP = 1.5f;
     for (int i = 0; i < v->npc_count; i++) {
         VxNpc *np = &v->npcs[i];
-        if (np->px != np->tx || np->pz != np->tz) {
-            np->t += dt;
-            if (np->t >= 0.3f) { np->px = np->tx; np->pz = np->tz; np->t = 0.3f; np->py_ = np->y; }
+        np->py_ = np->y;
+        if (!np->wander) { np->y = vx_nav_y(v, np->x, np->z); continue; }
+        float dx = np->gx - np->x, dz = np->gz - np->z;
+        float d = sqrtf(dx * dx + dz * dz);
+        if (d < 0.12f) {
+            np->wait -= dt;
+            if (np->wait <= 0) {
+                np->wait = 1.0f + vx_rnd((int)(v->anim_t * 60) + i, i, 17) * 2.0f;
+                float ang = vx_rnd((int)(v->anim_t * 97) + i, 5, 3) * 6.2831853f;
+                float rad = 0.6f + vx_rnd(i, (int)(v->anim_t * 31), 9) * (float)np->wander;
+                float tx = np->hx + 0.5f + cosf(ang) * rad, tz = np->hz + 0.5f + sinf(ang) * rad;
+                int gcx = (int)floorf(tx), gcz = (int)floorf(tz);
+                bool in = gcx >= 0 && gcz >= 0 && gcx < v->mw && gcz < v->md;
+                if (in && vx_nav_at(v, tx, tz) && !v->tsolid[gcz][gcx]) {
+                    // only take it if the straight line stays inside the region
+                    bool ok = true;
+                    int n = (int)(rad / (VOX_S * 0.5f)) + 1;
+                    for (int s = 1; s <= n && ok; s++)
+                        ok = vx_nav_at(v, np->x + (tx - np->x) * s / n, np->z + (tz - np->z) * s / n);
+                    if (ok && trig_at(v, gcx, gcz, TG_EXIT, TG_DOOR) < 0) { np->gx = tx; np->gz = tz; }
+                }
+            }
+            np->phase = 0;
+            np->y = vx_nav_y(v, np->x, np->z);
             continue;
         }
-        if (!np->wander) continue;
-        np->wait -= dt;
-        if (np->wait > 0) continue;
-        np->wait = 1.0f + vx_rnd((int)(v->anim_t * 60) + i, i, 17) * 2.0f;
-        int d = (int)(vx_rnd((int)(v->anim_t * 97) + i, 5, 3) * 4) & 3;
-        int nx = np->tx + DX[d], nz = np->tz + DZ[d];
-        np->facing = d;
-        if (abs(nx - np->hx) > np->wander || abs(nz - np->hz) > np->wander) continue;
-        if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
-        if (v->tsolid[nz][nx] || !v->walk[nz][nx]) continue;
-        if (abs((int)v->hgt[nz][nx] - (int)v->hgt[np->tz][np->tx]) > 1) continue;
-        if (trig_at(v, nx, nz, TG_EXIT, TG_DOOR) >= 0 || trig_at(v, nx, nz, TG_MESSAGE, TG_ZONE) >= 0) continue;
-        bool blocked = false;
-        for (int p = 0; p < v->party && !blocked; p++) if (v->act[p].tx == nx && v->act[p].tz == nz) blocked = true;
-        if (blocked) continue;
-        v->walk[np->tz][np->tx] = 1;
-        np->px = np->tx; np->pz = np->tz; np->py_ = np->y;
-        np->tx = (short)nx; np->tz = (short)nz;
-        np->y = vx_gy(v, nx, nz);
-        np->t = 0; np->parity ^= 1;
-        v->walk[nz][nx] = 0;
+        float step = SP * dt;
+        if (step > d) step = d;
+        float feet = vx_nav_y(v, np->x, np->z);
+        float bx = np->x, bz = np->z;
+        vx_move_slide(v, &np->x, &np->z, dx / d * step, dz / d * step, feet, false, VX_NPC_R);
+        // walked into something: give up on this goal rather than grinding along a wall
+        if ((np->x - bx) * (np->x - bx) + (np->z - bz) * (np->z - bz) < step * step * 0.09f) {
+            np->gx = np->x; np->gz = np->z; np->wait = 0.4f;
+        }
+        np->facing = vx_face_pick(np->facing, dx, dz);
+        np->phase += SP * 1.35f * dt;
+        np->y = vx_nav_y(v, np->x, np->z);
+        np->tx = (short)floorf(np->x); np->tz = (short)floorf(np->z);
+        if (np->x < 0.01f || np->z < 0.01f) { np->gx = np->x; np->gz = np->z; }
+    }
+    // soft separation: the player out of every NPC, the NPC out of the player
+    VxActor *a = &v->act[0];
+    if (v->airborne) return;
+    for (int i = 0; i < v->npc_count; i++) {
+        VxNpc *np = &v->npcs[i];
+        float dx = a->x - np->x, dz = a->z - np->z;
+        float d2 = dx * dx + dz * dz, R = v->agent_r + VX_NPC_R;
+        if (d2 >= R * R) continue;
+        float d = sqrtf(d2);
+        if (d < 1e-4f) { dx = 0.01f; dz = 0; d = 0.01f; }
+        float pen = R - d, ux = dx / d, uz = dz / d;
+        float feet = a->y;
+        // the NPC takes the larger share, which is what "steps aside" means in practice
+        vx_move_slide(v, &np->x, &np->z, -ux * pen * 0.65f, -uz * pen * 0.65f, np->y, false, VX_NPC_R);
+        np->gx = np->x; np->gz = np->z;
+        np->tx = (short)floorf(np->x); np->tz = (short)floorf(np->z);
+        vx_move_slide(v, &a->x, &a->z, ux * pen * 0.35f, uz * pen * 0.35f, feet, false, v->agent_r);
     }
 }
 
-static bool vx_blocked(VoxField *v, int fx, int fz, int tx, int tz) {
-    if (v->noclip) return false;
-    if (!vx_can_step(v, fx, fz, tx, tz)) return true;
-    return npc_at(v, tx, tz) >= 0;
-}
-
-// ───────────────────────── input (the tile field's, unchanged in feel) ─────────────────────────
+// ───────────────────────── input ─────────────────────────
+// Touch is a FULLY FREE floating analog stick: it appears wherever the left thumb lands in the left
+// 45% of the screen, any angle, dead zone 12% of its radius, and the MAGNITUDE picks the speed —
+// under 55% of the throw is a walk, over it is a run. There is no run button any more; the stick
+// carries it, which is one fewer thing for a thumb to find. The right side has two buttons, Jump and
+// the interact button that was already there, both low and right so nothing overlaps Dev/Settings
+// at the top right.
+// Keyboard is WASD/arrows (8 directions, normalised so a diagonal is not faster), Shift to run,
+// Space to jump, Enter or Z to interact.
 
 struct VxTouch { SDL_FingerID id; float x, y; };
 
@@ -2889,131 +3525,256 @@ static int vx_touches(VxTouch *out, int max, int w, int h) {
     return 0;
 }
 
+// The two thumb buttons, in screen pixels. One place, so draw_touch_ui and the hit test agree.
+static void vx_btn_act(int w, int h, float *x, float *y, float *r)  { *x = w - h * 0.19f; *y = h * 0.72f; *r = h * 0.115f; }
+static void vx_btn_jump(int w, int h, float *x, float *y, float *r) { *x = w - h * 0.49f; *y = h * 0.84f; *r = h * 0.105f; }
+
 static void vx_input(VoxField *v, int w, int h, bool blocked, float dt) {
     VxTouch tt[8];
     int n = blocked ? 0 : vx_touches(tt, 8, w, h);
     v->tapped = false;
-    bool stick_seen = false, act_seen = false;
+    v->want_jump = 0;
+    bool stick_seen = false, act_seen = false, jump_seen = false;
+    float jx, jy, jr, ax2, ay2, ar;
+    vx_btn_jump(w, h, &jx, &jy, &jr);
+    vx_btn_act(w, h, &ax2, &ay2, &ar);
     for (int i = 0; i < n; i++) {
         if (v->stick_on && tt[i].id == v->stick_id) { stick_seen = true; v->stick_x = tt[i].x; v->stick_y = tt[i].y; }
         if (v->act_on && tt[i].id == v->act_id) act_seen = true;
+        if (v->jump_held && tt[i].id == v->jump_id) jump_seen = true;
     }
     if (v->stick_on && !stick_seen) v->stick_on = false;
-    if (v->act_on && !act_seen) {
-        if (v->act_t <= 0.35f) v->tapped = true;
-        v->act_on = false; v->run = false; v->act_t = 0;
-    }
+    if (v->act_on && !act_seen) { v->tapped = true; v->act_on = false; v->act_t = 0; }
+    if (v->jump_held && !jump_seen) v->jump_held = 0;
     for (int i = 0; i < n; i++) {
-        if ((v->stick_on && tt[i].id == v->stick_id) || (v->act_on && tt[i].id == v->act_id)) continue;
-        if (tt[i].x < w * 0.5f && !v->stick_on) {
+        if ((v->stick_on && tt[i].id == v->stick_id) || (v->act_on && tt[i].id == v->act_id) ||
+            (v->jump_held && tt[i].id == v->jump_id)) continue;
+        float dxj = tt[i].x - jx, dyj = tt[i].y - jy;
+        float dxa = tt[i].x - ax2, dya = tt[i].y - ay2;
+        if (!v->jump_held && dxj * dxj + dyj * dyj <= jr * jr * 1.44f) {
+            v->jump_held = 1; v->jump_id = tt[i].id; v->want_jump = 1;
+        } else if (!v->act_on && dxa * dxa + dya * dya <= ar * ar * 1.44f) {
+            v->act_on = true; v->act_id = tt[i].id; v->act_t = 0;
+        } else if (tt[i].x < w * 0.45f && !v->stick_on) {
             v->stick_on = true; v->stick_id = tt[i].id;
             v->stick_ox = v->stick_x = tt[i].x; v->stick_oy = v->stick_y = tt[i].y;
-        } else if (tt[i].x >= w * 0.5f && !v->act_on) { v->act_on = true; v->act_id = tt[i].id; v->act_t = 0; }
+        }
     }
-    if (v->act_on) { v->act_t += dt; if (v->act_t > 0.35f) v->run = true; }
+    if (v->act_on) v->act_t += dt;
     if (!blocked) {
         ImGuiIO &io = ImGui::GetIO();
         if (!io.WantCaptureKeyboard) {
-            if (ImGui::IsKeyPressed(ImGuiKey_Space, false) || ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_Z, false)) v->tapped = true;
-            if (ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift)) v->run = true;
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false) ||
+                ImGui::IsKeyPressed(ImGuiKey_Z, false)) v->tapped = true;
+            if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) v->want_jump = 1;
         }
     }
 }
 
-static int vx_want_dir(VoxField *v, int w) {
-    float dx = 0, dy = 0;
+// The desired move vector, in world units, normalised, plus a magnitude 0..1 that decides walk or
+// run on touch. Screen up is north (-z) because the camera never rotates.
+static void vx_move_input(VoxField *v, int w, int h) {
+    float dx = 0, dy = 0, mag = 0;
+    bool from_stick = false;
+    if (v->bot_on) {
+        v->move_in_x = v->bot_mx; v->move_in_z = v->bot_mz;
+        float l = sqrtf(v->bot_mx * v->bot_mx + v->bot_mz * v->bot_mz);
+        if (l > 1e-4f) { v->move_in_x /= l; v->move_in_z /= l; v->move_mag = l > 1 ? 1.0f : l; }
+        else { v->move_in_x = v->move_in_z = 0; v->move_mag = 0; }
+        v->run = v->bot_run != 0;
+        return;
+    }
+    float R = h * 0.14f;                               // the stick's throw, as drawn
     if (v->stick_on) {
         dx = v->stick_x - v->stick_ox; dy = v->stick_y - v->stick_oy;
-        if (dx * dx + dy * dy < (w * 0.024f) * (w * 0.024f)) { dx = dy = 0; }
+        float l = sqrtf(dx * dx + dy * dy);
+        if (l < R * 0.12f) { dx = dy = 0; }             // dead zone
+        else { mag = l / R; if (mag > 1) mag = 1; dx /= l; dy /= l; from_stick = true; }
     }
+    float kx = 0, ky = 0;
     ImGuiIO &io = ImGui::GetIO();
     if (!io.WantCaptureKeyboard) {
-        if (ImGui::IsKeyDown(ImGuiKey_LeftArrow) || ImGui::IsKeyDown(ImGuiKey_A)) dx -= 100;
-        if (ImGui::IsKeyDown(ImGuiKey_RightArrow) || ImGui::IsKeyDown(ImGuiKey_D)) dx += 100;
-        if (ImGui::IsKeyDown(ImGuiKey_UpArrow) || ImGui::IsKeyDown(ImGuiKey_W)) dy -= 100;
-        if (ImGui::IsKeyDown(ImGuiKey_DownArrow) || ImGui::IsKeyDown(ImGuiKey_S)) dy += 100;
+        if (ImGui::IsKeyDown(ImGuiKey_LeftArrow) || ImGui::IsKeyDown(ImGuiKey_A)) kx -= 1;
+        if (ImGui::IsKeyDown(ImGuiKey_RightArrow) || ImGui::IsKeyDown(ImGuiKey_D)) kx += 1;
+        if (ImGui::IsKeyDown(ImGuiKey_UpArrow) || ImGui::IsKeyDown(ImGuiKey_W)) ky -= 1;
+        if (ImGui::IsKeyDown(ImGuiKey_DownArrow) || ImGui::IsKeyDown(ImGuiKey_S)) ky += 1;
     }
-    if (dx == 0 && dy == 0) { v->last_axis = -1; return -1; }
-    int axis;
-    float ax = fabsf(dx), ay = fabsf(dy);
-    if (ax > ay * 1.35f) axis = 0;
-    else if (ay > ax * 1.35f) axis = 1;
-    else axis = v->last_axis >= 0 ? v->last_axis : (ax >= ay ? 0 : 1);
-    v->last_axis = axis;
-    return axis == 0 ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0);
+    if (kx != 0 || ky != 0) {
+        float l = sqrtf(kx * kx + ky * ky);             // a diagonal is not faster
+        dx = kx / l; dy = ky / l; mag = 1; from_stick = false;
+    }
+    v->move_in_x = dx; v->move_in_z = dy; v->move_mag = mag;
+    bool shift = false;
+    if (!io.WantCaptureKeyboard)
+        shift = ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift);
+    v->run = from_stick ? (mag > 0.55f) : shift;
 }
 
-static void vx_walk(VoxField *v, int w, float dt, VxEvent *ev) {
-    if (v->moving) {
-        v->move_t += dt;
-        if (v->move_t < v->step_len) return;
-        v->moving = false; v->move_t = 0;
-        for (int i = 0; i < VX_PARTY; i++) {
-            v->act[i].px = v->act[i].tx; v->act[i].pz = v->act[i].tz;
-            v->act[i].y0 = v->act[i].y;
-        }
-        on_enter_cell(v, ev);
-        if (v->fade_dir) return;
+// ───────────────────────── the leader ─────────────────────────
+
+static void vx_respawn_at_takeoff(VoxField *v, const char *why) {
+    SDL_Log("voxfield: %s — no valid landing, returning to %.2f,%.2f", why, v->tko_x, v->tko_z);
+    v->land_fails++;
+    VxActor *a = &v->act[0];
+    a->x = v->tko_x; a->z = v->tko_z; a->y = v->tko_y;
+    v->pvx = v->pvz = v->pvy = 0;
+    v->airborne = 0; v->coyote = VX_COYOTE;
+    v->fade = FADE_FRAMES; v->fade_dir = -1;              // a quick fade back in, no damage
+}
+
+static void vx_leader_move(VoxField *v, int w, int h, float dt, VxEvent *ev) {
+    VxActor *a = &v->act[0];
+    if (dt > 0.1f) dt = 0.1f;                            // a hitch must not become a teleport
+
+    bool frozen = v->msg[0] || v->fade_dir > 0;
+    if (frozen) { v->move_in_x = v->move_in_z = 0; v->move_mag = 0; v->want_jump = 0; v->jump_buf = 0; }
+    else vx_move_input(v, w, h);
+
+    float mx = v->move_in_x, mz = v->move_in_z;
+    float target = 0;
+    if (mx != 0 || mz != 0) target = v->run ? v->sp_run : v->sp_walk;
+    // On touch the magnitude is the speed, so a small push is a creep and a full push is a run.
+    if (v->move_mag > 0 && v->move_mag < 0.55f && !v->bot_on) target = v->sp_walk * (0.35f + v->move_mag);
+
+    float want_vx = mx * target, want_vz = mz * target;
+    // Ground movement is nearly direct (a JRPG wants the character to start when you push), air
+    // control is a fraction of it.
+    float tau = v->airborne ? 0.06f / VX_AIR_CTRL : 0.06f;
+    float k = dt / (tau + dt);
+    v->pvx += (want_vx - v->pvx) * k;
+    v->pvz += (want_vz - v->pvz) * k;
+
+    // jump buffering and coyote time
+    if (v->want_jump) v->jump_buf = VX_JUMPBUF;
+    else if (v->jump_buf > 0) v->jump_buf -= dt;
+    if (!v->airborne) v->coyote = VX_COYOTE; else if (v->coyote > 0) v->coyote -= dt;
+    if (v->jump_buf > 0 && v->coyote > 0 && !frozen && !v->noclip) {
+        v->pvy = sqrtf(2.0f * v->gravity * v->jump_apex);
+        v->airborne = 1; v->coyote = 0; v->jump_buf = 0;
+        v->tko_x = a->x; v->tko_z = a->z; v->tko_y = a->y;
     }
-    if (v->msg[0] || v->fade_dir) return;
-    int dir = vx_want_dir(v, w);
-    if (dir < 0) { v->hold_t = 0; v->want_dir = -1; return; }
-    if (dir != v->want_dir) { v->want_dir = dir; v->hold_t = 0; v->act[0].facing = dir; return; }
-    v->hold_t += dt;
-    if (v->hold_t < TURN_HOLD) return;
-    v->act[0].facing = dir;
-    int nx = v->act[0].tx + DX[dir], nz = v->act[0].tz + DZ[dir];
-    if (vx_blocked(v, v->act[0].tx, v->act[0].tz, nx, nz)) return;
-    short ox[VX_PARTY], oz[VX_PARTY];
-    float oy[VX_PARTY];
-    for (int i = 0; i < VX_PARTY; i++) { ox[i] = v->act[i].tx; oz[i] = v->act[i].tz; oy[i] = v->act[i].y; }
-    v->act[0].px = ox[0]; v->act[0].pz = oz[0]; v->act[0].y0 = oy[0];
-    v->act[0].tx = (short)nx; v->act[0].tz = (short)nz;
-    v->act[0].y = vx_gy(v, nx, nz);
+
+    if (v->noclip) {
+        a->x += v->pvx * dt; a->z += v->pvz * dt;
+        a->y = vx_nav_y(v, a->x, a->z);
+        v->airborne = 0;
+    } else if (!v->airborne) {
+        float ox = a->x, oz = a->z;
+        vx_move_slide(v, &a->x, &a->z, v->pvx * dt, v->pvz * dt, a->y, false, v->agent_r);
+        // what the body actually achieved is its speed, so a body pressed into a wall stops animating
+        float adx = a->x - ox, adz = a->z - oz;
+        v->speed_now = dt > 0 ? sqrtf(adx * adx + adz * adz) / dt : 0;
+        float g = vx_nav_y(v, a->x, a->z);
+        if (g < a->y - 0.30f) { v->airborne = 1; v->pvy = 0; v->tko_x = ox; v->tko_z = oz; v->tko_y = a->y; }
+        else a->y += (g - a->y) * (dt * 18.0f > 1 ? 1 : dt * 18.0f);
+    } else {
+        float ox = a->x, oz = a->z;
+        vx_move_slide(v, &a->x, &a->z, v->pvx * dt, v->pvz * dt, a->y, true, v->agent_r);
+        float adx = a->x - ox, adz = a->z - oz;
+        v->speed_now = dt > 0 ? sqrtf(adx * adx + adz * adz) / dt : 0;
+        v->pvy -= v->gravity * dt;
+        float ny = a->y + v->pvy * dt;
+        if (v->pvy > 0) {
+            // head bump: something in the band just above the head stops the climb
+            int ix = (int)floorf(a->x / VOX_S), iz = (int)floorf(a->z / VOX_S);
+            if (vx_solid_band(v, ix, iz, ny + VX_BODY_H - 0.1f, ny + VX_BODY_H + 0.05f)) { v->pvy = 0; ny = a->y; }
+        } else {
+            float g = vx_nav_y(v, a->x, a->z);
+            if (ny <= g) {
+                float lx = a->x, lz = a->z;
+                bool ok = vx_nav_at(v, lx, lz);
+                if (!ok) ok = vx_nav_snap(v, &lx, &lz, v->agent_r);
+                if (ok) {
+                    a->x = lx; a->z = lz; a->y = vx_nav_y(v, lx, lz); ny = a->y;
+                    v->airborne = 0; v->pvy = 0; v->coyote = VX_COYOTE;
+                } else { vx_respawn_at_takeoff(v, "landed on water, a void or a top too narrow to stand on"); return; }
+            }
+        }
+        if (v->airborne) a->y = ny;
+        if (a->y < -2.0f) { vx_respawn_at_takeoff(v, "fell off the world"); return; }
+    }
+
+    // The invariant. If a frame ever ends with the centre outside the region it is a bug, so say so
+    // once and put the body back rather than letting it walk away inside a wall.
+    if (!v->noclip && !v->airborne && !vx_nav_at(v, a->x, a->z)) {
+        float sx = a->x, sz = a->z;
+        if (!v->invalid_logged) {
+            SDL_Log("voxfield: BUG — the leader ended a frame off the navmesh at %.3f,%.3f on %s; snapping back",
+                    a->x, a->z, v->map_name);
+            v->invalid_logged = 1;
+        }
+        if (vx_nav_snap(v, &sx, &sz, 3.0f)) { a->x = sx; a->z = sz; a->y = vx_nav_y(v, sx, sz); }
+        else { a->x = v->tko_x; a->z = v->tko_z; a->y = v->tko_y; }
+        v->pvx = v->pvz = 0;
+    }
+
+    a->facing = vx_face_pick(a->facing, v->pvx, v->pvz);
+    a->ang = vx_face_ang(v->pvx, v->pvz, a->ang);
+    if (v->speed_now > 0.15f) a->phase += v->speed_now * 1.35f * dt; else a->phase = 0;
+    v->moving = v->speed_now > 0.15f;
+
+    vx_trail_push(v, a->x, a->z, a->y, v->airborne != 0);
+
+    int cx = (int)floorf(a->x), cz = (int)floorf(a->z);
+    if (cx < 0) cx = 0; if (cz < 0) cz = 0;
+    if (cx >= v->mw) cx = v->mw - 1;
+    if (cz >= v->md) cz = v->md - 1;
+    if (cx != a->tx || cz != a->tz) {
+        a->tx = (short)cx; a->tz = (short)cz;
+        on_enter_cell(v, ev, v->airborne == 0);
+    }
+}
+
+// The rest of the party walks the leader's recorded path: same route, same jumps, same spots, and
+// no collision between party members at all — she can never be the thing standing in your way.
+static void vx_followers(VoxField *v, float dt) {
     for (int i = 1; i < VX_PARTY; i++) {
-        v->act[i].px = ox[i]; v->act[i].pz = oz[i]; v->act[i].y0 = oy[i];
-        v->act[i].tx = ox[i - 1]; v->act[i].tz = oz[i - 1];
-        v->act[i].y = vx_gy(v, v->act[i].tx, v->act[i].tz);
-        if (v->act[i].tx != v->act[i].px || v->act[i].tz != v->act[i].pz) {
-            int ddx = v->act[i].tx - v->act[i].px, ddz = v->act[i].tz - v->act[i].pz;
-            v->act[i].facing = ddx < 0 ? 1 : ddx > 0 ? 2 : ddz < 0 ? 3 : 0;
+        VxActor *a = &v->act[i];
+        float x, z, y, mx, mz; unsigned char air;
+        bool got = vx_trail_sample(v, VX_FOLLOW_D * i, &x, &z, &y, &mx, &mz, &air);
+        float lx = v->act[0].x, lz = v->act[0].z;
+        float far2 = (a->x - lx) * (a->x - lx) + (a->z - lz) * (a->z - lz);
+        bool bad = !got || far2 > 8.0f * 8.0f || (!air && !vx_nav_at(v, x, z));
+        if (bad) v->follow_stuck[i] += dt; else v->follow_stuck[i] = 0;
+        if (v->follow_stuck[i] > 2.0f || far2 > 14.0f * 14.0f) {
+            float sx = lx, sz = lz;
+            vx_nav_snap(v, &sx, &sz, 3.0f);
+            a->x = sx; a->z = sz; a->y = vx_nav_y(v, sx, sz);
+            a->phase = 0; v->follow_stuck[i] = 0; v->follow_warp_t[i] = 0.25f;
+            continue;
         }
+        if (v->follow_warp_t[i] > 0) v->follow_warp_t[i] -= dt;
+        if (!got) continue;
+        float dx = x - a->x, dz = z - a->z;
+        float d = sqrtf(dx * dx + dz * dz);
+        a->x = x; a->z = z; a->y = y;
+        if (d > 1e-4f) { a->facing = vx_face_pick(a->facing, dx, dz); a->ang = vx_face_ang(dx, dz, a->ang); }
+        float sp = dt > 0 ? d / dt : 0;
+        if (sp > 0.15f) a->phase += sp * 1.35f * dt; else a->phase = 0;
+        a->tx = (short)floorf(a->x); a->tz = (short)floorf(a->z);
     }
-    v->moving = true; v->move_t = 0;
-    v->step_len = v->run ? RUN_STEP : WALK_STEP;
-    v->step_parity ^= 1;
+}
+
+static void vx_walk(VoxField *v, int w, int h, float dt, VxEvent *ev) {
+    vx_leader_move(v, w, h, dt, ev);
+    vx_followers(v, dt);
 }
 
 // ───────────────────────── billboards ─────────────────────────
 
-static int walk_col(const VxArt *a, int parity, float k, bool moving) {
+// The walk cycle is driven by a PHASE that advances with the body's actual speed, so a creep on the
+// touch stick ambles and a run strides, and a body pressed into a wall stops moving its legs.
+static int walk_col_phase(const VxArt *a, float phase, bool moving) {
     if (!moving) return a->col_stand;
-    if (a->ncols >= 4) { int c = parity ? (k < 0.5f ? 3 : 0) : (k < 0.5f ? 1 : 2); return c; }
-    int c = parity ? a->col_b : a->col_a;
-    return k < 0.6f ? c : a->col_stand;
+    float f = phase - floorf(phase);
+    int q = (int)(f * 4.0f) & 3;
+    if (a->ncols >= 4) { static const int S4[4] = { 1, 0, 2, 3 }; return S4[q]; }
+    const int S3[4] = { a->col_a, a->col_stand, a->col_b, a->col_stand };
+    return S3[q];
 }
 
 static void spr_push(VoxField *v, const VxSpr *s) {
     if (v->spr_count < VX_SPRITES) v->spr[v->spr_count++] = *s;
-}
-
-// Where a walker's feet are, mid-step. On level ground or a one-voxel step it is a straight lerp; a
-// two-voxel step keeps the little hop it always had; a RAMP is read straight off the slope's own
-// plane at the fractional position, which is what makes climbing one smooth.
-static float vx_actor_y(VoxField *v, const VxActor *a, float x, float z, float k) {
-    bool on_ramp = (v->ramp[a->pz][a->px] || v->ramp[a->tz][a->tx]);
-    if (on_ramp) {
-        int cx = (int)floorf(x), cz = (int)floorf(z);
-        if (cx < 0) cx = 0; if (cz < 0) cz = 0;
-        if (cx >= v->mw) cx = v->mw - 1;
-        if (cz >= v->md) cz = v->md - 1;
-        return vx_surface_v(v, cx, cz, x - cx, z - cz) * VOX_S;
-    }
-    float y = vx_lerp(a->y0, a->y, k);
-    float d = a->y - a->y0;
-    if (d < 0) d = -d;
-    if (d > VOX_S * 1.5f) y += sinf(k * 3.14159f) * 0.18f;        // the hop over a two-voxel lip
-    return y;
 }
 
 static void vx_light_at_foot(VoxField *v, float x, float y, float z, float *lit, float *warm) {
@@ -3023,7 +3784,10 @@ static void vx_light_at_foot(VoxField *v, float x, float y, float z, float *lit,
     *warm = lamp;
 }
 
-static void push_walker(VoxField *v, int art, float x, float y, float z, int facing, int col) {
+// `gy` is the ground under the character, which is where the blob shadow goes. With jumping in the
+// game the blob is what makes height readable: it stays on the ground, shrinks and fades as the
+// body rises. Pass y for gy when the body is on the ground and the two are the same.
+static void push_walker(VoxField *v, int art, float x, float y, float z, int facing, int col, float gy) {
     if (art < 0 || art >= v->art_count) return;
     VxArt *a = &v->art[art];
     int row = a->row_of[facing & 3];
@@ -3043,33 +3807,29 @@ static void push_walker(VoxField *v, int art, float x, float y, float z, int fac
     spr_push(v, &s);
     VxSpr sh;                                            // the blob shadow, flat on the ground
     memset(&sh, 0, sizeof(sh));
-    sh.x = x; sh.y = y + 0.02f; sh.z = z;
-    sh.w = s.w * 0.85f; sh.h = s.w * 0.62f;
-    sh.kind = 1; sh.alpha = 0.42f; sh.tilt = 0;
+    float air = y - gy;
+    if (air < 0) air = 0;
+    float f = 1.0f / (1.0f + air * 0.55f);               // shrinks and fades with height
+    sh.x = x; sh.y = gy + 0.02f; sh.z = z;
+    sh.w = s.w * 0.85f * f; sh.h = s.w * 0.62f * f;
+    sh.kind = 1; sh.alpha = 0.42f * f; sh.tilt = 0;
     spr_push(v, &sh);
 }
 
 static void vx_collect_sprites(VoxField *v) {
     v->spr_count = 0;
-    float k = v->moving ? v->move_t / v->step_len : 1.0f;
     for (int i = v->party - 1; i >= 0; i--) {
         VxActor *a = &v->act[i];
-        float x = vx_lerp(a->px + 0.5f, a->tx + 0.5f, k);
-        float z = vx_lerp(a->pz + 0.5f, a->tz + 0.5f, k);
-        float y = vx_actor_y(v, a, x, z, k);
         int art = v->art_party[i];
-        int col = art >= 0 ? walk_col(&v->art[art], v->step_parity ^ (i & 1), k, v->moving) : 0;
-        push_walker(v, art, x, y, z, a->facing, col);
+        bool mv = a->phase != 0.0f;
+        int col = art >= 0 ? walk_col_phase(&v->art[art], a->phase, mv) : 0;
+        push_walker(v, art, a->x, a->y, a->z, a->facing, col, vx_nav_y(v, a->x, a->z));
     }
     for (int i = 0; i < v->npc_count; i++) {
         VxNpc *np = &v->npcs[i];
-        float nk = np->t >= 0.3f ? 1.0f : np->t / 0.3f;
-        bool mv = (np->px != np->tx || np->pz != np->tz);
-        float x = vx_lerp(np->px + 0.5f, np->tx + 0.5f, mv ? nk : 1.0f);
-        float z = vx_lerp(np->pz + 0.5f, np->tz + 0.5f, mv ? nk : 1.0f);
-        float y = vx_lerp(np->py_, np->y, mv ? nk : 1.0f);
-        int col = np->art >= 0 ? walk_col(&v->art[np->art], np->parity, nk, mv) : 0;
-        push_walker(v, np->art, x, y, z, np->facing, col);
+        bool mv = np->phase != 0.0f;
+        int col = np->art >= 0 ? walk_col_phase(&v->art[np->art], np->phase, mv) : 0;
+        push_walker(v, np->art, np->x, np->y, np->z, np->facing, col, np->y);
     }
     // Props: any stamp nobody has modelled, as a billboard of its own atlas cells standing on the map.
     if (v->atlas && v->atlas_cell > 0) {
@@ -3182,11 +3942,18 @@ static void vx_draw_sprite_batch(VoxField *v, const VxSprVert *vert, int n) {
 }
 
 static void vx_camera(VoxField *v, int w, int h, float *proj) {
-    float k = v->moving ? v->move_t / v->step_len : 1.0f;
     VxActor *a = &v->act[0];
-    float px = vx_lerp(a->px + 0.5f, a->tx + 0.5f, k);
-    float pz = vx_lerp(a->pz + 0.5f, a->tz + 0.5f, k);
-    float py = vx_lerp(a->y0, a->y, k);
+    float px = a->x, pz = a->z;
+    // The camera follows the GROUND-projected position with a softened height: a jump is read from
+    // the blob shadow and the sprite, not from the whole town moving down the screen. The old 3D
+    // field's third reported bug was the camera losing the player, so it never leads or lags in x/z.
+    float gy = vx_nav_y(v, px, pz);
+    if (!v->cam_y_init) { v->cam_y = gy; v->cam_y_init = true; }
+    float dtc = 1.0f / 60.0f;
+    v->cam_y += (gy - v->cam_y) * (dtc * 6.0f > 1 ? 1 : dtc * 6.0f);
+    if (v->cam_y < a->y - 6.0f) v->cam_y = a->y - 6.0f;          // never lose the party off the top
+    if (v->cam_y > a->y + 6.0f) v->cam_y = a->y + 6.0f;
+    float py = v->cam_y;
     v->cam_tgt[0] = px; v->cam_tgt[1] = py + 0.9f; v->cam_tgt[2] = pz;
     float p = v->pitch * 3.14159265f / 180.0f;
     float aspect = (float)w / (h > 0 ? (float)h : 1.0f);
@@ -3380,6 +4147,111 @@ static void vx_draw_sky(VoxField *v, const float *sky) {
 // that is entirely behind the party, or whose screen box misses that circle's box, has no such
 // fragment and can be drawn with the discard-free program. The pixels are identical; only early-Z
 // changes. Conservative everywhere it is unsure (a corner behind the near plane → yes).
+// ───────────────────────── the Nav view (Dev toggle) ─────────────────────────
+// What the movement actually runs on, drawn over the world: the walkable region a translucent
+// green, jump-only regions magenta, every LEDGE edge an orange bar, the body's radius circle, and
+// the breadcrumb trail the followers walk. `capture.sh --vox <map> --nav 1` renders it into a
+// capture so the buffer from a wall can be looked at on the Mac.
+
+static void nav_vert(VoxField *v, float x, float y, float z, const float c[4]) {
+    if (v->nav_verts + 1 > v->nav_cap) return;
+    float *p = v->nav_buf + (size_t)v->nav_verts * 7;
+    p[0] = x; p[1] = y; p[2] = z; p[3] = c[0]; p[4] = c[1]; p[5] = c[2]; p[6] = c[3];
+    v->nav_verts++;
+}
+static void nav_quad(VoxField *v, float x0, float z0, float x1, float z1, float y, const float c[4]) {
+    nav_vert(v, x0, y, z0, c); nav_vert(v, x1, y, z0, c); nav_vert(v, x1, y, z1, c);
+    nav_vert(v, x0, y, z0, c); nav_vert(v, x1, y, z1, c); nav_vert(v, x0, y, z1, c);
+}
+
+static void vx_nav_build_overlay(VoxField *v) {
+    if (!v->nav_buf) {
+        v->nav_cap = 420000;
+        v->nav_buf = (float *)malloc((size_t)v->nav_cap * 7 * sizeof(float));
+        if (!v->nav_buf) { v->nav_cap = 0; return; }
+    }
+    v->nav_verts = 0;
+    // Blue, not green: most of this world IS green grass, and a green overlay on it says nothing.
+    const float GREEN[4]   = { 0.25f, 0.58f, 1.00f, 0.34f };
+    const float JUMPONLY[4]= { 0.95f, 0.30f, 0.90f, 0.40f };
+    const float LEDGE[4]   = { 1.00f, 0.52f, 0.10f, 0.85f };
+    const float EPS = 0.035f, BAR = 0.06f;
+    // The green is the ERODED region — where the body's CENTRE may be — so a side that faces a wall,
+    // a fence, water or a step up is pulled back by the radius. That gap is the buffer, and looking
+    // at it in a capture is how the old field's clipping bug is checked for.
+    float r = v->agent_r;
+    for (int j = 0; j < v->vd; j++) for (int i = 0; i < v->vw; i++) {
+        if (!v->nav_ok[j][i]) continue;
+        float y = v->nav_h[j][i] + EPS;
+        float e0 = i * VOX_S, f0 = j * VOX_S, e1 = e0 + VOX_S, f1 = f0 + VOX_S;
+        float x0 = e0, z0 = f0, x1 = e1, z1 = f1;
+        bool ledge[4];
+        for (int d = 0; d < 4; d++) {
+            int ni = i + DX[d], nj = j + DZ[d];
+            if (ni < 0 || nj < 0 || ni >= v->vw || nj >= v->vd || !v->nav_ok[nj][ni]) ledge[d] = true;
+            else { float dh = v->nav_h[nj][ni] - v->nav_h[j][i]; ledge[d] = dh > VX_STEP_UP || dh < -VX_STEP_UP; }
+            if (!ledge[d]) continue;
+            if (DX[d] > 0) x1 -= r; else if (DX[d] < 0) x0 += r;
+            if (DZ[d] > 0) z1 -= r; else if (DZ[d] < 0) z0 += r;
+        }
+        if (x1 > x0 && z1 > z0) nav_quad(v, x0, z0, x1, z1, y, v->nav_reg[j][i] == 1 ? GREEN : JUMPONLY);
+        // and the boundary itself, so the gap between the orange line and the green is the buffer
+        for (int d = 0; d < 4; d++) {
+            if (!ledge[d]) continue;
+            float a0 = e0, b0 = f0, a1 = e1, b1 = f1;
+            if (DX[d] > 0) a0 = a1 - BAR; else if (DX[d] < 0) a1 = a0 + BAR;
+            if (DZ[d] > 0) b0 = b1 - BAR; else if (DZ[d] < 0) b1 = b0 + BAR;
+            nav_quad(v, a0, b0, a1, b1, y + 0.01f, LEDGE);
+        }
+    }
+    v->nav_dirty = false;
+}
+
+static void vx_nav_draw(VoxField *v) {
+    if (!v->nav_view || !v->nav_prog) return;
+    if (v->nav_dirty || v->nav_verts == 0) vx_nav_build_overlay(v);
+    // the dynamic part — the body's radius circle and the followers' trail — is appended each frame
+    int base = v->nav_verts;
+    const float CYAN[4] = { 0.30f, 0.95f, 1.00f, 0.85f };
+    const float TRAIL[4] = { 1.00f, 0.92f, 0.35f, 0.55f };
+    {
+        VxActor *a = &v->act[0];
+        float r = v->agent_r, w = 0.035f, y = a->y + 0.06f;
+        for (int k = 0; k < 28; k++) {
+            float t0 = k * 6.2831853f / 28.0f, t1 = (k + 1) * 6.2831853f / 28.0f;
+            float ax = a->x + cosf(t0) * r, az = a->z + sinf(t0) * r;
+            float bx = a->x + cosf(t1) * r, bz = a->z + sinf(t1) * r;
+            float cx = a->x + cosf(t1) * (r - w), cz = a->z + sinf(t1) * (r - w);
+            float dx = a->x + cosf(t0) * (r - w), dz = a->z + sinf(t0) * (r - w);
+            nav_vert(v, ax, y, az, CYAN); nav_vert(v, bx, y, bz, CYAN); nav_vert(v, cx, y, cz, CYAN);
+            nav_vert(v, ax, y, az, CYAN); nav_vert(v, cx, y, cz, CYAN); nav_vert(v, dx, y, dz, CYAN);
+        }
+    }
+    for (int k = 0; k < v->trail_n; k++) {
+        VxCrumb *c = &v->trail[(v->trail_head - 1 - k + 2 * VX_TRAIL) % VX_TRAIL];
+        nav_quad(v, c->x - 0.05f, c->z - 0.05f, c->x + 0.05f, c->z + 0.05f, c->y + 0.07f, TRAIL);
+    }
+    int n = v->nav_verts;
+    v->nav_verts = base;                       // the dynamic tail is rebuilt every frame
+    if (n <= 0) return;
+    glUseProgram(v->nav_prog);
+    glUniformMatrix4fv(vx_uni(v->nav_prog, "u_mvp"), 1, GL_FALSE, v->mvp);
+    glBindVertexArray(v->nav_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, v->nav_vbo);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)n * 7 * sizeof(float), v->nav_buf, GL_STREAM_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+    glDrawArrays(GL_TRIANGLES, 0, n);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glBindVertexArray(0);
+}
+
 static bool vx_chunk_needs_cut(VoxField *v, const float *lo, const float *hi,
                                int w, int h, float rad) {
     if (rad <= 0.0f) return false;
@@ -3581,6 +4453,7 @@ static void vx_render(VoxField *v, int w, int h) {
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(0);
+    vx_nav_draw(v);
     vxp_end(VXP_SPRITES);
     vxp.c.sprites = v->spr_count;
     vxp.c.detail = v->det_count;
@@ -3725,15 +4598,25 @@ static void draw_touch_ui(VoxField *v, int w, int h) {
     if (v->stick_on) {
         float dx = v->stick_x - v->stick_ox, dy = v->stick_y - v->stick_oy;
         float len = sqrtf(dx * dx + dy * dy);
+        bool running = len > r * 0.55f;
         if (len > r) { dx *= r / len; dy *= r / len; }
         dl->AddCircleFilled(ImVec2(v->stick_ox, v->stick_oy), r, IM_COL32(255, 255, 255, 26), 32);
         dl->AddCircle(ImVec2(v->stick_ox, v->stick_oy), r, IM_COL32(255, 255, 255, 70), 32, h * 0.006f);
-        dl->AddCircleFilled(ImVec2(v->stick_ox + dx, v->stick_oy + dy), r * 0.42f, IM_COL32(220, 228, 255, 110), 24);
+        // the run ring: past it the magnitude is a run, so the thumb can feel where the line is
+        dl->AddCircle(ImVec2(v->stick_ox, v->stick_oy), r * 0.55f,
+                      running ? IM_COL32(255, 230, 150, 120) : IM_COL32(255, 255, 255, 40), 32, h * 0.004f);
+        dl->AddCircleFilled(ImVec2(v->stick_ox + dx, v->stick_oy + dy), r * 0.42f,
+                            running ? IM_COL32(255, 236, 190, 140) : IM_COL32(220, 228, 255, 110), 24);
     }
-    float ax = w - h * 0.20f, ay = h * 0.74f;
-    dl->AddCircle(ImVec2(ax, ay), h * 0.10f, IM_COL32(255, 255, 255, v->act_on ? 130 : 45), 28, h * 0.006f);
-    if (v->act_on) dl->AddCircleFilled(ImVec2(ax, ay), h * 0.10f, IM_COL32(255, 255, 255, v->run ? 60 : 30), 28);
-    if (v->run) dl->AddText(ImGui::GetFont(), h * 0.05f, ImVec2(ax - h * 0.05f, ay - h * 0.025f), IM_COL32(255, 230, 150, 220), "RUN");
+    float ax, ay, ar, jx, jy, jr;
+    vx_btn_act(w, h, &ax, &ay, &ar);
+    vx_btn_jump(w, h, &jx, &jy, &jr);
+    dl->AddCircle(ImVec2(ax, ay), ar, IM_COL32(255, 255, 255, v->act_on ? 130 : 45), 28, h * 0.006f);
+    if (v->act_on) dl->AddCircleFilled(ImVec2(ax, ay), ar, IM_COL32(255, 255, 255, 30), 28);
+    dl->AddCircle(ImVec2(jx, jy), jr, IM_COL32(255, 255, 255, v->jump_held ? 130 : 45), 28, h * 0.006f);
+    if (v->jump_held) dl->AddCircleFilled(ImVec2(jx, jy), jr, IM_COL32(255, 255, 255, 30), 28);
+    dl->AddText(ImGui::GetFont(), h * 0.045f, ImVec2(jx - h * 0.055f, jy - h * 0.022f),
+                IM_COL32(255, 230, 150, 200), "JUMP");
     if (v->exam_trig >= 0 || v->exam_npc >= 0) {
         float px = v->player_screen[0], py = (float)h - v->player_screen[1];
         dl->AddText(ImGui::GetFont(), h * 0.09f, ImVec2(px - h * 0.02f, py - h * 0.22f), IM_COL32(255, 230, 120, 240), "!");
@@ -4109,16 +4992,30 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
         } else if (v->fade_dir < 0 && v->fade <= 0) { v->fade = 0; v->fade_dir = 0; }
     }
 
-    vx_walk(v, w, dt, ev);
+    vxp_begin(VXP_MOVE);
+    vx_walk(v, w, h, dt, ev);
     npc_step(v, dt);
+    vxp_end(VXP_MOVE);
 
+    // What the interact button would act on. Free movement means this is a distance and a cone, not
+    // "the cell in front of me": within 0.9 cells and roughly facing it (a 100-degree cone), or
+    // standing on it. Airborne, nothing is examinable.
     v->exam_trig = v->exam_npc = -1;
-    {
-        int fx = v->act[0].tx + DX[v->act[0].facing & 3], fz = v->act[0].tz + DZ[v->act[0].facing & 3];
-        v->exam_npc = npc_at(v, fx, fz);
+    if (!v->airborne) {
+        VxActor *a = &v->act[0];
+        float fxd = (float)DX[a->facing & 3], fzd = (float)DZ[a->facing & 3];
+        const float COS_CONE = -0.1736f;                 // cos(100 degrees)
+        int cand = npc_near(v, a->x, a->z, 0.9f + VX_NPC_R);
+        if (cand >= 0) {
+            float dx = v->npcs[cand].x - a->x, dz = v->npcs[cand].z - a->z;
+            float l = sqrtf(dx * dx + dz * dz);
+            if (l < 1e-3f || (dx * fxd + dz * fzd) / l > COS_CONE) v->exam_npc = cand;
+        }
         if (v->exam_npc < 0) {
+            // the cell 0.9 ahead, then the one under the feet
+            int fx = (int)floorf(a->x + fxd * 0.9f), fz = (int)floorf(a->z + fzd * 0.9f);
             v->exam_trig = trig_at(v, fx, fz, TG_MESSAGE, TG_DOOR);
-            if (v->exam_trig < 0) v->exam_trig = trig_at(v, v->act[0].tx, v->act[0].tz, TG_MESSAGE, TG_MESSAGE);
+            if (v->exam_trig < 0) v->exam_trig = trig_at(v, a->tx, a->tz, TG_MESSAGE, TG_MESSAGE);
         }
     }
     if (v->tapped && !v->fade_dir) {
@@ -4128,8 +5025,8 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
             else { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; }
         } else if (v->exam_npc >= 0) {
             VxNpc *np = &v->npcs[v->exam_npc];
-            static const int OPP[4] = { 3, 2, 1, 0 };
-            np->facing = OPP[v->act[0].facing & 3];
+            np->facing = vx_face_pick(-1, v->act[0].x - np->x, v->act[0].z - np->z);   // turn to the player
+            np->gx = np->x; np->gz = np->z; np->wait = 2.5f;                           // and stop walking
             vx_say(v, nullptr, np->text);
         } else if (v->exam_trig >= 0) {
             VxTrig *g = &v->trigs[v->exam_trig];
@@ -4202,8 +5099,9 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
     }
     if (v->dbg_coord) {
         char lbl[96];
-        snprintf(lbl, sizeof(lbl), "%s %d,%d %s  y%d  steps %d  %d tris", v->map_name, v->act[0].tx, v->act[0].tz,
-                 FACE_NAME[v->act[0].facing & 3], (int)v->act[0].y, v->steps, v->tris);
+        snprintf(lbl, sizeof(lbl), "%s %.2f,%.2f %s  y%.2f %s  steps %d  %d tris", v->map_name,
+                 v->act[0].x, v->act[0].z, FACE_NAME[v->act[0].facing & 3], v->act[0].y,
+                 v->airborne ? "AIR" : "", v->steps, v->tris);
         dl->AddText(ImGui::GetFont(), h * 0.04f, ImVec2(12, 12), IM_COL32(255, 240, 160, 230), lbl);
     }
     vxp_hud(v->perf_hud, w, h);
@@ -4282,13 +5180,21 @@ void vx_capture_to(VoxField *v, const char *map, int w, int h, const char *out_p
     if ((e = SDL_getenv("VOX_CUT")) && e[0]) v->cutaway = atoi(e) ? 1 : 0;
     if ((e = SDL_getenv("VOX_FOG")) && e[0]) v->fog = (float)atof(e);
     if ((e = SDL_getenv("VOX_TILT")) && e[0]) v->tilt = (float)atof(e);
+    if ((e = SDL_getenv("VOX_NAV")) && e[0]) { v->nav_view = atoi(e) ? 1 : 0; v->nav_dirty = true; v->nav_verts = 0; }
+    if ((e = SDL_getenv("VOX_RADIUS")) && e[0]) { v->agent_r = (float)atof(e); vx_build_nav(v); v->nav_dirty = true; v->nav_verts = 0; }
     if ((e = SDL_getenv("VOX_FACE")) && e[0]) { int f = facing_of(e); for (int i = 0; i < VX_PARTY; i++) v->act[i].facing = f; }
-    // The party stands on one cell at spawn: trail them out so the shot shows everyone.
-    for (int i = 1; i < v->party; i++) {
-        int bx = v->act[i - 1].tx - DX[v->act[0].facing & 3], bz = v->act[i - 1].tz - DZ[v->act[0].facing & 3];
-        if (!vx_can_stand(v, bx, bz)) break;
-        v->act[i].tx = v->act[i].px = (short)bx; v->act[i].tz = v->act[i].pz = (short)bz;
-        v->act[i].y = v->act[i].y0 = vx_gy(v, bx, bz);
+    // The party stands on one point at spawn: lay a straight trail behind the leader so the shot
+    // shows everyone, using the same breadcrumbs the followers normally walk.
+    {
+        VxActor *a = &v->act[0];
+        float bx = -(float)DX[a->facing & 3], bz = -(float)DZ[a->facing & 3];
+        v->trail_n = 0; v->trail_head = 0; v->trail_s = 0;
+        for (int k = 40; k >= 0; k--) {
+            float x = a->x + bx * (VX_TRAIL_DS * k), z = a->z + bz * (VX_TRAIL_DS * k);
+            if (!vx_nav_at(v, x, z)) continue;
+            vx_trail_push(v, x, z, vx_nav_y(v, x, z), false);
+        }
+        vx_followers(v, 1.0f / 60.0f);
     }
     snprintf(v->cap_out, sizeof(v->cap_out), "%s", out_path);
     v->cap_req = 3;
@@ -4303,9 +5209,9 @@ bool vx_capture_done(VoxField *v) {
 
 bool vx_dev_ui(VoxField *v, char *out, int cap) {
     bool printed = false;
-    ImGui::Text("vox field — %s  %d,%d %s  y%d  steps %d  (%dx%d, %d tris)", v->map_name,
-                v->act[0].tx, v->act[0].tz, FACE_NAME[v->act[0].facing & 3], (int)v->act[0].y,
-                v->steps, v->mw, v->md, v->tris);
+    ImGui::Text("vox field — %s  %.2f,%.2f %s  y%.2f%s  steps %d  (%dx%d, %d tris)", v->map_name,
+                v->act[0].x, v->act[0].z, FACE_NAME[v->act[0].facing & 3], v->act[0].y,
+                v->airborne ? " AIR" : "", v->steps, v->mw, v->md, v->tris);
     for (int i = 0; i < vx_map_count(); i++) {
         if (i) ImGui::SameLine();
         bool cur = !strcmp(v->map_name, vx_map_name_at(i));
@@ -4321,6 +5227,30 @@ bool vx_dev_ui(VoxField *v, char *out, int cap) {
     if (ImGui::Checkbox("No clip", &d)) v->noclip = d;
     ImGui::SameLine();
     if (ImGui::Checkbox("Cut away", &ct)) v->cutaway = ct;
+    // ── movement (VOXFIELD_NOTES.md "Movement") ──
+    ImGui::Separator();
+    { bool nv = v->nav_view != 0;
+      if (ImGui::Checkbox("Nav view", &nv)) { v->nav_view = nv; v->nav_dirty = true; } }
+    ImGui::SameLine();
+    ImGui::Text("walkable %s | jump-only %d vox in %d region(s) | nav %.1f ms",
+                v->nav_bad ? "UNREACHABLE TARGETS" : "ok", v->nav_jump_vox,
+                v->nav_regions > 1 ? v->nav_regions - 1 : 0, v->nav_ms);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("walk", &v->sp_walk, 1.0f, 12.0f, "%.1f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("run", &v->sp_run, 1.0f, 18.0f, "%.1f");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("jump apex", &v->jump_apex, 0.2f, 3.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    ImGui::SliderFloat("gravity", &v->gravity, 8.0f, 120.0f, "%.0f");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    // The radius is read live by the collision; the nav data is only re-derived (and the reach
+    // re-proved) when the slider is LET GO, because that pass is milliseconds, not microseconds.
+    ImGui::SliderFloat("radius", &v->agent_r, 0.05f, 0.45f, "%.2f");
+    if (ImGui::IsItemDeactivatedAfterEdit()) { vx_build_nav(v); v->nav_dirty = true; v->nav_verts = 0; }
     // camera
     bool o = v->ortho != 0;
     if (ImGui::Checkbox("Ortho", &o)) v->ortho = o;
@@ -4422,10 +5352,16 @@ bool vx_dev_ui(VoxField *v, char *out, int cap) {
     }
     if (ImGui::Button("Print cell")) {
         int x = v->act[0].tx, z = v->act[0].tz;
+        int ix = (int)floorf(v->act[0].x / VOX_S), iz = (int)floorf(v->act[0].z / VOX_S);
+        if (ix < 0) ix = 0; if (iz < 0) iz = 0;
+        if (ix >= v->vw) ix = v->vw - 1; if (iz >= v->vd) iz = v->vd - 1;
         unsigned char top = get_blk(v, x * VX_VPC, v->hgt[z][x], z * VX_VPC);
-        snprintf(out, cap, "%s: %d,%d height %d, top block %s, %s — %d tris, mesh %.1f ms, reach %s",
+        snprintf(out, cap, "%s: %d,%d height %d, top block %s, %s — nav %s region %d clearance %.2f, "
+                 "%d tris, mesh %.1f ms, nav %.1f ms, reach %s/%s",
                  v->map_name, x, z, v->hgt[z][x], BLOCKS[top].name, v->walk[z][x] ? "walkable" : "blocked",
-                 v->tris, v->mesh_ms, v->reach_missing ? "FAIL" : "ok");
+                 v->nav_ok[iz][ix] ? "ok" : "blocked", v->nav_reg[iz][ix], v->nav_clr[iz][ix] / 32.0f,
+                 v->tris, v->mesh_ms, v->nav_ms,
+                 v->reach_missing ? "FAIL" : "ok", v->nav_bad ? "FAIL" : "ok");
         printed = true;
     }
     return printed;
@@ -4438,6 +5374,10 @@ VoxField *vx_create() {
     v->want_dir = v->last_axis = -1;
     v->party = 2;
     v->step_len = WALK_STEP;
+    // free movement (VOXFIELD_NOTES.md "Movement"); all five ride the reload blob as Dev sliders
+    v->agent_r = VX_AGENT_R; v->sp_walk = VX_SP_WALK; v->sp_run = VX_SP_RUN;
+    v->jump_apex = VX_JUMP_APEX; v->gravity = VX_GRAVITY;
+    v->nav_view = 0;
     v->amb = 1.0f;
     // Octopath, not Minecraft: a low pitched camera, a narrow field of view, the party about a fifth
     // of the screen, and a far fog so the town fades out instead of ending in a cliff.
@@ -4456,6 +5396,7 @@ VoxField *vx_create() {
 
 void vx_destroy(VoxField *v) {
     if (!v) return;
+    free(v->nav_buf);
     free(v->cmap_px);
     free(v->spr);
     free(v);
@@ -4479,6 +5420,205 @@ int vx_selftest(VoxField *v) {
     return bad;
 }
 
+// ───────────────────────── the walk test (capture.sh --vox-walktest) ─────────────────────────
+// A deterministic bot driving the SAME movement code the player's thumb drives, with no rendering
+// and no phone. Three parts, and it exits non-zero on any of them:
+//   (a) a scripted input sequence run at jittered dt against walls, fences and corners, asserting
+//       the body never leaves the eroded region, never NaNs, and never sticks for more than 3 s
+//       while the input is held along a path that is open;
+//   (b) A* on the nav grid from the spawn to every exit, door and NPC, then the bot WALKS that path
+//       and has to arrive;
+//   (c) 200 jumps from random valid spots on random headings, each of which has to end either on
+//       valid ground or in a clean respawn.
+// A* is the bot's, not the game's: nothing in the field pathfinds.
+
+struct VxBotRng { uint32_t s; };
+static uint32_t bot_rand(VxBotRng *r) { r->s = r->s * 1664525u + 1013904223u; return r->s; }
+static float bot_f(VxBotRng *r) { return (float)(bot_rand(r) & 0xFFFFFF) / (float)0xFFFFFF; }
+
+static void vx_bot_frame(VoxField *v, float dt, float mx, float mz, bool run, bool jump) {
+    VxEvent ev; ev.kind = VXE_NONE; ev.arg[0] = 0;
+    v->bot_on = 1; v->bot_mx = mx; v->bot_mz = mz; v->bot_run = run ? 1 : 0;
+    v->want_jump = jump ? 1 : 0;
+    vx_leader_move(v, 1920, 1080, dt, &ev);
+    vx_followers(v, dt);
+    npc_step(v, dt);
+    // a map change would pull the world out from under the test; the bot never takes one
+    v->fade_dir = 0; v->fade = 0; v->to_map[0] = 0;
+    v->msg[0] = 0;
+}
+
+// A* over the nav grid with WALK connectivity only. Returns the length, or 0.
+#define VXB_PATH 4096
+static int vx_bot_astar(VoxField *v, int sx, int sz, int gx, int gz, short *px, short *pz) {
+    static float g[VX_VD][VX_VW];
+    static short pi[VX_VD][VX_VW], pj[VX_VD][VX_VW];
+    static unsigned char closed[VX_VD][VX_VW];
+    static int qi[VX_VW * VX_VD], qj[VX_VW * VX_VD];
+    static float qf[VX_VW * VX_VD];
+    for (int j = 0; j < v->vd; j++) for (int i = 0; i < v->vw; i++) { g[j][i] = 1e18f; closed[j][i] = 0; }
+    int n = 0;
+    g[sz][sx] = 0; qi[n] = sx; qj[n] = sz; qf[n] = 0; n++;
+    while (n > 0) {
+        int best = 0;
+        for (int k = 1; k < n; k++) if (qf[k] < qf[best]) best = k;
+        int x = qi[best], z = qj[best];
+        qi[best] = qi[n - 1]; qj[best] = qj[n - 1]; qf[best] = qf[n - 1]; n--;
+        if (closed[z][x]) continue;
+        closed[z][x] = 1;
+        if (x == gx && z == gz) break;
+        for (int d = 0; d < 4; d++) {
+            int nx = x + DX[d], nz = z + DZ[d];
+            if (nx < 0 || nz < 0 || nx >= v->vw || nz >= v->vd) continue;
+            if (!v->nav_ok[nz][nx] || closed[nz][nx]) continue;
+            float dh = v->nav_h[nz][nx] - v->nav_h[z][x];
+            if (dh > VX_STEP_UP || dh < -VX_STEP_UP) continue;
+            float ng = g[z][x] + 1.0f;
+            if (ng >= g[nz][nx]) continue;
+            g[nz][nx] = ng; pi[nz][nx] = (short)x; pj[nz][nx] = (short)z;
+            if (n < VX_VW * VX_VD) { qi[n] = nx; qj[n] = nz; qf[n] = ng + (float)(abs(nx - gx) + abs(nz - gz)); n++; }
+        }
+    }
+    if (g[gz][gx] > 1e17f) return 0;
+    short tx[VXB_PATH], tz[VXB_PATH];
+    int m = 0, x = gx, z = gz;
+    while (m < VXB_PATH && !(x == sx && z == sz)) { tx[m] = (short)x; tz[m] = (short)z; m++; int ax = pi[z][x], az = pj[z][x]; x = ax; z = az; }
+    for (int k = 0; k < m; k++) { px[k] = tx[m - 1 - k]; pz[k] = tz[m - 1 - k]; }
+    return m;
+}
+
+// The nav voxel a cell's reachable corner sits on, or false.
+static bool vx_bot_cell_vox(VoxField *v, int cx, int cz, int *ox, int *oz) {
+    for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++) {
+        int i = cx * VX_VPC + dx, j = cz * VX_VPC + dz;
+        if (i < v->vw && j < v->vd && v->nav_reg[j][i] == 1) { *ox = i; *oz = j; return true; }
+    }
+    return false;
+}
+
+static int vx_walktest_map(VoxField *v, const char *map, char *summary, int cap) {
+    if (!vx_load_map(v, map)) { snprintf(summary, cap, "%s: FAILED TO LOAD", map); return 1; }
+    int fails = 0;
+    VxBotRng rng; rng.s = 0x9E3779B9u ^ (uint32_t)strlen(map) * 2654435761u;
+    for (const char *c = map; *c; c++) rng.s = rng.s * 31u + (unsigned char)*c;
+    v->noclip = 0;
+    int out_of_region = 0, nan_hits = 0, stuck_hits = 0;
+
+    // ── (a) scripted input against the world ──
+    // Eight headings held for a second each, then a long diagonal grind, run on jittered dt. The
+    // body is pressed into whatever it meets; nothing here should ever push it off the region.
+    const int FRAMES = 6000;
+    float held_x = 0, held_z = 0, stuck_t = 0;
+    float last_x = v->act[0].x, last_z = v->act[0].z;
+    for (int f = 0; f < FRAMES; f++) {
+        float dt = 1.0f / 60.0f * (0.5f + bot_f(&rng) * 1.6f);       // dt jitter: 8 ms to 35 ms
+        int phase = (f / 90) % 10;
+        float ang = phase < 8 ? phase * 0.7853981f : (f * 0.013f);
+        held_x = cosf(ang); held_z = sinf(ang);
+        bool run = (f / 90) % 3 == 0;
+        vx_bot_frame(v, dt, held_x, held_z, run, false);
+        VxActor *a = &v->act[0];
+        if (!(a->x == a->x) || !(a->z == a->z) || !(a->y == a->y)) { nan_hits++; break; }
+        if (!v->airborne && !vx_nav_at(v, a->x, a->z)) out_of_region++;
+        float moved = sqrtf((a->x - last_x) * (a->x - last_x) + (a->z - last_z) * (a->z - last_z));
+        last_x = a->x; last_z = a->z;
+        // "stuck" only counts when the way the body is being pushed is actually open a cell ahead
+        float ax = a->x + held_x * 1.0f, az = a->z + held_z * 1.0f;
+        if (moved < 0.002f && vx_nav_at(v, ax, az)) stuck_t += dt; else stuck_t = 0;
+        if (stuck_t > 3.0f) { stuck_hits++; stuck_t = 0; }
+    }
+    fails += (out_of_region > 0) + (nan_hits > 0) + (stuck_hits > 0);
+
+    // ── (b) path-walk to every exit, door and NPC ──
+    int targets = 0, arrived = 0;
+    short px[VXB_PATH], pz[VXB_PATH];
+    struct { int x, z; } tgt[128];
+    int nt = 0;
+    for (int i = 0; i < v->trig_count && nt < 128; i++) {
+        if (v->trigs[i].kind != TG_EXIT && v->trigs[i].kind != TG_DOOR) continue;
+        tgt[nt].x = v->trigs[i].x + v->trigs[i].w / 2; tgt[nt].z = v->trigs[i].z + v->trigs[i].d / 2; nt++;
+    }
+    for (int i = 0; i < v->npc_count && nt < 128; i++) { tgt[nt].x = v->npcs[i].tx; tgt[nt].z = v->npcs[i].tz; nt++; }
+    for (int t = 0; t < nt; t++) {
+        int gx, gz, sx, sz;
+        bool have = vx_bot_cell_vox(v, tgt[t].x, tgt[t].z, &gx, &gz);
+        if (!have) for (int d = 0; d < 4 && !have; d++) have = vx_bot_cell_vox(v, tgt[t].x + DX[d], tgt[t].z + DZ[d], &gx, &gz);
+        if (!have) continue;                                   // nothing the game asks to be walkable
+        targets++;
+        vx_place_party(v, v->spawn_x, v->spawn_z, 0);
+        VxActor *a = &v->act[0];
+        sx = (int)floorf(a->x / VOX_S); sz = (int)floorf(a->z / VOX_S);
+        if (sx < 0 || sz < 0 || sx >= v->vw || sz >= v->vd || !v->nav_ok[sz][sx]) continue;
+        int n = vx_bot_astar(v, sx, sz, gx, gz, px, pz);
+        if (!n) { SDL_Log("WALKTEST %s: no walk path from the spawn to %d,%d", map, tgt[t].x, tgt[t].z); continue; }
+        int wp = 0, budget = n * 60 + 600;
+        while (wp < n && budget-- > 0) {
+            float wx = (px[wp] + 0.5f) * VOX_S, wz = (pz[wp] + 0.5f) * VOX_S;
+            float dx = wx - v->act[0].x, dz = wz - v->act[0].z;
+            float d = sqrtf(dx * dx + dz * dz);
+            if (d < VOX_S * 0.6f) { wp++; continue; }
+            vx_bot_frame(v, 1.0f / 60.0f, dx / d, dz / d, false, false);
+            if (!v->airborne && !vx_nav_at(v, v->act[0].x, v->act[0].z)) out_of_region++;
+        }
+        float fx = (px[n - 1] + 0.5f) * VOX_S, fz = (pz[n - 1] + 0.5f) * VOX_S;
+        float dd = sqrtf((fx - v->act[0].x) * (fx - v->act[0].x) + (fz - v->act[0].z) * (fz - v->act[0].z));
+        if (dd < 1.0f) arrived++;
+        else SDL_Log("WALKTEST %s: did not arrive at %d,%d (%.2f cells short)", map, tgt[t].x, tgt[t].z, dd);
+    }
+    if (arrived != targets) fails++;
+
+    // ── (c) 200 jumps ──
+    int jumps = 0, jump_bad = 0, respawns0 = v->land_fails;
+    for (int k = 0; k < 200; k++) {
+        int i, j, tries = 0;
+        do { i = (int)(bot_f(&rng) * v->vw); j = (int)(bot_f(&rng) * v->vd); }
+        while (++tries < 400 && (i >= v->vw || j >= v->vd || !v->nav_ok[j][i]));
+        if (i >= v->vw || j >= v->vd || !v->nav_ok[j][i]) continue;
+        vx_place_party_at(v, (i + 0.5f) * VOX_S, (j + 0.5f) * VOX_S, 0);
+        float ang = bot_f(&rng) * 6.2831853f;
+        float hx = cosf(ang), hz = sinf(ang);
+        jumps++;
+        int before = v->land_fails;
+        vx_bot_frame(v, 1.0f / 60.0f, hx, hz, true, true);
+        int guard = 600;
+        while (v->airborne && guard-- > 0) vx_bot_frame(v, 1.0f / 60.0f, hx, hz, true, false);
+        // a respawn is a clean outcome; what is not allowed is ending off the region, or NaN, or
+        // never coming down at all
+        VxActor *a = &v->act[0];
+        bool nan = !(a->x == a->x) || !(a->z == a->z) || !(a->y == a->y);
+        bool clean = (v->land_fails > before) || (!v->airborne && vx_nav_at(v, a->x, a->z));
+        if (nan || !clean || guard <= 0) {
+            jump_bad++;
+            if (jump_bad <= 3) SDL_Log("WALKTEST %s: jump %d from %.2f,%.2f ended badly (air=%d nan=%d guard=%d)",
+                                       map, k, (i + 0.5f) * VOX_S, (j + 0.5f) * VOX_S, v->airborne, (int)nan, guard);
+        }
+    }
+    if (jump_bad) fails++;
+
+    v->bot_on = 0;
+    snprintf(summary, cap,
+             "WALKTEST %s: %s  frames=%d off-region=%d nan=%d stuck=%d | paths %d/%d arrived | "
+             "jumps %d/%d clean (%d respawns) | nav %.2f ms r=%.2f",
+             map, fails ? "FAIL" : "ok", FRAMES, out_of_region, nan_hits, stuck_hits,
+             arrived, targets, jumps - jump_bad, jumps, v->land_fails - respawns0, v->nav_ms, v->agent_r);
+    return fails;
+}
+
+int vx_walktest(VoxField *v, const char *one_map) {
+    if (!v->gl_ready) vx_gl_init(v);
+    int bad = 0;
+    char line[320];
+    for (int i = 0; i < vx_map_count(); i++) {
+        const char *m = vx_map_name_at(i);
+        if (one_map && one_map[0] && strcmp(one_map, "all") && strcmp(one_map, m)) continue;
+        int f = vx_walktest_map(v, m, line, sizeof line);
+        SDL_Log("%s", line);
+        bad += f;
+    }
+    SDL_Log("WALKTEST verdict: %s (%d map%s bad)", bad ? "FAIL" : "ok", bad, bad == 1 ? "" : "s");
+    return bad;
+}
+
 void vx_save(VoxField *v, VxSave *s) {
     memset(s, 0, sizeof(*s));
     snprintf(s->map, sizeof(s->map), "%s", v->map_name);
@@ -4493,6 +5633,9 @@ void vx_save(VoxField *v, VxSave *s) {
     s->sun_az = v->sun_az; s->sun_el = v->sun_el;
     s->sh_str = v->sh_str; s->sh_soft = v->sh_soft; s->sh_snap = v->sh_snap;
     s->perf_hud = v->perf_hud;
+    for (int i = 0; i < VX_PARTY; i++) { s->px[i] = v->act[i].x; s->pz[i] = v->act[i].z; }
+    s->agent_r = v->agent_r; s->sp_walk = v->sp_walk; s->sp_run = v->sp_run;
+    s->jump_apex = v->jump_apex; s->gravity = v->gravity; s->nav_view = v->nav_view;
 }
 
 void vx_restore(VoxField *v, const VxSave *s) {
@@ -4515,6 +5658,13 @@ void vx_restore(VoxField *v, const VxSave *s) {
     v->ortho = s->ortho ? 1 : 0; v->hd2d = s->hd2d ? 1 : 0; v->cutaway = s->cutaway ? 1 : 0;
     v->res_pct = (s->res_scale_pct >= 40 && s->res_scale_pct <= 100) ? s->res_scale_pct : 100;
     v->perf_hud = (s->perf_hud >= 0 && s->perf_hud <= 2) ? s->perf_hud : 0;
+    // The movement tunables go in BEFORE the map load, because the nav build reads the radius.
+    if (s->agent_r >= 0.05f && s->agent_r <= 0.45f) v->agent_r = s->agent_r;
+    if (s->sp_walk >= 0.5f && s->sp_walk <= 20.0f) v->sp_walk = s->sp_walk;
+    if (s->sp_run >= 0.5f && s->sp_run <= 30.0f) v->sp_run = s->sp_run;
+    if (s->jump_apex >= 0.1f && s->jump_apex <= 6.0f) v->jump_apex = s->jump_apex;
+    if (s->gravity >= 4.0f && s->gravity <= 200.0f) v->gravity = s->gravity;
+    v->nav_view = s->nav_view ? 1 : 0;
     vx_load_map(v, map[0] ? map : "halm");
     v->party = s->party < 1 ? 1 : s->party > VX_PARTY ? VX_PARTY : s->party;
     v->steps = s->steps < 0 ? 0 : s->steps;
@@ -4533,13 +5683,19 @@ void vx_restore(VoxField *v, const VxSave *s) {
     v->bench_poll = 0.5f;          // half a period out of phase with map.flag's, so never the same frame
     int lx = s->tx[0], lz = s->ty[0];
     if (lx < 0 || lz < 0 || lx >= v->mw || lz >= v->md) { SDL_Log("voxfield: restored cell %d,%d is off %s", lx, lz, map); return; }
-    vx_place_party(v, lx, lz, s->facing[0] & 3);
+    // The float position is the truth; the cell is only the fallback for a blob written before free
+    // movement existed. Either way the party comes back ON THE GROUND and never airborne.
+    float rx = s->px[0], rz = s->pz[0];
+    if (!(rx > 0.0f && rz > 0.0f && rx < v->mw && rz < v->md)) { rx = lx + 0.5f; rz = lz + 0.5f; }
+    vx_place_party_at(v, rx, rz, s->facing[0] & 3);
     for (int i = 1; i < VX_PARTY; i++) {
-        int x = s->tx[i], z = s->ty[i];
-        if (!vx_can_stand(v, x, z)) continue;
-        v->act[i].tx = v->act[i].px = (short)x;
-        v->act[i].tz = v->act[i].pz = (short)z;
-        v->act[i].y = v->act[i].y0 = vx_gy(v, x, z);
+        float x = s->px[i], z = s->pz[i];
+        if (!(x > 0.0f && z > 0.0f && x < v->mw && z < v->md)) continue;
+        if (!vx_nav_snap(v, &x, &z, 2.0f)) continue;
+        v->act[i].x = x; v->act[i].z = z;
+        v->act[i].tx = v->act[i].px = (short)floorf(x);
+        v->act[i].tz = v->act[i].pz = (short)floorf(z);
+        v->act[i].y = v->act[i].y0 = vx_nav_y(v, x, z);
         v->act[i].facing = s->facing[i] & 3;
     }
 }

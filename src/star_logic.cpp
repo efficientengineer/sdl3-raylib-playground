@@ -470,6 +470,7 @@ struct Star {
     char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
     int cap_tiles;                // 1 = TILE_CAPTURE=<map>:<scale>:<out.png> instead: the tile field
     int cap_vox;                  // 1 = VOX_CAPTURE=<map>:<w>:<h>:<out.png>: the voxel field
+                                  // 2 = VOX_SELFTEST, 3 = VOX_WALKTEST (the movement bot)
     int cap_state;                // 0 idle, 1 asked, 2 done -> quit
     char dlg_spec[160];           // DIALOG_CAPTURE=<scene>:<line>[:page][:n|:x], the box on the Mac
     int dlg_frames;
@@ -1024,6 +1025,8 @@ static void *game_create(float dpi_scale) {
     if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 1; st->cap_tiles = 0; }
     spec = SDL_getenv("VOX_SELFTEST");                 // load every map once and fail loudly
     if (spec && spec[0] == '1') st->cap_vox = 2;
+    spec = SDL_getenv("VOX_WALKTEST");                 // <map>|all: drive the movement bot, then quit
+    if (spec && spec[0]) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 3; }
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
@@ -1059,7 +1062,7 @@ struct ReloadBlob {
     int32_t has_tf, old_field; TfSave tf;
     int32_t has_vx, tile_field; VxSave vx;
 };
-#define RELOAD_MAGIC 0x43525453u   // 'STRC' — bumped for the Perf HUD mode in VxSave
+#define RELOAD_MAGIC 0x44525453u   // 'STRD' — bumped for free movement: VxSave now carries a float position
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
@@ -1165,6 +1168,11 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
         if (!st->vx) st->vx = vx_create();
         st->screen = SCR_FIELD;
         vx_selftest(st->vx);   // capture.sh --vox-selftest greps the SELFCHECK lines for the verdict
+        st->cap_state = 2;
+    } else if (st->cap_vox == 3 && st->cap_state < 2) {
+        if (!st->vx) st->vx = vx_create();
+        st->screen = SCR_FIELD;
+        vx_walktest(st->vx, st->cap_spec);   // capture.sh --vox-walktest greps the verdict line
         st->cap_state = 2;
     } else if (st->cap_spec[0] && st->cap_vox && st->cap_state < 2) {
         if (!st->vx) st->vx = vx_create();

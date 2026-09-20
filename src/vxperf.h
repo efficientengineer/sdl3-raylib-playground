@@ -32,6 +32,7 @@
 // program, so their cost lands in WORLD. Saying so beats inventing a scope that would always read 0.
 enum VxpId {
     VXP_TICK = 0,      // walking, NPCs, triggers, input — all the logic in vx_tick
+    VXP_MOVE,          // free movement: the navmesh slide, jumps, followers, NPCs (nested in TICK)
     VXP_MESH,          // building and uploading chunk VBOs (load time, not per frame)
     VXP_SHADOW,        // the sun's depth pass (only when the sun moves)
     VXP_SKY,           // the full-screen sky gradient + clouds
@@ -45,7 +46,7 @@ enum VxpId {
 };
 
 static const char *VXP_NAME[VXP_COUNT] = {
-    "tick/logic", "mesh/upload", "shadow map", "sky", "world opaque",
+    "tick/logic", "movement", "mesh/upload", "shadow map", "sky", "world opaque",
     "sprites+detail", "post: blur", "post: bloom", "post: composite", "ui/dialogue",
 };
 

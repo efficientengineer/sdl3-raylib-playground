@@ -46,6 +46,21 @@ fi
 #   ./capture.sh --vox halm --light night:0.35    -> the same colormap the phone uses
 #   ./capture.sh --vox halm --hd2d 0              -> the post pass off, for a side-by-side
 #   ./capture.sh --vox halm --pitch 40 --fov 32 --viewh 9 --face N --size 1920x1080 --name spawn
+#   ./capture.sh --vox halm --nav 1               -> the navmesh overlay drawn into the shot
+# The movement bot: the real movement code driven against walls, path-walked to every exit, door and
+# NPC, and jumped 200 times, on one map or all three. Non-zero exit means a real failure.
+if [ "$1" = "--vox-walktest" ]; then
+    MAP=${2:-all}
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    OUT=$(VOX_WALKTEST="$MAP" "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "WALKTEST")
+    echo "$OUT"
+    echo "$OUT" | grep -q "WALKTEST verdict: ok" || { echo "ERROR: voxel field walk test FAILED" >&2; exit 1; }
+    exit 0
+fi
+
 # The self-test: every map loaded once, meshed and checked. Non-zero exit means a real failure.
 if [ "$1" = "--vox-selftest" ]; then
     ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -61,7 +76,7 @@ fi
 if [ "$1" = "--vox" ]; then
     MAP=${2:-halm}
     shift 2 || true
-    AT=""; ORTHO=""; HD2D=""; LIGHT=""; PITCH=""; FOV=""; VIEWH=""; FACE=""; SIZE="1920x1080"; NAME=""; SUFFIX=""; CUT=""; FOG=""; TILT=""
+    AT=""; ORTHO=""; HD2D=""; LIGHT=""; PITCH=""; FOV=""; VIEWH=""; FACE=""; SIZE="1920x1080"; NAME=""; SUFFIX=""; CUT=""; FOG=""; TILT=""; NAV=""; RADIUS=""
     while [ $# -gt 0 ]; do
         case "$1" in
             --at) AT="$2"; SUFFIX="${SUFFIX}_at${2//,/-}"; shift ;;
@@ -77,6 +92,8 @@ if [ "$1" = "--vox" ]; then
             --cut) CUT="$2"; shift ;;
             --fog) FOG="$2"; shift ;;
             --tilt) TILT="$2"; shift ;;
+            --nav) NAV="$2"; [ "$2" = "1" ] && SUFFIX="${SUFFIX}_nav"; shift ;;
+            --radius) RADIUS="$2"; shift ;;
         esac
         shift
     done
@@ -89,6 +106,7 @@ if [ "$1" = "--vox" ]; then
     cd "$ROOT"
     VOX_AT="$AT" VOX_ORTHO="$ORTHO" VOX_HD2D="$HD2D" VOX_LIGHT="$LIGHT" VOX_PITCH="$PITCH" \
     VOX_FOV="$FOV" VOX_VIEWH="$VIEWH" VOX_FACE="$FACE" VOX_CUT="$CUT" VOX_FOG="$FOG" VOX_TILT="$TILT" \
+    VOX_NAV="$NAV" VOX_RADIUS="$RADIUS" \
         VOX_CAPTURE="$MAP:$W:$H:$OUT" "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "SELFCHECK|OVERDRAW|voxfield: (capture|walker|[0-9]+ cells)" || true
     if [ -f "$OUT" ]; then
         echo "wrote $OUT"
