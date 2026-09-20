@@ -59,6 +59,14 @@ Replaces "running to the board" as the start, and last round's explore block + B
    hall. The player passes the well and the jar, the Stair on the horizon, the board being readied:
    the guild's job sheets open TOMORROW. {{HEALER}} meanwhile at the town healer's; her own house at
    dinner time: dark, tidy, one chair — she walks next door to the lit one.
+   *Owner addition:* "As part of the chores, perhaps Falke could drop off mail for Hart which includes
+   the guild job." So the bundle for the guild hall = the repaired part + sealed post to the clerk,
+   and one letter IS the water run with Hart's thirty coin. {{HERO}} carries his own job in without
+   knowing. The clerk opening the post is the natural place for the plain rule (job sheets go up at
+   dawn; the board closes on the last ring of the evening bell). Payoff in `0110`: "Who put it on the
+   board?" — "You did. It came in yesterday, with Hart's post." (replaces "Hart carried it in himself
+   this morning"; apply when writing). Open: how much the player sees of the letter (proposal: sealed,
+   Hart's mark, one examine line; the reveal is saved for the board).
 3. *Sundown, dinner at Hart's.* {{HERO}} excited about the guild's jobs opening tomorrow. Hart reminds
    him he isn't ready. A moment to explore {{HEALER}}'s life (plain fact from Hart/the town healer,
    not a speech from her).
