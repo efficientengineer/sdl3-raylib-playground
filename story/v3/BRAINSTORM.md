@@ -194,6 +194,18 @@ Falke's back — sprite gag), sharpest at night; Ottilie adopts them on the spot
 starts). Whether/why they stay after the beast goes home is left open. Asked: boy/girl/hard to tell;
 young and prickly (orchestrator's lean) or older and wry. Token names for the people and the person.
 
+**Owner:** "I think maybe they'd have to put down the beast. The herder could try to calm it, fail, and
+Falke strikes it down to save it. This makes it easier to not have to haul back to the herders' town and
+maybe gives him a reason to keep exploring to find the cause." (Read as: Falke strikes it down to save
+the HERDER — confirm.) SUPERSEDES "sleeps and is carried home". Shape: two-phase fight — phase 1 parry
+and hold it open so the herder can calm it; it seems to work, then it doesn't know them; phase 2 a real
+fight, the beast goes for its own handler, Falke cuts it down. His first kill is a mercy, not a trophy.
+The herder: saved and bereaved at once — complicated start with Falke. Their reason to stay: a guard
+beast does not forget its handler; something was done to it; if theirs, then others; they are going to
+find out and Falke goes too. The sheep wake, the shepherd pays (first coin as a hunter) — solved on
+paper, not solved. Optional: something visibly wrong found on the beast, meaning undecided (would go in
+THREADS.md).
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
