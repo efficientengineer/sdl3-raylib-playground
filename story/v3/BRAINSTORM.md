@@ -128,6 +128,18 @@ is to go and see; B — a hunt for a creature nobody has a name for, the trail l
 C — the carters' convoy is a week overdue, find them (carts standing, oxen fine, no people). Asked the
 owner what "wonderful" means to them here and for a first job they loved.
 
+**Owner chose B (2026-09-21):** "B sounds best. Wonderful means wondrous, things like magic, monsters,
+faeries, etc." So the world turns toward faerie-tale wonder: magic is real and visible (Ottilie's
+healing can be a gift she is growing into), the old places belong to the other folk rather than being
+dead machines. Orchestrator's first shape (owner not yet answered): the last job sheet is a hunt the
+old hunters laughed at — animals taken from the high pasture, found asleep and unwakeable miles away,
+tracks that stop in open ground; Hart posted it because he saw such tracks the year Rabe died, and he
+believes none of it; the trail goes pasture → old wood with small wonders; a strange, beautiful monster
+fought with the parry; the turn: it was a guard, and behind it is the first faerie and an old bargain
+Halm stopped keeping. Questions put to the owner: is magic ordinary or half-forgotten in Halm; is the
+first faerie friend, trickster or threat (orchestrator leans half-forgotten, trickster; evil stays
+human). The jar, the Stair, the woman under the step and the moved moon are shelved ideas, not canon.
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
