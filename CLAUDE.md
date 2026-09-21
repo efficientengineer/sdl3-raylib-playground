@@ -108,9 +108,11 @@ Five kinds of package and nothing else:
 ./story_prompt.py ingest [folder]   # cut every returned.png waiting in it
 ./story_prompt.py export            # -> src/cutscene_data.h and src/field_text.h
 ./story_prompt.py names | stats | brief ["beat"]
+./story_prompt.py script [chapter]   # rebuild story/v3/chapterNN_script.md: the chapter as a play
 ./story_prompt.py tmap check <map>|--all   |   tmap preview <map>
 ./story_prompt.py palette build | apply | check | colormap
 ./tools/arttray/run.sh [--selftest]  # the Mac GUI; --selftest prints one PASS/FAIL line
+tools/script/golden.py record|diff   # the tool's own contract: every command's output, hashed
 ./deploy.sh                         # android APK -> phone (only when the owner asks)
 ./fast_reload.sh                    # hot reload libgame_logic.so (~0.7s; only when the owner asks)
 ./compile_shaders.sh                # GLSL 450 -> SPIR-V -> glsl330, glsl300es, msl, hlsl
@@ -192,6 +194,12 @@ compile: `$ADB shell pidof com.playground.sdlraylib` still returns a pid ten sec
 - `story/field/` — `sprites.md` + `sprites/` (billboards), `walkers.md` + `walkers/` (NPC walk
   sheets), `tmaps/` (the maps), `tilesets/valley/` (terrain ids, atlas, decals — frozen),
   `text.md` (what the world says), `manifest.md` (generated)
-- `story_prompt.py` — builds the prompts, cuts what comes back, validates, exports
+- `story_prompt.py` — the entry point, and a shim. The tool is the `storytool/` package: one
+  responsibility a module, each with a docstring saying what it owns and what it must never do.
+  **`storytool/README.md` is the map** — it has a "where do I look to change X" table and the
+  import graph. Never grow a module past ~600 lines; split it and update that README.
+- `tools/script/golden.py` — the refactor contract: runs every command in a throwaway copy of the
+  repo and hashes everything it wrote. Take the before/after pair back to back (other agents edit
+  `story/` while you work) and require `IDENTICAL`
 - `tools/arttray/` — the Mac GUI over the tray
 - `shaders/`, `assets/`, `third_party/`, `android/`
