@@ -29,16 +29,16 @@ The first minute of the game, at the end of a training session the player has ju
 
 ## Dialogue
 - {{HEALER}} [1] {wonder}: He's at the swing again. Best wall in {{HOME_TOWN}}, this.
-- {{HEALER}} [2]: Feet over his head. That's the best one all week.
-- {{HERO}} [3]: I hit it a dozen times!
-- {{HEALER}} [4]: It hit you once.
+- {{HEALER}} [3]: Feet over his head. That's the best one all week.
+- {{HERO}} [4]: I hit it a dozen times!
+- {{HEALER}} [2]: It hit you once.
 - {{HERO}} [5]: How is anyone supposed to beat that thing?
-- {{HEALER}}: Don't ask me. I sit on a wall and eat apples.
+- {{HEALER}}: Maybe hit it again?
 - {{HERO}}: My wrist's fine.
 - {{HEALER}} [6]: Put it down, then. I can't patch a wrist you're holding on to.
 - {{HEALER}}: There. Closed.
 - {{HERO}}: That's it? That's all of it?
-- {{HEALER}}: It's a wrist, {{HERO}}, not a war.
+- {{HEALER}}: You fought a training dummy, not a bear.
 - {{MENTOR}} [7]: Again. From the gate.
 - {{HERO}}: {{MENTOR}} — say it straight. Am I ready or am I not?
 - {{MENTOR}} {sorrow}: Not quite ready yet.
