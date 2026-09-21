@@ -30,17 +30,17 @@ The plan worked and then it stopped working: Distel held her {{GUARD_BEAST}} wit
 
 ## Dialogue
 - Distel [1] {sorrow}: He's dead. You killed him, and he'd have killed me. Both of those are true.
-- {{HERO}}: I'm sorry. I didn't want to.
-- Distel: I know. Bring the lamp closer. Behind his ear.
+- {{HERO}} [1]: I'm sorry. I didn't want to.
+- Distel [1]: I know. Bring the lamp closer. Behind his ear.
 - {{HEALER}} [2] {dread}: Nine of them, all the same size, healed shut years ago.
 - Distel [3]: I've known him since he was a pup. I have never seen those.
 - Distel [4]: A {{GUARD_BEAST}} does not forget his handler. Not ever.
-- {{HERO}}: He forgot you.
-- Distel: So it was done to him. If it was done to mine, it was done to others.
-- Garbe [6]: {{SHEPHERD}}, and that's my flock walking home on its own legs.
-- Garbe: Five coin, the way the job sheet said. I'll take the sheet off the board tonight.
+- {{HERO}} [4]: He forgot you.
+- Distel [4]: So it was done to him. If it was done to mine, it was done to others.
+- Garbe [5]: {{SHEPHERD}}, and that's my flock walking home on its own legs.
+- Garbe [6]: Five coin, the way the job sheet said. I'll take the sheet off the board tonight.
 - {{HEALER}} [7] {hope}: Put it somewhere you won't sit on it.
-- Distel: I'm going up to find out what was done to him. I don't need either of you.
-- {{HEALER}}: We're coming. Walk in the middle, you're asleep on your feet.
-- Distel {sorrow}: I'm going to cry soon. Keep walking.
-- {{HERO}}: Then we walk. Which way is up your mountain?
+- Distel [7]: I'm going up to find out what was done to him. I don't need either of you.
+- {{HEALER}} [7]: We're coming. Walk in the middle, you're asleep on your feet.
+- Distel [7] {sorrow}: I'm going to cry soon. Keep walking.
+- {{HERO}} [7]: Then we walk. Which way is up your mountain?

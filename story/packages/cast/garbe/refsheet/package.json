@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "garbe",
+  "title": "Garbe \u2014 reference sheet",
+  "ref": "story/refs/garbe.png",
+  "makes": "`story/refs/garbe.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/garbe.png",
+    "story/portraits/garbe.png"
+  ],
+  "dir": "story/packages/cast/garbe/refsheet"
+}

@@ -129,12 +129,14 @@ open door, not from a speech. Sixty-seven minutes of play to six of clip.
 > 🖼 *a black hillside at night under heavy stars, a broken stone wall running up it, pale sheep lying asleep in the grass in ones and twos, one small lamp burning low on the ground*
 
 **Ottilie**: I've been up here in daylight a hundred times. It isn't the same hill.  
-> 🖼 *Falke's eyes and brow filling the panel edge to edge, lamp light coming up at them from below*
+> 🖼 *seen from above, a sleeping ewe in flattened grass with Distel, very small and hooded, crouched over her, a long pale crook laid down alongside, the lamp beside them*
 
 **Falke**: Get away from her! Get back!  
-> 🖼 *Falke on the left with a plain sword up and out, Ottilie stepping across in front of him with one arm barred against his chest, Distel small and crouched on the right beyond them*
+> 🖼 *Falke's eyes and brow filling the panel edge to edge, lamp light coming up at them from below*
 
 **Distel**: Don't shout. You'll wake her. She's had a bad night.  
+> 🖼 *Falke on the left with a plain sword up and out, Ottilie stepping across in front of him with one arm barred against his chest, Distel small and crouched on the right beyond them*
+
 **Ottilie**: She's a girl. Falke, she's a girl — put the sword down.  
 > — *the page clears* —
 
@@ -155,8 +157,6 @@ open door, not from a speech. Sixty-seven minutes of play to six of clip.
 **Distel**: Then hold him still and I'll calm him. Quietly — she's sleeping.  
 **Falke**: That's a sheep!  
 **Distel**: She has a name.  
-
-> ⚠ panels never shown by a line: [2]
 
 *The boss, in two phases: parry Klee and hold him open so Distel can calm him — it works, and then he does not know her, and he goes for her, and you cut him down. Then you walk up to the body yourself and find the ring of nine holes behind his ear.*
 
@@ -180,9 +180,11 @@ open door, not from a speech. Sixty-seven minutes of play to six of clip.
 **Distel**: A drover does not forget his handler. Not ever.  
 **Falke**: He forgot you.  
 **Distel**: So it was done to him. If it was done to mine, it was done to others.  
-> 🖼 *Garbe on the left in an oiled canvas coat with a rope over one shoulder, Falke on the right with the sword slung and his hand out, the walking sheep streaming past behind them*
+> 🖼 *the hillside at first light, dozens of sheep standing up all at once out of the grass and beginning to walk downhill together, the broken wall running down beside them*
 
 **Garbe**: Garbe, and that's my flock walking home on its own legs.  
+> 🖼 *Garbe on the left in an oiled canvas coat with a rope over one shoulder, Falke on the right with the sword slung and his hand out, the walking sheep streaming past behind them*
+
 **Garbe**: Five coin, the way the job sheet said. I'll take the sheet off the board tonight.  
 > 🖼 *five small worn coins lying in a young open palm, grass seed and dried blood on the fingers, morning light across them*
 
@@ -191,8 +193,6 @@ open door, not from a speech. Sixty-seven minutes of play to six of clip.
 **Ottilie**: We're coming. Walk in the middle, you're asleep on your feet.  
 **Distel**: I'm going to cry soon. Keep walking.  
 **Falke**: Then we walk. Which way is up your mountain?  
-
-> ⚠ panels never shown by a line: [5]
 
 *The high pasture at first light, and the three of them walking uphill. End of chapter one.*
 

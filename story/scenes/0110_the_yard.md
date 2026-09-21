@@ -33,12 +33,12 @@ The first minute of the game, at the end of a training session the player has ju
 - {{HERO}} [4]: I hit it a dozen times!
 - {{HEALER}} [2]: It hit you once.
 - {{HERO}} [5]: How is anyone supposed to beat that thing?
-- {{HEALER}}: Maybe hit it again?
-- {{HERO}}: My wrist's fine.
+- {{HEALER}} [5]: Maybe hit it again?
+- {{HERO}} [5]: My wrist's fine.
 - {{HEALER}} [6]: Put it down, then. I can't patch a wrist you're holding on to.
-- {{HEALER}}: There. Closed.
-- {{HERO}}: That's it? That's all of it?
-- {{HEALER}}: You fought a training dummy, not a bear.
+- {{HEALER}} [6]: There. Closed.
+- {{HERO}} [6]: That's it? That's all of it?
+- {{HEALER}} [6]: You fought a training dummy, not a bear.
 - {{MENTOR}} [7]: Again. From the gate.
-- {{HERO}}: {{MENTOR}} — say it straight. Am I ready or am I not?
-- {{MENTOR}} {sorrow}: Not quite ready yet.
+- {{HERO}} [7]: {{MENTOR}} — say it straight. Am I ready or am I not?
+- {{MENTOR}} [7] {sorrow}: Not quite ready yet.

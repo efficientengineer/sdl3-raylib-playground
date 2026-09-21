@@ -1,0 +1,19 @@
+{
+  "kind": "expressions",
+  "handle": "guildclerk",
+  "title": "Guildclerk \u2014 expression sheet",
+  "makes": "10 dialogue-box faces in `story/portraits/`",
+  "outputs": [
+    "story/portraits/guildclerk_neutral.png",
+    "story/portraits/guildclerk_smile.png",
+    "story/portraits/guildclerk_laugh.png",
+    "story/portraits/guildclerk_biglaugh.png",
+    "story/portraits/guildclerk_concern.png",
+    "story/portraits/guildclerk_sorrow.png",
+    "story/portraits/guildclerk_annoyed.png",
+    "story/portraits/guildclerk_angry.png",
+    "story/portraits/guildclerk_shock.png",
+    "story/portraits/guildclerk_resolve.png"
+  ],
+  "dir": "story/packages/cast/guildclerk/expressions"
+}

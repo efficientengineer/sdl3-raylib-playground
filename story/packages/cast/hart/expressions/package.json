@@ -1,0 +1,19 @@
+{
+  "kind": "expressions",
+  "handle": "hart",
+  "title": "Hart \u2014 expression sheet",
+  "makes": "10 dialogue-box faces in `story/portraits/`",
+  "outputs": [
+    "story/portraits/hart_neutral.png",
+    "story/portraits/hart_smile.png",
+    "story/portraits/hart_laugh.png",
+    "story/portraits/hart_biglaugh.png",
+    "story/portraits/hart_concern.png",
+    "story/portraits/hart_sorrow.png",
+    "story/portraits/hart_annoyed.png",
+    "story/portraits/hart_angry.png",
+    "story/portraits/hart_shock.png",
+    "story/portraits/hart_resolve.png"
+  ],
+  "dir": "story/packages/cast/hart/expressions"
+}

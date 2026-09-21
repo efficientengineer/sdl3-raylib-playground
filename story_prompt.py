@@ -14,6 +14,12 @@
 
   ./story_prompt.py portraits                  cut each character's reference sheet down to story/portraits/<name>.png
                                                (the middle head-and-shoulders panel; shipped as portrait_<name>.png)
+  ./story_prompt.py expressions Bron [more]    the EXPRESSION SHEET: one template of ten numbered
+                                               head-and-shoulders slots (neutral, smile, laugh,
+                                               biglaugh, concern, sorrow, annoyed, angry, shock,
+                                               resolve) -> story/portraits/<name>_<id>.png, shipped as
+                                               portrait_<name>_<id>.png. A dialogue line picks one with
+                                               '- Bron (biglaugh): text'; the line may be textless.
 
   Field art (parked paths; the tile field below is the live one): the tool draws the sheet's layout
   itself as a template PNG, ChatGPT only fills
@@ -137,7 +143,38 @@ NARRATOR = "narrator"                               # speaker for an unattribute
 LOOK_BANNED = ["dwarf", "dwarven", "halfling", "hobbit", "elf", "elven", "gnome", "orc", "fighter",
                "rogue", "cleric", "wizard", "ranger", "barbarian", "paladin", "beard", "bearded"]  # see characters.md
 REQUIRED_BLOCKS = ["header", "layout", "framing", "acting", "character_design", "rendering",
-                   "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet", "refsheet_avoid"]
+                   "dialogue_box", "negative", "sheet_layout", "sheet_avoid", "refsheet", "refsheet_avoid",
+                   "expressions", "expressions_avoid"]
+
+# ── Dialogue-box expressions (mirror STYLE.md "Expression sheet") ──
+#
+# One expression sheet a character: ten head-and-shoulders portraits in the same framing, so a
+# dialogue line can switch the face without switching the character. The ids and their ORDER are the
+# contract — the slot number on the template is the index into this list, the file name is the id,
+# and a scene tags a line with `- Name (biglaugh): ...`. Never reorder or rename one: the sheets
+# already drawn are cut by slot number.
+EXPRESSIONS = (
+    ("neutral", "calm and level, mouth closed, eyes open and steady, looking at the viewer"),
+    ("smile", "a small warm closed-mouth smile, eyes softened, one brow slightly raised"),
+    ("laugh", "laughing openly, mouth wide and grinning, eyes crinkled nearly shut, head tipped back a little"),
+    ("biglaugh", "laughing extremely hard, mouth wide open, eyes squeezed shut, head thrown back, "
+                 "one shoulder up and a tear at the corner of one eye"),
+    ("concern", "concerned, brows drawn together and up in the middle, mouth a small flat line, "
+                "eyes searching slightly off to one side"),
+    ("sorrow", "extreme sorrow, head lowered, brows up in the middle, eyes shut, mouth trembling open, "
+               "tears running on both cheeks"),
+    ("annoyed", "annoyed, one brow down and one up, eyes half lidded and turned aside, mouth pulled "
+                "flat to one side"),
+    ("angry", "furious, both brows hard down, eyes wide and fixed on the viewer, teeth bared, jaw set"),
+    ("shock", "shocked, eyes wide with small pupils, brows high, mouth open, head pulled back"),
+    ("resolve", "resolved, chin lifted, brows level and firm, eyes narrowed and fixed ahead, mouth "
+                "closed and set"),
+)
+EXPR_IDS = tuple(e for e, _ in EXPRESSIONS)
+EXPR_COLS, EXPR_ROWS = 5, 2           # the template is 2 rows of 5, numbered in reading order
+EXPR_ASPECT = 2 / 3                   # width / height of a slot, the dialogue portrait's own shape
+EXPR_OUT_H = 288                      # ...and the height a portrait ships at (PORTRAIT_H)
+EXPR_OUT_W = 192
 
 # ── Sheet mechanics (layout maths, not style) ──
 SHEET_MAX_PANELS = 8
@@ -521,12 +558,15 @@ def parse_scene(path):
         m = re.match(r"^\s+- ([^:]+):\s*(.+)$", raw)           # indented "- Name: where they look, expression, body"
         if m and panels:
             acting[-1][m.group(1).strip().lower()] = m.group(2).strip()
-    dialogue, reveals, moods = [], [], []
-    for m in re.finditer(r"^- ([^:\[{\n]+?)\s*(?:\[(\d+)\])?\s*(?:\{(\w+)\})?\s*:\s*(.+)$",
+    dialogue, reveals, moods, exprs = [], [], [], []
+    # "- Speaker (expr) [panel] {mood}: text". The expression comes first, right after the speaker,
+    # and a line that carries one may have no text at all: a reaction beat, an empty box and a face.
+    for m in re.finditer(r"^- ([^:\[{(\n]+?)\s*(?:\((\w+)\))?\s*(?:\[(\d+)\])?\s*(?:\{(\w+)\})?\s*:[ \t]*(.*)$",
                          secs.get("dialogue", ""), flags=re.M):
-        dialogue.append((m.group(1).strip(), m.group(4).strip()))
-        reveals.append(int(m.group(2)) if m.group(2) else None)
-        moods.append(m.group(3).lower() if m.group(3) else None)
+        dialogue.append((m.group(1).strip(), m.group(5).strip()))
+        exprs.append(m.group(2).lower() if m.group(2) else None)
+        reveals.append(int(m.group(3)) if m.group(3) else None)
+        moods.append(m.group(4).lower() if m.group(4) else None)
     meta = kv_lines(head)
     kind = meta.get("type", "").lower() or "panels"
     return {
@@ -535,7 +575,8 @@ def parse_scene(path):
         "meta": meta,
         "characters": [c.strip() for c in meta.get("characters", "").split(",") if c.strip()],
         "beat": squash(secs.get("beat", "")),
-        "panels": panels, "acting": acting, "pages": pages, "dialogue": dialogue, "reveals": reveals, "moods": moods,
+        "panels": panels, "acting": acting, "pages": pages, "dialogue": dialogue, "reveals": reveals,
+        "moods": moods, "exprs": exprs,
         "kind": kind,
         "narration": kind == "narration",
         "talk": kind == "talk",
@@ -636,6 +677,25 @@ def validate(scene, style, cast):
     for n, mood in enumerate(scene["moods"], 1):
         if mood and mood not in MOODS:
             err.append(f"dialogue line {n}: unknown mood '{{{mood}}}'. Use one of: {', '.join(MOODS)}")
+    # The expression tag: '- Name (biglaugh) [2] {hope}: text', and a tagged line may be textless.
+    for n, ((who, text), expr) in enumerate(zip(scene["dialogue"], scene["exprs"]), 1):
+        if expr and expr not in EXPR_IDS:
+            err.append(f"dialogue line {n}: unknown expression '({expr})'. Use one of: {', '.join(EXPR_IDS)}")
+        elif expr and is_narrator(who):
+            err.append(f"dialogue line {n}: the Narrator has no portrait and takes no expression; "
+                       f"drop the '({expr})' tag")
+        elif expr:
+            handle = resolve_name(who, cast, aliases)
+            if not handle or not existing(cast[handle].get("ref")):
+                warn.append(f"dialogue line {n}: '{who}' has no reference sheet, so there is no "
+                            f"portrait_{slug(who)}_{expr}.png and the game falls back to no portrait")
+            elif not expr_portrait_path(handle, expr).exists():
+                warn.append(f"dialogue line {n}: {cast[handle]['display']}'s '{expr}' portrait has not "
+                            f"been generated yet (./story_prompt.py expressions {cast[handle]['display']}); "
+                            f"the game falls back to their main portrait")
+        if not text and not expr:
+            err.append(f"dialogue line {n} ('{who}') has no text. A line may only be empty when it "
+                       f"carries an expression, which makes it a reaction beat: '- {who} (shock):'")
     if scene["kind"] not in SCENE_KINDS:
         err.append(f"unknown '- type: {scene['kind']}'. Use one of: {', '.join(SCENE_KINDS)}")
         return err, warn
@@ -1393,7 +1453,7 @@ def cmd_slice(args):
     if len(pos) != 2:
         die('usage: slice story/out/<name>.sheet.json <image> [--trim N] [--boxes "x,y,w,h;..."]')
     manifest, image = json.loads(Path(pos[0]).read_text()), Path(pos[1]).expanduser()
-    if manifest.get("kind") in FIELD_KINDS:              # a field template package: the boxes are known
+    if manifest.get("kind") in FIELD_KINDS + ("expressions",):   # a template package: the boxes are known
         return cmd_cut(args)                             # --trim and --boxes mean nothing there, --fringe does
     if not image.exists():
         die(f"{image} not found")
@@ -2006,14 +2066,19 @@ def draw_digits(rows, text, x, y, scale, rgb):
     return cx - x
 
 
-def draw_template(W, H, bg, slots, digit=None):
+def draw_template(W, H, bg, slots, digit=None, fill=None):
     """The template: a white border round each slot and its number in the gutter above it.
 
-    `digit` is (scale, gap); the tile sheets pass a smaller one because their gutters are tight."""
+    `digit` is (scale, gap); the tile sheets pass a smaller one because their gutters are tight.
+    `fill` paints the inside of every slot a different colour from the canvas — the expression sheet
+    wants flat mid-grey behind each head while the margins stay dark, so the margin check that tells
+    a file from the wrong package apart still has a background of its own to test."""
     scale, gap = digit or (DIGIT_SCALE, DIGIT_GAP)
     rows = new_canvas(W, H, bg)
     for s in slots:
         x, y, w, h = s["box"]
+        if fill:
+            fill_rect(rows, x, y, w, h, fill)
         stroke_rect(rows, x, y, w, h, SLOT_BORDER, WHITE)
         draw_digits(rows, str(s["n"]), x, y - gap - 5 * scale, scale, WHITE)
     return rows
@@ -2168,14 +2233,15 @@ def field_status(kind, slots, out_file=None):
 
 
 def write_field_package(kind, name, canvas_label, W, H, bg, slots, prompt, attach, after, out_file=None,
-                        status=(), digit=None):
+                        status=(), digit=None, fill=None):
     OUT.mkdir(exist_ok=True)
     template = pkg_path(name, "template.png")
-    write_png(template, W, H, 3, draw_template(W, H, bg, slots, digit))
+    write_png(template, W, H, 3, draw_template(W, H, bg, slots, digit, fill))
     manifest = pkg_path(name, "sheet.json")
     manifest.write_text(json.dumps({
         "template": name, "kind": kind, "canvas": [W, H], "canvas_label": canvas_label,
         "background": list(bg), "border": SLOT_BORDER, "out": out_file, "slots": slots, "prompt": prompt,
+        **({"slot_fill": list(fill)} if fill else {}),
     }, indent=2) + "\n")
     md = pkg_path(name, "chatgpt.md")
     md.write_text(package(f"{kind} template {name}", attach, prompt, after, status=status))
@@ -2520,6 +2586,131 @@ def cmd_walker(args):
                    "target": f"{WALK_OUT_W * 3}x{WALK_OUT_H * len(c['rows'])}",
                    "package": package_label(name)} for c in who],
                  warn, md, template, f"{len(slots)} frames at {s}x, {label}")
+
+
+EXPR_BG = (40, 40, 44)                # the canvas behind the slots: dark, so a wrong file is caught
+EXPR_GREY = (128, 128, 132)           # inside a slot: the same flat neutral mid-grey as the refsheet
+EXPR_MARGIN = SLOT_MARGIN             # the margin check samples inside this, so do not shrink it
+EXPR_GUTTER_X, EXPR_GUTTER_Y = 24, 44 # the vertical gutter holds the slot number (5*DIGIT_SCALE + gap)
+
+
+def layout_expressions():
+    """(W, H, label, boxes) for EXPR_ROWS x EXPR_COLS portrait slots, as big as the canvas allows."""
+    W, H, label = TEMPLATE_CANVASES[0]                    # landscape: 5 across reads as two rows of five
+    sw = (W - 2 * EXPR_MARGIN - (EXPR_COLS - 1) * EXPR_GUTTER_X) // EXPR_COLS
+    sh_fit = (H - 2 * EXPR_MARGIN - (EXPR_ROWS - 1) * EXPR_GUTTER_Y) // EXPR_ROWS
+    w = min(sw, int(sh_fit * EXPR_ASPECT))
+    h = int(round(w / EXPR_ASPECT))
+    gw = EXPR_COLS * w + (EXPR_COLS - 1) * EXPR_GUTTER_X
+    gh = EXPR_ROWS * h + (EXPR_ROWS - 1) * EXPR_GUTTER_Y
+    ox, oy = (W - gw) // 2, (H - gh) // 2
+    boxes = [(ox + c * (w + EXPR_GUTTER_X), oy + r * (h + EXPR_GUTTER_Y), w, h)
+             for r in range(EXPR_ROWS) for c in range(EXPR_COLS)]
+    return W, H, label, boxes
+
+
+def expr_portrait_path(key, expr):
+    return PORTRAITS / f"{key}_{expr}.png"
+
+
+def cmd_expressions(args):
+    """One expression sheet a character: ten dialogue-box portraits of the same head.
+
+    Template-drawn like the walker and the prop sheets — the tool owns the slots, ChatGPT fills them
+    — because the ten faces have to be the same shot ten times, and a generator left to lay the page
+    out itself returns ten different crops. The reference sheet is REQUIRED: the portrait beside the
+    dialogue box is cut from it, and a face that does not match it is a different character."""
+    names = [a for a in args if not a.startswith("--")]
+    if not names:
+        die("usage: expressions <Name> [<Name> ...]   (one sheet a character, from characters.md)")
+    style, cast, warn = load_style(), load_cast(), []
+    b = style["blocks"]
+    made = []
+    for written in names:
+        handle = resolve_name(written, cast)
+        if not handle:
+            die(f"'{written}' is not a name in characters.md (a '## handle' or an '- alias:'). An "
+                f"expression sheet is a cast member's face; a one-off NPC has no portrait at all.")
+        c = cast[handle]
+        rp = existing(c.get("ref"))
+        if not rp:
+            die(f"{c['display']} has no reference sheet at {c.get('ref')}, so the expression sheet "
+                f"would not match the portrait. Generate it first: ./story_prompt.py refsheet {c['display']}")
+        W, H, label, boxes = layout_expressions()
+        slots = []
+        for n, ((eid, _), box) in enumerate(zip(EXPRESSIONS, boxes), 1):
+            slots.append({"n": n, "id": f"{handle}_{eid}", "who": handle, "expr": eid,
+                          "box": list(box), "inner": list(inner_box(box)),
+                          "target": [EXPR_OUT_W, EXPR_OUT_H],
+                          "out": str(expr_portrait_path(handle, eid).relative_to(ROOT.parent))})
+        name = f"expressions_{handle}"
+        # The template, then the CUTSCENE style reference (a portrait belongs to the cutscene look,
+        # not the map look, so the field's own style sheet is deliberately not attached), then the
+        # character, then the palette last as everywhere else.
+        attach = [(pkg_path(name, "template.png"),
+                   "TEMPLATE. Redraw this exact image with every numbered slot filled in and "
+                   "everything else left untouched. It is the canvas, not a reference.")]
+        sp = existing(style["refs"].get("style"))
+        if sp:
+            attach.append((sp, "STYLE reference. " + style["refs"].get("style_note", "")))
+        else:
+            warn.append(f"no style reference at {style['refs'].get('style')}; "
+                        f"the prompt text carries the style alone")
+        attach.append((rp, f"CHARACTER reference for {c['display']}. Every slot is this character: keep "
+                           f"the face, hair, colours, collar and marks identical to the middle panel of "
+                           f"this sheet. Use it for the design only — ignore its background, its "
+                           f"three-panel layout and its neutral expression, which is only slot 1."))
+        pa = palette_attachment(warn)
+        if pa:
+            attach.append(pa)
+        fw, fh = slots[0]["inner"][2], slots[0]["inner"][3]
+        L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
+             f"Canvas: {label}, the same size as the template.", b["header"], "",
+             "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
+        L += [f"Image {i}: {note}" for i, (_, note) in enumerate(attach, 1)]
+        L += ["", TEMPLATE_RULES, "",
+              f"WHAT THIS IS: the dialogue-box faces for {c['display']}. The game draws one of these "
+              f"beside the text box while {c['display']} is speaking, so all ten have to read as the "
+              f"same person in the same shot with a different feeling.", "",
+              f"CHARACTER: {c['look']}", "",
+              f"SHEET: {b['expressions']}", "",
+              f"THE TEN SLOTS, in this order:"]
+        for n, (eid, how) in enumerate(EXPRESSIONS, 1):
+            L.append(f"  Slot {n} ({eid}): {how}.")
+        L += ["",
+              f"FRAMING, identical in every slot: three-quarter view facing slightly to the viewer's "
+              f"left, head and the top of the shoulders only, the top of the head a little below the "
+              f"top border and the chin around two thirds down the slot, the head the same size and "
+              f"in the same place in all ten. Each slot is {fw}x{fh} pixels here and is stored at "
+              f"{EXPR_OUT_W}x{EXPR_OUT_H}, so keep the pixels large and the face readable at a glance: "
+              f"the feeling has to be clear from the brows and the mouth alone.", "",
+              "NOTHING IS HELD AND NOTHING IS CARRIED: no hands, no arms raised into frame, no "
+              "weapon, no sword, staff, bow or knife, no props, no objects, no cartoon symbols, no "
+              "effect lines. Only the head and shoulders against the flat grey.", "",
+              f"CHARACTER DESIGN: {b['character_design']}", "", f"RENDERING: {b['rendering']}", "",
+              f"AVOID: {b['expressions_avoid']}, drawing outside a slot, moving or covering a slot "
+              f"number, painting over the grey background, changing the size of the image"]
+        after = field_after(manifest_path(name), [
+            f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
+            "- [ ] The same head, the same size, in the same place, in all ten slots",
+            "- [ ] Hair, colours, collar and marks match the reference sheet in all ten",
+            "- [ ] Each slot's feeling is the one listed for that number, and no two slots are the same face",
+            "- [ ] No hands, no weapons, no props, nothing held; flat grey behind every head", "",
+            "If one face fails, reply in the same chat: \"Redraw only slot 6 and keep every other slot "
+            "and the whole template exactly as it is. <what was wrong>\"."],
+            makes=", ".join(f"`{s['out']}`" for s in slots))
+        template, manifest, md = write_field_package(
+            "expressions", name, label, W, H, EXPR_BG, slots, "\n".join(L), attach, after,
+            status=field_status("expressions", slots), fill=EXPR_GREY)
+        data = json.loads(manifest.read_text())
+        data["who"] = handle
+        manifest.write_text(json.dumps(data, indent=2) + "\n")
+        made.append((c["display"], template, md, f"{len(slots)} faces at {fw}x{fh}, {label}"))
+    for w in warn:
+        print(f"warning: {w}", file=sys.stderr)
+    for who, template, md, what in made:
+        print(f"wrote {template.relative_to(ROOT.parent)}  ({who}: {what})")
+        print(f"      {md.relative_to(ROOT.parent)}  — attach the template first, then paste the prompt")
 
 
 def cmd_building(args):
@@ -3722,6 +3913,70 @@ def cmd_walker_compact(args):
         write_field_manifest(rows_out)
 
 
+EXPR_SIG = (8, 12)                    # the thumbnail two faces are compared on
+EXPR_SAME = 3.0                       # mean per-channel difference under this: the same drawing twice
+EXPR_FLAT = 4.0                       # spread under this: the slot came back empty
+
+
+def expr_signature(px, w, h):
+    """A tiny RGB thumbnail of one cut face, for the empty/duplicate checks.
+
+    Colour, not luminance: two faces can differ only in what is coloured (a blush, a tear, bared
+    teeth) and a grey thumbnail would call them the same drawing."""
+    sw, sh = EXPR_SIG
+    small = resample(px, w, h, 3, sw, sh)
+    return [float(v) for r in small for v in r[:sw * 3]]
+
+
+def cut_expressions(data, slots, rows, w, h, ch, sx, sy, neutral_main=False):
+    """Ten head-and-shoulders portraits out of one expression sheet.
+
+    A portrait is an opaque rectangle, not a sprite: nothing is keyed out, the flat grey behind the
+    head ships with it exactly as the reference-sheet portrait's does. The only cleaning is the
+    border scrub, because a localised slot can still hold a pixel of the white border."""
+    PORTRAITS.mkdir(exist_ok=True)
+    sigs, main = [], None
+    for s in slots:
+        x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+        # A portrait is opaque, so a surviving sliver of the white border would ship as a bright line
+        # down the side of the face. There is nothing to lose by shaving the slot: the head sits in
+        # the middle of it and the rest is flat grey.
+        pad = max(2, int(round(2 * sx)))
+        x, y, bw, bh = x + pad, y + pad, bw - 2 * pad, bh - 2 * pad
+        px = crop(rows, ch, x, y, bw, bh)
+        scrub_border(px, bw, bh, ch, False)
+        if ch == 4:                                       # a portrait has no transparency
+            px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
+        px = resample(px, bw, bh, 3, EXPR_OUT_W, EXPR_OUT_H)
+        out = ROOT.parent / s["out"]
+        ship_png(out, EXPR_OUT_W, EXPR_OUT_H, 3, px)
+        print(f"  slot {s['n']} {s['expr']}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  "
+              f"{EXPR_OUT_W}x{EXPR_OUT_H}  (ships as portrait_{out.stem}.png)")
+        sig = expr_signature(px, EXPR_OUT_W, EXPR_OUT_H)
+        chans = [sig[k::3] for k in range(3)]             # flat per channel, not flat on average
+        spread = max(sum(abs(v - sum(c) / len(c)) for v in c) / len(c) for c in chans)
+        if spread < EXPR_FLAT:
+            LOUD.append(f"slot {s['n']} ({s['expr']}) came back flat — nothing was drawn in it")
+            print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+        for other, osig in sigs:
+            if sum(abs(a - b) for a, b in zip(sig, osig)) / len(sig) < EXPR_SAME:
+                LOUD.append(f"slot {s['n']} ({s['expr']}) is the same drawing as slot {other['n']} "
+                            f"({other['expr']}); ask for that one to be redrawn")
+                print(f"WARNING: {LOUD[-1]}", file=sys.stderr)
+                break
+        sigs.append((s, sig))
+        if s["expr"] == "neutral":
+            main = px
+    if neutral_main and main is not None:
+        who = data.get("who") or slots[0]["who"]
+        out = PORTRAITS / f"{who}.png"
+        ship_png(out, EXPR_OUT_W, EXPR_OUT_H, 3, main)
+        print(f"  --neutral-main: {out.relative_to(ROOT.parent)} replaced from slot 1")
+    else:
+        print("  the main portrait is still the one cut from the reference sheet "
+              "(pass --neutral-main to replace it with slot 1)")
+
+
 def cmd_cut(args):
     pos, fringe, palette, it = [], 0, 0, iter(args)
     for a in it:
@@ -3742,7 +3997,7 @@ def cmd_cut(args):
         if not image.exists():
             die(f"{image} not found")
         return cut_view(data, image, "--nearest" in args)
-    if kind not in FIELD_KINDS + ("tileset", "swatch", "decal"):
+    if kind not in FIELD_KINDS + ("tileset", "swatch", "decal", "expressions"):
         die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
     if not image.exists():
         die(f"{image} not found")
@@ -3775,6 +4030,8 @@ def cmd_cut(args):
         return cut_swatches(data, slots, rows, w, h, ch, sx, sy)
     if kind == "decal":                                   # D20: key, trim to the object, palettise
         return cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe)
+    if kind == "expressions":                             # ten dialogue-box faces: opaque, like a portrait
+        return cut_expressions(data, slots, rows, w, h, ch, sx, sy, "--neutral-main" in args)
     if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
         FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
         for s in slots:
@@ -7989,6 +8246,11 @@ def cmd_packages(args):
     handles = cast_in_play(scenes, cast) or ([h for h, _ in refsheet_priority(cast)] if every else [])
     if every:
         handles += [h for h, _ in refsheet_priority(cast) if h not in handles]
+    # Only a character who SPEAKS needs the ten faces: the expression sheet is the dialogue box's,
+    # and somebody who is only drawn in a panel never has a portrait on screen.
+    aliases_now = alias_map(cast)
+    speakers = {h for _, sc in scenes for w, _ in sc["dialogue"]
+                if (h := resolve_name(w, cast, aliases_now))}
     for handle in handles:
         c = cast[handle]
         who, key = c["display"], slug(c["display"])
@@ -7998,6 +8260,17 @@ def cmd_packages(args):
              "makes": f"`{ref}` and the dialogue-box portrait cut out of it",
              "outputs": [ref, str((PORTRAITS / f"{handle}.png").relative_to(ROOT.parent))]},
             cmd_refsheet, [handle], group="refsheet", who=who)
+        if handle in speakers or every:
+            outs = [str(expr_portrait_path(handle, e).relative_to(ROOT.parent)) for e in EXPR_IDS]
+            meta = {"kind": "expressions", "handle": handle, "title": f"{who} — expression sheet",
+                    "makes": f"{len(EXPR_IDS)} dialogue-box faces in `story/portraits/`",
+                    "outputs": outs}
+            d = PACKAGES / "cast" / key / "expressions"
+            if existing(ref):                    # the prompt attaches the reference sheet, as the walker does
+                add(d, meta, cmd_expressions, [who], group="expressions", who=who)
+            else:
+                index.append({"dir": d, "meta": meta, "ok": False, "group": "expressions", "who": who,
+                              "blocked": "needs the reference sheet first"})
         walker_out = str((FIELD_DIRS["walker"] / f"{key}.png").relative_to(ROOT.parent))
         meta = {"kind": "walker", "handle": handle, "title": f"{who} — walk sheet",
                 "makes": f"`{walker_out}`, the 4x4 walk sprite sheet", "outputs": [walker_out]}
@@ -8121,7 +8394,8 @@ def cmd_packages(args):
     orphans = prune_packages(built)
     write_packages_readme(index, orphans, failures, notes, every, scenes, shared, all_maps, lead_map, cast)
     print(f"wrote {len(built)} package folder(s) under {PACKAGES.relative_to(ROOT.parent)}/")
-    for g, label in (("tileset", "tile sheets (tilesets)"), ("refsheet", "reference sheets"), ("walker", "walk sheets"),
+    for g, label in (("tileset", "tile sheets (tilesets)"), ("refsheet", "reference sheets"),
+                     ("expressions", "expression sheets"), ("walker", "walk sheets"),
                      ("screen", "painted screens"), ("tiles", "tile sheets"),
                      ("props", "prop sheets"), ("building", "building face sheets"),
                      ("view", "painted views"), ("scene", "scene shot sheets")):
@@ -8236,6 +8510,9 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
                     f"{len(m['ids'])} tile(s) into that set's atlas, which the map is built from")
     for r in todo_first(rows("refsheet")):       # what is left to do first, then the ones already cut
         step(r, f"{r['who']}'s reference sheet — the portrait, the walker and every panel come from it")
+    for r in todo_first([x for x in rows("expressions") if not x.get("blocked")]):
+        step(r, f"{r['who']}'s expression sheet — the ten dialogue-box faces, so a line can change "
+                f"the face without changing the character")
     for r in todo_first([x for x in rows("walker") if not x.get("blocked") and x["meta"].get("handle") in cast]):
         step(r, f"{r['who']}'s walk sprite — the figure walking the map")
     for r in [x for x in rows("screen") if x["map"] == lead_map]:
@@ -8270,7 +8547,21 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
     if not rows("refsheet"):
         L.append("| — | | no cast in the selected scenes | |")
 
-    L += ["", "## 4. Walk sprites", "",
+    L += ["", "## 4. Character expressions", "",
+          "Ten head-and-shoulders faces a speaking character, on one template sheet: `neutral`, `smile`,",
+          "`laugh`, `biglaugh`, `concern`, `sorrow`, `annoyed`, `angry`, `shock`, `resolve`. They cut to",
+          "`story/portraits/<name>_<id>.png` and ship as `portrait_<name>_<id>.png`; a dialogue line picks",
+          "one with `- Name (biglaugh): text`, and may be textless for a reaction beat. Blocked until the",
+          "reference sheet exists, because the ten faces must be the same person. No weapons, nothing held.", "",
+          "| who | folder | status | after downloading |", "| --- | --- | --- | --- |"]
+    for r in rows("expressions"):
+        link = f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md)" if r["ok"] else f"`{rel(r['dir'])}`"
+        after = "rerun `packages` once the sheet is in" if r.get("blocked") else cmd(r["dir"])
+        L.append(f"| {r['who']} | {link} | {state(r)} | {after} |")
+    if not rows("expressions"):
+        L.append("| — | | no speaking cast in the selected scenes | |")
+
+    L += ["", "## 5. Walk sprites", "",
           "The 4x4 sheet the field renderer animates (rows S, W, E, N). A character's package is blocked",
           "until their reference sheet exists, because the walker must match it.", "",
           "| who | folder | status | after downloading |", "| --- | --- | --- | --- |"]
@@ -8282,7 +8573,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         L.append("| — | | | |")
 
     field = [r for r in index if r["group"] in ("tiles", "props", "building")]
-    L += ["", "## 5. Field art, by chapter and map", "",
+    L += ["", "## 6. Field art, by chapter and map", "",
           "A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,",
           "and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces",
           "the ground is made of; a building is map geometry wearing three textures (the front wall, a wall",
@@ -8335,7 +8626,7 @@ def write_packages_readme(index, orphans, failures, notes, every, scenes, shared
         L += ["(nothing in `story/field/tiles.md` or `story/field/props.md` yet)", ""]
 
     scene_rows = rows("scene")
-    L += ["## 6. Scene shot sheets, by chapter and map", "",
+    L += ["## 7. Scene shot sheets, by chapter and map", "",
           "One sheet per panel scene: all of its panels as separate white-bordered rectangles on black,",
           "cut apart into `story/panels/`. Talk and narration scenes need no art and are not listed.", ""]
     for key in sorted({(r["chapter"], r["map"]) for r in scene_rows}):
@@ -9368,7 +9659,7 @@ def ingest_one(d, meta, returned, extra=()):
         ok, msg = run_quiet(cmd_screen_cut, [str(d / "sheet.json"), str(d),
                                              *[a for a in extra if a == "--debug"]])
         return ok, (SCREEN_SUMMARY[0] if ok and SCREEN_SUMMARY else msg)
-    if kind in FIELD_KINDS or kind in ("view", "tileset", "swatch", "decal"):
+    if kind in FIELD_KINDS or kind in ("view", "tileset", "swatch", "decal", "expressions"):
         return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]
@@ -9396,7 +9687,7 @@ def cmd_ingest(args):
         elif a in ("--fringe", "--palette"):
             extra.append(a)
             skip = True
-        elif a in ("--nearest", "--debug", "--no-heal"):
+        elif a in ("--nearest", "--debug", "--no-heal", "--neutral-main"):
             extra.append(a)
     roots = [Path(a).expanduser().resolve() for a in args
              if not a.startswith("--") and a not in extra] or [PACKAGES]
@@ -9476,7 +9767,12 @@ def cmd_export(args):
            "struct CsRect { float x, y, w, h; };                 // percent of the stage",
            "struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen",
            "struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood;  // reveal 0 = none",
-           "                const char *portrait; CsSide side; };  // portrait file, or nullptr when the speaker has none",
+           "                const char *portrait; CsSide side;    // portrait file, or nullptr when the speaker has none",
+           "                const char *expr; };                  // \"\" when untagged; else one of the ten ids below.",
+           "// A tagged line's face is portrait_<name>_<expr>.png, falling back to portrait_<name>.png.",
+           "// text may be \"\" on a tagged line: a reaction beat, the portrait with an empty box.",
+           "#define CS_HAS_EXPR 1",
+           "// " + ", ".join(EXPR_IDS),
            f'#define CS_NARRATOR "{NARRATOR.title()}"              '
            "// speaker of an unattributed box: no name drawn, never a portrait",
            "struct CsScene { const char *id; const char *title; bool narration;   // narration == (kind == CS_NARRATION)",
@@ -9518,12 +9814,14 @@ def cmd_export(args):
                 out.append("};")
             sides = speaker_sides(scene, cast)                    # first speaker left, second right, then alternating
             out.append(f"static const CsLine CS_{ident}_LINES[] = {{")
-            for (who, text), reveal, tag in zip(scene["dialogue"], reveal_plan(scene), scene["moods"]):
+            for (who, text), reveal, tag, expr in zip(scene["dialogue"], reveal_plan(scene),
+                                                      scene["moods"], scene["exprs"]):
                 mood = tag or mood                                # an untagged line keeps the current mood
                 pf = portrait_file(who, cast)                     # an alias uses its handle's portrait
                 face = c_str(f"portrait_{pf.name}") if pf else "nullptr"
                 side = "CS_RIGHT" if sides[who.strip().lower()] else "CS_LEFT"
-                out.append(f"    {{ {c_str(who)}, {c_str(text)}, {reveal}, CS_{mood.upper()}, {face}, {side} }},")
+                out.append(f"    {{ {c_str(who)}, {c_str(text)}, {reveal}, CS_{mood.upper()}, {face}, "
+                           f"{side}, {c_str(expr or '')} }},")
             out += ["};", ""]
         title = re.sub(r"^(Scene \S+|Prologue):\s*", "", scene["title"])
         panels = f"CS_{ident}_PANELS, {len(scene['panels'])}" if scene["panels"] else "nullptr, 0"
@@ -9589,6 +9887,8 @@ def main():
         cmd_props(args[1:])
     elif cmd == "walker":
         cmd_walker(args[1:])
+    elif cmd == "expressions":
+        cmd_expressions(args[1:])
     elif cmd == "building":
         cmd_building(args[1:])
     elif cmd == "view":

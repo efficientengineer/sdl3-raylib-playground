@@ -32,17 +32,17 @@
 
 ## Dialogue
 - {{HEALER}} [1] {dread}: I've been up here in daylight a hundred times. It isn't the same hill.
-- {{HERO}} [3] {tense}: Get away from her! Get back!
-- Distel [4]: Don't shout. You'll wake her. She's had a bad night.
-- {{HEALER}}: She's a girl. {{HERO}}, she's a girl — put the sword down.
+- {{HERO}} [2] {tense}: Get away from her! Get back!
+- Distel [3]: Don't shout. You'll wake her. She's had a bad night.
+- {{HEALER}} [4]: She's a girl. {{HERO}}, she's a girl — put the sword down.
 - {{HERO}} [5]: What are you?
-- Distel: {{HERDER_PEOPLE}}. You'd say night herder.
+- Distel [5]: {{HERDER_PEOPLE}}. You'd say night herder.
 - {{HEALER}} [6] {wonder}: I've heard of your people all my life. No one here has ever seen one.
-- Distel: Now you have. Move your foot. You're standing on my lead.
-- Distel: {{BEAST_NAME}} put them down. My {{GUARD_BEAST}} — I raised him from a pup.
-- {{HEALER}}: What is a {{GUARD_BEAST}}?
-- Distel: He beds a flock down where he thinks it's safe. He ran in the spring and stopped knowing me.
+- Distel [6]: Now you have. Move your foot. You're standing on my lead.
+- Distel [6]: {{BEAST_NAME}} put them down. My {{GUARD_BEAST}} — I raised him from a pup.
+- {{HEALER}} [6]: What is a {{GUARD_BEAST}}?
+- Distel [6]: He beds a flock down where he thinks it's safe. He ran in the spring and stopped knowing me.
 - {{HERO}} [7] {confront}: He's the monster on my job sheet. I signed for him.
-- Distel: Then hold him still and I'll calm him. Quietly — she's sleeping.
-- {{HERO}}: That's a sheep!
-- Distel {sorrow}: She has a name.
+- Distel [7]: Then hold him still and I'll calm him. Quietly — she's sleeping.
+- {{HERO}} [7]: That's a sheep!
+- Distel [7] {sorrow}: She has a name.

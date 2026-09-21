@@ -1,0 +1,19 @@
+{
+  "kind": "expressions",
+  "handle": "lyra",
+  "title": "Ottilie \u2014 expression sheet",
+  "makes": "10 dialogue-box faces in `story/portraits/`",
+  "outputs": [
+    "story/portraits/lyra_neutral.png",
+    "story/portraits/lyra_smile.png",
+    "story/portraits/lyra_laugh.png",
+    "story/portraits/lyra_biglaugh.png",
+    "story/portraits/lyra_concern.png",
+    "story/portraits/lyra_sorrow.png",
+    "story/portraits/lyra_annoyed.png",
+    "story/portraits/lyra_angry.png",
+    "story/portraits/lyra_shock.png",
+    "story/portraits/lyra_resolve.png"
+  ],
+  "dir": "story/packages/cast/ottilie/expressions"
+}

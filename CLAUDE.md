@@ -75,6 +75,10 @@ kept for reference and **no longer built**; don't add features there.
 ./story_prompt.py sheet <scene>  # scene file → ChatGPT package (prompt + refs to attach) in story/out/
 ./story_prompt.py slice <sheet.json> <img>  # cut the generated shot sheet into story/panels/
 ./story_prompt.py portraits      # refs sheets → story/portraits/<name>.png (dialogue-box portraits)
+./story_prompt.py expressions <Name>...  # THE EXPRESSION SHEET: a tool-drawn template of ten numbered
+                                 # head-and-shoulders slots (neutral smile laugh biglaugh concern sorrow
+                                 # annoyed angry shock resolve) → story/portraits/<name>_<id>.png,
+                                 # shipped as portrait_<name>_<id>.png; `ingest` cuts it
 ./story_prompt.py stats [--all]  # per chapter: scenes by type, panels, lines, optional scenes, art
 ./story_prompt.py names          # the {{TOKEN}} table, and every token used with no row in it
 ./story_prompt.py packages [--all]  # (re)build story/packages/ — the art tray, by chapter and map
@@ -381,6 +385,22 @@ tool complaints go in `story/notes/<agent>.md` and the orchestrator rules on the
   `story/portraits/<name>.png`. It reuses the same border detection as `slice`, needs exactly three
   panels on the sheet, and warns and skips otherwise. `fast_reload.sh` and `deploy.sh` run it before
   the export, so regenerating a reference sheet and hot reloading updates the in-game portrait.
+- **Expressions.** One portrait a character is not enough, so `./story_prompt.py expressions <Name>`
+  draws a template of **ten** numbered head-and-shoulders slots (2 rows of 5, flat mid-grey behind
+  each head) and `ingest` cuts it to `story/portraits/<name>_<id>.png`, shipped as
+  `portrait_<name>_<id>.png`. The ten ids and their slot order are fixed forever (`EXPRESSIONS` in
+  `story_prompt.py`, mirrored in `STYLE.md` "Expression sheet"): `neutral smile laugh biglaugh
+  concern sorrow annoyed angry shock resolve`. A dialogue line picks one with the tag in parentheses
+  right after the speaker — `- Ottilie (biglaugh) [2] {hope}: text` — and a tagged line may be
+  **textless** (`- Ottilie (biglaugh):`): a reaction beat, the portrait with an empty box. `export`
+  writes the id into a new `const char *expr;` at the END of `CsLine` (`""` when untagged) and
+  defines `CS_HAS_EXPR`; the game looks for `portrait_<name>_<expr>.png` and falls back to
+  `portrait_<name>.png`. An unknown id is an error, `Narrator` takes none, a missing sheet is only a
+  warning. Only cast members who **speak** get an `cast/<name>/expressions/` package. The cut warns
+  when a slot comes back flat or is the same drawing as another, and `--neutral-main` (off by
+  default) lets slot 1 replace the refsheet-derived main portrait.
+- **No weapons on a character sheet.** The `refsheet` and `expressions` blocks in `STYLE.md` say the
+  character carries and holds nothing — no weapon anywhere on the sheet, full-body panel included.
 - **Pages and sheet size.** A scene is 1-3 pages of 2-4 panels, at most 8 panels, with `---` in
   `## Panels` starting a new page (the game clears the screen, as Phantasy Star IV does). Aim for 6-8
   shots in a scene that matters. One sheet holds the whole scene: up to 4 panels use 1536x1024-class

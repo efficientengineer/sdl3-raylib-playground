@@ -16,7 +16,7 @@ Nothing here is edited by hand; rerun the command after any change to a scene fi
 Work down this page: the short path first, then everything else — reference sheets (every later
 prompt attaches them), walk sprites, the field art for each map, the scene shot sheets.
 
-Scenes come from `story/playlist.md` — a scene file no chapter list names gets no package; 7 scene(s) selected.
+Scenes come from `story/playlist.md` — a scene file no chapter list names gets no package; 6 scene(s) selected.
 
 ## 1. Tilesets — the tile field
 
@@ -59,42 +59,50 @@ unblock each other. A checked box is already cut; everything below this section 
       [`tilesets/valley/objects_3`](tilesets/valley/objects_3/prompt.md) · done · `ingest tilesets/valley/objects_3`
 - [x] **6.** the `objects_4` sheet of the `valley` tileset — 12 tile(s) into that set's atlas, which the map is built from  
       [`tilesets/valley/objects_4`](tilesets/valley/objects_4/prompt.md) · done · `ingest tilesets/valley/objects_4`
-- [x] **7.** Falke's reference sheet — the portrait, the walker and every panel come from it  
+- [ ] **7.** Distel's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/distel/refsheet`](cast/distel/refsheet/prompt.md) · to generate · `ingest cast/distel/refsheet`
+- [ ] **8.** Garbe's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/garbe/refsheet`](cast/garbe/refsheet/prompt.md) · to generate · `ingest cast/garbe/refsheet`
+- [x] **9.** Falke's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/falke/refsheet`](cast/falke/refsheet/prompt.md) · done · `ingest cast/falke/refsheet`
-- [x] **8.** Guildclerk's reference sheet — the portrait, the walker and every panel come from it  
-      [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) · done · `ingest cast/guildclerk/refsheet`
-- [x] **9.** Ottilie's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **10.** Ottilie's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) · done · `ingest cast/ottilie/refsheet`
-- [x] **10.** Hart's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **11.** Hart's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) · done · `ingest cast/hart/refsheet`
-- [x] **11.** Stolz's reference sheet — the portrait, the walker and every panel come from it  
+- [x] **12.** Guildclerk's reference sheet — the portrait, the walker and every panel come from it  
+      [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) · done · `ingest cast/guildclerk/refsheet`
+- [x] **13.** Stolz's reference sheet — the portrait, the walker and every panel come from it  
       [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) · done · `ingest cast/stolz/refsheet`
-- [x] **12.** Shrinewoman's reference sheet — the portrait, the walker and every panel come from it  
-      [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) · done · `ingest cast/shrinewoman/refsheet`
-- [ ] **13.** Guildclerk's walk sprite — the figure walking the map  
-      [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) · to generate · `ingest cast/guildclerk/walker`
-- [ ] **14.** Hart's walk sprite — the figure walking the map  
+- [ ] **14.** Falke's expression sheet — the ten dialogue-box faces, so a line can change the face without changing the character  
+      [`cast/falke/expressions`](cast/falke/expressions/prompt.md) · to generate · `ingest cast/falke/expressions`
+- [ ] **15.** Ottilie's expression sheet — the ten dialogue-box faces, so a line can change the face without changing the character  
+      [`cast/ottilie/expressions`](cast/ottilie/expressions/prompt.md) · to generate · `ingest cast/ottilie/expressions`
+- [ ] **16.** Hart's expression sheet — the ten dialogue-box faces, so a line can change the face without changing the character  
+      [`cast/hart/expressions`](cast/hart/expressions/prompt.md) · to generate · `ingest cast/hart/expressions`
+- [ ] **17.** Guildclerk's expression sheet — the ten dialogue-box faces, so a line can change the face without changing the character  
+      [`cast/guildclerk/expressions`](cast/guildclerk/expressions/prompt.md) · to generate · `ingest cast/guildclerk/expressions`
+- [ ] **18.** Stolz's expression sheet — the ten dialogue-box faces, so a line can change the face without changing the character  
+      [`cast/stolz/expressions`](cast/stolz/expressions/prompt.md) · to generate · `ingest cast/stolz/expressions`
+- [ ] **19.** Hart's walk sprite — the figure walking the map  
       [`cast/hart/walker`](cast/hart/walker/prompt.md) · to generate · `ingest cast/hart/walker`
-- [ ] **15.** Stolz's walk sprite — the figure walking the map  
+- [ ] **20.** Guildclerk's walk sprite — the figure walking the map  
+      [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) · to generate · `ingest cast/guildclerk/walker`
+- [ ] **21.** Stolz's walk sprite — the figure walking the map  
       [`cast/stolz/walker`](cast/stolz/walker/prompt.md) · to generate · `ingest cast/stolz/walker`
-- [ ] **16.** Shrinewoman's walk sprite — the figure walking the map  
-      [`cast/shrinewoman/walker`](cast/shrinewoman/walker/prompt.md) · to generate · `ingest cast/shrinewoman/walker`
-- [x] **17.** Falke's walk sprite — the figure walking the map  
+- [x] **22.** Falke's walk sprite — the figure walking the map  
       [`cast/falke/walker`](cast/falke/walker/prompt.md) · done · `ingest cast/falke/walker`
-- [x] **18.** Ottilie's walk sprite — the figure walking the map  
+- [x] **23.** Ottilie's walk sprite — the figure walking the map  
       [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) · done · `ingest cast/ottilie/walker`
-- [x] **19.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
+- [x] **24.** the top-down map `town` of `halm` — the whole place in one picture, which is what the player walks around in  
       [`ch01/halm/screens/town`](ch01/halm/screens/town/prompt.md) · done · `ingest ch01/halm/screens/town`
-- [x] **20.** the ground and walls of `halm`, sheet 1 of 2  
+- [x] **25.** the ground and walls of `halm`, sheet 1 of 2  
       [`ch01/halm/tiles`](ch01/halm/tiles/prompt.md) · done · `ingest ch01/halm/tiles`
-- [x] **21.** the ground and walls of `halm`, sheet 2 of 2  
+- [x] **26.** the ground and walls of `halm`, sheet 2 of 2  
       [`ch01/halm/tiles_2`](ch01/halm/tiles_2/prompt.md) · done · `ingest ch01/halm/tiles_2`
-- [x] **22.** everything standing in `halm`  
+- [x] **27.** everything standing in `halm`  
       [`ch01/halm/props`](ch01/halm/props/prompt.md) · done · `ingest ch01/halm/props`
-- [x] **23.** the front, wall and roof of every building in `halm`  
+- [x] **28.** the front, wall and roof of every building in `halm`  
       [`ch01/halm/buildings`](ch01/halm/buildings/prompt.md) · done · `ingest ch01/halm/buildings`
-- [x] **24.** the shot sheet for `0110_the_board` — the first scene the game plays  
-      [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) · done · `ingest ch01/halm/scenes/0110_the_board`
 
 Then `./story_prompt.py ingest` and `./fast_reload.sh`.
 
@@ -106,13 +114,32 @@ are all drawn from this one image.
 | character | folder | status | after downloading |
 | --- | --- | --- | --- |
 | Falke | [`cast/falke/refsheet`](cast/falke/refsheet/prompt.md) | done | `ingest cast/falke/refsheet` |
-| Guildclerk | [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) | done | `ingest cast/guildclerk/refsheet` |
 | Ottilie | [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) | done | `ingest cast/ottilie/refsheet` |
 | Hart | [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) | done | `ingest cast/hart/refsheet` |
+| Guildclerk | [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) | done | `ingest cast/guildclerk/refsheet` |
 | Stolz | [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) | done | `ingest cast/stolz/refsheet` |
-| Shrinewoman | [`cast/shrinewoman/refsheet`](cast/shrinewoman/refsheet/prompt.md) | done | `ingest cast/shrinewoman/refsheet` |
+| Distel | [`cast/distel/refsheet`](cast/distel/refsheet/prompt.md) | to generate | `ingest cast/distel/refsheet` |
+| Garbe | [`cast/garbe/refsheet`](cast/garbe/refsheet/prompt.md) | to generate | `ingest cast/garbe/refsheet` |
 
-## 4. Walk sprites
+## 4. Character expressions
+
+Ten head-and-shoulders faces a speaking character, on one template sheet: `neutral`, `smile`,
+`laugh`, `biglaugh`, `concern`, `sorrow`, `annoyed`, `angry`, `shock`, `resolve`. They cut to
+`story/portraits/<name>_<id>.png` and ship as `portrait_<name>_<id>.png`; a dialogue line picks
+one with `- Name (biglaugh): text`, and may be textless for a reaction beat. Blocked until the
+reference sheet exists, because the ten faces must be the same person. No weapons, nothing held.
+
+| who | folder | status | after downloading |
+| --- | --- | --- | --- |
+| Falke | [`cast/falke/expressions`](cast/falke/expressions/prompt.md) | to generate | `ingest cast/falke/expressions` |
+| Ottilie | [`cast/ottilie/expressions`](cast/ottilie/expressions/prompt.md) | to generate | `ingest cast/ottilie/expressions` |
+| Hart | [`cast/hart/expressions`](cast/hart/expressions/prompt.md) | to generate | `ingest cast/hart/expressions` |
+| Guildclerk | [`cast/guildclerk/expressions`](cast/guildclerk/expressions/prompt.md) | to generate | `ingest cast/guildclerk/expressions` |
+| Stolz | [`cast/stolz/expressions`](cast/stolz/expressions/prompt.md) | to generate | `ingest cast/stolz/expressions` |
+| Distel | `cast/distel/expressions` | needs the reference sheet first | rerun `packages` once the sheet is in |
+| Garbe | `cast/garbe/expressions` | needs the reference sheet first | rerun `packages` once the sheet is in |
+
+## 5. Walk sprites
 
 The 4x4 sheet the field renderer animates (rows S, W, E, N). A character's package is blocked
 until their reference sheet exists, because the walker must match it.
@@ -120,15 +147,16 @@ until their reference sheet exists, because the walker must match it.
 | who | folder | status | after downloading |
 | --- | --- | --- | --- |
 | Falke | [`cast/falke/walker`](cast/falke/walker/prompt.md) | done | `ingest cast/falke/walker` |
-| Guildclerk | [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) | to generate | `ingest cast/guildclerk/walker` |
 | Ottilie | [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) | done | `ingest cast/ottilie/walker` |
 | Hart | [`cast/hart/walker`](cast/hart/walker/prompt.md) | to generate | `ingest cast/hart/walker` |
+| Guildclerk | [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) | to generate | `ingest cast/guildclerk/walker` |
 | Stolz | [`cast/stolz/walker`](cast/stolz/walker/prompt.md) | to generate | `ingest cast/stolz/walker` |
-| Shrinewoman | [`cast/shrinewoman/walker`](cast/shrinewoman/walker/prompt.md) | to generate | `ingest cast/shrinewoman/walker` |
+| Distel | `cast/distel/walker` | needs the reference sheet first | rerun `packages` once the sheet is in |
+| Garbe | `cast/garbe/walker` | needs the reference sheet first | rerun `packages` once the sheet is in |
 | villager_a | [`cast/villager_a/walker`](cast/villager_a/walker/prompt.md) | done | `ingest cast/villager_a/walker` |
 | villager_b | [`cast/villager_b/walker`](cast/villager_b/walker/prompt.md) | done | `ingest cast/villager_b/walker` |
 
-## 5. Field art, by chapter and map
+## 6. Field art, by chapter and map
 
 A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,
 and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces
@@ -250,39 +278,33 @@ Shared tiles, drawn with another map so one id is never drawn twice: `grass` (wi
 
 Shared props, drawn with another map so one id is never drawn twice: `cart` (with `halm`), `sign` (with `halm`), `tree_a` (with `halm`), `tree_b` (with `halm`)
 
-## 6. Scene shot sheets, by chapter and map
+## 7. Scene shot sheets, by chapter and map
 
 One sheet per panel scene: all of its panels as separate white-bordered rectangles on black,
 cut apart into `story/panels/`. Talk and narration scenes need no art and are not listed.
-
-### ch01 — bridge
-
-| scene | folder | panels | status | after downloading |
-| --- | --- | --- | --- | --- |
-| `0150_the_road_west` | [`ch01/bridge/scenes/0150_the_road_west`](ch01/bridge/scenes/0150_the_road_west/prompt.md) | 6 | done | `ingest ch01/bridge/scenes/0150_the_road_west` |
-
-### ch01 — halm
-
-| scene | folder | panels | status | after downloading |
-| --- | --- | --- | --- | --- |
-| `0110_the_board` | [`ch01/halm/scenes/0110_the_board`](ch01/halm/scenes/0110_the_board/prompt.md) | 6 | done | `ingest ch01/halm/scenes/0110_the_board` |
 
 ### ch01 — hart_yard
 
 | scene | folder | panels | status | after downloading |
 | --- | --- | --- | --- | --- |
-| `0120_youre_not_ready` | [`ch01/hart_yard/scenes/0120_youre_not_ready`](ch01/hart_yard/scenes/0120_youre_not_ready/prompt.md) | 6 | done | `ingest ch01/hart_yard/scenes/0120_youre_not_ready` |
+| `0110_the_yard` | [`ch01/hart_yard/scenes/0110_the_yard`](ch01/hart_yard/scenes/0110_the_yard/prompt.md) | 7 | to generate | `ingest ch01/hart_yard/scenes/0110_the_yard` |
+| `0150_the_sword` | [`ch01/hart_yard/scenes/0150_the_sword`](ch01/hart_yard/scenes/0150_the_sword/prompt.md) | 8 | to generate | `ingest ch01/hart_yard/scenes/0150_the_sword` |
 
-### ch01 — stair_shrine
+### ch01 — high_pasture
 
 | scene | folder | panels | status | after downloading |
 | --- | --- | --- | --- | --- |
-| `0170_the_jar` | [`ch01/stair_shrine/scenes/0170_the_jar`](ch01/stair_shrine/scenes/0170_the_jar/prompt.md) | 5 | done | `ingest ch01/stair_shrine/scenes/0170_the_jar` |
+| `0160_the_herder` | [`ch01/high_pasture/scenes/0160_the_herder`](ch01/high_pasture/scenes/0160_the_herder/prompt.md) | 7 | to generate | `ingest ch01/high_pasture/scenes/0160_the_herder` |
+| `0180_what_was_on_it` | [`ch01/high_pasture/scenes/0180_what_was_on_it`](ch01/high_pasture/scenes/0180_what_was_on_it/prompt.md) | 7 | to generate | `ingest ch01/high_pasture/scenes/0180_what_was_on_it` |
 
 ## Kept, but no longer generated
 
 These folders left the playlist while holding an image you generated. Nothing deletes them;
 move the image somewhere safe and delete the folder by hand when you are done with it.
 
+- `cast/shrinewoman/refsheet`
+- `ch01/bridge/scenes/0150_the_road_west`
 - `ch01/halm/screens/square`
+- `ch01/hart_yard/scenes/0120_youre_not_ready`
+- `ch01/stair_shrine/scenes/0170_the_jar`
 - `tilesets/valley/terrain`

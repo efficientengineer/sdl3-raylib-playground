@@ -1,0 +1,19 @@
+{
+  "kind": "expressions",
+  "handle": "bron",
+  "title": "Falke \u2014 expression sheet",
+  "makes": "10 dialogue-box faces in `story/portraits/`",
+  "outputs": [
+    "story/portraits/bron_neutral.png",
+    "story/portraits/bron_smile.png",
+    "story/portraits/bron_laugh.png",
+    "story/portraits/bron_biglaugh.png",
+    "story/portraits/bron_concern.png",
+    "story/portraits/bron_sorrow.png",
+    "story/portraits/bron_annoyed.png",
+    "story/portraits/bron_angry.png",
+    "story/portraits/bron_shock.png",
+    "story/portraits/bron_resolve.png"
+  ],
+  "dir": "story/packages/cast/falke/expressions"
+}

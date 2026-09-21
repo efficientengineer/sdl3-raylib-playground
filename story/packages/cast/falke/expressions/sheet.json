@@ -1,0 +1,255 @@
+{
+  "template": "expressions_bron",
+  "kind": "expressions",
+  "canvas": [
+    1536,
+    1024
+  ],
+  "canvas_label": "landscape, 1536x1024",
+  "background": [
+    40,
+    40,
+    44
+  ],
+  "border": 3,
+  "out": null,
+  "slots": [
+    {
+      "n": 1,
+      "id": "bron_neutral",
+      "who": "bron",
+      "expr": "neutral",
+      "box": [
+        52,
+        90,
+        267,
+        400
+      ],
+      "inner": [
+        55,
+        93,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_neutral.png"
+    },
+    {
+      "n": 2,
+      "id": "bron_smile",
+      "who": "bron",
+      "expr": "smile",
+      "box": [
+        343,
+        90,
+        267,
+        400
+      ],
+      "inner": [
+        346,
+        93,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_smile.png"
+    },
+    {
+      "n": 3,
+      "id": "bron_laugh",
+      "who": "bron",
+      "expr": "laugh",
+      "box": [
+        634,
+        90,
+        267,
+        400
+      ],
+      "inner": [
+        637,
+        93,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_laugh.png"
+    },
+    {
+      "n": 4,
+      "id": "bron_biglaugh",
+      "who": "bron",
+      "expr": "biglaugh",
+      "box": [
+        925,
+        90,
+        267,
+        400
+      ],
+      "inner": [
+        928,
+        93,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_biglaugh.png"
+    },
+    {
+      "n": 5,
+      "id": "bron_concern",
+      "who": "bron",
+      "expr": "concern",
+      "box": [
+        1216,
+        90,
+        267,
+        400
+      ],
+      "inner": [
+        1219,
+        93,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_concern.png"
+    },
+    {
+      "n": 6,
+      "id": "bron_sorrow",
+      "who": "bron",
+      "expr": "sorrow",
+      "box": [
+        52,
+        534,
+        267,
+        400
+      ],
+      "inner": [
+        55,
+        537,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_sorrow.png"
+    },
+    {
+      "n": 7,
+      "id": "bron_annoyed",
+      "who": "bron",
+      "expr": "annoyed",
+      "box": [
+        343,
+        534,
+        267,
+        400
+      ],
+      "inner": [
+        346,
+        537,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_annoyed.png"
+    },
+    {
+      "n": 8,
+      "id": "bron_angry",
+      "who": "bron",
+      "expr": "angry",
+      "box": [
+        634,
+        534,
+        267,
+        400
+      ],
+      "inner": [
+        637,
+        537,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_angry.png"
+    },
+    {
+      "n": 9,
+      "id": "bron_shock",
+      "who": "bron",
+      "expr": "shock",
+      "box": [
+        925,
+        534,
+        267,
+        400
+      ],
+      "inner": [
+        928,
+        537,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_shock.png"
+    },
+    {
+      "n": 10,
+      "id": "bron_resolve",
+      "who": "bron",
+      "expr": "resolve",
+      "box": [
+        1216,
+        534,
+        267,
+        400
+      ],
+      "inner": [
+        1219,
+        537,
+        261,
+        394
+      ],
+      "target": [
+        192,
+        288
+      ],
+      "out": "story/portraits/bron_resolve.png"
+    }
+  ],
+  "prompt": "Create ONE image: the attached template with all 10 numbered slots filled in. Canvas: landscape, 1536x1024, the same size as the template.\n16-bit Sega Genesis era pixel art, early 1990s JRPG manga cutscene style.\n\nATTACHED REFERENCE IMAGES, in the order I attached them:\nImage 1: TEMPLATE. Redraw this exact image with every numbered slot filled in and everything else left untouched. It is the canvas, not a reference.\nImage 2: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.\nImage 3: CHARACTER reference for Falke. Every slot is this character: keep the face, hair, colours, collar and marks identical to the middle panel of this sheet. Use it for the design only \u2014 ignore its background, its three-panel layout and its neutral expression, which is only slot 1.\nImage 4: the game's COLOUR PALETTE, one material ramp a row: use only these colours.\n\nTEMPLATE RULES: Return the whole template at the same size and proportions as the image I attached. Every white slot border and every slot number stays exactly where it is, the same size and the same place, down to the pixel. Draw only inside the slots. Everything outside a slot is left as it is: the margins, the gutters between the slots, and the background behind the numbers. Nothing crosses a border, nothing leans into a neighbouring slot, nothing is added between the slots. No text, no labels, no captions, no arrows, no colour swatches, no signature.\n\nWHAT THIS IS: the dialogue-box faces for Falke. The game draws one of these beside the text box while Falke is speaking, so all ten have to read as the same person in the same shot with a different feeling.\n\nCHARACTER: Bron, a short, compact, sturdy boy of seventeen with a youthful clean-shaven face and an eager open expression, big spiky forest-green hair swept back under a plain white headband with long trailing ends, bright amber eyes, a cream long-sleeved shirt with the sleeves rolled to the elbow under a sleeveless quilted ochre training vest fastened with two toggles, a strip of white bandage wrapped round his right wrist, plain brown leather bracers, grey-green trousers, a brown belt with a small pouch, worn brown boots with turned-down tops.\n\nSHEET: An expression sheet: the same head-and-shoulders portrait of one character drawn ten times, once in each numbered slot, against the flat neutral mid-grey that already fills the slot. Every slot is the same shot: three-quarter view, head and the top of the shoulders only, the head the same size and in the same place in the frame, the same lighting, the same hair, the same collar and the same colors. Only the face changes: brows, eyes, mouth, and a small tilt of the head. No hands, no arms raised into frame, no weapons, no props, no objects, no scenery, no effects, no sweat drops or anger marks or cartoon symbols. The grey behind the head stays flat and untouched.\n\nTHE TEN SLOTS, in this order:\n  Slot 1 (neutral): calm and level, mouth closed, eyes open and steady, looking at the viewer.\n  Slot 2 (smile): a small warm closed-mouth smile, eyes softened, one brow slightly raised.\n  Slot 3 (laugh): laughing openly, mouth wide and grinning, eyes crinkled nearly shut, head tipped back a little.\n  Slot 4 (biglaugh): laughing extremely hard, mouth wide open, eyes squeezed shut, head thrown back, one shoulder up and a tear at the corner of one eye.\n  Slot 5 (concern): concerned, brows drawn together and up in the middle, mouth a small flat line, eyes searching slightly off to one side.\n  Slot 6 (sorrow): extreme sorrow, head lowered, brows up in the middle, eyes shut, mouth trembling open, tears running on both cheeks.\n  Slot 7 (annoyed): annoyed, one brow down and one up, eyes half lidded and turned aside, mouth pulled flat to one side.\n  Slot 8 (angry): furious, both brows hard down, eyes wide and fixed on the viewer, teeth bared, jaw set.\n  Slot 9 (shock): shocked, eyes wide with small pupils, brows high, mouth open, head pulled back.\n  Slot 10 (resolve): resolved, chin lifted, brows level and firm, eyes narrowed and fixed ahead, mouth closed and set.\n\nFRAMING, identical in every slot: three-quarter view facing slightly to the viewer's left, head and the top of the shoulders only, the top of the head a little below the top border and the chin around two thirds down the slot, the head the same size and in the same place in all ten. Each slot is 261x394 pixels here and is stored at 192x288, so keep the pixels large and the face readable at a glance: the feeling has to be clear from the brows and the mouth alone.\n\nNOTHING IS HELD AND NOTHING IS CARRIED: no hands, no arms raised into frame, no weapon, no sword, staff, bow or knife, no props, no objects, no cartoon symbols, no effect lines. Only the head and shoulders against the flat grey.\n\nCHARACTER DESIGN: 1990s Japanese anime and manga character design, like the cast of a 1993 sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes with simple highlights, small noses and pointed chins, big layered spiky hair with hard-edged shine bands, slim necks, clean readable silhouettes. Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes, headbands, sashes, work clothes and travelling clothes. Armour only when the character's description asks for it. Simple clean shapes and large flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones per color, no gradients.\n\nRENDERING: Low resolution 320x224 upscaled with nearest-neighbor, crisp visible pixels on a single consistent pixel grid, limited palette of about 32 colors, checkerboard dithering for skies, walls, and shadows only, never as noisy texture on skin, hair, or cloth. Thin 1-pixel outlines. Muted earthy base tones with saturated accents on clothing and hair.\n\nAVOID: western fantasy art, gritty realism, noisy texture, smooth gradients, blur, soft shading, painterly, 3D render, photorealistic, chibi, lens flare, glow effects, hands, arms, weapons, props, held objects, manga effect symbols, speed lines, background scenery, a different head size or angle between slots, a different outfit or hair between slots, full body, text, letters, labels, color swatches, watermark, signature, drawing outside a slot, moving or covering a slot number, painting over the grey background, changing the size of the image",
+  "slot_fill": [
+    128,
+    128,
+    132
+  ],
+  "who": "bron"
+}

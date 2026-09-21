@@ -87,6 +87,34 @@ so a handle is never a common word and never a word that appears in the setting 
   descriptions — that is what the handle is for, and it is why the alias exists at all. An alias may
   not be another character's handle or alias, and may not be `Narrator`.
 
+## Expression sheet (the dialogue-box faces)
+
+A character's reference sheet gives them one portrait: the calm, neutral one. The expression sheet
+gives them ten, in the same framing, so a dialogue line can change the face without changing the
+character. `./story_prompt.py expressions <Name>` draws the template (2 rows of 5 numbered slots on
+flat neutral mid-grey); ChatGPT fills it; `ingest` cuts it to `story/portraits/<name>_<id>.png`,
+which ships as `portrait_<name>_<id>.png`. A scene tags a line `- Ottilie (biglaugh): text`, and a
+line may be textless when it has an expression (`- Ottilie (biglaugh):`) — a reaction beat.
+
+The ids, their order, and the slot they sit in are fixed forever (the cut goes by slot number), and
+are mirrored in `EXPRESSIONS` at the top of `story_prompt.py`:
+
+| slot | id | the face |
+| --- | --- | --- |
+| 1 | `neutral` | calm and level |
+| 2 | `smile` | a small warm closed-mouth smile |
+| 3 | `laugh` | laughing openly |
+| 4 | `biglaugh` | laughing extremely hard, eyes squeezed shut, head thrown back |
+| 5 | `concern` | concerned, brows up in the middle |
+| 6 | `sorrow` | extreme sorrow, head lowered, tears |
+| 7 | `annoyed` | annoyed, half-lidded, mouth pulled to one side |
+| 8 | `angry` | furious, brows hard down |
+| 9 | `shock` | shocked, eyes wide, mouth open |
+| 10 | `resolve` | resolved, chin lifted, eyes fixed ahead |
+
+Only the face changes between slots: same head size, same position, same angle, same hair, collar
+and colours. **No hands, no props and no weapons** — in the expression sheet or the reference sheet.
+
 ## Review checklist (before accepting a generated sheet)
 
 `sheet` prints a per-scene version of this in the ChatGPT package, with a ready-made correction to
@@ -97,7 +125,8 @@ paste back. Whoever receives a generated sheet (the owner, or a model shown the 
 2. **Expression** — does each face show the stated emotion, or the reference sheet's neutral face?
 3. **Screen direction** — does the panel obey the scene's staging line?
 4. **Design** — hair, outfit, colors, and distinguishing marks match the reference.
-5. **Hands and props** — right number of fingers, weapon on the correct side, nothing invented.
+5. **Hands and props** — right number of fingers, nothing invented. A reference sheet or an
+   expression sheet carries **no weapon and nothing held at all**; reject it if one appears.
 6. **Sheet hygiene** — panels separate on pure black, right count and proportions, no text or labels.
 
 Reject on 1-3 even when the art is beautiful: a wrong eyeline breaks the scene. Ask ChatGPT to redraw
@@ -162,7 +191,8 @@ sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes
 with simple highlights, small noses and pointed chins, big layered spiky hair
 with hard-edged shine bands, slim necks, clean readable silhouettes.
 Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes,
-oversized shoulder plates, headbands, sashes. Simple clean shapes and large
+headbands, sashes, work clothes and travelling clothes. Armour only when the
+character's description asks for it. Simple clean shapes and large
 flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones
 per color, no gradients.
 ```
@@ -231,7 +261,11 @@ white-bordered panels in one row. Left panel: full-body standing pose, head to
 boots, three-quarter view. Middle panel: head-and-shoulders portrait in
 three-quarter view against a flat neutral mid-grey background. Right panel: the
 same head in strict profile. The character is identical in all three panels:
-same face, hair, outfit, and colors. No text, no labels, no color swatches.
+same face, hair, outfit, and colors. The character carries nothing and holds
+nothing: no weapon of any kind anywhere on the sheet, including the full-body
+panel, and no sword, knife, staff, spear, bow, axe, gun, shield, tool, bag or
+prop slung, sheathed or strapped to them. Hands empty and visible.
+No text, no labels, no color swatches.
 ```
 
 ### refsheet_avoid
@@ -241,8 +275,34 @@ western fantasy art, tabletop RPG illustration, gritty realism, realistic anatom
 smooth gradients, anti-aliasing, blur, soft shading, painterly, 3D render,
 photorealistic, modern anime, chibi, high resolution detail, lens flare,
 glow effects, mixed pixel sizes, different outfits or colors between panels,
-scenery, props not in the description, text, letters, labels, color swatches,
-watermark, signature
+scenery, props not in the description, weapons, swords, knives, staves, spears,
+bows, axes, guns, shields, sheaths, scabbards, holding or carrying anything,
+text, letters, labels, color swatches, watermark, signature
+```
+
+### expressions
+
+```
+An expression sheet: the same head-and-shoulders portrait of one character
+drawn ten times, once in each numbered slot, against the flat neutral mid-grey
+that already fills the slot. Every slot is the same shot: three-quarter view,
+head and the top of the shoulders only, the head the same size and in the same
+place in the frame, the same lighting, the same hair, the same collar and the
+same colors. Only the face changes: brows, eyes, mouth, and a small tilt of the
+head. No hands, no arms raised into frame, no weapons, no props, no objects, no
+scenery, no effects, no sweat drops or anger marks or cartoon symbols. The grey
+behind the head stays flat and untouched.
+```
+
+### expressions_avoid
+
+```
+western fantasy art, gritty realism, noisy texture, smooth gradients, blur,
+soft shading, painterly, 3D render, photorealistic, chibi, lens flare, glow
+effects, hands, arms, weapons, props, held objects, manga effect symbols,
+speed lines, background scenery, a different head size or angle between slots,
+a different outfit or hair between slots, full body, text, letters, labels,
+color swatches, watermark, signature
 ```
 
 ### negative

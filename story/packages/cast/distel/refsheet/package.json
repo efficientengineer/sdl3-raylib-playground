@@ -1,0 +1,12 @@
+{
+  "kind": "refsheet",
+  "handle": "distel",
+  "title": "Distel \u2014 reference sheet",
+  "ref": "story/refs/distel.png",
+  "makes": "`story/refs/distel.png` and the dialogue-box portrait cut out of it",
+  "outputs": [
+    "story/refs/distel.png",
+    "story/portraits/distel.png"
+  ],
+  "dir": "story/packages/cast/distel/refsheet"
+}

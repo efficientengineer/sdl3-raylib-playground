@@ -37,11 +37,11 @@
 - {{HERO}} [4]: All right. Come on, then.
 - {{HERO}} [5] {confront}: Come on!
 - {{HEALER}} [6] {wonder}: I had a very good thing ready to say and now I'm not saying it.
-- {{HERO}}: Say it!
-- {{HEALER}}: No. You'd have it framed.
+- {{HERO}} [6]: Say it!
+- {{HEALER}} [6]: No. You'd have it framed.
 - {{MENTOR}} [7] {hope}: Put the stick down. Both hands.
-- {{MENTOR}}: Made it the winter before last. It's been on its hook since.
+- {{MENTOR}} [7]: Made it the winter before last. It's been on its hook since.
 - {{HEALER}} [8] {sorrow}: It suits you.
-- {{MENTOR}}: Take it to the clerk. He'll write your name in the book.
-- {{HERO}}: I can sign. Tonight, I can sign.
-- {{HEALER}} {tense}: {{HERO}}. That's the evening bell.
+- {{MENTOR}} [8]: Take it to the clerk. He'll write your name in the book.
+- {{HERO}} [8]: I can sign. Tonight, I can sign.
+- {{HEALER}} [8] {tense}: {{HERO}}. That's the evening bell.

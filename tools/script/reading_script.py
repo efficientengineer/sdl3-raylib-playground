@@ -26,7 +26,8 @@ def scene_block(path):
         if not m: continue
         who, expr, tags, text = m.group(1), m.group(2), m.group(3), m.group(4)
         t = re.search(r"\[(\d+)\]", tags or "")
-        n = int(t.group(1)) if t else next((k for k in sorted(panels) if k not in seen), None) if panels and not seen else None
+        # the game's rule (story_prompt.py reveal_plan): the [n] tag, else the next unseen panel
+        n = int(t.group(1)) if t else next((k for k in sorted(panels) if k not in seen), None)
         if n and n in panels and n not in seen:
             if page_of[n] != cur_page: out.append("> — *the page clears* —\n"); cur_page = page_of[n]
             out.append(f"> 🖼 *{sub(panels[n][1])}*\n"); seen.add(n)
