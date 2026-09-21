@@ -242,6 +242,21 @@ learns it from the world (her house, a townsperson, a passing reference between 
 Also pending for the same pass: the ten fixes in `story/notes/cold-read-ch01-draft2.md` (owner's notes
 win on any conflict).
 
+## Art direction notes (owner, 2026-09-21) — apply to characters.md AFTER the writer's run ends
+
+"I don't really care for the look he has now, seems too dragon warrior monster and too barbarian. Maybe
+he should have green hair? Also no weapons in the portraits. Also, I think we need to have multiple
+portraits for each character's dialogue boxes covering an array of emotions, laughing, laughing
+extremely hard, concern, extreme sorrow, annoyance, etc."
+→ Falke redesign (proposed look, owner testing in ChatGPT): seventeen, short, compact; spiky forest-green
+hair, white headband; amber eyes; cream shirt with rolled sleeves under a sleeveless quilted ochre
+training vest; bandaged right wrist; plain leather bracers; grey-green trousers; brown belt with a
+pouch; worn brown boots; NO armour, NO weapons. → Reference sheets and portraits never show weapons
+(all characters). → EXPRESSION SHEETS: a second sheet per speaking character, ten head-and-shoulders
+portraits (neutral, smile, laugh, big laugh, concern, deep sorrow, annoyed, angry, shocked, determined);
+needs a tool command (tool-drawn numbered template + cutter → portrait_<name>_<expr>.png), a per-line
+expression tag in scene files, and engine support with fallback to neutral. QUEUED, not started.
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
