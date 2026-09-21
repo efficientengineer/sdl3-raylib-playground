@@ -118,6 +118,16 @@ last dummy cannot be beaten by attacking, only by parrying its swing and strikin
 combat system's core lesson, learned by player and Falke together; Ottilie's calls were the hint all
 along; pays off in the first real fight with the road creature).
 
+## Chapter one's JOB is open again (owner, 2026-09-21)
+
+"I still don't care much for the water delivery quest. It doesn't feel very interesting or wonderful."
+Revision pass ON HOLD until this is settled. Keep: Hart's post, no sword no signature, one job sheet
+left, the road that killed Rabe. Replace: what the job sheet says. Orchestrator's three directions
+(owner has not chosen): A — something came down the Stair in the night, the whole town saw it, the job
+is to go and see; B — a hunt for a creature nobody has a name for, the trail leads to the Stair;
+C — the carters' convoy is a week overdue, find them (carts standing, oxen fine, no people). Asked the
+owner what "wonderful" means to them here and for a first job they loved.
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
