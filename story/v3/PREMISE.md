@@ -42,15 +42,14 @@ belonged to somebody, killed to save her, and he is not proud of it.
 
 ## {{HEALER}} — healer, twenty-three
 
-Tall, pale-gold hair, a gold sun medallion, a mace she is better with than she admits. She lives in
-the house next door to {{MENTOR}}'s and has lived in it on her own since she was nine, when a fever
-took her mother and her father in one winter. She tried to close it herself and was not strong
-enough; {{TOWN_HEALER}}, the healer of {{HOME_TOWN}}, saw what a nine-year-old had managed and came
-and got her. {{TOWN_HEALER}}, the healer of {{HOME_TOWN}}, came and got her. She has been fine ever since — the
+Tall, pale-gold hair, a gold sun medallion, and a mace she is better with than she admits. She lives in
+the house next door to {{MENTOR}}'s and has lived in it on her own since she was seven, when a fever
+took her mother and her father in one winter. {{TOWN_HEALER}}, the healer of {{HOME_TOWN}}, came and
+got her and has taught her since. She has been fine ever since — the
 older cool neighbour, six years ahead of {{HERO}}, relaxed, funny, warm, never formal, and the first
 person who ever told him to his face that he would be good.
 
-**She is good at her work today** (owner, 2026-09-21). The child who could not save her parents is
+**She is good at her work today** (owner, 2026-09-21). The winter she lost her parents is
 backstory and nothing else: it says why she became a healer and it is said once, lightly, by somebody
 else. It is not a limit she carries around. She closes a wrist in a moment while teasing the patient
 and thinks nothing of it, and magic in this valley does light work for everybody, not just for her.
@@ -59,7 +58,8 @@ work outside the valley, and {{HEALER}} has never been further than the bridge �
 not got round to, which is why walking up the hill with {{HERO}} suits her.
 
 **Wants:** people she chooses to be her family. She never says it. It is in the behaviour: she is
-always already there, she sits on the wall between the houses instead of knocking, she eats at
+always already there, she sits on the wall between the houses instead of knocking, she is at the
+table when {{MENTOR}} says "eat here tomorrow as well" and changes the subject inside four words, she eats at
 {{MENTOR}}'s table most nights, she has {{HERO}}'s bandages rolled before he knows he is going
 anywhere, when he finally asks her to come her yes is instant and she covers it with a joke, and at
 the end of chapter one she takes a bereaved fourteen-year-old along without asking anyone, including

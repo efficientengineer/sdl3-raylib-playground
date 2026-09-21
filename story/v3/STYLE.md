@@ -79,7 +79,20 @@ Rule 14 is the owner's too, and rule 0 and rule 14 are the two that outrank ever
     **Understanding beats brevity** (owner, 2026-09-20): *"We want to maximize for understanding, so
     don't take any shortcuts when talking about things."* When a clip is too dense the fix is **more
     short lines, never denser ones** — six two-word taps beat one packed sentence, and rule 6's
-    "shorter" means shorter *lines*, not fewer of them. Name an object in full every time it is said:
+    "shorter" means shorter *lines*, not fewer of them.
+    **And understanding is bought with play, not with boxes** (owner, 2026-09-21, on draft two:
+    *"there's too much text and exposition… it's a bit much"*). More short lines is how a thing that
+    must be said is said; it is not a licence to say it. A clip is **ten to fourteen boxes**. Before a
+    line is written, ask whether the player could be shown it, walked through it, or made to do it
+    instead — and if the answer is yes, that is the line's answer. **Never write a line that tells the
+    player what they just saw or just did**: no character narrates a fight the player fought, no
+    character explains a machine the player is fighting, and no examine box ends with a sentence
+    interpreting the box's own first sentence. **No character recites a set of rules as a list** —
+    state the one rule that stops the hero, let the rest fall out of somebody arguing or gloating, and
+    show the rest (the bell ringing *is* the board closing). Prefer a look, an action or a silence in
+    an acting line to a sentence of dialogue. A character may never coach the player: hints are the
+    designer's, carried by the world, and a companion who calls the answer takes the discovery away
+    from the person holding the phone. Name an object in full every time it is said:
     it is a **job sheet**, not "a sheet"; it is the **guild book**, not "the book". Let the person who
     does not know ask — the hero's "Out to where?" and "What for?" are lines, and they are the best
     lines in the chapter. A rule the player has been told is not a rule the player has seen: state it

@@ -8,7 +8,7 @@
 - dialogue_box: no
 
 ## Beat
-{{HERO}} and {{HEALER}} have followed a line of sleeping animals up the hill to the place the job sheet describes, where the tracks stop in open grass. There is a shape crouched over a sleeping ewe in the dark and {{HERO}} has his sword up before he can think, and {{HEALER}} gets in front of him. Distel is fourteen, a head shorter than {{HEALER}}, and has never spoken to a human being in her life; she does not greet them, does not explain herself, and tells {{HERO}} to move his foot off her lead. Her people herd at night up above the trees and everyone in the valley has heard of them and no one in {{HOME_TOWN}} has ever seen one. The thing taking the sheep is her own guard animal, raised from a pup, which ran and stopped knowing her, and she has come down the mountain alone to get him back. She does not want him killed.
+{{HERO}} and {{HEALER}} have followed a line of sleeping animals up the hill to the place where the tracks stop in open grass, and the player has read every one of those sleepers themself. There is a shape crouched over a sleeping ewe in the dark and {{HERO}} has his sword up before he can think, and {{HEALER}} gets in front of him. Distel is fourteen, a head shorter than {{HEALER}}, and has never spoken to a human being in her life; she does not greet them, does not explain herself, and tells {{HERO}} to move his foot off her lead. Her people herd at night up above the trees and everyone in the valley has heard of them and no one in {{HOME_TOWN}} has ever seen one. The thing taking the sheep is her own guard animal, raised from a pup, which ran in the spring and stopped knowing her — he has not been eating them, he has been bedding them down where he thinks they are safe, which is the job he was raised to do and cannot stop doing. She does not want him killed.
 
 ## Panels
 1. establishing_tall | a black hillside at night under heavy stars, a broken stone wall running up it, pale sheep lying asleep in the grass in ones and twos, one small lamp burning low on the ground
@@ -31,31 +31,18 @@
    - {{HEALER}}: eyes down on Distel, head tilted, one hand out low and open
 
 ## Dialogue
-- {{HERO}} [1] {dread}: That's another one asleep. Nine sheep, and every one of them is breathing.
-- {{HEALER}} [2]: {{HERO}}. Something's kneeling over that ewe.
+- {{HEALER}} [1] {dread}: I've been up here in daylight a hundred times. It isn't the same hill.
 - {{HERO}} [3] {tense}: Get away from her! Get back!
 - Distel [4]: Don't shout. You'll wake her. She's had a bad night.
-- {{HERO}}: {{HEALER}}, what is it? What am I looking at?
 - {{HEALER}}: She's a girl. {{HERO}}, she's a girl — put the sword down.
 - {{HERO}} [5]: What are you?
 - Distel: {{HERDER_PEOPLE}}. You'd say night herder.
-- {{HERO}}: A night herder. Like in the carters' song?
-- Distel: I don't know your songs. We keep flocks above the trees. We work in the dark.
 - {{HEALER}} [6] {wonder}: I've heard of your people all my life. No one here has ever seen one.
 - Distel: Now you have. Move your foot. You're standing on my lead.
-- {{HERO}}: Did you put these sheep to sleep?
-- Distel: No. {{BEAST_NAME}} did.
-- {{HERO}}: Who is {{BEAST_NAME}}?
-- Distel: My {{GUARD_BEAST}}. I raised him from a pup.
+- Distel: {{BEAST_NAME}} put them down. My {{GUARD_BEAST}} — I raised him from a pup.
 - {{HEALER}}: What is a {{GUARD_BEAST}}?
-- Distel: He walks a flock together and puts it to sleep, so it's safe until morning.
-- {{HERO}} [7] {confront}: Then he's the monster on my job sheet. He's been taking her sheep for weeks.
-- Distel: He takes any animal he finds. There's no one telling him what to do now.
-- {{HEALER}}: Where is the person who tells him what to do?
-- Distel: Standing on my lead. He ran, and he stopped knowing me.
-- {{HERO}}: I signed a job sheet that says monster. I might have to kill him.
-- Distel: No. You hold him still and I'll calm him. That's the whole plan.
-- {{HERO}}: And if he doesn't calm?
-- Distel: Then I'll think of something else. Keep your voice down. She's sleeping.
+- Distel: He beds a flock down where he thinks it's safe. He ran in the spring and stopped knowing me.
+- {{HERO}} [7] {confront}: He's the monster on my job sheet. I signed for him.
+- Distel: Then hold him still and I'll calm him. Quietly — she's sleeping.
 - {{HERO}}: That's a sheep!
 - Distel {sorrow}: She has a name.

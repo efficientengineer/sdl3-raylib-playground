@@ -11,7 +11,7 @@ Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 | Token | Current name | What it is |
 |---|---|---|
 | `{{HERO}}` | Falke | Hunter's apprentice, seventeen. Loses to his teacher's last training machine until he stops swinging at it. Given his first sword by his teacher, which is what lets him sign for a job. |
-| `{{HEALER}}` | Ottilie | Apprentice healer, twenty-three. Lives next door to {{MENTOR}}, alone since she was nine. Wants people she chooses to be family. |
+| `{{HEALER}}` | Ottilie | Apprentice healer, twenty-three. Lives next door to {{MENTOR}}, alone since she was seven. Wants people she chooses to be family. |
 | `{{FATHER}}` | Rabe | {{HERO}}'s father. Hunter, carried the water out with {{MENTOR}} for twenty years, died on that road eleven years ago. Never appears on screen. |
 | `{{SCHOLAR}}` | Frage | One of eight people alive who read any of the ancients' language, and the worst of them. Joins chapter two. |
 | `{{THIEF}}` | Elster | Thief, small, loud. Sends money home to a sister a caretaker keeps alive. Joins chapter two. |
@@ -20,7 +20,7 @@ Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 | `{{VILLAIN}}` | Durst | The young lord in the west. Bought a caretaker, had the {{SECOND_MOON}} moved, and is walking to {{THE_DOOR}}. |
 | `{{VILLAGER_1}}` | Bleibe | Woman by the square in {{HOME_TOWN}}. Her sister went west; she stayed. Minor. |
 | `{{VILLAGER_2}}` | Wagen | Kept the carters' horses in {{HOME_TOWN}} and has no work now the convoy is gone. Minor. |
-| `{{TOWN_HEALER}}` | Linde | The healer of {{HOME_TOWN}}, sixty. Took {{HEALER}} in at nine and has taught her since; decides when she gets full standing. |
+| `{{TOWN_HEALER}}` | Linde | The healer of {{HOME_TOWN}}, sixty. Took {{HEALER}} in at seven and has taught her since; decides when she gets full standing. |
 | `{{HERDER}}` | Distel | The young night herder, fourteen. Raised {{BEAST_NAME}} from a pup and came down the mountain after him alone. Joins the party at the end of chapter one. |
 | `{{HERDER_PEOPLE}}` | Mohn | One of the night herding people of the high country: small, large-eyed, awake at night. Known to the world; never seen in {{HOME_TOWN}} until now. |
 | `{{HERDER_PEOPLE_PL}}` | Mohnen | Plural of `{{HERDER_PEOPLE}}`. |

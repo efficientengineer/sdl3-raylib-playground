@@ -9,7 +9,7 @@ twenty years of talking to her, the moon that moved, the carters walking west, {
 receipts — went with the draft (BRAINSTORM, 2026-09-21: "no sunk cost"). None of them was ever on
 screen, so by D23 none of them was canon. They are not owed.
 
-## Chapter one, *The Last Job Sheet* (second draft — not yet approved, so these are provisional)
+## Chapter one, *The Last Job Sheet* (third draft, 2026-09-21 — not yet approved, so these are provisional)
 
 **The big one, and the reason the party walks out of the valley:**
 
@@ -24,16 +24,21 @@ screen, so by D23 none of them was canon. They are not owed.
 - Why have the {{HERDER_PEOPLE_PL}} never come to {{HOME_TOWN}}, when towns up the valley trade with
   them twice a year? Two people say so out loud on day one and neither of them knows.
 - Why is {{HERDER}} down here alone at fourteen, and where is the rest of her family?
-- Magic in this valley does light work and no more: {{HEALER}} closes a wrist in a moment and thinks
-  nothing of it, and {{HERDER}}'s gift puts an animal to sleep. **Why does it stop there?** The
+- Magic in this valley does light work and no more: a woman in the road warms a lamp wick alight with
+  two fingers as a chore, {{HEALER}} closes a wrist in a moment and thinks nothing of it, and
+  {{HERDER}}'s gift puts an animal to sleep. **Why does it stop there?** The
   chapter never asks the question out loud; it only ever shows the ceiling. Leave it unanswered until
   the player asks it.
 - {{MENTOR}} says tracks do not stop and somebody miscounted sheep. He is wrong, and he has not been
   told yet.
-- {{HERO}} owes {{RIVAL}} four coin for bread, and has now been paid exactly four coin.
+- {{HERO}} owes {{RIVAL}} three coin for bread, and has been paid five for the job.
 - {{TOWN_HEALER}} gives {{HEALER}} full standing after a season's work outside the valley. {{HEALER}}
   is now doing one, and has not told her.
 - {{HEALER}} took {{HERDER}} along without asking anybody, including {{HERDER}}. Nothing on screen
   says why she wants people around her; the player has only watched her do it.
+- {{HEALER}}'s house has one chair at the table and two coats still on the hook by the door. The
+  player walks past the open door; no one in the chapter ever mentions either. **Whose coats?**
+  ({{HERO}} has always known her parents died — it is the player who is finding out, and the chapter
+  does not stop to explain it.)
 - {{HERO}} killed something that belonged to somebody, to save them. He has said sorry once and
   {{HERDER}} has not said it was all right.

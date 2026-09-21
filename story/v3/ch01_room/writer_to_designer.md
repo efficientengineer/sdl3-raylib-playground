@@ -5,72 +5,74 @@ Nothing here is a decision about what the player DOES — only about what is sai
 
 ---
 
-## 1. Your four questions, answered
+# DRAFT THREE (2026-09-21) — the revision pass
 
-1. **The clerk has a handle already.** `## Guildclerk` in `characters.md`, with `- alias: Clerk`.
-   Per `STYLE.md` a role-only speaker gets no token, so write him as `CLERK` in your files and
-   `Clerk:` as a speaker label in a scene. **Do not add `{{CLERK}}`.**
-2. **{{SHEPHERD}} is on screen twice, and your design is better than mine was.** She is a market NPC
-   on day one (`halm.shepherd_market`, `halm.shepherd_market_2`) saying the job exists and that the
-   old hunters laughed at it — so the player hears about the job before they can take it, which makes
-   the sheet on day two land — and then in person after the boss, to pay. She is **not** at the board.
-3. **Shown, and not even shown as a limit any more.** The owner's correction landed while I was
-   writing: {{HEALER}}'s "wasn't strong enough" is a fact about a nine-year-old and has no bearing on
-   her now. She is quick and reliable, she closes {{HERO}}'s wrist in a moment while teasing him, and
-   she does not sit down afterwards. `high_pasture.ottilie_limit` is gone; the line in that slot is
-   now `high_pasture.ottilie_ready`, which is her being unbothered and still teasing.
-4. **The herder is {{HERDER}} = Distel.** Thistle: small, prickly, a plant word, and one word a
-   player can say. She is **a girl, fourteen**, and the game says "she" from her second line, because
-   the new-player rule makes an ambiguous pronoun expensive and the player has to be able to hold her.
+Owner's notes on draft two, verbatim: *"too much text and exposition… I don't like that Ottilie tells
+Falke what to do, it's not her domain. She just thinks it's funny he's getting whomped. Also, why
+wouldn't Falke know her family died?"* Plus the ten fixes in `story/notes/cold-read-ch01-draft2.md`,
+owner winning any conflict.
 
-## 2. Your assumptions — all eight accepted
+## What changed on my side
 
-Including 2 (the {{GRAIN_CREATURE_PL}} stay; `halm.grainwife` sends the player in after them) and 5
-(the run cannot be failed permanently). **The line you asked me to write for 5 is
-`halm.clerk_signing_late`:** *"The bell has stopped and the shutter is halfway down. Put your hand on
-it and I will call that the last ring."* The on-time version is `halm.clerk_signing`. The clerk is
-covering for him on purpose and never says so.
+**162 dialogue boxes → 86.** Per scene: 0110 22→14, 0130 28→14, 0140 31→14, 0150 25→14, 0160 28→15,
+0180 28→15. **Field text 80 ids → 66** (52 of them chapter-one ids; the rest are the `west_road` and
+`practice_posts` lines your maps still trigger — see below).
 
-## 3. Clip slots: conformed exactly
+1. **Nobody coaches, and nobody narrates.** Every line where Ottilie called a swing, named the side,
+   told him to stop swinging, or described the parry after it landed is gone — from the scenes and
+   from `hart_yard.day2_*`. So are Falke's "There's a click first" and her "He turned it aside and
+   then he hit it". The realisation is silent: the acting lines carry it (`0150` panels 3, 4, 5) and
+   the beat line says so outright, which you have quoted back at me.
+2. **Ottilie on the wall.** She keeps score, rates the falls, has an apple, and has no idea how the
+   swing is beaten — that is now in `characters.md` as a fact about her, so no future draft can quietly
+   make her the hint system again. Her warmth moved *into* the scenes (C3's "Eat here tomorrow as
+   well. You've eaten alone enough." / "I'll be here.") instead of living in optional boxes.
+3. **Falke has always known about her parents.** No one tells him, on screen or off. The player finds
+   it in `halm.ottilie_house` (one chair, two coats on the hook), hears it in passing from
+   {{TOWN_HEALER}} talking to somebody who is not him, and feels it at the table when {{MENTOR}} says
+   the warm thing in seven words. Nothing is explained and nothing is heavy.
+4. **The Counter opens on "No sword, no signature."** The recited manual is gone; dawn and the last
+   ring come out of {{RIVAL}} gloating, which is also where "don't be up a hill at supper time"
+   plants day two. Falke sees him first now.
+5. **The sword gets its breath** — your staging note made it free: two lines of nothing being said, a
+   held panel of the sword in his two hands, Ottilie's one line that isn't a joke ("It suits you"),
+   and the bell after.
+6. **Numbers as you set them:** nine is the ring only, flock eleven, job five coin, {{RIVAL}} lends
+   three, Ottilie orphaned at seven, no "forty-one", three machines named not numbered. Updated in
+   `NAMES.md`, `PREMISE.md`, `THREADS.md`, `characters.md`.
+7. **Klee before he dies:** one line, "I carried him under my coat when he was a pup."
+8. **Taken vs kept safe:** one line, "He beds a flock down where he thinks it's safe. He ran in the
+   spring and stopped knowing me."
 
-Six scenes, your names, all six passing `check --all`. Nothing I needed was missing a slot, so I have
-not asked for a seventh clip. The two things I would otherwise have made clips are in your field:
+## Your list, taken whole
 
-- **The board** is `halm.board_sheets` then `halm.job_sheet` + `halm.job_sheet_2` — the only place in
-  the chapter the job is written down.
-- **The boss turn** is the two exchanges you staged: `high_pasture.boss_break` / `boss_break_2`
-  (Distel calls Klee and it works for a moment) and `high_pasture.boss_turn` / `boss_turn_2`
-  (he doesn't know her, and {{HEALER}} tells the player what to do). Thank you for freezing control
-  and keeping the boss UI up — that is exactly why I wanted it played rather than reported.
+All ten mandatory ids written and marked **MANDATORY** in `text.md`; the carter's saying merged into
+`halm.lamp_charm_2`; three machines renamed to `machine_post` / `machine_arm` / `machine_swing`;
+`machine_swing` is one sentence and I have written "one sentence forever" beside it; the sleeper
+lines lost their interpreting second sentences; five townspeople down to three pairs; your deletions
+applied.
 
-## 4. Everything in §2 of your file is written
+**Two exceptions, both forced by `check --all`:**
 
-All ids in `story/field/text.md`, `check --all` clean. Differences from your list, all small:
+- `hart_yard.practice_posts` — `hart_yard.tmap` still triggers it, so deleting it is an error. It is
+  back as one short line about the row as a whole. Delete the trigger and I will delete the line.
+- `west_road.culvert` / `west_road.west_end` — same, and you have already agreed to keep them.
 
-- `halm.npc_1..5` → I kept the four ids the existing `halm.tmap` already triggers
-  (`halm.gate_watch`, `halm.marta`, `halm.ostler`, `halm.grainwife`) so your maps keep validating, and
-  added `halm.npc_2`, `halm.npc_5`. **Each has a `_after` twin** for the bell run, as you asked.
-- `hart_yard.machine_1..4` written, plus `hart_yard.practice_posts` (the row as a whole), which the
-  existing `hart_yard.tmap` triggers.
-- `hart_yard.supper_1..3`, not 1..4 — three boxes get the player to the table and C3 is the rest.
-- `high_pasture.sleeper_1..4` each say one thing more than the last: asleep → they all face uphill →
-  it took a dog as well → nine of them lying inside one flattened circle, so they were **gathered**.
-- `high_pasture.tracks_stop` is the line I want the player to quote: *"Four heavy tracks in the mud,
-  then two, then flat grass for a hundred paces. Whatever left here stopped putting its feet down."*
-- `west_road.culvert` and `west_road.west_end` are rewritten rather than deleted, so the existing
-  `west_road.tmap` validates. Chapter one does not play that map.
+## Two things I did not cut, and why
 
-## 5. Two notes on your side of the line
+- **`0160` and `0180` are fifteen boxes, not fourteen.** 0160 introduces a people, a person and the
+  boss in the dark; 0180 is the kill, the clue, the payment and the party forming. Every further cut
+  I tried took out something the player needs (what a drover is) or something the cold reader and the
+  owner both liked ("She has a name", "I'm going to cry soon. Keep walking.").
+- **Ottilie asks "What is a {{GUARD_BEAST}}?"** It reads like exposition and it is not: it is the new
+  player rule, it is the one moment a human admits they do not know something about the Mohnen, and
+  the cold reader called it out as correct.
 
-- **"You hit everything as hard as you can" is now Hart's line at supper**, straight after "It isn't
-  about hitting it" — so the effort system is stated in words on day one and played on day two.
-  Nothing else in 0150 changed; the forty-one losses and "my arms are gone" were already the system.
-- **{{MACHINE}} does not need a token.** "Machine" is a common word and {{MENTOR}} calls them
-  machines; `NAMES.md` rule is that role-only and common words stay plain English. The player's one
-  plain word is **machine**, used everywhere in the scenes and the field lines.
+## Assumptions I logged
 
-## 6. Dropped rows
-
-I have **not** deleted the old creature and loot rows you listed ({{ROAD_CREATURE}} and the rest).
-They cost nothing, `names` reports them as unused, and D23 says nothing is canon until it is on
-screen — so they are a menu for chapter two, not debt. Say the word and they go.
+- Falke's "I hit it a dozen times" is the only count he gives; if your session design makes a dozen
+  wrong, tell me the number and it is a one-word edit.
+- {{RIVAL}} carries both board rules in one breath. If you would rather the clerk kept the dawn rule,
+  say so — it is one line moving one speaker.
+- `halm.lamp_charm` fires as two boxes at one stop. If your trigger wants them separate, they read
+  fine apart.
