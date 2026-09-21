@@ -169,6 +169,12 @@ day on Halm's low pasture with their flock and guard beast; the sheep were swept
 Something drove them off the high ground; we don't need to know what yet. Fight the guard beast in the
 dark (parry), then someone small steps between.
 
+**Owner's refinement:** "Maybe we are aware of their existence with A, it just hasn't happened yet for
+this town." SETTLED for A: the night herders are known to the world (travellers' talk, towns up the
+valley deal with them, sayings) but have never come to Halm — no yearly market visit. The hunt ends in
+Halm's first meeting with them: a first for Falke and the town, not for the world. Open question the
+chapter leaves: why here, why now.
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
