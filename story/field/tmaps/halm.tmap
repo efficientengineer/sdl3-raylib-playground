@@ -68,23 +68,23 @@ l gate_post
 .....................ddddddddddd................
 .....................ddddddddddd.......ccccc.cc.
 ....m.mmmmm.m........ddd..............ccccccccc.
-....mmmmmmmmmm.......ddd..............ccccccccc.
-....mmmmmmmmmm.......ddd...............ccccccc..
-....mmmmmmmmmm.....ppppppppp..........ccccccccc.
+....mmmmmmmmmm.......ddd.ppp..pp......ccccccccc.
+....mmmmmmmmmm.......dddpppp..pp.......ccccccc..
+....mmmmmmmmmm.....ppppppppp..pp......ccccccccc.
 .....mmmmmmmm.....ppppppppppp.........ccccccccc.
 ....mmmmmmmmmm...ppppppppppppp........c.cccc.cc.
 ....m.mmmm.mmm..pppppppppppppp..................
 ................ppppppppppppppp.................
-dddddddddddddddpppppppppppppppp.................
-dddddddddddddddppppppppppppppp..................
-ddddddddddddddddpppppppppppppp..................
+....dddddddddddpppppppppppppppp.................
+....dddddddddddppppppppppppppp..................
+....ddddddddddddpppppppppppppp..................
 ................pppppppppppppdddddddddd.........
-.................ppppppppppp.dddddddddd.........
-..................ppppppppp..dddddddddd.........
-....................pppppp..........ddd.........
-....................ddd.............ddd.........
-....................ddd.............ddd.........
-....................ddd............gddd.ggggg...
+.................ppppppppppppdddddddddd.........
+..................ppppppppp.pdddddddddd.........
+....................pppppp..p.......ddd.........
+....................ddd.....p.......ddd.........
+....................ddd.....p..pppppppppddpppp..
+....................ddd........dpp.gddd.ggggg...
 ....................ddd.............dddgggggg...
 ....................dddddddddddddddgdddggggg....
 ....................dddddddddddddddgggggggggg...
@@ -105,53 +105,150 @@ ddddddddddddddddpppppppppppppp..................
 .................................T+......j......
 .................................++.............
 .................t+..............++.s...........
-....A++.......F..++......H++....................
-....+++.......F..++......+++....................
-....+++..C+...F....u.....+++....................
+....A++.......F..++.............................
+....+++.......F..++.............................
+....+++..C+...F....u.........h..................
 .........++...F................Q+++++++.........
 ..............F................++++++++.........
-..............F.........T+.....++++++++hhhhhhhh.
-...jffffffffffn......W+.++.....++++++++.........
-.....................++.++.....++++++++.M+++....
-...............................++++++++.++++....
-..............................e......r..++++....
-............H++s.V+.....................++++.t+.
+..............F.........T+.....++++++++hhhhhhhhh
+h..jffffffffffn......W+.++.....++++++++.........
+h....................++.++.....++++++++.M+++....
+hh.............................++++++++.++++....
+h.............................e......r..++++....
+h...........H++s.V+.....................++++.t+.
 ..T+..U++...+++..++..........................++.
 ..++..+++...+++..............................++.
 ..++..+++.......................................
 O+.........r...t+............T+...............o.
-++.O+..........++............++...xwwwww..wwwx..
+++.O+..........++............++.................
 ++.++.....J++..++............++...N.......Z+.N..
 ...++.....+++.....................l.k.....++.N..
 O+........+++...K+++...................G+++..N..
 ++.O+...........++++...................++++..N..
 ++.++...........++++...............S++.++++..N..
-...++..B+++..............L+++.....l+++.X+e.k.N..
-.......++++..............++++.....N+++.++....N..
+...++..B+++..............L+++.....l+++...e.k.N..
+.......++++..............++++.....N+++.......N..
 .......++++..............++++.....xwwwwwwwwwwx..
 ......................................u.........
+## height
+# HEIGHT. Every cell is authored so the smoothing pass cannot build a staircase up the side of
+# anything here. '0' is the town floor; a voxel is HALF a walk cell, so '2' is one cell up and '4'
+# is two. Walking climbs one voxel free, so a '2' beside a '0' already needs a hop and a '4' beside
+# a '0' cannot be climbed at all (the jump apex is 2.5 voxels). Every raised block is TERRAIN with
+# paving under it, never a stamp: a stamp is solid and its top is not walkable.
+#
+# THE BELL RUN (chapter01.md P5). The party arrives at 31,2 and wants the guild-hall counter at
+# 34-35,20. The counter stands in the guild CLOSE, which the hedge at z16 and the hall itself seal
+# from the north and the close wall at x28 seals from the square. On foot the only way in is the
+# long one: down the lane, round the square, south past the lamp to z29, east under the back wall,
+# in at the grain yard's propped door (x34, z29-31), through the yard and out of the gap in its far
+# wall at 40-41,26. That is 67 cells of walking (measured on the nav dump) and it does not make it.
+#
+# Three shortcuts, all of them jumps, in the order the chapter teaches them. The engine turns a
+# lone two-voxel step with level ground opposite into a RAMP (vx_build, step 4), which is why the
+# '2' blocks — the step, the kerb, the trough — can be walked up: they are the run-up, and every
+# '4' above them still has to be jumped for.
+#
+#   1. THE ROOFS OFF THE LANE.  step 24,12 ('2') -> roof1 x25-27 z11-13 ('4', the house whose stamp
+#      was removed) -> roof2 x30-31 z11-13 ('4') -> a two-cell drop south into the alley behind the
+#      hall at 29-30,14.  The gap between the roofs is x28-x29 at z11-13: TWO empty cells, so the
+#      body leaves x=27.76 and must land at x>=30.24 -> 2.48 cells of travel. A running jump carries
+#      3.6 and a walking one 2.2, so the run clears it and the walk does not. From the alley the
+#      counter is fourteen cells away: 17 + 7 + 14 = 38 cells against the direct route's 67.
+#
+#   2. OVER THE GRAIN-YARD WALL.  trough x32-33 z27 ('2') -> the back wall z26 ('4') -> run east
+#      along it and drop north into the close, or east over the gate gap and down into the yard.
+#      Ground to trough is 2 voxels (a hop), trough to wall another 2; from the ground the wall's 4
+#      voxels are unclimbable. The gate gap at x40-41 is again TWO empty cells of wall top: 2.48
+#      cells, run-only, exactly as above. 43 + 10 + 8 = 61 against 67 — six cells, and it also
+#      skips the three {{GRAIN_CREATURE_PL}} on the yard route, which is where its time goes.
+#
+#   3. THE WELL KERB TO THE LOW SHED — the small one, for players who missed the other two.
+#      kerb x23-24 z19-20 ('2', beside the well) -> ONE empty cell at x25 -> the shed roof
+#      x26-27 z19-20 ('4') -> walk straight onto the close wall at x28 and drop into the alley.
+#      1 + 0.48 = 1.48 cells of travel with a one-cell rise: at walking speed the body is still
+#      2.2 voxels up when it lands, so even a standing jump makes it. Forgiving on purpose.
+#      26 + 7 + 7 = 40 against 67.
+#
+# If VX_SP_RUN, VX_SP_WALK, VX_JUMP_APEX, VX_GRAVITY or VX_AGENT_R changes in voxfield.cpp, the two
+# 2.48-cell gaps have to be re-measured.
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000044400440000000000000000
+000000000000000000000000244400440000000000000000
+000000000000000000000000044400440000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000002204440000000000000000000
+000000000000000000000002204440000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040000000000000000000
+000000000000000000000000000040044444444400444400
+000000000000000000000000000000002200000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000000000000000
 ## triggers
 21 19 2 1 message halm.well
-35 20 2 1 message halm.guild_hall_door
+# ONE EXAMINE PER CELL. Two `message` triggers on the same cell is a coin toss decided by file
+# order — the engine's trig_at returns the first match — and the counter used to be three deep:
+# `guild_hall_door` spanned x35-36 and sat on top of both clerk lines and the rival's door, so
+# examining the counter gave you the doorway line and the guild book could never be signed. The
+# chapter play-test found it on step 16. The board's "it is bare" state is NOT a second trigger any
+# more either: it is the ALTERNATE on the one trigger (src/chapter01.h, CH_TRIG_COND), so the board
+# is one place that says a different thing before the job exists.
+35 20 1 1 message halm.guild_hall_door
 34 20 2 1 zone guild_hall_door
 33 20 1 1 message halm.job_sheet
+32 20 1 1 message halm.job_sheet_2
+# The counter is ONE trigger. Which of the clerk's two lines fires is the bell's business, not the
+# map's: ch_clerk_line() swaps in `halm.clerk_signing_late` when the rings have run out, and both
+# ids bind to the same flag, because the run is pressure and never a failure.
+34 20 1 1 message halm.clerk_signing
+36 20 1 1 message halm.rival_door
 31 20 2 1 message halm.bell
 20 26 3 1 message halm.lamp_charm
 20 26 3 1 zone lamp_charm
+20 27 3 1 message halm.lamp_charm_2
 17 23 2 1 message halm.bread
+19 22 1 1 message halm.shepherd_market
+19 23 1 1 message halm.shepherd_market_2
+13 24 1 1 message halm.healer_bench
+14 24 1 1 message halm.town_healer
+19 20 1 1 message halm.marta_after
+11 15 1 1 message halm.ostler_after
+34 7 1 1 message halm.gate_watch_after
 41 22 1 1 message halm.ottilie_door
+41 23 1 1 message halm.ottilie_door_2
 42 22 2 1 message halm.ottilie_house
 41 32 2 2 message halm.grain_yard_scales
 41 32 2 2 pickup loot_teaching_find halm.grain_yard_scales
-37 29 3 2 fight lid
-43 30 2 3 fight lid
-36 27 3 2 fight lid
+36 29 3 1 fight lid
 19 21 3 1 goal Sign_on_at_the_guild_hall
 18 20 1 1 npc villager_a S halm.marta wander 2
 10 15 1 1 npc villager_b E halm.ostler wander 1
 33 30 1 1 npc villager_a E halm.grainwife
 33 7 1 1 npc villager_b S halm.gate_watch
-0 18 1 3 exit west_road 37 8 W
 30 0 3 1 exit hart_yard 11 18 N
 47 23 1 3 exit hill_path 12 45 N
 30 6 3 1 zone valley_road

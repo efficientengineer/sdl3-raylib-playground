@@ -21,6 +21,48 @@
 #include <SDL3/SDL.h>
 #include "voxfield.h"
 
+// ───────────────────────── names ─────────────────────────
+// THE ONE PLACE A PROPER NOUN IS WRITTEN IN THE ENGINE. story/v3/NAMES.md is the table and every
+// story file is tokenised against it; the engine is not, because nothing exports the table to C.
+// So a goal line or a battle line that has to name somebody builds itself from these, and a rename
+// is these four lines and nothing else.
+//
+// WHAT THE REAL FIX IS, when somebody has the tool budget: `./story_prompt.py export` already
+// writes src/field_text.h with every token substituted. It should write src/names.h beside it —
+// `#define CH_NAME_HERDER "Distel"` straight out of NAMES.md — and this block should become
+// `#include "names.h"`. Until then these are hand-copied and this comment is the audit trail.
+// Checked against story/v3/NAMES.md rows 13, 14, 24, 65 on 2026-09-21.
+#define CH_NAME_HERO       "Falke"      // {{HERO}}
+#define CH_NAME_HEALER     "Ottilie"    // {{HEALER}}
+#define CH_NAME_HERDER     "Distel"     // {{HERDER}}
+#define CH_NAME_BEAST      "Klee"       // {{BEAST_NAME}}
+// {{GUARD_BEAST}} reads "drover" and is a COMMON NOUN, lower case in a sentence. chapter01.md C5 is
+// explicit that the player is never told "guard beast" — that is a designer's word.
+#define CH_NAME_GUARD_BEAST "drover"
+
+// The chapter title, drawn on the title card. The scene data carries no title field, so it is here
+// with its source named: story/v3/chapter01.md line 1.
+#define CH_TITLE "Chapter 1  -  The High Pasture"
+
+// ───────────────────────── the party lantern ─────────────────────────
+// PALETTE.md's `lamp` colormap table runs 32 light levels and the top of it is the most saturated
+// row there is — a hot orange that, dropped into the middle of a blue night, reads as a fire rather
+// than as a lantern and flattens every colour it touches. The party's lantern is a lantern. It is
+// CAPPED here rather than in the table, because the table is shared with the map's own static
+// `lamp:` lines (a forge, a window) which are allowed to be that hot.
+//
+// RELAXED to 0.85 on 2026-09-21, and NOT YET VERIFIED BY EYE. The new colormap.png bleaches lamp
+// light toward warm straw rather than toward saturated orange, so the thing this cap was guarding
+// against is much weaker than it was, and 0.72 on a `night 0.16` pasture is very nearly black.
+//
+// The honest caveat: I could not check it. `capture.sh --vox` drives the MAP's static `lamp:`
+// lines, not the party lantern — the party lantern is `vx_set_party_lamp`, which only the chapter
+// script calls — so a night capture of high_pasture shows the map's lamps and no lantern at all,
+// and there is nothing to judge. Either the capture path needs a `--partylamp r:level` knob or this
+// wants thirty seconds of somebody walking around in the dark. Both are cheap; neither is done.
+#define CH_LAMP_MAX 0.85f
+#define CH_LAMP_RADIUS 4.5f          // cells; chapter01.md P7 "the lantern shows about four cells"
+
 // ───────────────────────── flags ─────────────────────────
 // X(name, id) — the id is what a binding row and the Dev panel show. The first ten are THE
 // MANDATORY TEN from the spine: the chapter cannot be finished without every one of them.
@@ -38,13 +80,30 @@
     X(F_BODY,              "body")               /* 10 the ring of nine holes; C6 waits for it   */ \
     /* progress the steps turn on */ \
     X(F_SWING_TRIED,       "swing_tried")        /* P1 ends having fought the swing, not won it  */ \
+    /* P4 is FOUR SESSIONS (chapter01.md P4) and a session is one go at the swing. These three are
+       set by ch_on_battle as the day-two session count passes 1, 2 and 3, so each of the first
+       three rows completes by the player actually fighting — not by walking onto a cell. The
+       fourth row is the win. */ \
+    X(F_DAY2_1,            "day2_session_1")     /* grey dawn: the swing as it was               */ \
+    X(F_DAY2_2,            "day2_session_2")     /* sun up: Hart pulls the pin, the tell slows   */ \
+    X(F_DAY2_3,            "day2_session_3")     /* high sun: the pin goes back, full speed      */ \
     X(F_SWING_BEATEN,      "swing_beaten")       /* P4's win: the parry lands and it goes down   */ \
+    X(F_SUPPER,            "supper")             /* P3: at Hart's table, at sundown              */ \
     X(F_BED,               "bed")                /* P3 ends by going to bed                      */ \
     X(F_LEFT_YARD,         "left_yard")          /* the gate: this is what starts the bell       */ \
     X(F_SIGNED,            "signed")             /* the clerk signs the book                     */ \
     X(F_AT_PASTURE,        "at_pasture")         /* arrived on high_pasture                      */ \
     X(F_DISTEL,            "distel")             /* the herder is in the party (C5)              */ \
     X(F_BOSS_DEAD,         "boss_dead")          /* Klee is down                                 */ \
+    /* P6. The cold read of draft four promoted `hill_path.ottilie_dark_2` to mandatory: it is the
+       only place {{HEALER}}'s own want surfaces, and the climb is where it belongs. It gates P6, so
+       the route goes through it and no player can finish the chapter without it — but it is NOT one
+       of the spine's mandatory TEN, which is a named list of ten ids (chapter01.md, "The mandatory
+       ten") that the end card and the play-test assert as a set. Adding an eleventh member to that
+       list would silently change what those two things mean. Gating the step is the same guarantee
+       with none of that; if the designer wants it counted in the ten, chapter01.md's table is the
+       place it has to be added first. */ \
+    X(F_OTTILIE_DARK,      "ottilie_dark")       /* the climb: she has never been anywhere at night */ \
     /* the four hidden finds; they are optional and never gate a step */ \
     X(F_LOOT_YARD,         "loot_yard") \
     X(F_LOOT_TEACHING,     "loot_teaching_find") \
@@ -107,17 +166,33 @@ static const ChStep CH_STEPS[] = {
  { CHS_CLIP, "0130_the_counter", nullptr, -1, -1, nullptr, nullptr, 0, 0, 0, 0, nullptr, { -1 } },  // C2
 
  // P3 — the lane home at dusk, then supper and bed.
+ // TWO ROWS IN THE YARD, not one. chapter01.md P3 is "day -> dusk -> night, supper at sundown", and
+ // 0140_supper opens at sundown; putting the whole supper-and-bed block at `night 0.40` had the
+ // player walking into a dark house at sundown. So supper is dusk and only the bed is night.
  { CHS_PLAY, nullptr, "halm",      -1, -1, "S", "dusk", 0.70f, 1, 0, 0, "Get home before supper.",
    { F_OTTILIE_HOUSE, -1 } },
- { CHS_PLAY, nullptr, "hart_yard", -1, -1, "N", "night",0.40f, 1, 1, 0, "Eat, and go to bed.",
+ { CHS_PLAY, nullptr, "hart_yard", -1, -1, "N", "dusk", 0.45f, 1, 1, 0, "Eat, and go to bed.",
+   { F_SUPPER, -1 } },
+ { CHS_PLAY, nullptr, nullptr,     -1, -1, nullptr, "night", 0.40f, 1, 1, 0, nullptr,
    { F_BED, -1 } },
  { CHS_CLIP, "0140_supper", nullptr, -1, -1, nullptr, nullptr, 0, 0, 0, 0, nullptr, { -1 } },       // C3
 
- // P4 — day two. Four sessions at the swing with the light moving; the last one is the win.
- { CHS_PLAY, nullptr, "hart_yard", -1, -1, "N", "night",0.35f, 1, 1, 0, "Be at the machines before light.",
-   { -1 } },
- { CHS_PLAY, nullptr, nullptr,     -1, -1, nullptr, "dusk", 0.75f, 1, 0, 0, nullptr, { -1 } },
+ // P4 — day two. FOUR sessions at the swing with the light moving, and it ENDS AT LAST LIGHT.
+ // chapter01.md P4 states this plainly and states why: C4's panels and beat are "the last light of
+ // the second day", the low gold the sword is written into, and the engine used to run three rows
+ // ending at `day 1.00` — which put the sword in the middle of the afternoon. The light walks grey
+ // dawn -> sun up -> high sun -> low gold, one step a session. The number of sessions is what makes
+ // the day feel long; the last one's light is what makes the sword land.
+ //
+ // Only the FOURTH row gates on F_SWING_BEATEN, and ch_on_battle refuses to set that flag before
+ // this block (see there) — so a lucky win in session one does not end the day.
+ { CHS_PLAY, nullptr, "hart_yard", -1, -1, "N", "night", 0.35f, 1, 1, 0, "Be at the machines before light.",
+   { F_DAY2_1, -1 } },                                                       // 1. grey dawn
+ { CHS_PLAY, nullptr, nullptr,     -1, -1, nullptr, "day",  0.80f, 1, 0, 0, "Beat the swing.",
+   { F_DAY2_2, -1 } },                                                       // 2. sun up
  { CHS_PLAY, nullptr, nullptr,     -1, -1, nullptr, "day",  1.00f, 1, 0, 0, nullptr,
+   { F_DAY2_3, -1 } },                                                       // 3. high sun
+ { CHS_PLAY, nullptr, nullptr,     -1, -1, nullptr, "dusk", 0.80f, 1, 0, 0, nullptr,            // 4. low gold
    { F_SWING_BEATEN, -1 } },
  { CHS_CLIP, "0150_the_sword", nullptr, -1, -1, nullptr, nullptr, 0, 0, 0, 0, nullptr, { -1 } },    // C4
 
@@ -129,18 +204,32 @@ static const ChStep CH_STEPS[] = {
  { CHS_PLAY, nullptr, "halm",      -1, -1, "N", "dusk", 0.60f, 2, 0, 0, "Get to the guild hall.",
    { F_JOB_SHEET, F_OTTILIE_DOOR, F_SIGNED, -1 } },
 
- // P6 — the hill path. Dusk into night, climbing.
+ // P6 — the hill path. Dusk into night, climbing. Two rows so the light drops as you climb
+ // (chapter01.md P6: "the light drops a step at each switchback — the time-of-day change is the
+ // level design"), and the first ends on {{HEALER}}'s line in the dark, which draft four's cold
+ // read made mandatory.
  { CHS_PLAY, nullptr, "hill_path",    -1, -1, "N", "dusk", 0.50f, 2, 0, 0, "Get up to the pasture.",
+   { F_OTTILIE_DARK, -1 } },
+ { CHS_PLAY, nullptr, nullptr,        -1, -1, nullptr, "night", 0.30f, 2, 1, 0, nullptr,
    { F_AT_PASTURE, -1 } },
 
  // P7 — the high pasture. You cannot see. The lantern is four cells of light.
+ // TWO ROWS, not one, and the order is fixed. The audit's finding 18: with both flags needed in
+ // EITHER order, C5 could fire after the player had already been to the false lantern in a far
+ // corner, or the player could reach the tracks first and be sent back across a dark map. The
+ // spine's P7 is a sequence — the trail of sleepers, then the false lantern, then the tracks — so
+ // it is two rows and the goal line changes between them.
  { CHS_PLAY, nullptr, "high_pasture", -1, -1, "N", "night", 0.16f, 2, 1, 0, "Follow the sleeping animals.",
-   { F_LANTERN, F_TRACKS_STOP, -1 } },
+   { F_LANTERN, -1 } },
+ { CHS_PLAY, nullptr, nullptr, -1, -1, nullptr, nullptr, 0, 2, 1, 0, nullptr,
+   { F_TRACKS_STOP, -1 } },
  { CHS_CLIP, "0160_the_herder", nullptr, -1, -1, nullptr, nullptr, 0, 0, 0, 0, nullptr, { -1 } },   // C5
  { CHS_SET,  nullptr, nullptr, -1, -1, nullptr, nullptr, 0, 0, 0, 0, nullptr, { F_DISTEL, -1 } },
 
  // P8 — three of them now, her night sight on, and the thing in the fold.
- { CHS_PLAY, nullptr, nullptr, -1, -1, nullptr, "night", 0.16f, 3, 1, 1, "Find the guard beast.",
+ // The goal line says DROVER, not "guard beast". chapter01.md C5 is explicit: {{GUARD_BEAST}}
+ // reads "drover" and the player is never told "guard beast", which is a designer's word.
+ { CHS_PLAY, nullptr, nullptr, -1, -1, nullptr, "night", 0.16f, 3, 1, 1, "Find the " CH_NAME_GUARD_BEAST ".",
    { F_BOSS_DEAD, -1 } },
  { CHS_PLAY, nullptr, nullptr, -1, -1, nullptr, nullptr,  0,    3, 1, 1, nullptr, { F_BODY, -1 } },
  { CHS_CLIP, "0180_what_was_on_it", nullptr, -1, -1, nullptr, nullptr, 0, 0, 0, 0, nullptr, { -1 } }, // C6
@@ -155,7 +244,9 @@ struct ChBind { const char *text_id; int flag; };
 static const ChBind CH_BINDS[] = {
     { "hart_yard.machine_swing",   F_MACHINE_SWING },
     { "hart_yard.bench_part",      F_BENCH_PART },
+    { "hart_yard.supper_1",        F_SUPPER },
     { "hart_yard.bed",             F_BED },
+    { "hill_path.ottilie_dark",    F_OTTILIE_DARK },
     { "halm.lamp_charm",           F_LAMP_CHARM },
     { "halm.guild_hall_door",      F_GUILD_HALL_DOOR },
     { "halm.ottilie_house",        F_OTTILIE_HOUSE },
@@ -186,6 +277,148 @@ static const ChBind CH_FIGHT_BINDS[] = {
 };
 static const int CH_FIGHT_BIND_COUNT = (int)(sizeof(CH_FIGHT_BINDS) / sizeof(CH_FIGHT_BINDS[0]));
 
+// ───────────────────────── the steps, by name ─────────────────────────
+// The condition table below has to be able to say "from here to there", and a raw index into
+// CH_STEPS is the worst possible way to write that: adding one row silently re-points every
+// number. So the few steps anything names are named, and ch_steps_selfcheck() proves at runtime
+// that each name still sits on the row it is supposed to. If a row moves, the self-test says so by
+// name on the first run instead of the chapter going quietly wrong in the middle.
+enum ChStepId {
+    CHST_P1_YARD = 0,        // P1: the yard at midday
+    CHST_C1 = 1,
+    CHST_P2_YARD = 2,        // P2: the part off Hart's bench
+    CHST_P2_TOWN = 3,        // P2: Halm by day
+    CHST_C2 = 4,
+    CHST_P3_LANE = 5,        // P3: the lane home at dusk
+    CHST_P3_SUPPER = 6,      // P3: Hart's table, sundown
+    CHST_P3_BED = 7,         // P3: night, and bed
+    CHST_C3 = 8,
+    CHST_P4_S1 = 9,          // P4: four sessions, grey dawn to low gold
+    CHST_P4_S4 = 12,
+    CHST_C4 = 13,
+    CHST_P5_YARD = 14,       // P5: the sword's breath, before the bell
+    CHST_P5_TOWN = 15,       // P5: the bell run
+    CHST_P6_CLIMB = 16,      // P6: the hill path
+    CHST_P6_TOP = 17,
+    CHST_P7_SLEEPERS = 18,   // P7: the trail, then the false lantern
+    CHST_P7_TRACKS = 19,     // P7: where the tracks stop
+    CHST_C5 = 20,
+    CHST_P8_BOSS = 22,       // P8: the fold
+    CHST_P8_BODY = 23,       // P8: the ring of nine holes
+};
+
+// ───────────────────────── when a trigger is live ─────────────────────────
+// THE PROBLEM THIS SOLVES. A .tmap trigger has no idea what time it is. `halm.job_sheet` sat on the
+// job board and fired the moment the player walked past it on DAY ONE, when the spine says the
+// board is bare and `halm.board_closed` is what the player reads — and it set mandatory number six
+// out of order while it was at it. `halm.ottilie_door` sat on a cell of the day-one lane home, so
+// she could be asked along, and JOIN THE PARTY, before the sword existed and before there was a job
+// to ask her to. Neither is a map bug: the map is a place, and a place does not change. What
+// changes is the chapter.
+//
+// So: every trigger that is only live for part of the chapter has a row here, and
+// ch_apply_triggers() switches it on or off on every step change. A trigger with no row is always
+// live, which is almost all of them.
+//
+//   id          the trigger's arg id — a text id, a pickup's item id, an encounter id, or the
+//               synthetic `exit:<map>` the field gives an exit (an exit line carries no id of its
+//               own and the .tmap grammar is not this side's to change).
+//   from,to     the step window, INCLUSIVE, by name from ChStepId. -1 either side = unbounded.
+//   needs,not   a flag that must be set / must not be set. -1 = don't care.
+//   alt         a text id to show INSTEAD when the trigger is inert and the player interacts
+//               anyway. This is the `board_closed` / `job_sheet` pair: the board is always there,
+//               it just says a different thing before the job exists. nullptr = simply inert.
+//
+// The alternate is not a second trigger on the same cell (two triggers on a cell is a coin toss
+// decided by file order); it is the SAME trigger answering differently, which is also why the map
+// only has to carry the place once.
+struct ChTrigCond {
+    const char *id;
+    int from, to;
+    int needs, nots;
+    const char *alt;
+};
+static const ChTrigCond CH_TRIG_COND[] = {
+    // ── P1: "one small enclosure, NO EXITS OPEN YET" (chapter01.md P1) ──
+    // Without this the player can walk out of the gate in the first minute and arrive in a Halm
+    // that is dressed for day two, with a goal line about a swing.
+    { "exit:halm",                 -1, -1, F_SWING_TRIED, -1, nullptr },
+
+    // ── the day-two lines, and the bed ──
+    // Supper and bed are day one's evening and nothing else: before the lane home they are not
+    // there, and after the player has slept the house is not the point any more.
+    { "hart_yard.supper_1",        CHST_P3_SUPPER, CHST_P3_BED, -1, -1, nullptr },
+    { "hart_yard.supper_2",        CHST_P3_SUPPER, CHST_P3_BED, -1, -1, nullptr },
+    { "hart_yard.book",            CHST_P3_SUPPER, -1, -1, -1, nullptr },   // and between sessions
+    { "hart_yard.room_sword_gap",  CHST_P3_SUPPER, CHST_P3_BED, -1, -1, nullptr },
+    { "hart_yard.bed",             CHST_P3_BED,    CHST_P3_BED, -1, -1, nullptr },
+    { "hart_yard.day2_b",          CHST_P4_S1, CHST_P4_S4, -1, -1, nullptr },
+    { "hart_yard.day2_d",          CHST_P4_S1, CHST_P4_S4, -1, -1, nullptr },
+    // Hart's errand is P2's opening and nothing else's.
+    { "hart_yard.errand",          CHST_P2_YARD, CHST_P2_TOWN, -1, -1, nullptr },
+
+    // ── the board ──
+    // "The job board is visible across the square and EMPTY: it is not dawn." (chapter01.md P2.2)
+    // It becomes the job on the bell run and not before, and until then it answers `board_closed`.
+    { "halm.job_sheet",            CHST_P5_TOWN, -1, -1, -1, "halm.board_closed" },
+    { "halm.job_sheet_2",          CHST_P5_TOWN, -1, F_JOB_SHEET, -1, nullptr },
+
+    // ── her door ──
+    // Mandatory seven, and it is on the FAST ROUTE of the bell run, not on the day-one lane home.
+    // She is ASKED, and she joins on the spot; that cannot happen before there is a job to ask her
+    // to. `halm.ottilie_house` — the open door, one chair, two coats — is the day-one one and stays
+    // exactly where it is.
+    { "halm.ottilie_door",         CHST_P5_TOWN, -1, F_JOB_SHEET, -1, nullptr },
+    { "halm.ottilie_door_2",       CHST_P5_TOWN, -1, F_OTTILIE_DOOR, -1, nullptr },
+    { "halm.ottilie_house",        -1, CHST_P3_LANE, -1, -1, nullptr },
+
+    // ── the counter ──
+    // Signing is reading: you cannot sign a sheet you have not taken down. The engine picks between
+    // the two clerk lines by the bell (ch_on_text), so both are live together and only one fires.
+    { "halm.clerk_signing",        CHST_P5_TOWN, -1, F_JOB_SHEET, -1, nullptr },
+    { "halm.clerk_signing_late",   CHST_P5_TOWN, -1, F_JOB_SHEET, -1, nullptr },
+
+    // ── the townspeople's two states ──
+    // "Three townspeople, each with a line now and a different one after he has the sword" — so the
+    // `_after` lines start at C4 and, per the draft-four cold read, STAY UP through the bell run
+    // and until the party leaves Halm for the hill. Nobody reads boxes on a clock, so they are not
+    // cut off at signing.
+    { "halm.marta_after",          CHST_P5_YARD, CHST_P5_TOWN, -1, -1, nullptr },
+    { "halm.ostler_after",         CHST_P5_YARD, CHST_P5_TOWN, -1, -1, nullptr },
+    { "halm.gate_watch_after",     CHST_P5_YARD, CHST_P5_TOWN, -1, -1, nullptr },
+    { "halm.rival_door",           CHST_P5_YARD, CHST_P5_TOWN, -1, -1, nullptr },
+    { "halm.marta",                -1, CHST_P3_LANE, -1, -1, nullptr },
+    { "halm.ostler",               -1, CHST_P3_LANE, -1, -1, nullptr },
+    { "halm.gate_watch",           -1, CHST_P3_LANE, -1, -1, nullptr },
+
+    // ── the pasture ──
+    // The body is only there once the fight is over, and the lens is only findable after C5 — the
+    // map's own `nightsight` word already hides it, and this makes it a fact rather than a lighting
+    // accident.
+    { "high_pasture.body",         CHST_P8_BODY, -1, F_BOSS_DEAD, -1, nullptr },
+    { "high_pasture.body_2",       CHST_P8_BODY, -1, F_BODY, -1, nullptr },
+    { "loot_pasture",              -1, -1, F_DISTEL, -1, nullptr },
+    { "high_pasture.find",         -1, -1, F_DISTEL, -1, nullptr },
+};
+static const int CH_TRIG_COND_COUNT = (int)(sizeof(CH_TRIG_COND) / sizeof(CH_TRIG_COND[0]));
+
+// ───────────────────────── what is meant to be behind a jump ─────────────────────────
+// The field reports every trigger walking cannot reach (voxfield.cpp, vx_nav_check_targets). This
+// is the list of the ones that are the DESIGN — story/v3/LOOT.md's three platforming finds. The
+// play-test checks it in BOTH directions: anything here that has become plain-walkable is a level
+// that lost its lesson, and anything the field reports that is NOT here is a trigger the player
+// cannot get to, which is a bug however pretty the hillside is.
+struct ChJumpOnly { const char *map, *id, *why; };
+static const ChJumpOnly CH_JUMP_ONLY[] = {
+    { "hart_yard",    "loot_yard",       "the tin under the eaves: a running jump off the workshop roof" },
+    { "hart_yard",    "hart_yard.ladder","the same cell's examine" },
+    { "hill_path",    "loot_hill",       "the whistle: a two-cell drop off the outside of the bend" },
+    { "hill_path",    "hill_path.drop",  "the same cell's examine" },
+    { "high_pasture", "loot_pasture",    "the lens: a running jump onto the shelf above the fold" },
+    { "high_pasture", "high_pasture.find","the same cell's examine" },
+};
+static const int CH_JUMP_ONLY_COUNT = (int)(sizeof(CH_JUMP_ONLY) / sizeof(CH_JUMP_ONLY[0]));
+
 // ───────────────────────── state ─────────────────────────
 // POD: this is what the reload blob and the save file carry, and it is the whole of the story's
 // memory. Nothing chapter-shaped lives anywhere else.
@@ -201,11 +434,26 @@ struct Chapter {
     // running out of rings only switches the clerk to his late line.
     int32_t bell_armed, bell_started, rings;
     float bell_t;
+    int32_t swing_sessions;       // P4: how many goes at the swing day two has had
     int32_t skip_fights;          // Dev toggle
 };
 
-#define CH_BELL_RINGS 12          // how many rings the run is given
-#define CH_BELL_PERIOD 9.0f       // seconds between rings
+// ── the bell, re-tuned against the map that exists ─────────────────────────────────────────────
+// chapter01.md P5 asks for "six minutes including the board and the door" and for "the direct route
+// down the lane and round the square does not make it". THOSE TWO CANNOT BOTH BE TRUE ON THIS MAP,
+// and the play-test measures it rather than guessing: halm is 48x36, the walking route from the
+// yard's arrival cell via the board and her door to the counter is about 116 cells, and the party
+// covers that in 26 s walking or 16 s running. A six-minute clock is twenty times the length of the
+// run. This is a design question and it is flagged in the final report; what the engine can do is
+// make the number MEAN something.
+//
+// 8 rings x 2.5 s = 20 s, which sits between the two: a player who RUNS the direct road makes it,
+// a player who strolls it does not, and the shortcuts buy margin. The bell does not tick while a
+// box is open (ch_tick), so the two mandatory conversations on the route cost nothing.
+//
+// Not 9 rings, ever: chapter01.md P5 reserves nine for the ring of holes and for nothing else.
+#define CH_BELL_RINGS 8
+#define CH_BELL_PERIOD 2.5f       // seconds between rings
 
 static inline bool ch_has(const Chapter *c, int flag) {
     return flag >= 0 && flag < CH_FLAG_COUNT && (c->flags & (1ull << flag)) != 0;
@@ -258,6 +506,48 @@ static inline void ch_party_resize(Chapter *c, int n) {
 // Apply a PLAY row to the world: map, spawn, time of day, party size, lantern, night sight, goal.
 // Only what the row actually names is touched, so a row that changes nothing but the light leaves
 // the player standing exactly where they were.
+// Is a conditioned trigger live right now? Returns the row, or nullptr when there is no condition
+// on this id at all (which is the usual answer).
+static inline const ChTrigCond *ch_trig_cond(const char *id) {
+    for (int i = 0; i < CH_TRIG_COND_COUNT; i++)
+        if (!strcmp(CH_TRIG_COND[i].id, id)) return &CH_TRIG_COND[i];
+    return nullptr;
+}
+static inline bool ch_cond_open(const Chapter *c, const ChTrigCond *t) {
+    if (!t) return true;
+    if (t->from >= 0 && c->step < t->from) return false;
+    if (t->to   >= 0 && c->step > t->to)   return false;
+    if (t->needs >= 0 && !ch_has(c, t->needs)) return false;
+    if (t->nots  >= 0 &&  ch_has(c, t->nots)) return false;
+    return true;
+}
+// True when the world may act on this id at all — the one question ch_on_text asks before it
+// believes what the field just told it. A trigger with an ALTERNATE is still "not open": the field
+// shows the alternate line and the chapter learns nothing from it, which is the whole point of the
+// bare board.
+static inline bool ch_trig_open(const Chapter *c, const char *id) {
+    return ch_cond_open(c, ch_trig_cond(id));
+}
+// The line to show when the player interacts with a trigger that is not open, or nullptr for
+// silence. (Today only the job board has one.)
+static inline const char *ch_trig_alt(const Chapter *c, const char *id) {
+    const ChTrigCond *t = ch_trig_cond(id);
+    return (t && !ch_cond_open(c, t)) ? t->alt : nullptr;
+}
+
+// Push the whole condition table at the field. Called on every step change and after a load, so a
+// trigger's state is always a function of the chapter and never of what happened to be switched
+// off last. Cheap: a few dozen string compares against one map's trigger list.
+static inline void ch_apply_triggers(Chapter *c, VoxField *v) {
+    if (!v) return;
+    for (int i = 0; i < CH_TRIG_COND_COUNT; i++) {
+        const ChTrigCond *t = &CH_TRIG_COND[i];
+        // A trigger with an alternate stays ON: the player must be able to walk up to the bare
+        // board and read that it is bare. star_logic swaps the text; the chapter ignores the event.
+        vx_set_trigger(v, t->id, (ch_cond_open(c, t) || t->alt) ? 1 : 0);
+    }
+}
+
 static inline void ch_apply_step(Chapter *c, VoxField *v) {
     if (c->step < 0 || c->step >= CH_STEP_COUNT) return;
     const ChStep *s = &CH_STEPS[c->step];
@@ -268,8 +558,9 @@ static inline void ch_apply_step(Chapter *c, VoxField *v) {
             vx_goto(v, s->map, s->sx, s->sz, s->face ? s->face : "S");
         if (s->light) vx_set_light(v, s->light, s->level);
         if (s->party > 0) vx_set_party(v, s->party);
-        vx_set_party_lamp(v, 4.5f, 0.9f, s->lamp);
+        vx_set_party_lamp(v, CH_LAMP_RADIUS, CH_LAMP_MAX, s->lamp);
         vx_set_night_sight(v, s->night_sight ? 0.10f : 0.0f);
+        ch_apply_triggers(c, v);
     }
     if (s->party > 0) ch_party_resize(c, s->party);    // who is in the FIGHT, not just on the map
     if (s->goal) snprintf(c->goal, sizeof(c->goal), "%s", s->goal);
@@ -306,15 +597,35 @@ static inline void ch_jump(Chapter *c, VoxField *v, int step) {
     for (int k = 0; k < step; k++)
         for (int i = 0; i < CH_NEED && CH_STEPS[k].need[i] >= 0; i++) ch_set(c, CH_STEPS[k].need[i]);
     c->step = step;
+    if (ch_has(c, F_DAY2_3)) c->swing_sessions = 3;
     // A step with no `party` column of its own inherits from the flags the jump just set.
     if (ch_has(c, F_DISTEL)) ch_party_resize(c, 3);
     else if (ch_has(c, F_OTTILIE_DOOR)) ch_party_resize(c, 2);
     else ch_party_resize(c, 1);
+    // WHAT THE PLAYER WOULD HAVE LEARNED BY NOW. A command the player has not met is ABSENT from
+    // the battle menu (battle.h, BT_KNOWS_*) and it arrives by being used — so a Dev jump into P8
+    // used to fight the boss with a party that had never met Guard or the effort press, because
+    // `known` is earned in the fights the jump skipped. The boss encounter happens to grant them
+    // all, which is why this was invisible; nothing else would. The teaching order is COMBAT.md
+    // §7a and this is it, by step.
+    uint32_t k = BT_KNOWS_ATTACK;                                   // the post: move, face, hit
+    if (step > CHST_P1_YARD)  k |= BT_KNOWS_GUARD;                  // the arm telegraphs at you
+    if (step >= CHST_P2_TOWN) k |= BT_KNOWS_EFFORT | BT_KNOWS_RUN;  // the grain yard: a real opening
+    if (step >= CHST_P5_TOWN) k |= BT_KNOWS_SKILL | BT_KNOWS_ITEM;  // {{HEALER}} is in the party
+    c->party.known |= k;
     ch_apply_step(c, v);
 }
 
 // The world reported something. Returns true if a flag changed.
+//
+// THE CONDITION TABLE IS CHECKED HERE TOO, not only at the field. ch_apply_triggers switches
+// triggers off at every step change, but a trigger the player is already standing inside, or one
+// on a map that is not loaded, or one a future edit forgets to condition, can still arrive — and a
+// flag set out of order is the kind of bug that only shows up as a chapter that cannot be
+// finished. So the gate is applied on the way IN as well as on the way out. Belt and braces, and
+// the braces are the cheap ones.
 static inline bool ch_on_text(Chapter *c, const char *text_id) {
+    if (!ch_trig_open(c, text_id)) return false;
     for (int i = 0; i < CH_BIND_COUNT; i++)
         if (!strcmp(CH_BINDS[i].text_id, text_id) && !ch_has(c, CH_BINDS[i].flag)) {
             ch_set(c, CH_BINDS[i].flag);
@@ -324,7 +635,9 @@ static inline bool ch_on_text(Chapter *c, const char *text_id) {
     return false;
 }
 
+
 static inline bool ch_on_pickup(Chapter *c, const char *item_id) {
+    if (!ch_trig_open(c, item_id)) return false;
     for (int i = 0; i < CH_ITEM_BIND_COUNT; i++)
         if (!strcmp(CH_ITEM_BINDS[i].text_id, item_id) && !ch_has(c, CH_ITEM_BINDS[i].flag)) {
             ch_set(c, CH_ITEM_BINDS[i].flag);
@@ -342,10 +655,32 @@ static inline bool ch_on_pickup(Chapter *c, const char *item_id) {
 }
 
 // A battle finished. `won` distinguishes P1's "you fought the swing" from P4's "you beat it".
+//
+// DAY ONE IS NOT WINNABLE, AND THAT IS THE CHAPTER. P1 is explicitly "you do not win today"
+// (chapter01.md P1.3: the player loses five or six times, the session ends with {{HERO}} out of
+// stamina, "and it ends WITHOUT the win"), and the whole of day two exists to be the day it goes
+// down. The engine used to set F_SWING_BEATEN on any swing win — so a player who got lucky on day
+// one completed P4's gate before day two had happened, and the chapter jumped its own middle.
+//
+// Two halves to the repair and both are here:
+//   * ch_swing_winnable() is false before P4, and the battle screen asks it — the day-one swing is
+//     actually unwinnable, so the player is never in the position of having beaten it and been told
+//     they have not. It is a LOSS THAT ADVANCES THE STORY: F_SWING_TRIED is what P1 gates on, and
+//     it is set by fighting, not by winning.
+//   * even if a win arrives anyway, F_SWING_BEATEN is only believed from P4 onward.
+static inline bool ch_swing_winnable(const Chapter *c) { return c->step >= CHST_P4_S4; }
+
 static inline void ch_on_battle(Chapter *c, const char *encounter, bool won) {
     if (!strcmp(encounter, "swing")) {
         ch_set(c, F_SWING_TRIED);
-        if (won) ch_set(c, F_SWING_BEATEN);
+        // A go at the swing on day two is a SESSION, win or lose, and four of them are the day.
+        if (c->step >= CHST_P4_S1 && c->step <= CHST_P4_S4) {
+            if (c->swing_sessions < 1000) c->swing_sessions++;
+            if (c->swing_sessions >= 1) ch_set(c, F_DAY2_1);
+            if (c->swing_sessions >= 2) ch_set(c, F_DAY2_2);
+            if (c->swing_sessions >= 3) ch_set(c, F_DAY2_3);
+        }
+        if (won && ch_swing_winnable(c)) ch_set(c, F_SWING_BEATEN);
         return;
     }
     if (!won) return;
@@ -363,13 +698,85 @@ static inline void ch_on_map(Chapter *c, const char *map) {
 }
 
 // Seconds pass. The bell is the only thing in the chapter that runs on a clock.
-static inline void ch_tick(Chapter *c, float dt) {
-    if (!c->bell_started || c->rings >= CH_BELL_RINGS) return;
+//
+// `paused` IS TRUE WHILE A BOX IS OPEN, and that is not a courtesy, it is the design. The bell run
+// is six minutes of adrenaline and it goes THROUGH two mandatory conversations — the board and her
+// door — and past a row of townspeople who have a second thing to say now that he has a sword.
+// A clock that keeps running while the player reads makes reading a cost, and the answer a player
+// reaches is to stop reading. Nobody reads boxes on a clock. (Draft-four cold read, 2026-09-21.)
+static inline void ch_tick(Chapter *c, float dt, bool paused) {
+    if (!c->bell_started || c->rings >= CH_BELL_RINGS || paused) return;
     c->bell_t += dt;
     if (c->bell_t >= CH_BELL_PERIOD) { c->bell_t -= CH_BELL_PERIOD; c->rings++; }
 }
 // True once the board has shut — the clerk's late line, never a failure.
 static inline bool ch_bell_late(const Chapter *c) { return c->rings >= CH_BELL_RINGS; }
+
+// WHICH CLERK LINE FIRES. Both are live on the counter and the bell decides, which is the only
+// thing that makes the run's soft outcome visible: on time he says you made it on the last ring,
+// late he pretends the shutter is not already down. Never a failure either way — the chapter has
+// no fail state and nothing in it sends the player backwards. Returns the id the field should
+// show, given the id the trigger carried. (Before this, `ch_bell_late` was read nowhere outside
+// the Dev panel and the whole late/on-time outcome was invisible in play.)
+static inline const char *ch_clerk_line(const Chapter *c, const char *text_id) {
+    if (strcmp(text_id, "halm.clerk_signing") && strcmp(text_id, "halm.clerk_signing_late")) return text_id;
+    return ch_bell_late(c) ? "halm.clerk_signing_late" : "halm.clerk_signing";
+}
+
+// ───────────────────────── the table checks itself ─────────────────────────
+// ChStepId names rows by index and CH_TRIG_COND is written in those names, so a row inserted in the
+// wrong place would re-point every window silently. This says so instead, by name, on the first run
+// of any self-test. It also catches a condition row whose id is not a trigger id anywhere, which is
+// the other way this table rots: a text id gets renamed and the condition quietly stops applying.
+// Returns the number of complaints, and logs each one.
+struct ChStepCheck { int idx; int kind; const char *what; };
+static inline int ch_steps_selfcheck() {
+    static const ChStepCheck EXPECT[] = {
+        { CHST_P1_YARD,     CHS_PLAY, "hart_yard" },  { CHST_C1,  CHS_CLIP, "0110_the_yard" },
+        { CHST_P2_YARD,     CHS_PLAY, "hart_yard" },  { CHST_P2_TOWN, CHS_PLAY, "halm" },
+        { CHST_C2,          CHS_CLIP, "0130_the_counter" },
+        { CHST_P3_LANE,     CHS_PLAY, "halm" },       { CHST_P3_SUPPER, CHS_PLAY, "hart_yard" },
+        { CHST_P3_BED,      CHS_PLAY, nullptr },      { CHST_C3,  CHS_CLIP, "0140_supper" },
+        { CHST_P4_S1,       CHS_PLAY, "hart_yard" },  { CHST_P4_S4, CHS_PLAY, nullptr },
+        { CHST_C4,          CHS_CLIP, "0150_the_sword" },
+        { CHST_P5_YARD,     CHS_PLAY, "hart_yard" },  { CHST_P5_TOWN, CHS_PLAY, "halm" },
+        { CHST_P6_CLIMB,    CHS_PLAY, "hill_path" },  { CHST_P6_TOP,  CHS_PLAY, nullptr },
+        { CHST_P7_SLEEPERS, CHS_PLAY, "high_pasture" }, { CHST_P7_TRACKS, CHS_PLAY, nullptr },
+        { CHST_C5,          CHS_CLIP, "0160_the_herder" },
+        { CHST_P8_BOSS,     CHS_PLAY, nullptr },      { CHST_P8_BODY, CHS_PLAY, nullptr },
+    };
+    int bad = 0;
+    static const char *K[] = { "PLAY", "CLIP", "SET", "END" };
+    for (int i = 0; i < (int)(sizeof(EXPECT) / sizeof(EXPECT[0])); i++) {
+        const ChStepCheck *e = &EXPECT[i];
+        if (e->idx < 0 || e->idx >= CH_STEP_COUNT) {
+            SDL_Log("CHAPTER FAIL: step name %d is off the end of CH_STEPS (%d rows)", e->idx, CH_STEP_COUNT);
+            bad++; continue;
+        }
+        const ChStep *s = &CH_STEPS[e->idx];
+        if (s->kind != e->kind) {
+            SDL_Log("CHAPTER FAIL: step %d should be a %s and is a %s — a row has moved; ChStepId "
+                    "and CH_TRIG_COND are both wrong until it is fixed", e->idx + 1, K[e->kind], K[s->kind]);
+            bad++; continue;
+        }
+        const char *got = s->kind == CHS_CLIP ? s->arg : s->map;
+        if (e->what && (!got || strcmp(got, e->what))) {
+            SDL_Log("CHAPTER FAIL: step %d should be '%s' and is '%s' — a row has moved",
+                    e->idx + 1, e->what, got ? got : "(same map)");
+            bad++;
+        }
+    }
+    // Every condition row's window has to be the right way round and inside the table.
+    for (int i = 0; i < CH_TRIG_COND_COUNT; i++) {
+        const ChTrigCond *t = &CH_TRIG_COND[i];
+        if (t->from >= CH_STEP_COUNT || t->to >= CH_STEP_COUNT ||
+            (t->from >= 0 && t->to >= 0 && t->from > t->to)) {
+            SDL_Log("CHAPTER FAIL: condition '%s' has an impossible window %d..%d", t->id, t->from, t->to);
+            bad++;
+        }
+    }
+    return bad;
+}
 
 // Every mandatory interaction accounted for? The end card asserts this; so does --chapter-selftest.
 static inline int ch_mandatory_missing(const Chapter *c) {

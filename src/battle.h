@@ -94,6 +94,11 @@ int bt_ui_phase(Battle *b);                  // 0 INPUT, 1 RESOLVE, 2 ENEMY, 3 O
 int bt_ui_rows(Battle *b, int *rows);        // the visible commands; returns how many
 int bt_ui_has_effort(Battle *b);
 int bt_ui_enemy_count(Battle *b);
+// What the player can see on an enemy, for a test that has to play rather than cheat:
+// is it telegraphing (guard NOW), is it open (spend NOW), is it still up?
+int bt_ui_enemy_tell(Battle *b, int i);
+int bt_ui_enemy_open(Battle *b, int i);
+int bt_ui_enemy_alive(Battle *b, int i);
 int bt_ui_selected(Battle *b);
 int bt_ui_effort(Battle *b);
 int bt_ui_target(Battle *b);

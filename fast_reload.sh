@@ -102,7 +102,7 @@ for f in "$SCRIPT_DIR"/story/portraits/*.png; do
     push_art "$f" "portrait_$(basename "$f")"
 done
 
-# Field maps and art (FIELD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
+# Field maps and art (WORLD.md): same push-only-if-changed rule, keeping the story/field/<kind>/ layout.
 # The game looks in files/field/<kind>/<id>.png first, then the APK assets, then its placeholder.
 for d in $FIELD_KINDS; do
     [ -d "$SCRIPT_DIR/story/field/$d" ] || continue
@@ -128,7 +128,7 @@ for d in $FIELD_KINDS; do
     done
 done
 
-# Tilesets (TILES.md) are a folder each, not a flat dir: atlas.png and tiles.md per set. tiles.md is
+# Tilesets (WORLD.md) are a folder each, not a flat dir: atlas.png and tiles.md per set. tiles.md is
 # small and is rewritten in place, so it always goes; the atlas only when its size changed.
 for d in "$SCRIPT_DIR"/story/field/tilesets/*/; do
     [ -d "$d" ] || continue

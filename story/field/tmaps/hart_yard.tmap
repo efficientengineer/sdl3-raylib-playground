@@ -57,10 +57,10 @@ l gate_post
 ........................
 ........................
 ..gggggggggggggggggggg..
-..gggggggggggggggggggg..
-..gggggggggggggggggggg..
-..gggggggggggggggggggg..
-..gggggggggggggggggggg..
+..gppppggggggggggggggg..
+..gppppggggggggggggggg..
+..gppppggggggggggggggg..
+..gppppggppppggggggggg..
 ..gggggddddddggggggggg..
 ..gggggddddddggggggggg..
 ..ggggggggdddggggggggg..
@@ -78,10 +78,10 @@ l gate_post
 ........................
 .xwwwwwwwwwwwwwwwwwwwwx.
 .N....................N.
-.N.R+++...H++.......Z+N.
-.N.++++...+++.......++N.
-.N.++++...+++.........N.
-.N.++++...............N.
+.N........H++.......Z+N.
+.N........+++.......++N.
+.N........+++.........N.
+.N....................N.
 .N....e...............N.
 .N....................N.
 .N..u.......i.i.i.....N.
@@ -95,13 +95,60 @@ l gate_post
 .N....................N.
 .xwwwwwwwl...lwwwwwwwwx.
 ........................
+## height
+# The yard is FLAT — every cell authored, so the smoothing pass cannot invent a staircase. Two
+# things stand above it and they are the chapter's first platforming lesson (LOOT.md, {{LOOT_YARD}}):
+#
+#   x2-6, z3-6 at 6   the workshop: a solid three-cell block with a walkable paved top. It is
+#                     TERRAIN, not a stamp — a `ladder_house` stamp stood here and its roof was
+#                     solid, so there was nothing to climb onto. In a voxel world a building is
+#                     geometry (WORLD.md §1), and the examines that used to be inside it are on
+#                     its south face: the door at 4,7 and the bench at 6,7.
+#   x2-3, z7-11       the ladder against its west wall, one voxel a cell, so walking gets you up.
+#   x9-12, z6 at 6    the eaves of Hart's house, with the tin nailed under them.
+#
+# Between the roof's east edge (x6) and the eaves (x9) there are TWO cells of nothing at ground
+# level. The body leaves the roof at x=6.76 and has to land at x>=9.24: 2.48 cells. A running jump
+# carries 3.6 cells (7.2 cells/s for the 0.5 s a 1.25-cell apex is airborne) and a standing one
+# 2.2 — so the run clears it and the walk does not, which is exactly what LOOT.md asks for. If any
+# of those five numbers in voxfield.cpp changes, this gap has to be re-measured; the chapter
+# play-test asserts both halves of it and will say so.
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
+006666600000000000000000
+006666600000000000000000
+006666600000000000000000
+006666600666600000000000
+005500000000000000000000
+004400000000000000000000
+003300000000000000000000
+002200000000000000000000
+001100000000000000000000
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
+000000000000000000000000
 ## triggers
 8 8 1 1 npc hart S hart_yard.hart
+7 7 1 1 message hart_yard.errand
 4 7 3 1 message hart_yard.workshop_door
 6 7 1 2 message hart_yard.bench_part
 6 7 1 2 pickup bench_part hart_yard.bench_part
 10 6 3 1 message hart_yard.ladder
 10 6 3 1 pickup loot_yard hart_yard.ladder
+9 3 1 1 message hart_yard.supper_1
+9 4 1 1 message hart_yard.supper_2
+9 5 1 1 message hart_yard.book
+13 3 1 1 message hart_yard.room_sword_gap
+13 4 1 1 message hart_yard.bed
+11 9 1 1 message hart_yard.practice_posts
+12 13 1 1 message hart_yard.day2_b
+16 13 1 1 message hart_yard.day2_d
 12 9 1 2 message hart_yard.machine_post
 12 10 1 1 fight post
 14 9 1 2 message hart_yard.machine_arm

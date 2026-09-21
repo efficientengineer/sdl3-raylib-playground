@@ -5,13 +5,13 @@ size: 24 48
 spawn: 12 45 N
 music: dread
 light: dusk 0.7
-lamp: 7 46 5.0 0.85 flicker
+lamp: 3 45 5.0 0.85 flicker
+landmark: the shoulder of rock above the third bend
 ## legend
 . grass
 ; grass_dry
 d dirt
 g gravel
-p paving
 T tree
 t tree_2
 Y tree_bare
@@ -22,67 +22,63 @@ o boulder
 s signpost
 l gate_post
 U hut
-f fence_ew
-r barrel
 ## ground
-...gggg.ggggdgdgg.gggggg
-..gg.ggg.ggddddgggg.gg.g
-gggg.ggg..gddddgg..ggg.g
-.gg.g.ggggg.dddgg..ggggg
-.ggggggggggdddd.ggg.gggg
-ggggg.gggggggdddggg.gggg
-...;;....;...gggd..;....
-.............dddd..;.;..
-..;......;...dddd.......
-.;......dd.dddddd....;;;
-...;d.ddgddddddd........
-..dddgdddddgdddd......;.
-...ddddddddggddd..;.....
-.dddddgdd.dd.d..;;;.;...
-..dddddd;d.........;.;.;
-.dgdd.......;.....;.....
-.ddgd...;...........;..;
-.dddddgddd;g.;d;........
-.gddgddddddgddgdgd......
-...dddgddgddddddddddd.g.
-..;.;..dddddddddddddddgg
-......;d.dddddddddddddgg
-..............d...ddgggg
-.........dd......dddgggg
-.....d.dddgdd.gdddddgggg
-....dddddddddddgddddgggg
-...dddddddddddddgggggggg
-..dgdgdgddd.ddd.ddgggggg
-.dddddd............ggggg
-dgdddd............gg.g..
-..ddd...................
-..dddg..................
-..ddgdggddddd.dddd......
-...dddddddgdgdddddd.....
-..ddddgdddddgddddddd....
-....d.d.dd.d.d.dddddd...
-............d...ddddd...
-..................ddd...
-................ddddg...
-................dddd....
-...........dddddddgdd...
-............ddddddd.....
-..........dddddgdd......
-..........dddddd........
-..........dddd..........
-..........ddddg.........
-..........ddd...........
-...........dddd.........
+;;;;;;......gg....;;;;;;
+;;;;;;......gg....;;;;;;
+;;;;;;......gg....;;;;;;
+;;;;;;....gggg....;;;;;;
+;;;;gggggggggg.....;;;;;
+....gggggggg............
+....gg..................
+...ggggggggggggggggg....
+....ggggggggggggggggg...
+.....ggggggggggggggggg..
+gggggggggggggggggggggggg
+........;;;;;;;;.dddd...
+........;;;;;;;;.dddd...
+....gdddddddggddddddd...
+...gdddddddggdddddddg...
+..dddddddggdddddddgg....
+..ddddddggdddddddg......
+ggddddgggggggggggggggggg
+..dddd..................
+;;ddgg.............;;;;;
+;;dggdddddddggdddd;;;;;;
+;;ggdddddddggdddddddgggg
+;;;ddddddggdddddddggd;;;
+;;;;ddddggdddddddggdd;;;
+ggggggggggggggggggdddggg
+;;;;;;...........dddd;;;
+;;;;;;...........dddd;;;
+;;;;gdddddddggddddddd;;;
+;;;gdddddddggdddddddg;;;
+..dddddddggdddddddgg....
+..ddddddggdddddddg......
+ggddddgggggggggggggggggg
+..dddd..;;;;;;;;........
+..ddgg..;;;;;;;;........
+..dggdddddddggdddd......
+..ggdddddddggddddddd....
+...ddddddggdddddddggd...
+....ddddggdddddddggddg..
+ggggggggggggggggggdddggg
+.........;;;;;;..dddd...
+.................dddd...
+...ggdddddddggddddddd...
+;;ggdddddddgddddddddg;;;
+;;dddddddggdddddddgg;;;;
+;;;dddddggdddddddg;;;;;;
+;;;ddddggddddd....;;;;;;
+;;;;ddgddddddd....;;;;;;
+;;;;;;.ddddddg....;;;;;;
 ## objects
-......o.................
+........................
 ........................
 ........................
 .xwwwwwwwwwl...lwwwwwwxo
 ........................
-o.................o...o.
-.....Y+.................
-.....++.................
-.....++.................
+........................
+.......oo..o............
 ........................
 ........................
 ........................
@@ -101,87 +97,114 @@ o.................o...o.
 ........................
 ........................
 ........................
-...................o....
-........................
-....................t+..
-s...................++..
-....................++..
 ........................
 ........................
 ........................
 ........................
 ........................
 ........................
-......................T+
-..T+..T+..............++
-..++..++..............++
-..++..++................
 ........................
-...U++..................
-...+++..................
-...+++T+.l.....l......T+
-......++..............++
-......++..............++
+.....................T+.
+.....................++.
+.....................++.
+........................
+........................
+........................
+........................
+........................
+........................
+........................
+........................
+........................
+........................
+U++.................t+..
++++.................++..
++++.s...............++..
 ## height
-ccccccdeghkkkkkjhgfccccc
-occcccceghikkkkkggdooooo
-ooocccdefhikkkkkmnoooooo
-oooobbbdghjjjjjkkmnooooo
-oooooocdehijjjjjjkoooooo
-ooooonncdfihjjjjklmooooo
-oononnmnlggiijjjjjmmoooo
-nmmmlkkkkkfhijiiikknoooo
-mlkjjjijijjkjiiiiigfdaaa
-kkjiiihihhihhiiiigfddbaa
-kigggggghhhhhiiihheddbaa
-jigggggghhhhhiiigfecbaaa
-hggggggghhhhhhiihedcbaaa
-iffggggghghhghiggfdbbjjj
-hgffffggghgggggfdddjiijj
-gfffffggeeefeedhggihiiij
-efffffffgefgfeeeefffgghi
-dfffeeeeeedddecedceeeehh
-cfffeeeeedddddccccccddeg
-cdffeeeeedddddcccccbbeeg
-accedeeeedddddcccccba9df
-9acddcceddddddcccccbb8de
-8ababbbcccdbccccbbbb777e
-debba9aaa99aaaabbbbb7778
-db99889899999aaaaabb7778
-c988888899999aaaaaab7777
-9888888899999aaaaaaa7777
-a877888889999aa9aaa88864
-877788888898898897987543
-777778766667668676665543
-77777889778767776767789a
-677776666556555565675779
-677766665555554444435568
-466666665555544444444478
-356666665555544444333446
-245566665555544444333455
-124435445553543444333335
-012234433323331153333310
-011002221215543422233210
-000000005443312222222200
-000000765421111222222200
-000097654221111222210000
-000997744111111222110000
-000000000011111110100000
-000000000000000000000000
-000000000000000000000000
-000000000000000000000000
-000000000000000000000000
+# THE CLIMB, written as one ribbon and the bank either side of it.  Every cell is authored: an
+# unauthored cell is procedural and the smoothing pass would bridge the cliffs this map is made of.
+#
+# THE RIBBON.  Six near-level legs at z43 z36 z29 z22 z15 z8, 3-4 cells wide, joined by U-turns at
+# the east edge (x17-20) and the west edge (x3-6).  The legs are FLAT and every voxel of the climb
+# is spent in a U: 6 voxels over the 7 cells of the turn, 0.857 a cell, inside the one-voxel free
+# step.  Leg heights 2, 8, 14, 20, 26, 32; the gate at 34.  The light drops a step at each turn.
+#
+# WHY IT CANNOT BE SHORT-CUT.  Off the ribbon the ground takes its height from the nearest LEG, not
+# from the nearest point of the whole path, so the band between two legs is a single clean face of
+#   6 voxels - 2.4 of cross-slope and roll = 3.6, rounding to 3 or 4.
+# A walking step buys one voxel and a jump buys two, so three is a wall.  The only places the two
+# legs come within two voxels of each other are the few cells just inside each bend, and those are
+# field stones (## objects) — the shoulders of rock the bends turn around.  Walking bottom to top is
+# about 145 cells; there is no line up the hillside shorter than the ribbon.
+#
+# THE WHISTLE LEDGE, x21-23 z22-24 at 16, off the OUTSIDE of the third bend.
+#   verge  x20 z19-24 at 20 (walk-reachable off leg z22)
+#   ledge  at 16: 20 - 16 = 4 voxels = TWO CELLS down.  A jump gains two, so there is no way back up
+#          and the ledge is its own nav region — the map's ONE jump-only region.
+#   far end x20-23 z25-26 at 13: 16 - 13 = 3 voxels down off the north... south end of the ledge,
+#          then 13 -> 14 at z27, a walk edge onto the leg-29 bank.  Jump-only in, walked out.
+#   isolation  N 4, W 4, S 3, E is the map edge.  Nothing else on the map is off the walk graph.
+xyyyzzzzzyyyyyyxxxxxxyxx
+xxxxxyyyyyyyyyyyyyyyxxxx
+xxxxxyyyyyyyyyyyyyyxxxxx
+xxwwwwxxxxxyyyyyyyxxxxxx
+wwwwxxxxxxxyyyyyxxxxxxxx
+wwwvxxxxxxxyyyyxxxxxxxxx
+wvvvwwvvvwwwxxxxxxxxxxxw
+vvvwwwwwwwwwwwwwwwvvxxxw
+vvuuwwwwwwwwwwwwwwvvvxww
+vvuuuwwwwwwwwwwwwvvvvxww
+vuuuuuuuuvvwwwxxxuuuuwww
+qqqpppppqqqrrrsssttttsrr
+qqppppppqqqrrrrssssssrrr
+qqppqqqqqqqqqqqqqqrrrrrq
+qqppqqqqqqqqqqqqqqrrrrqq
+qqpppqqqqqqqqqqqqqqrqqqq
+qqppppqqqqqqqqqqqqqqqqqq
+qqooooqqqqqppppppppppppp
+llnnnnlllllllkkkkkkkkkkl
+llmmmmlllllkkkkkkkkkkkkk
+llllllkkkkkkkkkkkkjjkkkk
+llllkkkkkkkkkkkkkkkjkkkk
+kllkkkkkkkkkkkkkkkjjkggg
+klllkkkkkkkkkkkkkjjjkggg
+kklllllllkkjjjiiiiiikggg
+fggggggggfffeeeddhhhdddd
+ffggggggfffeeeeddgggdddd
+ffffeeeeeeeeeeeeefffeeee
+effeeeeeeeeeeeeeeefffeee
+eedddeeeeeeeeeeeeeefdeee
+eeddddeeeeeeeeeeeeddeeee
+ddccccdddddeeeeeeeeeeeee
+98bbbb888899999999999999
+88aaaa888889999999999999
+889998888888888888999998
+879988888888888888879998
+777988888888888888777988
+776688888888888887777988
+776666666778889996666888
+221111112223334445555433
+221111112223333444444333
+221222222222222223333332
+222222222222222222333322
+212222222222222222232222
+222222211100222222222222
+222222111100001111111111
+222222111100000011111111
+222222211100000000001111
 ## triggers
 11 46 3 1 exit halm 45 24 E
 11 44 3 1 goal Reach_the_high_pasture
-7 43 2 3 message hill_path.last_house
-1 29 4 4 message hill_path.dusk_view
-20 22 3 4 message hill_path.drop
-20 22 3 4 pickup loot_hill hill_path.drop
-11 4 5 2 message hill_path.gate
-12 40 4 3 fight burr
-7 32 4 3 fight burr
-8 18 4 3 fight burr
-10 11 4 3 fight burr
-13 6 4 3 fight burr
+4 45 2 1 message hill_path.last_house
+7 36 3 1 message hill_path.dusk_view
+12 29 3 1 message hill_path.ottilie_dark
+21 22 3 3 message hill_path.drop
+21 22 3 3 pickup loot_hill hill_path.drop
+12 4 3 1 message hill_path.ottilie_dark_2
+12 2 3 2 message hill_path.gate
+12 42 4 3 fight burr
+7 35 4 3 fight burr
+13 28 4 3 fight burr
+9 14 4 3 fight burr3
+13 7 4 3 fight burr3
 12 0 3 1 exit high_pasture 24 46 N

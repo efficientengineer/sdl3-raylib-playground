@@ -1529,6 +1529,24 @@ int bt_ui_rows(Battle *b, int *rows) {
 }
 int bt_ui_has_effort(Battle *b) { return b ? b->ui_has_effort : 0; }
 int bt_ui_enemy_count(Battle *b) { return b ? b->enemy_count : 0; }
+
+// WHAT A PLAYER CAN SEE ON THE SCREEN, as two numbers. The chapter play-test's battle policy is
+// "guard on a tell, spend into an opening, attack otherwise", and it has to read those two things
+// the way the player reads them — off the enemy. Without this the bot can only guard, and a bot
+// that only guards parries the arm that holds for thirteen hundred rounds without ever killing it,
+// which is how these two accessors came to exist.
+int bt_ui_enemy_tell(Battle *b, int i) {
+    if (!b || i < 0 || i >= b->enemy_count) return 0;
+    return b->en[i].alive && b->en[i].tell && !b->en[i].open;
+}
+int bt_ui_enemy_open(Battle *b, int i) {
+    if (!b || i < 0 || i >= b->enemy_count) return 0;
+    return b->en[i].alive && (b->en[i].open || b->en[i].open_next);
+}
+int bt_ui_enemy_alive(Battle *b, int i) {
+    if (!b || i < 0 || i >= b->enemy_count) return 0;
+    return b->en[i].alive;
+}
 int bt_ui_selected(Battle *b) { return b ? b->ui_cmd : 0; }
 int bt_ui_effort(Battle *b) { return b ? b->ui_effort : 0; }
 int bt_ui_target(Battle *b) { return b ? b->ui_target : 0; }

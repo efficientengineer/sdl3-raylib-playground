@@ -813,12 +813,78 @@ the owner was tuning wins over the map's own `light:` line.
 
 ## The self-test
 
-`./capture.sh --vox-selftest` loads halm, hart_yard and west_road in turn, builds and meshes each,
+`./capture.sh --vox-selftest` loads every map in turn, builds and meshes each,
 renders its shadow map and prints a `SELFCHECK vox:` line — and a second `SELFCHECK vox: nav` line
 with the navmesh's own verdict (walkable voxels, walk-reachable, jump-only regions and their sizes,
-how much was widened, `navreach`, build ms) — with the shaped-voxel count, the number of
-buildings generated and `reach=ok|FAIL`, then a verdict line. The script greps that line and exits
-non-zero. All three pass.
+how much was widened, `navreach`, `jump-targets`, build ms) — with the shaped-voxel count, the
+number of buildings generated and `reach=ok|FAIL`, then a verdict line. The script greps that line
+and exits non-zero. All five pass.
+
+It also runs a **colormap identity check** first: `day` at level 0 must equal `master.hex` exactly
+for all 255 opaque indices. It does (2026-09-21). Both shader lookups address texel centres —
+`(idx+0.5)/256.0, (row+0.5)/u_cmaph` — and the CPU lookup indexes `cmap_px` directly, so the engine
+is not shifted; the earlier "index 24 comes back cyan" report was a shifted diagnostic, not a
+shifted engine. **Nothing in this engine cycles colormap columns**: `cmap_px` is written once at
+load and never touched. The old tile field's per-frame column rewrite went with the tile field.
+
+---
+
+## The three tests, and what each one does NOT prove
+
+This matters more than what they do prove, because for two months the chapter self-test passed every
+run while three of the chapter's gates had **no map trigger anywhere** that could open them.
+
+| test | drives | proves | does NOT prove |
+|---|---|---|---|
+| `--chapter-logic-selftest` (was `--chapter-selftest`) | `ch_on_text` / `ch_on_pickup` / `ch_on_battle` directly | the step table is well-formed, every clip exists in `cutscene_data.h`, the gates chain to the end card, `ch_steps_selfcheck` agrees with `ChStepId` | **anything at all about the world.** It types the answers in itself. A flag with no trigger, a trigger on no map, a trigger that fires in the wrong step — all invisible here |
+| `--vox-walktest` | `vx_leader_move` directly, no `vx_tick` | the body: it never leaves the eroded region, never NaNs, never sticks with the way open; A* reaches every exit, door and NPC; 200 jumps land or respawn cleanly | anything about the chapter. It does not know what a flag is |
+| `--chapter-playtest` | **the real game**, through `vx_tick`, a stick and two buttons | that a player can finish the chapter: every gate opened by walking to a reachable trigger and pressing the button, fights won through the real menu, clips tapped through the real renderer | the typewriter and pagination (see below), the Dev panel, save/load, resize |
+
+### What the play-test is
+
+`CHAPTER_PLAYTEST=1`. A bot with a stick and two buttons. **It never calls `ch_set`, `ch_on_text`,
+`ch_on_pickup`, `ch_on_battle`, `ch_jump` or `ch_advance`.** It is told a FLAG, looks up which text
+or item id binds it in the chapter's own binding table, asks the MAP where that id is
+(`vx_find_trigger`), path-walks there on the real navmesh, and presses the real interact button.
+Three static checks run first, because they need no play:
+
+- **the hidden finds**, both ways, against `CH_JUMP_ONLY` in `src/chapter01.h`: a find the player can
+  walk up to has lost its lesson, and a jump-only target that is *not* in the table is a trigger
+  nobody can reach;
+- **the bell run**, measured: the direct road's length in cells at walking and running pace against
+  `CH_BELL_RINGS * CH_BELL_PERIOD`. The clock has to bite between the two or it is not a clock;
+- **the hill climb**, measured: the walking route from the bottom to the top gate, which has to be
+  long enough that the climb is a climb and not a ramp.
+
+Then two runs: the **completionist**, which also goes and takes every designed jump; and the **lazy
+player**, which follows only the goal line and must still finish having seen all ten mandatory
+interactions.
+
+### Two things the play-test cannot do, by construction
+
+1. **It runs headless.** `vx_tick` has one early return after the event queue: everything above it is
+   the simulation, everything below is the render. Without it a run costs the GPU tens of minutes and
+   ImGui's draw lists grow without bound inside the blocking loop. The consequence is that
+   `msg_typing` and `msg_more` — which `draw_msg_box` decides by measuring text against the font —
+   are never updated, so **a press closes a box whole**. The bot therefore does not exercise the
+   typewriter or pagination. `./capture.sh --dialog` is what covers those.
+2. **Clips and battles yield.** Both are drawn with ImGui and a tap is only delivered by an ImGui
+   frame cycle, so those steps cost one real frame each and the play steps cost none. That is why the
+   whole thing is a state machine driven from `game_tick` rather than a function that runs to
+   completion.
+
+### Where it currently stops (2026-09-21)
+
+The completionist reaches **step 21 of 26 with 9 of the mandatory 10**, through four map changes,
+eight battles including the boss, and 28 jumps, in 144 s of real time for 6.5 minutes of play. Open:
+
+- **C5 `0160_the_herder` never ends** under the bot's tapping. Clips C1-C4 end in ~27 frames each; C5
+  does not. Not diagnosed.
+- **The lazy player stalls on `hart_yard.bench_part`** while the completionist gets it. Both the
+  `message` and the `pickup` sit on the same box, and `trig_at` returns the first match, so the
+  pickup can never fire — the same overlapping-trigger class as the guild-hall counter was.
+- `pb_play_step` caches `vx_current_map` at the top, so after a map change it reports one spurious
+  "cannot walk to exit:high_pasture on high_pasture".
 
 ## Known issues, in the order they matter
 

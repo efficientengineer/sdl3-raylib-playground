@@ -77,6 +77,9 @@
 #define VX_AIR_CTRL   0.40f      // of the ground acceleration
 #define VX_BODY_H     1.6f       // the party sprite's height, in cells
 #define VX_STEP_UP    (VOX_S + 0.001f)   // one voxel of rise is a free, smooth step
+// How far up or down the interact button can reach, in world units. Two voxels: you can examine
+// something a step above or below you and nothing on a roof. See the exam cone in vx_tick.
+#define VX_EXAM_REACH (VOX_S * 2.0f + 0.001f)
 #define VX_FACE_HYST  55.0f      // degrees off the current facing's axis before it flips
 #define VX_TRAIL      512        // breadcrumbs the followers walk
 #define VX_TRAIL_DS   0.06f      // cells between breadcrumbs
@@ -273,6 +276,9 @@ static float shape_height_at(unsigned char s, float fu, float fw) {
 
 enum { TG_MESSAGE = 0, TG_EXIT, TG_DOOR, TG_ZONE, TG_TRAP, TG_SCENE,
        TG_FIGHT, TG_PICKUP, TG_GOAL, TG_SPRITE };
+// A trigger walking cannot reach but a jump or a drop can. See vx_nav_check_targets.
+#define VX_JUMPTGT 32
+struct VxJumpTgt { short x, z, kind; char arg[96]; };
 #define TGM(k) (1u << (k))
 
 // `arg2` is the second argument a `pickup` carries (its field-text id). `off` is set by
@@ -404,6 +410,7 @@ struct VoxField {
     unsigned char nav_clr[VX_VD][VX_VW];    // clearance to the nearest blocked voxel, 1/32 cell, saturating
     float nav_h[VX_VD][VX_VW];              // the walking surface at the voxel's centre, world y
     int nav_regions, nav_jump_vox, nav_widened, nav_bad;
+    VxJumpTgt nav_jump_tgt[VX_JUMPTGT]; int nav_jump_tgt_n;   // targets behind a jump, by design or not
     int nav_reg_size[16];
     double nav_ms;
 
@@ -424,7 +431,7 @@ struct VoxField {
     float follow_warp_t[VX_PARTY], follow_stuck[VX_PARTY];
 
     // the walktest bot (capture.sh --vox-walktest): drives the same movement code with no input
-    int bot_on, bot_jump, bot_run; float bot_mx, bot_mz;
+    int bot_on, bot_jump, bot_run, bot_tap, headless; float bot_mx, bot_mz;
     float cam_y;                            // the camera's own softened height, so a jump does not bob it
     bool cam_y_init;
     // the Nav view overlay (Dev): its own flat-colour program and a VBO rebuilt when the map changes
@@ -928,6 +935,13 @@ static void vx_parse_tmap(VoxField *v, char *text) {
             row = 0;
             continue;
         }
+        // A line beginning with a SINGLE '#' is a comment, and is not a row of anything. The tool's
+        // `tmap check` has always skipped these; the engine did not, so a comment inside `## height`
+        // was read as a row of base-36 heights and quietly shredded the map — hart_yard went from
+        // one walk region to a hundred and fifteen. Maps are written by hand and the height grid is
+        // the one section that needs explaining in place, so the comment stays and the engine
+        // learns to skip it.
+        if (line[0] == '#') continue;
         if (sec < 0 || !line[0]) continue;
         if (sec == 0) {
             char *val = strchr(line, ':');
@@ -1091,6 +1105,11 @@ static void vx_parse_tmap(VoxField *v, char *text) {
                 if (n < 9) continue;
                 g->kind = !strcmp(k, "exit") ? TG_EXIT : TG_DOOR;
                 snprintf(g->map, sizeof(g->map), "%s", w[5]);
+                // An exit gets a synthetic id so the chapter's condition table can name it. P1's
+                // "no exits open yet" (chapter01.md) is `exit:halm` switched off until the swing
+                // has been fought; there is no other way to name an exit, because the .tmap line
+                // carries no id of its own and the grammar is not this side's to change.
+                snprintf(g->arg, sizeof(g->arg), "exit:%s", w[5]);
                 g->ax = (short)atoi(w[6]); g->az = (short)atoi(w[7]); g->af = (short)facing_of(w[8]);
             } else continue;
             v->trig_count++;
@@ -2037,19 +2056,64 @@ static int vx_nav_widen_cell(VoxField *v, int cx, int cz) {
     return removed;
 }
 
+// Is any of this cell's four nav voxels walkable AT ALL, whatever region it is in — i.e. could you
+// stand there if something put you there? A shelf you can only jump onto answers true here and
+// false to vx_cell_reachable, and the difference between those two answers is the whole of the
+// "designed jump-only" idea below.
+static bool vx_cell_standable(VoxField *v, int cx, int cz) {
+    if (cx < 0 || cz < 0 || cx >= v->mw || cz >= v->md) return false;
+    for (int dz = 0; dz < VX_VPC; dz++) for (int dx = 0; dx < VX_VPC; dx++)
+        if (v->nav_ok[cz * VX_VPC + dz][cx * VX_VPC + dx]) return true;
+    return false;
+}
+
 // Everything the story needs to be able to reach on foot: every exit, door and message trigger, and
 // the cell next to every NPC.
+//
+// THREE ANSWERS, NOT TWO (2026-09-21). A target that walking cannot reach used to be a flat
+// failure, which is why high_pasture reported `navreach=FAIL` for a shelf that LOOT.md deliberately
+// puts behind a jump. A target is now classified:
+//
+//   reachable   — some cell of it is in walk region 1. Nothing to say.
+//   jump-only   — no cell of it is in region 1, but some cell of it is STANDABLE. You can get there,
+//                 by jumping or by dropping; the navmesh already calls that a jump-only region.
+//                 Recorded in v->nav_jump_tgt[] and REPORTED, never failed, and never widened —
+//                 widening a designed jump is the tool undoing the level.
+//   dead        — no cell of it, and no cell beside it, is standable at all. That is a real break
+//                 and it is what `nav_bad` counts.
+//
+// Which of the jump-only ones are DESIGNED is not the field's business: the field has no idea what
+// a hidden item is. src/chapter01.h's CH_JUMP_ONLY table is the design, and the chapter play-test
+// checks this list against it in both directions.
 static int vx_nav_check_targets(VoxField *v, short *bad_x, short *bad_z, int cap) {
     int n = 0;
+    v->nav_jump_tgt_n = 0;
     for (int i = 0; i < v->trig_count; i++) {
         VxTrig *g = &v->trigs[i];
-        bool any = false;
+        bool any = false, stand = false;
         for (int z = g->z; z < g->z + g->d && !any; z++) for (int x = g->x; x < g->x + g->w && !any; x++)
             if (vx_cell_reachable(v, x, z)) any = true;
+        // A door in a wall — or an examine on anything solid — is reached from the cell in front of
+        // it, not from its own cell. But only if that cell is within the interact button's reach in
+        // Y as well as in plan: a ledge three cells up with walkable ground underneath is NOT
+        // reachable from underneath, and saying it was is what made the eaves tin a ground pickup.
+        for (int d = 0; d < 4 && !any; d++) {
+            int nx = g->x + DX[d], nz = g->z + DZ[d];
+            if (!vx_cell_reachable(v, nx, nz)) continue;
+            if (fabsf(vx_gy(v, nx, nz) - vx_gy(v, g->x, g->z)) > VX_EXAM_REACH) continue;
+            any = true;
+        }
         if (any) continue;
-        // a door in a wall is reached from the cell in front of it, not from its own cell
-        for (int d = 0; d < 4 && !any; d++) if (vx_cell_reachable(v, g->x + DX[d], g->z + DZ[d])) any = true;
-        if (any) continue;
+        for (int z = g->z; z < g->z + g->d && !stand; z++) for (int x = g->x; x < g->x + g->w && !stand; x++)
+            if (vx_cell_standable(v, x, z)) stand = true;
+        if (stand) {
+            if (v->nav_jump_tgt_n < VX_JUMPTGT) {
+                VxJumpTgt *t = &v->nav_jump_tgt[v->nav_jump_tgt_n++];
+                t->x = g->x; t->z = g->z; t->kind = (short)g->kind;
+                snprintf(t->arg, sizeof(t->arg), "%s", g->arg);
+            }
+            continue;                                   // designed or not, never a failure here
+        }
         if (n < cap) { bad_x[n] = g->x; bad_z[n] = g->z; }
         n++;
     }
@@ -2093,6 +2157,26 @@ static void vx_build_nav(VoxField *v) {
           char one[16]; snprintf(one, sizeof one, "%s%d,%d", rl[0] ? " " : "", x, z);
           if (strlen(rl) + strlen(one) < sizeof(rl) - 1) strcat(rl, one); }
       if (rl[0]) SDL_Log("voxfield nav: %s ramps at %s", v->map_name, rl); }
+    // VOX_HDUMP=1 prints the surface height of every cell and the walk region beside it, in the same
+    // grid shape as the .tmap's `## height` section. It is how a hand-authored height field is
+    // debugged: an authored plateau that turns out to be walk-connected to the ground shows up here
+    // as a run of heights climbing where the author wrote a cliff. Base 36, '.' = not walkable.
+    if (SDL_getenv("VOX_HDUMP")) {
+        SDL_Log("voxfield hdump %s: surface height (base 36, relative to base %d)", v->map_name, v->base_v);
+        for (int z = 0; z < v->md; z++) {
+            char h[VX_MAXW + 1], r[VX_MAXW + 1];
+            for (int x = 0; x < v->mw; x++) {
+                int dh = (int)v->hgt[z][x] - (v->base_v - 1);
+                h[x] = !v->walk[z][x] ? '#' : dh < 0 ? '-' : dh < 10 ? (char)('0' + dh) : dh < 36 ? (char)('a' + dh - 10) : '+';
+                int reg = 0;
+                for (int dz = 0; dz < VX_VPC && !reg; dz++) for (int dx = 0; dx < VX_VPC && !reg; dx++)
+                    if (v->nav_ok[z * VX_VPC + dz][x * VX_VPC + dx]) reg = v->nav_reg[z * VX_VPC + dz][x * VX_VPC + dx];
+                r[x] = !reg ? '.' : reg < 10 ? (char)('0' + reg) : (char)('a' + reg - 10);
+            }
+            h[v->mw] = r[v->mw] = 0;
+            SDL_Log("voxfield hdump %s: %2d  %s   %s", v->map_name, z, h, r);
+        }
+    }
     SDL_Log("voxfield nav: %s %dx%d voxels, %d walkable (%d walk-reachable, %d jump-only in %d region%s), "
             "radius %.2f, %.2f ms%s", v->map_name, v->vw, v->vd, freev, freev - v->nav_jump_vox,
             v->nav_jump_vox, v->nav_regions > 1 ? v->nav_regions - 1 : 0, v->nav_regions == 2 ? "" : "s",
@@ -3453,10 +3537,15 @@ static void vx_selfcheck(VoxField *v, int dw, int dh, int draws, int sprites) {
             if (strlen(sizes) + strlen(one) < sizeof(sizes) - 1) strcat(sizes, one);
         }
         SDL_Log("SELFCHECK vox: nav map=%s r=%.2f  walkable=%d vox  walk-reachable=%d  jumponly=%d in %d region(s)"
-                "%s%s  widened=%d  navreach=%s  nav=%.2fms",
+                "%s%s  widened=%d  navreach=%s  jump-targets=%d  nav=%.2fms",
                 v->map_name, v->agent_r, freev, freev - v->nav_jump_vox, v->nav_jump_vox,
                 v->nav_regions > 1 ? v->nav_regions - 1 : 0, sizes[0] ? " sizes " : "", sizes,
-                v->nav_widened, v->nav_bad ? "FAIL" : "ok", v->nav_ms);
+                v->nav_widened, v->nav_bad ? "FAIL" : "ok", v->nav_jump_tgt_n, v->nav_ms);
+        // Named, so the map author can see at a glance whether the list is the design or an accident.
+        for (int i = 0; i < v->nav_jump_tgt_n; i++)
+            SDL_Log("SELFCHECK vox:   %s jump-only target '%s' at %d,%d (walking cannot reach it; "
+                    "src/chapter01.h CH_JUMP_ONLY says whether that is the design)",
+                    v->map_name, v->nav_jump_tgt[i].arg, v->nav_jump_tgt[i].x, v->nav_jump_tgt[i].z);
     }
 }
 
@@ -3836,6 +3925,16 @@ static void vx_input(VoxField *v, int w, int h, bool blocked, float dt) {
     int n = blocked ? 0 : vx_touches(tt, 8, w, h);
     v->tapped = false;
     v->want_jump = 0;
+    // THE BOT PRESSES THE SAME TWO BUTTONS. `bot_tap` and `bot_jump` are one-shot latches set by
+    // vx_bot_interact / vx_bot_jump, and they land on exactly the two variables the Act button and
+    // the Jump button land on — so the chapter play-test's interact goes through trig_at, the cone
+    // test, the message pager and vx_fire, not around them. Everything below this block is touch
+    // and keyboard and is skipped entirely while the bot drives.
+    if (v->bot_on) {
+        if (v->bot_tap) { v->tapped = true; v->bot_tap = 0; }
+        if (v->bot_jump) { v->want_jump = 1; v->bot_jump = 0; }
+        return;
+    }
     bool stick_seen = false, act_seen = false, jump_seen = false;
     float jx, jy, jr, ax2, ay2, ar;
     vx_btn_jump(w, h, &jx, &jy, &jr);
@@ -5413,13 +5512,32 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
             int fx = (int)floorf(a->x + fxd * 0.9f), fz = (int)floorf(a->z + fzd * 0.9f);
             const unsigned AHEAD = TGM(TG_MESSAGE) | TGM(TG_DOOR) | TGM(TG_PICKUP);
             const unsigned UNDER = TGM(TG_MESSAGE) | TGM(TG_PICKUP);
-            v->exam_trig = trig_at(v, fx, fz, AHEAD);
+            // AND WITHIN ARM'S REACH IN Y. Without this the cone is a PLAN test, so a tin nailed
+            // under the eaves three cells up could be taken by standing in the yard underneath it
+            // and facing north — which is what the hart_yard height field turned the chapter's
+            // first platforming lesson into the first time it was authored. A trigger on a SOLID
+            // cell (a wall, a well, a house front) keeps that cell's ground height, so examining
+            // those from beside them still works exactly as it did.
+            if (fx >= 0 && fz >= 0 && fx < v->mw && fz < v->md && fabsf(vx_gy(v, fx, fz) - a->y) > VX_EXAM_REACH)
+                v->exam_trig = -1;
+            else v->exam_trig = trig_at(v, fx, fz, AHEAD);
             if (v->exam_trig < 0) v->exam_trig = trig_at(v, a->tx, a->tz, UNDER);
         }
     }
     if (v->tapped && !v->fade_dir) {
         if (v->msg[0]) {
-            if (v->msg_typing) v->msg_t = 99.0f;
+            // HEADLESS: `msg_typing` and `msg_more` are decided by draw_msg_box, which measures the
+            // text against the font at the real screen width — so with the picture undrawn they are
+            // stale forever, every press only re-finishes a typewriter that is already finished,
+            // and the box never closes. The play-test then reads the same line for eternity, the
+            // field will not move the body while a box is open, and it presents as "the player
+            // cannot walk to the swing", which is how an hour went.
+            //
+            // So with no renderer a press CLOSES the box, whole. The consequence is stated in
+            // VOXFIELD_NOTES.md: the play-test does not exercise the typewriter or pagination.
+            // --capture.sh --dialog and the robustness sweep are what cover those.
+            if (v->headless) { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; }
+            else if (v->msg_typing) v->msg_t = 99.0f;
             else if (v->msg_more) { v->msg_page++; v->msg_t = 0; }
             else { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; }
         } else if (v->exam_npc >= 0) {
@@ -5451,6 +5569,17 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
     }
 
     vxp_end(VXP_TICK);
+
+    // HEADLESS: everything above this line is the simulation — input, movement, NPCs, the fade and
+    // the map change, the examine cone, the interact button, the event queue. Everything below is
+    // the render and the ImGui overlay. The chapter play-test drives the REAL game through
+    // vx_tick, tens of thousands of steps of it, and cannot afford either: the GPU cost would put
+    // the run into the tens of minutes, and calling ImGui's draw lists in a blocking loop between
+    // one NewFrame and its Render grows them without bound until it falls over.
+    //
+    // So this is one early return and not a refactor: the simulation the test drives is the same
+    // code the player drives, byte for byte, with the picture left undrawn.
+    if (v->headless) return;
 
     int rw = (int)(w * (v->res_pct / 100.0f) + 0.5f), rh = (int)(h * (v->res_pct / 100.0f) + 0.5f);
     if (rw < 64) rw = 64;
@@ -5847,9 +5976,49 @@ void vx_destroy(VoxField *v) {
 
 // Load every map once, mesh it, and say so. Non-zero means something a capture would have hidden:
 // a map that will not build, or a route the tile map has and the voxel world does not.
+// ── the colormap identity check ────────────────────────────────────────────────────────────────
+// `day` at full light must be the palette, exactly, for every one of the 255 opaque indices. If it
+// is not, something between master.hex, colormap.png and the lookup is shifted by a row or a
+// column, and the symptom is the one the palette investigation saw: index 24 coming back cyan
+// because it was read against column 25, the head of the `sparkle` ramp.
+//
+// THE ANSWER, 2026-09-21: the engine is NOT shifted. The two shader lookups address texel centres
+// (`(idx+0.5)/256.0, (row+0.5)/u_cmaph`) and the CPU lookup indexes `cmap_px` directly, which is
+// exact by construction. This check exists so that stays true, and so the next person who sees a
+// cyan block has a one-line answer instead of an afternoon.
+//
+// Also worth recording here: NOTHING IN THIS ENGINE CYCLES COLORMAP COLUMNS. `cmap_px` is written
+// once, at load, and never touched again; the old tile field's per-frame column rewrite went with
+// the tile field. Water and lamp movement in the voxel world is shader-driven and does not touch a
+// palette index, so no face can strobe. Leave it that way until the palette has genuinely reserved
+// ranges — the art currently uses 3-28 heavily (Hart's portraits sit 10-14% on `fire_lamp`).
+static int vx_colormap_check(VoxField *v) {
+    if (!v->cmap_px) { SDL_Log("SELFCHECK vox: colormap — no colormap loaded, nothing to check"); return 0; }
+    int day = -1;
+    for (int i = 0; i < v->cmap_tables && i < 8; i++) if (!SDL_strcasecmp(v->cmap_tname[i], "day")) day = i;
+    if (day < 0) { SDL_Log("SELFCHECK vox: colormap — no `day` table; cannot check the identity row"); return 1; }
+    int row = v->cmap_row0[day];                       // level 0 of `day` is full light: the identity
+    int bad = 0, first = -1;
+    for (int i = 1; i < 256; i++) {
+        const unsigned char *p = v->cmap_px + ((size_t)row * 256 + i) * 4;
+        if (p[0] == v->pal[i][0] && p[1] == v->pal[i][1] && p[2] == v->pal[i][2]) continue;
+        if (first < 0) {
+            first = i;
+            SDL_Log("SELFCHECK vox: colormap MISMATCH at index %d: palette %02x%02x%02x, day level 0 "
+                    "%02x%02x%02x — the colormap, the palette or the lookup is shifted",
+                    i, v->pal[i][0], v->pal[i][1], v->pal[i][2], p[0], p[1], p[2]);
+        }
+        bad++;
+    }
+    SDL_Log("SELFCHECK vox: colormap %s — `day` level 0 equals master.hex for %d of 255 indices "
+            "(texel-centre addressing, no column cycling anywhere in this engine)",
+            bad ? "FAIL" : "ok", 255 - bad);
+    return bad ? 1 : 0;
+}
+
 int vx_selftest(VoxField *v) {
     if (!v->gl_ready) vx_gl_init(v);
-    int bad = 0;
+    int bad = vx_colormap_check(v);
     for (int i = 0; i < vx_map_count(); i++) {
         const char *m = vx_map_name_at(i);
         if (!vx_load_map(v, m)) { SDL_Log("SELFCHECK vox: map=%s FAILED TO LOAD", m); bad++; continue; }
@@ -6067,6 +6236,140 @@ static int vx_walktest_map(VoxField *v, const char *map, char *summary, int cap)
     return fails;
 }
 
+// ───────────────────── the play-test bot's hands (src/star_logic.cpp --chapter-playtest) ─────────
+// The walk test above drives vx_leader_move directly, because all it is testing is the body. The
+// CHAPTER play-test has to go through vx_tick — triggers, messages, events, map changes, the lot —
+// so it needs the stick and the two buttons rather than the movement function. That is all this is:
+// a stick and two buttons, plus the A* the bot needs to know where to push the stick.
+//
+// NOTHING HERE SETS A FLAG, OPENS A BOX OR FIRES AN EVENT. If the bot reaches a trigger it is
+// because it walked onto it, and if a box opens it is because vx_tick opened it.
+
+void vx_bot(VoxField *v, int on) {
+    if (!v) return;
+    v->bot_on = on ? 1 : 0;
+    v->headless = v->bot_on;              // the bot never needs the picture; see vx_tick
+    if (!v->bot_on) { v->bot_mx = v->bot_mz = 0; v->bot_run = v->bot_tap = v->bot_jump = 0; }
+}
+void vx_bot_stick(VoxField *v, float mx, float mz, int run) {
+    if (!v) return;
+    v->bot_mx = mx; v->bot_mz = mz; v->bot_run = run ? 1 : 0;
+}
+void vx_bot_interact(VoxField *v) { if (v) v->bot_tap = 1; }
+void vx_bot_jump(VoxField *v)     { if (v) v->bot_jump = 1; }
+
+void vx_bot_where(VoxField *v, float *x, float *z, int *airborne) {
+    if (!v) return;
+    if (x) *x = v->act[0].x;
+    if (z) *z = v->act[0].z;
+    if (airborne) *airborne = v->airborne;
+}
+
+// Walk connectivity only, cell to cell, as a pure query: can the player get from here to there
+// WITHOUT jumping? This is the negative test for a hidden item ("reachable by plain walking" is a
+// failure) and the positive test for everything mandatory.
+bool vx_bot_can_walk(VoxField *v, int fx, int fz, int tx, int tz) {
+    if (!v) return false;
+    int sx, sz, gx, gz;
+    if (!vx_bot_cell_vox(v, fx, fz, &sx, &sz)) return false;
+    bool have = vx_bot_cell_vox(v, tx, tz, &gx, &gz);
+    for (int d = 0; d < 4 && !have; d++) have = vx_bot_cell_vox(v, tx + DX[d], tz + DZ[d], &gx, &gz);
+    if (!have) return false;
+    return v->nav_reg[sz][sx] && v->nav_reg[sz][sx] == v->nav_reg[gz][gx];
+}
+
+// Is this cell somewhere a body could stand, but not somewhere walking can get to? — the engine's
+// own definition of a jump-only place, asked about one cell.
+bool vx_bot_jump_only(VoxField *v, int cx, int cz) {
+    if (!v) return false;
+    return vx_cell_standable(v, cx, cz) && !vx_cell_reachable(v, cx, cz);
+}
+
+// The party's current cell as the bot sees it.
+void vx_bot_cell(VoxField *v, int *cx, int *cz) {
+    if (!v) return;
+    if (cx) *cx = (int)floorf(v->act[0].x / VOX_S / VX_VPC);
+    if (cz) *cz = (int)floorf(v->act[0].z / VOX_S / VX_VPC);
+}
+
+// A* from where the party is standing to a cell, in CELLS, walk edges only. Writes at most `cap`
+// waypoints and returns how many; 0 means there is no walking route, which is a fact the test
+// wants rather than an error.
+int vx_bot_path(VoxField *v, int tx, int tz, short *out_x, short *out_z, int cap) {
+    if (!v || cap < 1) return 0;
+    static short px[VXB_PATH], pz[VXB_PATH];
+    int sx = (int)floorf(v->act[0].x / VOX_S), sz = (int)floorf(v->act[0].z / VOX_S);
+    if (sx < 0 || sz < 0 || sx >= v->vw || sz >= v->vd || !v->nav_ok[sz][sx]) return 0;
+    int gx, gz;
+    bool have = vx_bot_cell_vox(v, tx, tz, &gx, &gz);
+    for (int d = 0; d < 4 && !have; d++) have = vx_bot_cell_vox(v, tx + DX[d], tz + DZ[d], &gx, &gz);
+    if (!have) return 0;
+    int n = vx_bot_astar(v, sx, sz, gx, gz, px, pz);
+    if (n > cap) {
+        // Decimate rather than truncate: the bot only needs enough waypoints to steer by, and a
+        // truncated path would stop it halfway and read as "did not arrive".
+        int step = (n + cap - 1) / cap, m = 0;
+        for (int i = 0; i < n && m < cap; i += step) { out_x[m] = px[i]; out_z[m] = pz[i]; m++; }
+        if (m && (out_x[m - 1] != px[n - 1] || out_z[m - 1] != pz[n - 1])) { out_x[m - 1] = px[n - 1]; out_z[m - 1] = pz[n - 1]; }
+        return m;
+    }
+    for (int i = 0; i < n; i++) { out_x[i] = px[i]; out_z[i] = pz[i]; }
+    return n;
+}
+
+// The waypoints are in NAV VOXELS; this is the world position of one.
+void vx_bot_waypoint(VoxField *v, int wx, int wz, float *x, float *z) {
+    (void)v;
+    if (x) *x = (wx + 0.5f) * VOX_S;
+    if (z) *z = (wz + 0.5f) * VOX_S;
+}
+
+// What the interact button would act on right now, as an id, so the bot can tell whether standing
+// here and pressing would do the thing it came to do. "" when there is nothing.
+const char *vx_bot_examinable(VoxField *v) {
+    if (!v) return "";
+    if (v->exam_npc >= 0) return v->npcs[v->exam_npc].text;
+    if (v->exam_trig >= 0) {
+        VxTrig *g = &v->trigs[v->exam_trig];
+        return g->kind == TG_PICKUP ? g->arg2 : g->arg;
+    }
+    return "";
+}
+
+// WHERE IS THIS TRIGGER? The centre cell of the trigger whose arg (or, for a pickup, whose text
+// id) is `id`. This is what lets the play-test be told a FLAG and find its way to the thing that
+// sets it without anybody writing a cell number into a test: the chapter's binding table says
+// which id, and the map says where. False means the map does not have it — which is exactly the
+// shape of the three blockers the 2026-09-21 audit found.
+bool vx_find_trigger(VoxField *v, const char *id, short *cx, short *cz) {
+    if (!v || !id || !id[0]) return false;
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (strcmp(g->arg, id) && strcmp(g->arg2, id)) continue;
+        if (cx) *cx = (short)(g->x + g->w / 2);
+        if (cz) *cz = (short)(g->z + g->d / 2);
+        return true;
+    }
+    for (int i = 0; i < v->npc_count; i++) {
+        if (strcmp(v->npcs[i].text, id)) continue;
+        if (cx) *cx = v->npcs[i].tx;
+        if (cz) *cz = v->npcs[i].tz;
+        return true;
+    }
+    return false;
+}
+
+int vx_bot_jump_targets(VoxField *v, const char **ids, short *xs, short *zs, int cap) {
+    if (!v) return 0;
+    int n = v->nav_jump_tgt_n < cap ? v->nav_jump_tgt_n : cap;
+    for (int i = 0; i < n; i++) {
+        if (ids) ids[i] = v->nav_jump_tgt[i].arg;
+        if (xs) xs[i] = v->nav_jump_tgt[i].x;
+        if (zs) zs[i] = v->nav_jump_tgt[i].z;
+    }
+    return v->nav_jump_tgt_n;
+}
+
 int vx_walktest(VoxField *v, const char *one_map) {
     if (!v->gl_ready) vx_gl_init(v);
     int bad = 0;
@@ -6225,6 +6528,25 @@ void vx_disable_trigger(VoxField *v, const char *arg_id) {
     if (!n) SDL_Log("voxfield: vx_disable_trigger(\"%s\") matched nothing on %s", arg_id, v->map_name);
 }
 
+// The same switch, both ways and silently — what the chapter's step/flag condition table drives
+// (src/chapter01.h, CH_TRIG_COND). It is called for every conditioned trigger on every step change,
+// so it must not log: a trigger for another map matching nothing is the normal case, not a warning.
+// `taken` is never cleared: a pickup that has been taken stays taken however the window moves.
+int vx_set_trigger(VoxField *v, const char *arg_id, int on) {
+    if (!v || !arg_id || !arg_id[0]) return 0;
+    int n = 0;
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (strcmp(g->arg, arg_id) && strcmp(g->arg2, arg_id)) continue;
+        g->off = on ? 0 : 1;
+        // Re-arming a trigger the party is standing inside must not fire it on the spot: `inside`
+        // is left set, so it only fires when they walk out and back in. (Walking out of the guild
+        // hall and back in is a player's business; a step change is not.)
+        n++;
+    }
+    return n;
+}
+
 void vx_say_id(VoxField *v, const char *id) {
     if (!v || !id || !id[0]) return;
     vx_say2(v, nullptr, id, false);     // the chapter's own line: not reported back at it
@@ -6237,3 +6559,9 @@ void vx_freeze(VoxField *v, int on) {
     v->frozen = on ? 1 : 0;
     if (v->frozen) { v->move_in_x = v->move_in_z = 0; v->move_mag = 0; v->want_jump = 0; v->jump_buf = 0; }
 }
+
+// What is on screen right now, for a test that has to say WHY it is blocked rather than just that
+// it is. "" when the box is closed; the fade is reported separately because a map change looks
+// exactly like an open box to vx_busy and is a completely different problem.
+const char *vx_bot_boxtext(VoxField *v) { return v ? v->msg : ""; }
+int vx_bot_fading(VoxField *v) { return v ? v->fade_dir : 0; }

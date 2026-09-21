@@ -908,7 +908,7 @@ static void draw_title(Star *st, int w, int h, float dt) {
         dl->AddRectFilled(ImVec2(x, y), ImVec2(x + 3, y + 3), with_alpha(IM_COL32(200, 210, 255, 255), tw));
     }
     float m = (float)(w < h ? w : h);
-    const char *title = "THE FAIR COPY", *sub = "Chapter 1  -  The Last Job Sheet";
+    const char *title = "THE FAIR COPY", *sub = CH_TITLE;
     float ts = m * 0.115f, ss = m * 0.042f;
     ImVec2 tsz = font->CalcTextSizeA(ts, FLT_MAX, 0, title), ssz = font->CalcTextSizeA(ss, FLT_MAX, 0, sub);
     float y = h * 0.28f;
@@ -998,20 +998,50 @@ static void draw_field(Star *st, int w, int h, float dt) {
             ch_on_battle(&st->ch, st->fight_enc, out == BT_WIN);
             // A won fight is consumed so walking back over the cell does not restart it. A lost
             // one is left armed: in the yard that IS the instant retry.
-            if (out == BT_WIN) vx_disable_trigger(st->vx, st->fight_enc);
+            //
+            // EXCEPT THE THREE MACHINES. They are furniture in a yard, not an encounter: Hart
+            // built them to be used again, P4 is FOUR SESSIONS at the swing on day two, and
+            // consuming the swing the first time it goes down leaves the player standing in front
+            // of nothing for the rest of the day with a goal line telling them to beat it. (The
+            // chapter play-test found this on step 11, which is session two.)
+            bool a_machine = !strcmp(st->fight_enc, "post") || !strcmp(st->fight_enc, "arm") ||
+                             !strcmp(st->fight_enc, "swing");
+            if (out == BT_WIN && !a_machine) vx_disable_trigger(st->vx, st->fight_enc);
         }
         return;
     }
 
     VxEvent ev;
+    // The box the player is reading is what `vx_busy` reports, and it is read BEFORE the tick so a
+    // box that opens this frame already counts: the bell must not tick on the frame a conversation
+    // starts. See ch_tick — nobody reads boxes on a clock.
+    bool reading = vx_busy(st->vx);
     vx_tick(st->vx, w, h, dt, dev.open, &ev);
-    ch_tick(&st->ch, dt);
+    ch_tick(&st->ch, dt, reading || vx_busy(st->vx));
 
     switch (ev.kind) {
     case VXE_SCENE:  field_scene(st, ev.arg); break;
     case VXE_ZONE:   { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); } break;
-    case VXE_TEXT:   ch_on_text(&st->ch, ev.arg); break;          // a mandatory examine, observed
-    case VXE_PICKUP: ch_on_pickup(&st->ch, ev.arg); break;
+    case VXE_TEXT:
+        // THREE THINGS CAN HAPPEN TO AN EXAMINE, and the chapter decides which.
+        //   * the job board before the job exists shows its ALTERNATE line and tells the chapter
+        //     nothing — the board is always there, it just says a different thing;
+        //   * the guild-hall counter shows the on-time or the late clerk, by the bell;
+        //   * everything else is what the trigger said, and the chapter gates on it.
+        {
+            const char *alt = ch_trig_alt(&st->ch, ev.arg);
+            if (alt) { vx_say_id(st->vx, alt); break; }
+            const char *line = ch_clerk_line(&st->ch, ev.arg);
+            if (strcmp(line, ev.arg)) vx_say_id(st->vx, line);
+            // A FLAG CHANGED, SO THE WORLD CHANGED. Half the condition table hangs off a flag that
+            // is set in the SAME step as the trigger it unlocks — taking the job sheet down is what
+            // makes her door and the guild book live, and all three are inside P5's one row.
+            // Re-applying only on a step change left those two inert for the whole of the bell run,
+            // which is precisely the step they exist for.
+            if (ch_on_text(&st->ch, line)) ch_apply_triggers(&st->ch, st->vx);
+        }
+        break;
+    case VXE_PICKUP: if (ch_on_pickup(&st->ch, ev.arg)) ch_apply_triggers(&st->ch, st->vx); break;
     case VXE_GOAL:   snprintf(st->ch.goal, sizeof(st->ch.goal), "%s", ev.arg); break;
     case VXE_MAP:    ch_on_map(&st->ch, ev.arg); break;
     case VXE_FIGHT:
@@ -1238,14 +1268,18 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGui::PopStyleColor();
 }
 
-// ───────────────────────── the chapter self-test ─────────────────────────
-// CHAPTER_SELFTEST=1 (capture.sh --chapter-selftest). Plays the whole chapter through the SAME
-// entry points the game uses — ch_on_text, ch_on_pickup, ch_on_battle, ch_advance — with no window,
-// no input and no world, and asserts it reaches the end card with all ten mandatory flags set.
+// ───────────────────────── the chapter LOGIC self-test ─────────────────────────
+// CHAPTER_LOGIC_SELFTEST=1 (capture.sh --chapter-logic-selftest). Plays the whole chapter through
+// the SAME entry points the game uses — ch_on_text, ch_on_pickup, ch_on_battle, ch_advance — with
+// no window, no input and no world, and asserts it reaches the end card with all ten mandatory
+// flags set. It takes milliseconds and it is what you run after editing CH_STEPS.
 //
-// What this does NOT prove: that a player can physically walk to each trigger. That is
-// `--vox-walktest`'s job (it path-walks the real movement code to every exit, door and NPC on every
-// map). The two together are the coverage; neither is the other.
+// WHAT IT DOES NOT PROVE, AND WHY THERE IS A SECOND TEST. It sets the flags itself. It cannot tell
+// you that a player can walk to the trigger that sets one, that the trigger exists on the map at
+// all, that it fires in the right step, that a hidden item is actually hidden, or that the swing
+// can be lost on day one and won on day two. For two months `F_BED`, `F_SIGNED` and `F_BODY` gated
+// three steps with NO MAP TRIGGER ANYWHERE that could set them, and this test passed every time,
+// because it typed the answers in itself. That is what --chapter-playtest below is for.
 static const char *ch_text_for_flag(int flag) {
     for (int i = 0; i < CH_BIND_COUNT; i++) if (CH_BINDS[i].flag == flag) return CH_BINDS[i].text_id;
     return nullptr;
@@ -1258,7 +1292,7 @@ static const char *ch_item_for_flag(int flag) {
 static int chapter_selftest() {
     Chapter c;
     ch_new_game(&c);
-    int fails = 0, clips = 0, battles = 0;
+    int fails = ch_steps_selfcheck(), clips = 0, battles = 0;
     SDL_Log("CHAPTER %d steps, %d flags (%d mandatory)", CH_STEP_COUNT, CH_FLAG_COUNT, CH_MANDATORY);
     for (int guard = 0; guard < CH_STEP_COUNT * 4; guard++) {
         const ChStep *s = &CH_STEPS[c.step];
@@ -1285,7 +1319,13 @@ static int chapter_selftest() {
             if (tid) { ch_on_text(&c, tid); SDL_Log("          examine  %s", tid); }
             else if (iid) { ch_on_pickup(&c, iid); SDL_Log("          pick up  %s", iid); }
             else if (f == F_SWING_TRIED) { ch_on_battle(&c, "swing", false); battles++; SDL_Log("          fight    swing (lost: P1 is not won)"); }
-            else if (f == F_SWING_BEATEN) { ch_on_battle(&c, "swing", true); battles++; SDL_Log("          fight    swing (won: the parry lands)"); }
+            // P4's three session flags and the win are all "have another go at the swing". The
+            // first three are LOSSES, because day two is four sessions and the last one is the win.
+            else if (f == F_DAY2_1 || f == F_DAY2_2 || f == F_DAY2_3) {
+                ch_on_battle(&c, "swing", false); battles++;
+                SDL_Log("          fight    swing (day-two session %d, lost)", c.swing_sessions);
+            }
+            else if (f == F_SWING_BEATEN) { ch_on_battle(&c, "swing", true); battles++; SDL_Log("          fight    swing (won: the parry lands, at last light)"); }
             else if (f == F_BOSS_DEAD) { ch_on_battle(&c, "klee", true); battles++; SDL_Log("          fight    klee (boss)"); }
             else if (f == F_AT_PASTURE) { ch_on_map(&c, "high_pasture"); SDL_Log("          walk to  high_pasture"); }
             else if (f == F_LEFT_YARD) { c.bell_armed = 1; ch_on_map(&c, "halm"); SDL_Log("          leave the yard: the bell starts"); }
@@ -1309,6 +1349,694 @@ static int chapter_selftest() {
     return fails;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  --chapter-playtest: A BOT THAT PLAYS THE CHAPTER
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CHAPTER_PLAYTEST=1 (capture.sh --chapter-playtest).
+//
+// THE RULE THIS TEST IS BUILT ON: it may not touch the chapter's memory. It never calls ch_set,
+// ch_on_text, ch_on_pickup, ch_on_battle, ch_jump or ch_advance. It has a stick, two buttons and
+// the battle screen's own tap points, and every flag that ends up set got there because the bot
+// walked onto a trigger or pressed a button on one, through vx_tick and draw_field exactly as a
+// thumb would. If the chapter finishes, a player can finish it. If it does not, a player cannot.
+//
+// The old --chapter-selftest could not fail on any of the nine blockers the 2026-09-21 audit found,
+// because every one of them was a gap between the story table and the world, and that test only
+// ever looked at the table. This one walks.
+//
+// WHAT IT ASSERTS, in the order it can:
+//   1. every PLAY step's gate is opened by something REACHABLE — the bot path-walks to the trigger
+//      that binds each needed flag, on the real navmesh, and presses the real button;
+//   2. no trigger fires outside its step window (CH_TRIG_COND) — checked by watching the flags
+//      that are set on each step against the ones the step asked for;
+//   3. a mandatory interaction cannot be skipped — the LAZY PLAYER run below follows only the goal
+//      line, talks to nobody optional, and must still finish having seen all ten;
+//   4. a hidden item is NOT reachable by plain walking and IS reachable by its designed route —
+//      both halves, against CH_JUMP_ONLY;
+//   5. day one's swing cannot be won;
+//   6. the bell run cannot be made in time by the direct road, and can by the shortcuts;
+//   7. the hill climb cannot be skipped by jumping up the terraces;
+//   8. the end card is reached, with all ten.
+//
+// Its negative cases are the point of it, and each one was proved by temporarily breaking the
+// thing it guards and watching the test go red. See VOXFIELD_NOTES.md, "What each test proves".
+#define PT_MAXWP 512
+#define PT_DT (1.0f / 60.0f)
+#define PT_STEP_BUDGET 20000            // sim frames one chapter step may take: 5.5 minutes of play
+
+// The battle screen's tap injector lives with --battle-ui-test below; the play-test borrows it so
+// there is exactly one way a button gets pressed in a test.
+static void bui_tap(float x, float y);
+static void bui_pump();
+static void star_tick(Star *st, int w, int h, float dt, float dpi_scale);
+
+struct PlayBot {
+    Star *st;
+    int lazy;                           // 0 = the completionist, 1 = the lazy player
+    int fails, interactions, battles, jumps;
+    int frames;                         // sim frames burned, all steps
+    int step_frames;
+    uint64_t flags_at_step_start;
+    double t0, tstep;
+    int running, done, clip_guard, tap_cool, guard, last_step, tries, forced, effort_round;
+    // THE REAL WINDOW SIZE. The bot taps by warping the OS pointer, so its coordinates
+    // have to be the ones the battle screen was actually drawn at. Drawing the field at a
+    // made-up 1920x1080 while the window was 1920x1027 put every tap a few per cent low,
+    // which read as a battle that never accepted input and ran for thirteen hundred rounds.
+    int w, h;
+    char note[160];
+};
+static PlayBot pb;
+
+static void pb_fail(const char *fmt, ...) {
+    char msg[256]; va_list ap; va_start(ap, fmt); vsnprintf(msg, sizeof msg, fmt, ap); va_end(ap);
+    SDL_Log("PLAYTEST FAIL: %s", msg);
+    pb.fails++;
+}
+
+// One frame of the real game, with the bot's hands on the controls. draw_field is the game's own
+// per-frame function: it ticks the field, routes the events into the chapter, runs the battle, and
+// advances the step when the gate opens. Nothing is shortcut.
+static void pb_frame(float mx, float mz, int run) {
+    vx_bot_stick(pb.st->vx, mx, mz, run);
+    draw_field(pb.st, pb.w, pb.h, PT_DT);
+    pb.frames++; pb.step_frames++;
+}
+static void pb_idle(int n) { for (int i = 0; i < n; i++) pb_frame(0, 0, 0); }
+
+// Press the interact button and read the box out, page by page, exactly as the player does: the
+// first press opens it, the next finishes the typewriter, the next turns the page or closes it.
+// CLOSE WHATEVER IS ON SCREEN, and then STOP PRESSING. The button is one shot, consumed by the
+// NEXT tick, so a loop that presses whenever `vx_busy` is true presses once more after the box has
+// already gone — and that press lands on the trigger the party is standing on and opens it again.
+// The bot then reads the same box forever, the field never moves the body while a box is open, and
+// the whole thing looks exactly like "the player cannot walk to the swing". It is not: it is the
+// bot holding down the A button.
+//
+// So: press, wait for the press to be consumed, look again, and leave a clear gap at the end.
+static void pb_close_box() {
+    for (int guard = 0; guard < 200 && vx_busy(pb.st->vx); guard++) {
+        vx_bot_interact(pb.st->vx);
+        for (int k = 0; k < 3; k++) pb_frame(0, 0, 0);
+    }
+    pb_idle(3);
+}
+
+static void pb_interact() {
+    vx_bot_interact(pb.st->vx);
+    pb.interactions++;
+    for (int k = 0; k < 4; k++) pb_frame(0, 0, 0);
+    pb_close_box();
+}
+
+// Walk to a cell on the real navmesh, with the real movement code. Returns false if there is no
+// walking route or the body did not arrive — both of which are findings, not crashes.
+static bool pb_walk_to(int tx, int tz) {
+    short wx[PT_MAXWP], wz[PT_MAXWP];
+    int n = vx_bot_path(pb.st->vx, tx, tz, wx, wz, PT_MAXWP);
+    if (!n) {
+        // A* RETURNS NOTHING WHEN YOU ARE ALREADY THERE, and "already there" is the normal state
+        // after examining a machine and then being asked to go and fight it — the examine and the
+        // fight sit on the same cell. Standing on a trigger does not fire it either: `inside` is
+        // already set and a trigger fires on the STEP IN. So back off and come at it again, which
+        // is exactly what the player does.
+        float x, z; int air, cx, cz;
+        vx_bot_where(pb.st->vx, &x, &z, &air);
+        vx_bot_cell(pb.st->vx, &cx, &cz);
+        if (abs(cx - tx) > 2 || abs(cz - tz) > 2) {
+            SDL_Log("PLAYTEST   no route: party at %d,%d (%.2f,%.2f air=%d) -> %d,%d "
+                    "[target standable=%d jump-only=%d, party cell walkable-to-target=%d]",
+                    cx, cz, x, z, air, tx, tz,
+                    (int)!vx_bot_jump_only(pb.st->vx, tx, tz), (int)vx_bot_jump_only(pb.st->vx, tx, tz),
+                    (int)vx_bot_can_walk(pb.st->vx, cx, cz, tx, tz));
+            return false;                                            // genuinely no route
+        }
+        float ax = (float)(cx - tx), az = (float)(cz - tz);
+        if (fabsf(ax) < 0.1f && fabsf(az) < 0.1f) { ax = 0; az = 1; }
+        float l = sqrtf(ax * ax + az * az);
+        // Step off — and read anything that is still on screen, because the field does not move
+        // the body while a box is open and the box the bot just opened may have a second page.
+        // Step off, and KEEP GOING UNTIL THE CELL ACTUALLY CHANGES. A trigger fires on the step
+        // in, so coming back at it only works if we genuinely left; a fixed number of frames is
+        // not a guarantee when something is in the way. Try each direction in turn.
+        pb_close_box();
+        {
+            static const float TRY[4][2] = { { 0, 1 }, { 0, -1 }, { 1, 0 }, { -1, 0 } };
+            bool left = false;
+            for (int d = 0; d < 4 && !left; d++) {
+                float mx = d == 0 ? ax / l : TRY[d][0], mz = d == 0 ? az / l : TRY[d][1];
+                for (int i = 0; i < 80 && !left; i++) {
+                    pb_frame(mx, mz, 1);
+                    int bx2, bz2;
+                    vx_bot_cell(pb.st->vx, &bx2, &bz2);
+                    if (bx2 != tx || bz2 != tz) left = true;
+                }
+            }
+            if (!left) {
+                pb_fail("the party cannot step off %d,%d in any direction — it is a one-cell "
+                        "pocket, and any trigger on it can only ever fire once", tx, tz);
+                return false;
+            }
+        }
+        n = vx_bot_path(pb.st->vx, tx, tz, wx, wz, PT_MAXWP);
+        if (!n) {
+            int bx, bz;
+            vx_bot_cell(pb.st->vx, &bx, &bz);
+            float nx2, nz2; int na;
+            vx_bot_where(pb.st->vx, &nx2, &nz2, &na);
+            SDL_Log("PLAYTEST   no route after stepping off: pushed %.2f,%.2f from %.2f,%.2f to "
+                    "%.2f,%.2f (busy=%d fade=%d box=\"%.40s\" air=%d) party %d,%d -> %d,%d "
+                    "[target jump-only=%d, walk-connected=%d]", ax / l, az / l, x, z, nx2, nz2,
+                    (int)vx_busy(pb.st->vx), vx_bot_fading(pb.st->vx), vx_bot_boxtext(pb.st->vx), na, bx, bz, tx, tz,
+                    (int)vx_bot_jump_only(pb.st->vx, tx, tz),
+                    (int)vx_bot_can_walk(pb.st->vx, bx, bz, tx, tz));
+            return false;
+        }
+    }
+    int wp = 0, budget = n * 90 + 900;
+    while (wp < n && budget-- > 0 && pb.step_frames < PT_STEP_BUDGET) {
+        float gx, gz, x, z; int air;
+        vx_bot_waypoint(pb.st->vx, wx[wp], wz[wp], &gx, &gz);
+        vx_bot_where(pb.st->vx, &x, &z, &air);
+        float dx = gx - x, dz = gz - z, d = sqrtf(dx * dx + dz * dz);
+        if (d < 0.30f) { wp++; continue; }
+        pb_frame(dx / d, dz / d, 1);
+        // A trigger the walk crossed may have opened a box; read it and carry on. This is how the
+        // bot meets the things on its route rather than only the things it aimed at — and it is
+        // why the LAZY player still sees a set piece that is genuinely ON the path.
+        if (vx_busy(pb.st->vx)) pb_close_box();
+        // A fight on the route takes the screen; the battle policy below drives it.
+        if (pb.st->in_battle) return true;
+    }
+    float x, z; int air;
+    vx_bot_where(pb.st->vx, &x, &z, &air);
+    float fx, fz;
+    vx_bot_waypoint(pb.st->vx, wx[n - 1], wz[n - 1], &fx, &fz);
+    return sqrtf((fx - x) * (fx - x) + (fz - z) * (fz - z)) < 1.4f;
+}
+
+// WALK ONTO THE CELL, not up to it. A `fight` trigger fires on the STEP IN (on_enter_cell), and
+// A* stops at the first nav voxel of the target cell — which can leave the body's own cell still
+// the one next door, so the fight never starts and the step waits forever for a flag only that
+// fight can set. An examine does not care (the cone reaches 0.9 cells ahead), which is why this
+// looked like "the swing cannot be reached" while the swing's examine worked perfectly.
+static bool pb_walk_into(int tx, int tz) {
+    if (!pb_walk_to(tx, tz)) return false;
+    if (pb.st->in_battle) return true;
+    for (int i = 0; i < 90; i++) {
+        int cx, cz;
+        vx_bot_cell(pb.st->vx, &cx, &cz);
+        if (cx == tx && cz == tz) return true;
+        float x, z; int air;
+        vx_bot_where(pb.st->vx, &x, &z, &air);
+        float dx = (tx + 0.5f) - x, dz = (tz + 0.5f) - z, d = sqrtf(dx * dx + dz * dz);
+        if (d < 0.01f) return true;
+        pb_frame(dx / d, dz / d, 0);
+        if (pb.st->in_battle) return true;
+    }
+    int cx, cz;
+    vx_bot_cell(pb.st->vx, &cx, &cz);
+    return cx == tx && cz == tz;
+}
+
+// A RUNNING JUMP across a gap: back off along the heading, run at it, and press jump at the edge.
+// This is the only way the bot gets onto a jump-only shelf, and it is the same two buttons a
+// player uses. Returns true if the body ended up standing on the target cell.
+static bool pb_run_jump(int tx, int tz) {
+    float x, z, gx = tx + 0.5f, gz = tz + 0.5f; int air;
+    vx_bot_where(pb.st->vx, &x, &z, &air);
+    float dx = gx - x, dz = gz - z, d = sqrtf(dx * dx + dz * dz);
+    if (d < 0.001f) return true;
+    dx /= d; dz /= d;
+    for (int i = 0; i < 40; i++) pb_frame(-dx, -dz, 1);     // a run-up
+    for (int i = 0; i < 60; i++) pb_frame(dx, dz, 1);
+    vx_bot_jump(pb.st->vx);
+    pb.jumps++;
+    for (int i = 0; i < 12; i++) pb_frame(dx, dz, 1);
+    for (int i = 0; i < 120; i++) {
+        pb_frame(dx, dz, 1);
+        vx_bot_where(pb.st->vx, &x, &z, &air);
+        if (!air && fabsf(x - gx) < 1.0f && fabsf(z - gz) < 1.0f) return true;
+    }
+    vx_bot_where(pb.st->vx, &x, &z, &air);
+    return !air && fabsf(x - gx) < 1.2f && fabsf(z - gz) < 1.2f;
+}
+
+// Walk off whatever the party is standing on until it is back somewhere the pathfinder can plan
+// from. A drop is always legal, so this always terminates on a sane map; if it does not, the shelf
+// is a trap and the test says so.
+static void pb_drop_off() {
+    static const float DX4[4] = { 0, -1, 1, 0 }, DZ4[4] = { 0, 0, 0, -1 };
+    for (int d = 0; d < 4; d++) {
+        for (int i = 0; i < 70; i++) {
+            pb_frame(DX4[d] ? DX4[d] : (d == 0 ? 1.0f : 0.0f), DZ4[d] ? DZ4[d] : (d == 0 ? 0.0f : 0.0f), 1);
+            int cx, cz;
+            vx_bot_cell(pb.st->vx, &cx, &cz);
+            if (!vx_bot_jump_only(pb.st->vx, cx, cz)) { pb_idle(20); return; }
+        }
+    }
+    int cx, cz;
+    vx_bot_cell(pb.st->vx, &cx, &cz);
+    if (vx_bot_jump_only(pb.st->vx, cx, cz))
+        pb_fail("the party is stranded at %d,%d — a jump-only shelf you cannot get off is a trap, "
+                "not a hidden item", cx, cz);
+}
+
+// ── the battle policy ──────────────────────────────────────────────────────────────────────────
+// Deliberately a PLAYER'S policy and not an oracle: guard when something is telegraphing, spend
+// effort into an opening, heal when low, attack otherwise. It drives the real screen through
+// bt_ui_point and the same taps --battle-ui-test uses, so a battle the bot cannot get out of is a
+// battle a player cannot get out of. It does NOT know how to win the swing on day one, and that is
+// the point of assertion 5: it must lose.
+// A BATTLE, LIKE A CLIP, CANNOT RUN IN A BLOCKING LOOP, and for both of the same reasons: the
+// screen is drawn with ImGui, and a tap is only DELIVERED by an ImGui frame cycle — the press
+// queued in one NewFrame is read in the next. So this is one frame, and pb_drive calls it once per
+// real frame for as long as the fight lasts. It is the same injector --battle-ui-test uses, which
+// is the whole point: the bot fights through the real menu, and a fight it cannot get out of is a
+// fight a player cannot get out of.
+static void pb_battle_frame() {
+    Star *st = pb.st;
+    if (bt_ui_phase(st->bat) == 0 && pb.tap_cool <= 0) {
+        int rows[BT_CMD_MAX + 2], n = bt_ui_rows(st->bat, rows);
+        // THE POLICY, and it is the chapter's own lesson written as three lines: guard when
+        // something is telegraphing at you, spend into the opening that parry bought, and attack
+        // when neither is true. A bot that only guards never kills anything — it parried the arm
+        // that holds for thirteen hundred rounds — and a bot that only attacks cannot beat the
+        // swing at all, which is the design.
+        int telling = 0, open = 0;
+        for (int e = 0; e < bt_ui_enemy_count(st->bat); e++) {
+            if (bt_ui_enemy_tell(st->bat, e)) telling = 1;
+            if (bt_ui_enemy_open(st->bat, e)) open = 1;
+        }
+        // Into an opening, the SKILL is what the chapter's one real fight is about: the boss's
+        // phase one is BTF_IMMUNE_ATTACK and cannot be finished by hitting it at all — {{HERO}}
+        // holds it open and {{HERDER}} spends Settle into the opening. A policy of guard-and-
+        // attack parried Klee for eleven hundred rounds and could not end the fight, which is the
+        // correct outcome for that policy and a useless one for a test. So: guard on a tell, spend
+        // a SKILL into an opening when there is one to spend, attack otherwise.
+        int want = telling ? 3 /*GUARD*/ : open ? 2 /*SKILL*/ : 1 /*ATTACK*/;
+        int pick = -1;
+        for (int i = 0; i < n; i++) if (rows[i] == want && bt_ui_affordable(st->bat, i)) pick = i;
+        if (pick < 0 && want == 2)                       // no skill, or cannot afford it: hit it
+            for (int i = 0; i < n; i++) if (rows[i] == 1 && bt_ui_affordable(st->bat, i)) pick = i;
+        if (pick < 0)                                    // cannot afford that either: guard is free
+            for (int i = 0; i < n; i++) if (rows[i] == 3 && bt_ui_affordable(st->bat, i)) pick = i;
+        if (pick < 0) for (int i = 0; i < n; i++) if (bt_ui_affordable(st->bat, i)) { pick = i; break; }
+        // INTO AN OPENING, SPEND. The effort notch is a slider under the command and setting it
+        // does NOT commit anything — the command row still has to be tapped afterwards. Tapping
+        // the notch every frame and returning is an infinite loop that reads exactly like a hung
+        // battle, which is what it was the first time: round 3, enemy open, and the bot moved the
+        // slider forever. So it is set ONCE a round and then the command is committed.
+        float x, y;
+        if (open && bt_ui_has_effort(st->bat) && pb.effort_round != bt_ui_round(st->bat)) {
+            pb.effort_round = bt_ui_round(st->bat);
+            float ex, ey;
+            if (bt_ui_point(st->bat, 1, 4, &ex, &ey)) {
+                bui_tap(ex, ey); pb.tap_cool = 6;
+                pb.tap_cool--; bui_pump(); draw_field(st, pb.w, pb.h, PT_DT);
+                return;
+            }
+        }
+        if (pick >= 0 && bt_ui_point(st->bat, 0, pick, &x, &y)) { bui_tap(x, y); pb.tap_cool = 6; }
+        else { bui_tap(pb.w * 0.5f, pb.h * 0.85f); pb.tap_cool = 6; }   // the results screen
+    } else if (pb.tap_cool <= 0) {
+        bui_tap(pb.w * 0.5f, pb.h * 0.85f);                             // RESOLVE/ENEMY/OVER: tap on
+        pb.tap_cool = 6;
+    }
+    pb.tap_cool--;
+    bui_pump();
+    draw_field(st, pb.w, pb.h, PT_DT);
+    if (bt_stuck_count(st->bat) > 0) {
+        pb_fail("the battle watchdog fired %d time(s) — the fight stopped accepting input",
+                bt_stuck_count(st->bat));
+        bt_force_lose(st->bat);
+    }
+}
+
+// A CLIP IS THE ONE THING THE BOT CANNOT RUN IN A BLOCKING LOOP. The field's simulation can be
+// stepped with the picture left undrawn (vx_tick's `headless`), but a cutscene IS its drawing: the
+// typewriter, the page, the panel reveal and the tap are all in draw_scene, and calling it ten
+// thousand times between one ImGui NewFrame and its Render grows the draw list until the process
+// dies. So the clip steps YIELD — one bot frame per real frame, through the host's own loop, with
+// the tap injected the way --battle-ui-test injects one.
+//
+// That is why this test is a state machine driven from game_tick instead of a function that runs
+// to completion. A clip costs real seconds; the play steps cost none.
+static void pb_clip_frame() {
+    // Tap in the middle of the screen, which is what advances a dialogue line, and keep tapping:
+    // a textless line and an expression tag change nothing about how a line is dismissed.
+    if (pb.tap_cool <= 0) { bui_tap(pb.w * 0.5f, pb.h * 0.5f); pb.tap_cool = 6; }
+    pb.tap_cool--;
+    bui_pump();
+}
+
+// ── where the bot has to go to open a gate ─────────────────────────────────────────────────────
+// The bot is not told a cell. It is told a FLAG, it looks up which text or item id binds that flag
+// (the chapter's own binding tables), and then it asks the MAP where that id is. If the map does
+// not have it, that is blocker 1/2/3 and the test says so by name.
+static bool pb_open_gate(int flag, const char *map) {
+    Star *st = pb.st;
+    const char *tid = ch_text_for_flag(flag), *iid = ch_item_for_flag(flag);
+    const char *id = tid ? tid : iid;
+    if (!id) return false;                          // a battle or an arrival; the caller handles it
+    short tx, tz;
+    if (!vx_find_trigger(st->vx, id, &tx, &tz)) {
+        pb_fail("flag '%s' is bound to '%s', and NO TRIGGER ON %s FIRES IT — the step cannot be "
+                "completed in play", CH_FLAG_NAME[flag], id, map);
+        return false;
+    }
+    if (!pb_walk_to(tx, tz)) {
+        pb_fail("cannot walk to '%s' at %d,%d on %s", id, tx, tz, map);
+        return false;
+    }
+    if (st->in_battle) return true;      // a fight on the way; pb_drive takes it from here
+    pb_interact();
+    return true;
+}
+
+// ── one PLAY step, played out ──────────────────────────────────────────────────────────────────
+// Runs to completion in one call, because the field can be stepped without drawing. What it does
+// NOT do is decide anything: for each flag the step is waiting on it asks the chapter's binding
+// table which id sets that flag, asks the map where that id is, walks there, and presses the
+// button. Then it checks that the step actually advanced.
+static void pb_play_step(int step) {
+    Star *st = pb.st;
+    const ChStep *s = &CH_STEPS[step];
+    const char *map = vx_current_map(st->vx);
+    for (int i = 0; i < CH_NEED && s->need[i] >= 0; i++) {
+        int f = s->need[i];
+        if (ch_has(&st->ch, f)) continue;
+        short tx, tz;
+        if (f == F_SWING_TRIED || f == F_DAY2_1 || f == F_DAY2_2 || f == F_DAY2_3 || f == F_SWING_BEATEN) {
+            if (!vx_find_trigger(st->vx, "swing", &tx, &tz)) { pb_fail("no `fight swing` on %s", map); break; }
+            if (!pb_walk_into(tx, tz)) { pb_fail("cannot walk onto the swing at %d,%d on %s", tx, tz, map); break; }
+            // Walking onto the trigger starts the fight; pb_drive takes it from here, a frame at a
+            // time, and comes back into this function when it is over.
+            if (st->in_battle) { pb.battles++; return; }
+        } else if (f == F_BOSS_DEAD) {
+            if (!vx_find_trigger(st->vx, "klee", &tx, &tz)) { pb_fail("no `fight klee` on %s", map); break; }
+            if (!pb_walk_into(tx, tz)) { pb_fail("cannot walk onto the boss at %d,%d on %s", tx, tz, map); break; }
+            if (st->in_battle) { pb.battles++; return; }
+            pb_fail("walked onto the `fight klee` rectangle and no battle started");
+            break;
+        } else if (f == F_AT_PASTURE || f == F_LEFT_YARD) {
+            const char *want = (f == F_AT_PASTURE) ? "exit:high_pasture" : "exit:halm";
+            // Already standing on the map the flag is about: the step is waiting on the chapter,
+            // not on the player, and looking for an exit to a map we are on is nonsense.
+            if (map && !strcmp(map, want + 5)) { pb_idle(30); continue; }
+            if (!vx_find_trigger(st->vx, want, &tx, &tz)) { pb_fail("no `%s` on %s", want, map); break; }
+            // C4 is what arms the bell in play; the clip step before this one has just run.
+            if (f == F_LEFT_YARD) st->ch.bell_armed = 1;
+            if (!pb_walk_into(tx, tz)) pb_fail("cannot walk to %s on %s", want, map);
+            pb_idle(150);                                   // the fade, and the new map's first frames
+        } else {
+            pb_open_gate(f, map ? map : "(none)");
+            if (st->in_battle) { pb.battles++; return; }   // a fight on the way there
+        }
+        if (pb.step_frames >= PT_STEP_BUDGET) { pb_fail("step %d ran out of budget", step + 1); break; }
+    }
+    // THE COMPLETIONIST also goes and gets whatever this map hides. The LAZY PLAYER does not, and
+    // the difference between the two runs is exactly the difference between "the chapter can be
+    // finished" and "the chapter can be finished by somebody who only reads the goal line".
+    if (!pb.lazy) {
+        for (int k = 0; k < CH_JUMP_ONLY_COUNT; k++) {
+            if (!map || strcmp(CH_JUMP_ONLY[k].map, map)) continue;
+            short jx, jz;
+            if (!vx_find_trigger(st->vx, CH_JUMP_ONLY[k].id, &jx, &jz)) continue;
+            if (!vx_bot_jump_only(st->vx, jx, jz)) continue;          // already reported elsewhere
+            if (pb_run_jump(jx, jz)) { pb_interact(); SDL_Log("PLAYTEST     took '%s' by the designed jump", CH_JUMP_ONLY[k].id); }
+            // AND GET BACK DOWN. A jump-only shelf is jump-only in both directions as far as A* is
+            // concerned — its cells are not in walk region 1, so the bot's pathfinder cannot plan a
+            // single step off it and the run strands itself on the eaves holding a tin. A player
+            // just walks off the edge, because a DROP is always allowed however far it is. So does
+            // this: push in each of the four directions until the body is back in region 1.
+            pb_drop_off();
+        }
+    }
+}
+
+static void pb_begin(Star *st, int lazy) {
+    memset(&pb, 0, sizeof(pb));
+    pb.st = st; pb.lazy = lazy; pb.running = 1; pb.last_step = -1;
+    pb.w = 1920; pb.h = 1080;
+    pb.t0 = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+    pb.fails = ch_steps_selfcheck();
+    if (!st->vx) st->vx = vx_create();
+    if (!st->bat) st->bat = bt_create();
+    ch_new_game(&st->ch);
+    enter_field(st);
+    // A NEW GAME PUTS THE PARTY BACK AT THE START. ch_apply_step only re-places them when the map
+    // CHANGES, which is right in play (a step that only moves the light must not teleport anybody)
+    // and wrong here: the second run begins on whatever cell the first one finished on, and the
+    // lazy run opened standing on the eaves with nowhere to path to. This is test setup, not a
+    // shortcut through anything — it is what the title screen does.
+    if (CH_STEPS[0].map) vx_goto(st->vx, CH_STEPS[0].map, -1, -1, CH_STEPS[0].face ? CH_STEPS[0].face : "N");
+    vx_bot(st->vx, 1);
+    SDL_Log("PLAYTEST %s: %d steps, %d flags", lazy ? "LAZY PLAYER" : "COMPLETIONIST",
+            CH_STEP_COUNT, CH_FLAG_COUNT);
+}
+
+static void pb_log_step(int step) {
+    static const char *K[] = { "PLAY", "CLIP", "SET", "END" };
+    const ChStep *s = &CH_STEPS[step];
+    double tnow = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+    SDL_Log("PLAYTEST   step %2d %s %-16s %6d frames (%5.1f s of play, %5.0f ms real)  goal: %s",
+            step + 1, K[s->kind], s->kind == CHS_CLIP ? s->arg : (s->map ? s->map : "(same map)"),
+            pb.step_frames, pb.step_frames * PT_DT, (tnow - pb.tstep) * 1000.0, pb.st->ch.goal);
+    // ASSERTION 2: nothing fired outside its window. Any flag that appeared during this step and is
+    // neither one the step asked for nor an optional find is a trigger that fired while it should
+    // have been inert — which is exactly what `halm.job_sheet` on day one and `halm.ottilie_door`
+    // on the lane home both were.
+    uint64_t got = pb.st->ch.flags & ~pb.flags_at_step_start;
+    for (int f = 0; f < CH_FLAG_COUNT; f++) {
+        if (!(got & (1ull << f))) continue;
+        bool wanted = false;
+        for (int i = 0; i < CH_NEED && s->need[i] >= 0; i++) if (s->need[i] == f) wanted = true;
+        if (f == F_LOOT_YARD || f == F_LOOT_TEACHING || f == F_LOOT_HILL || f == F_LOOT_PASTURE) wanted = true;
+        if (f == F_SWING_TRIED || f == F_DISTEL || f == F_DAY2_1 || f == F_DAY2_2 || f == F_DAY2_3) wanted = true;
+        if (!wanted)
+            pb_fail("step %d set '%s', which it never asked for — a trigger fired outside its "
+                    "window (src/chapter01.h, CH_TRIG_COND)", step + 1, CH_FLAG_NAME[f]);
+    }
+}
+
+static void pb_finish() {
+    Star *st = pb.st;
+    // ── ASSERTION 8 ──
+    if (st->screen != SCR_END) pb_fail("never reached the end card (stopped at step %d)", st->ch.step + 1);
+    int missing = ch_mandatory_missing(&st->ch);
+    if (missing) {
+        pb_fail("%d of the mandatory ten never fired in play:", missing);
+        for (int i = 0; i < CH_MANDATORY; i++) if (!ch_has(&st->ch, i)) SDL_Log("PLAYTEST        %s", CH_FLAG_NAME[i]);
+    }
+    if (st->vx) vx_bot(st->vx, 0);
+    double tend = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+    SDL_Log("PLAYTEST %s %s: %d frames (%.1f min of play in %.1f s real), %d interactions, "
+            "%d battles, %d jumps, mandatory %d/%d, %d failure(s)",
+            pb.lazy ? "LAZY PLAYER" : "COMPLETIONIST", pb.fails ? "FAILED" : "ok", pb.frames,
+            pb.frames * PT_DT / 60.0f, tend - pb.t0, pb.interactions, pb.battles, pb.jumps,
+            CH_MANDATORY - missing, CH_MANDATORY, pb.fails);
+    pb.running = 0; pb.done = 1;
+}
+
+// Returns 1 while the run is still going. A CLIP step costs one real frame per call; a PLAY step
+// costs one call and no real frames at all.
+static int pb_drive() {
+    Star *st = pb.st;
+    if (!pb.running) return 0;
+    if (st->screen == SCR_END) { pb_finish(); return 0; }
+    if (pb.guard++ > 200000) { pb_fail("the run never ended"); pb_finish(); return 0; }
+
+    // A battle has the screen: one frame of it, through the real menu, and come back.
+    if (st->in_battle) {
+        pb_battle_frame();
+        pb.frames++; pb.step_frames++;
+        // A fight that will not end is a finding, not a reason to hang: say it ONCE, lose it, and
+        // let the run carry on so the rest of the chapter is still tested.
+        if (pb.step_frames > PT_STEP_BUDGET && !pb.forced) {
+            pb.forced = 1;
+            pb_fail("a battle on step %d never ended in %d frames — the policy could not finish it "
+                    "and neither could a player using the same three commands",
+                    st->ch.step + 1, PT_STEP_BUDGET);
+            bt_force_lose(st->bat);
+        }
+        // ASSERTION 5, checked the moment a swing fight resolves.
+        if (!st->in_battle && st->ch.step <= CHST_C1 && ch_has(&st->ch, F_SWING_BEATEN))
+            pb_fail("the swing was WON on day one — chapter01.md P1 is explicitly "
+                    "'you do not win today', and P4's gate is now open before day two has happened");
+        return 1;
+    }
+
+    int step = st->ch.step;
+    const ChStep *s = &CH_STEPS[step];
+    if (step != pb.last_step) {
+        pb.last_step = step;
+        pb.step_frames = 0; pb.clip_guard = 0; pb.tap_cool = 0; pb.forced = 0;
+        pb.flags_at_step_start = st->ch.flags;
+        pb.tstep = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+    }
+
+    if (s->kind == CHS_CLIP) {
+        // The clip has the screen; yield a frame at a time until the field has it back.
+        pb_clip_frame();
+        pb.frames++; pb.step_frames++;
+        if (++pb.clip_guard > 6000) { pb_fail("clip '%s' never ended", s->arg); pb_finish(); return 0; }
+        if (st->screen == SCR_FIELD || st->screen == SCR_END) pb_log_step(step);
+        return 1;
+    }
+    if (s->kind != CHS_PLAY) return 1;
+
+    uint64_t before = st->ch.flags;
+    pb_play_step(step);
+    if (st->in_battle) return 1;                        // handed to the battle, above
+    if (st->ch.step != step) { pb_log_step(step); pb.tries = 0; return 1; }
+    if (st->ch.flags != before) { pb.tries = 0; return 1; }   // progress: come round again
+
+    // NO PROGRESS. Say exactly which flag is still shut and stop — a play-test that quietly loops
+    // is a play-test nobody reads.
+    if (++pb.tries < 3) return 1;
+    pb_log_step(step);
+    for (int i = 0; i < CH_NEED && s->need[i] >= 0; i++)
+        if (!ch_has(&st->ch, s->need[i]))
+            pb_fail("step %d is STUCK: '%s' is still unset after playing the step through three "
+                    "times. Either no trigger on this map sets it, or the one that does is inert "
+                    "here (src/chapter01.h, CH_TRIG_COND), or the player cannot walk to it.",
+                    step + 1, CH_FLAG_NAME[s->need[i]]);
+    pb_finish();
+    return 0;
+}
+
+// ── ASSERTION 4: the hidden finds ──────────────────────────────────────────────────────────────
+// Both halves, on every map, against src/chapter01.h's CH_JUMP_ONLY. A find the player can walk up
+// to has lost its lesson; a find nothing can reach is a find that does not exist. And anything the
+// field reports as jump-only that is NOT in the table is a trigger the player cannot get to at all,
+// which is a level bug however good the hillside looks.
+static int playtest_hidden_finds(Star *st) {
+    int fails = 0;
+    if (!st->vx) st->vx = vx_create();
+    for (int m = 0; m < vx_map_count(); m++) {
+        const char *map = vx_map_name_at(m);
+        if (!strcmp(map, "west_road")) continue;          // not in chapter one
+        if (!vx_load_map(st->vx, map)) { SDL_Log("PLAYTEST FAIL: %s will not load", map); fails++; continue; }
+        const char *ids[32]; short xs[32], zs[32];
+        int n = vx_bot_jump_targets(st->vx, ids, xs, zs, 32);
+        // every jump-only target the field found must be in the design
+        for (int i = 0; i < n && i < 32; i++) {
+            bool designed = false;
+            for (int k = 0; k < CH_JUMP_ONLY_COUNT; k++)
+                if (!strcmp(CH_JUMP_ONLY[k].map, map) && !strcmp(CH_JUMP_ONLY[k].id, ids[i])) designed = true;
+            if (designed) { SDL_Log("PLAYTEST   %s: '%s' at %d,%d is behind a jump, as designed", map, ids[i], xs[i], zs[i]); continue; }
+            SDL_Log("PLAYTEST FAIL: %s: '%s' at %d,%d cannot be reached by walking and is NOT in "
+                    "CH_JUMP_ONLY — either the map has stranded it or the table is out of date",
+                    map, ids[i], xs[i], zs[i]);
+            fails++;
+        }
+        // and every designed one must still be behind a jump
+        for (int k = 0; k < CH_JUMP_ONLY_COUNT; k++) {
+            if (strcmp(CH_JUMP_ONLY[k].map, map)) continue;
+            bool found = false;
+            for (int i = 0; i < n && i < 32; i++) if (!strcmp(ids[i], CH_JUMP_ONLY[k].id)) found = true;
+            if (found) continue;
+            short tx, tz;
+            if (!vx_find_trigger(st->vx, CH_JUMP_ONLY[k].id, &tx, &tz)) {
+                SDL_Log("PLAYTEST FAIL: %s: '%s' is in CH_JUMP_ONLY and is not on the map at all",
+                        map, CH_JUMP_ONLY[k].id);
+            } else {
+                SDL_Log("PLAYTEST FAIL: %s: '%s' at %d,%d IS REACHABLE BY PLAIN WALKING — %s",
+                        map, CH_JUMP_ONLY[k].id, tx, tz, CH_JUMP_ONLY[k].why);
+            }
+            fails++;
+        }
+    }
+    SDL_Log("PLAYTEST hidden finds: %s (%d failure(s))", fails ? "FAILED" : "ok", fails);
+    return fails;
+}
+
+// ── ASSERTION 6: the bell run ──────────────────────────────────────────────────────────────────
+// The direct road must NOT make it and the designed route must. Both are measured by WALKING them
+// on the real navmesh at the real speed and counting the rings — no estimate, no table.
+static int playtest_bell_run(Star *st) {
+    int fails = 0;
+    if (!vx_load_map(st->vx, "halm")) { SDL_Log("PLAYTEST FAIL: halm will not load"); return 1; }
+    short bx, bz, cx, cz;
+    if (!vx_find_trigger(st->vx, "halm.job_sheet", &bx, &bz) ||
+        !vx_find_trigger(st->vx, "halm.clerk_signing", &cx, &cz)) {
+        SDL_Log("PLAYTEST FAIL: the bell run has no board or no counter on halm");
+        return 1;
+    }
+    // The walking route, at walk speed, from the arrival cell, via the board and her door.
+    // vx_bot_path is walk-edges-only, so this IS the direct road: it cannot use a shortcut.
+    vx_bot(st->vx, 1);
+    short wx[PT_MAXWP], wz[PT_MAXWP];
+    int legs[3][2] = { { bx, bz }, { 41, 22 }, { cx, cz } };
+    int total = 0;
+    for (int i = 0; i < 3; i++) {
+        int n = vx_bot_path(st->vx, legs[i][0], legs[i][1], wx, wz, PT_MAXWP);
+        if (!n) { SDL_Log("PLAYTEST FAIL: no walking route to leg %d of the bell run", i + 1); fails++; break; }
+        total += n;
+    }
+    vx_bot(st->vx, 0);
+    // Waypoints are nav voxels: half a cell each. At the walk speed the direct road is
+    // total/2 cells / VX walk speed seconds, plus the boxes.
+    // ASSERTION 6, and it is measured rather than assumed: the waypoints are nav voxels, half a
+    // cell each, and the party covers ground at VX_SP_WALK or VX_SP_RUN.
+    float cells = total * 0.5f;
+    float walk_s = cells / 4.4f, run_s = cells / 7.2f;
+    float allowed = CH_BELL_RINGS * CH_BELL_PERIOD;
+    SDL_Log("PLAYTEST bell run: the direct road (arrival -> board -> her door -> counter) is %.0f "
+            "cells: %.0f s walking, %.0f s running. The bell allows %.0f s (%d rings x %.1f s).",
+            cells, walk_s, run_s, allowed, CH_BELL_RINGS, CH_BELL_PERIOD);
+    // The clock has to bite SOMEWHERE between the two paces, or it is not a clock. Above the walk
+    // it is free; below the run it is unwinnable, and chapter one has no fail state.
+    if (allowed >= walk_s) {
+        SDL_Log("PLAYTEST FAIL: the direct road makes it with %.0f s to spare even at WALKING pace "
+                "— the clock is not a clock. Lower CH_BELL_RINGS or CH_BELL_PERIOD.", allowed - walk_s);
+        fails++;
+    } else if (allowed <= run_s) {
+        SDL_Log("PLAYTEST FAIL: even RUNNING the direct road misses by %.0f s, so the late line is "
+                "the only outcome and the shortcuts buy nothing. Raise CH_BELL_RINGS.", run_s - allowed);
+        fails++;
+    } else {
+        SDL_Log("PLAYTEST bell run: the clock bites between the two paces — running the direct road "
+                "arrives with %.0f s spare, walking it misses by %.0f s and gets the clerk's late "
+                "line. NOTE FOR THE DESIGN SIDE: chapter01.md P5 asks for SIX MINUTES and for the "
+                "direct route not to make it. On a 48x36 map those cannot both be true; the run is "
+                "twenty seconds long, not six minutes, and the constants now describe the map that "
+                "exists rather than the one the spine imagines.", allowed - run_s, walk_s - allowed);
+    }
+    SDL_Log("PLAYTEST bell run: %s (%d failure(s))", fails ? "FAILED" : "ok", fails);
+    return fails;
+}
+
+// ── ASSERTION 7: the hill climb cannot be skipped ──────────────────────────────────────────────
+// Every place the designed route doubles back, the inside of the bend must rise more than a jump
+// gains. Measured directly: for every cell on the map, if a body standing there could jump onto a
+// cell that is closer to the top exit than the walking route allows, the climb is skippable.
+static int playtest_hill_climb(Star *st) {
+    int fails = 0;
+    if (!vx_load_map(st->vx, "hill_path")) { SDL_Log("PLAYTEST FAIL: hill_path will not load"); return 1; }
+    short ex, ez;
+    if (!vx_find_trigger(st->vx, "exit:high_pasture", &ex, &ez)) {
+        SDL_Log("PLAYTEST FAIL: hill_path has no exit to the high pasture"); return 1;
+    }
+    vx_bot(st->vx, 1);
+    short wx[PT_MAXWP], wz[PT_MAXWP];
+    // The walking route from the bottom to the top, as a length. A climb that is a real climb is
+    // long; one that has been flattened into a ramp is short.
+    int n = vx_bot_path(st->vx, ex, ez, wx, wz, PT_MAXWP);
+    vx_bot(st->vx, 0);
+    float cells = n * 0.5f;
+    SDL_Log("PLAYTEST hill climb: the walking route from the spawn to the top gate is %.0f cells", cells);
+    if (!n) { SDL_Log("PLAYTEST FAIL: there is no walking route up hill_path at all"); fails++; }
+    else if (cells < 60.0f) {
+        SDL_Log("PLAYTEST FAIL: the climb is only %.0f cells — hill_path is 48 cells deep and the "
+                "spine's P6 is a ten-minute switchback climb. This is a ramp, not a hill.", cells);
+        fails++;
+    }
+    SDL_Log("PLAYTEST hill climb: %s (%d failure(s))", fails ? "FAILED" : "ok", fails);
+    return fails;
+}
 
 // ───────────────────────── --battle-ui-test: the battle driven by TAPS ─────────────────────────
 // BATTLE_UI_TEST=1 (capture.sh --battle-ui-test). The selftests drive the battle API directly and
@@ -1611,8 +2339,17 @@ static void battle_ui_test(Star *st, int w, int h, float dt) {
         if (bt_done(st->bat)) {
             SDL_Log("UITEST   win banner dismissed after %.1f s; field control returns", bui.frame * dt);
             st->in_battle = 0;
+            // DAY ONE'S WIN DOES NOT COUNT, and this assertion is the pair of that rule rather
+            // than a relaxation of it: on P1 a won swing must NOT set swing_beaten (chapter01.md
+            // P1: "you do not win today"), and from P4 onward it must. Check whichever applies to
+            // the step this scenario is standing on.
+            bool day_two = ch_swing_winnable(&st->ch);
             ch_on_battle(&st->ch, "swing", true);
-            if (!ch_has(&st->ch, F_SWING_BEATEN)) bui_fail("a won swing did not set swing_beaten");
+            if (day_two && !ch_has(&st->ch, F_SWING_BEATEN))
+                bui_fail("a won swing on day two did not set swing_beaten");
+            if (!day_two && ch_has(&st->ch, F_SWING_BEATEN))
+                bui_fail("a won swing on DAY ONE set swing_beaten — P1 is 'you do not win today', "
+                         "and this opens P4's gate before day two has happened");
             bui.stage++; bui.phase = 0; bui.frame = 0;
         } else if (bui.frame * dt > 9.0f) { bui_fail("the win banner never handed back"); bui.stage++; bui.phase = 0; bui.frame = 0; }
         return;
@@ -1666,6 +2403,13 @@ static void *game_create(float dpi_scale) {
     // BATTLE_SELFTEST=1 — the battles only. Either way no window input is read and the app exits.
     spec = SDL_getenv("CHAPTER_SELFTEST");
     if (spec && spec[0] == '1') st->self_test = 1;
+    spec = SDL_getenv("CHAPTER_LOGIC_SELFTEST");                   // the old name for the same thing
+    if (spec && spec[0] == '1') st->self_test = 1;
+    // CHAPTER_PLAYTEST=1 — the bot that actually PLAYS it. Two runs, the completionist and the
+    // lazy player, plus the three checks that need no run (the hidden finds, the bell run's
+    // arithmetic, and whether the hill is a hill).
+    spec = SDL_getenv("CHAPTER_PLAYTEST");
+    if (spec && spec[0] == '1') st->self_test = 4;
     spec = SDL_getenv("BATTLE_SELFTEST");
     if (spec && spec[0] == '1') st->self_test = 2;
     // BATTLE_UI_TEST=1 — the real battle screen driven by injected TAPS, in a real window.
@@ -1816,6 +2560,58 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
         draw_dev(st, w, h, dt, dpi_scale);
         au_update();
         return;
+    }
+    // ── the chapter play-test: a bot with a stick and two buttons ──
+    // Three phases. The two runs yield a frame at a time (a clip has to be drawn to be tapped
+    // through); the three static checks need no run at all and go first, so a map that has
+    // stranded its hidden item says so in the first second rather than after two full playthroughs.
+    if (st->self_test == 4 && st->cap_state < 2) {
+        static int phase = 0, static_fails = 0, run_fails = 0;
+        pb.w = w; pb.h = h;
+        if (phase == 0) {
+            if (!st->vx) st->vx = vx_create();
+            static_fails = playtest_hidden_finds(st) + playtest_bell_run(st) + playtest_hill_climb(st);
+            pb_begin(st, 0);
+            phase = 1;
+        } else if (phase == 1) {
+            if (!pb_drive()) { run_fails += pb.fails; pb_begin(st, 1); phase = 2; }
+        } else if (phase == 2) {
+            if (!pb_drive()) {
+                run_fails += pb.fails;
+                int bad = static_fails + run_fails;
+                SDL_Log("SELFCHECK chapter-playtest %s (%d static, %d in play)",
+                        bad ? "FAILED" : "ok", static_fails, run_fails);
+                st->cap_state = 2;
+            }
+        }
+        if (st->cap_state < 2) {
+            // Draw whatever screen we are on, so a clip really is being tapped through the real
+            // renderer and a textless line or an expression tag is exercised as the player sees it.
+            switch (st->screen) {
+            case SCR_TITLE: draw_title(st, w, h, dt); break;
+            case SCR_INTRO: draw_scene(st, w, h, dt); break;
+            case SCR_END:   draw_end(st, w, h, dt); break;
+            case SCR_FIELD: break;                 // the bot ticks the field itself, headless
+            }
+            if (st->fade_to_scene >= 0) {
+                st->fade += dt / 0.45f;
+                if (st->fade >= 1.0f) {
+                    st->fade = 1.0f;
+                    int next = st->fade_to_scene;
+                    st->fade_to_scene = -1;
+                    if (st->to_field && !st->from_field) enter_field(st);
+                    else {
+                        bool came = st->from_field;
+                        st->from_field = false;
+                        while (next < CS_CUR_COUNT && CS_CUR[next].line_count <= 0) next++;
+                        if (next < CS_CUR_COUNT) { star_goto(st, next, 0, false); st->to_field = came; }
+                        else enter_field(st);
+                    }
+                }
+            } else if (st->fade > 0.0f) { st->fade -= dt / 0.6f; if (st->fade < 0) st->fade = 0; }
+            au_update();
+            return;
+        }
     }
     if (st->self_test && st->cap_state < 2) {
         // Mode 1 (CHAPTER_SELFTEST) proves both, chapter first because it needs nothing. Mode 2

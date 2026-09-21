@@ -1,7 +1,7 @@
 #!/bin/bash
 # Capture a view of the game on the Mac, with no phone involved: builds the desktop host + game lib
-# and runs the real renderer once. See the mode headers below (--vox, --dialog, --chapter-selftest,
-# --battle-selftest, --vox-selftest, --vox-walktest).
+# and runs the real renderer once. See the mode headers below (--vox, --dialog, --chapter-playtest,
+# --chapter-logic-selftest, --battle-selftest, --battle-ui-test, --vox-selftest, --vox-walktest).
 #
 # The window flashes up for a moment; that is the renderer doing its one frame.
 #
@@ -53,7 +53,27 @@ fi
 # step's gate opens, every clip exists in cutscene_data.h, all ten mandatory interactions fire, the
 # end card is reached, the swing is unwinnable by attacking and winnable by the parry. It does NOT
 # prove the player can walk to each trigger — that is `--vox-walktest`. Run both.
-if [ "$1" = "--chapter-selftest" ] || [ "$1" = "--battle-selftest" ]; then
+# The chapter PLAY-test: a bot with a stick and two buttons that actually plays the chapter through
+# the real game — the real navmesh, the real movement code, the real interact button, the real
+# battle menu, the real renderer for the clips. It never touches the chapter's memory: every flag
+# that ends up set got there because the bot walked onto a trigger and pressed a button. Two runs,
+# the completionist and the lazy player, plus three static checks (the hidden finds, the bell run's
+# arithmetic, and whether the hill is a hill). See src/VOXFIELD_NOTES.md, "The three tests".
+if [ "$1" = "--chapter-playtest" ]; then
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    OUT=$(CHAPTER_PLAYTEST=1 "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "PLAYTEST|SELFCHECK chapter-playtest")
+    echo "$OUT"
+    echo "$OUT" | grep -q "SELFCHECK chapter-playtest ok" || { echo "ERROR: --chapter-playtest FAILED" >&2; exit 1; }
+    exit 0
+fi
+
+# --chapter-logic-selftest is the old --chapter-selftest: the story wiring only, in milliseconds,
+# with no world. Both names work. Run it after editing CH_STEPS; run --chapter-playtest after
+# editing a map.
+if [ "$1" = "--chapter-selftest" ] || [ "$1" = "--chapter-logic-selftest" ] || [ "$1" = "--battle-selftest" ]; then
     ROOT="$(cd "$(dirname "$0")" && pwd)"
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
     cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
@@ -136,5 +156,5 @@ if [ "$1" = "--vox" ]; then
     exit 1
 fi
 
-echo "usage: capture.sh --vox|--vox-selftest|--vox-walktest|--dialog|--chapter-selftest|--battle-selftest|--battle-ui-test ..." >&2
+echo "usage: capture.sh --chapter-playtest|--chapter-logic-selftest|--vox|--vox-selftest|--vox-walktest|--dialog|--chapter-logic-selftest|--chapter-playtest|--battle-selftest|--battle-ui-test ..." >&2
 exit 2

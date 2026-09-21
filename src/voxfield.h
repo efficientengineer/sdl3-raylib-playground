@@ -77,6 +77,34 @@ int vx_selftest(VoxField *v);
 // walls, path-walks to every exit/door/NPC and jumps 200 times. Non-zero means a real failure.
 int vx_walktest(VoxField *v, const char *one_map);
 
+// ───────────────────────── the play-test bot's hands ─────────────────────────
+// src/star_logic.cpp's --chapter-playtest drives the REAL game through these: a stick and two
+// buttons, which land on exactly the variables the touch stick and the Act and Jump buttons land
+// on, plus the A* the bot needs to steer. Everything else — triggers firing, boxes opening, events
+// reaching the chapter, map changes — happens inside vx_tick exactly as it does for a thumb.
+// Nothing here sets a flag or fires an event.
+void vx_bot(VoxField *v, int on);
+void vx_bot_stick(VoxField *v, float mx, float mz, int run);
+void vx_bot_interact(VoxField *v);
+void vx_bot_jump(VoxField *v);
+void vx_bot_where(VoxField *v, float *x, float *z, int *airborne);
+void vx_bot_cell(VoxField *v, int *cx, int *cz);
+// Walk edges only: can the player get from one cell to another WITHOUT jumping?
+bool vx_bot_can_walk(VoxField *v, int fx, int fz, int tx, int tz);
+// Standable, but not walk-reachable — the engine's own definition of a jump-only place.
+bool vx_bot_jump_only(VoxField *v, int cx, int cz);
+// A* from where the party stands to a cell. Waypoints are NAV VOXELS; 0 means no walking route.
+int vx_bot_path(VoxField *v, int tx, int tz, short *out_x, short *out_z, int cap);
+void vx_bot_waypoint(VoxField *v, int wx, int wz, float *x, float *z);
+// The id the interact button would act on from where the party stands, or "".
+const char *vx_bot_examinable(VoxField *v);
+// The centre cell of the trigger (or NPC) carrying this id. False = this map does not have it,
+// which is what a flag with no trigger looks like from the play-test's side.
+bool vx_find_trigger(VoxField *v, const char *id, short *cx, short *cz);
+// Every trigger on this map that walking cannot reach but a jump or a drop can. Reported, never
+// failed; chapter01.h's CH_JUMP_ONLY says which of them are the design.
+int vx_bot_jump_targets(VoxField *v, const char **ids, short *xs, short *zs, int cap);
+
 void vx_save(VoxField *v, VxSave *s);
 void vx_restore(VoxField *v, const VxSave *s);
 
@@ -118,6 +146,11 @@ void vx_set_party(VoxField *v, int count);
 // re-applies what it needs after a step change.
 void vx_disable_trigger(VoxField *v, const char *arg_id);
 
+// The same switch, both ways, and SILENT — the chapter's step/flag condition table (chapter01.h's
+// CH_TRIG_COND) calls it for every conditioned trigger on every step change, and most of those are
+// for some other map. Returns how many triggers matched.
+int vx_set_trigger(VoxField *v, const char *arg_id, int on);
+
 // Show a story/field/text.md id in the field's own box, from the game side.
 void vx_say_id(VoxField *v, const char *id);
 
@@ -128,3 +161,7 @@ bool vx_busy(VoxField *v);
 // Freeze the player where they stand (a scripted beat, a battle starting). Input is ignored and the
 // party stops walking; the world keeps rendering.
 void vx_freeze(VoxField *v, int on);
+
+// Diagnostics for the play-test: what the field is showing, and whether a map change is in flight.
+const char *vx_bot_boxtext(VoxField *v);
+int vx_bot_fading(VoxField *v);
