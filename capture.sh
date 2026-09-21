@@ -27,8 +27,12 @@ set -e
 # The Settings window shows "muted by STAR_MUTE" and the owner can still untick it for the session.
 export STAR_MUTE=1
 
-# One dialogue box, drawn by the real player: ./capture.sh --dialog 0110_the_board 4 [page] [n|x]
-#   n = draw it as a Narrator line (no name, no portrait, centred), x = no portrait.
+# One dialogue box, drawn by the real player: ./capture.sh --dialog 0110_the_board 4 [page] [n|x|s|t]
+#   n = draw it as a Narrator line (no name, no portrait, centred), x = no portrait,
+#   s = the short box (pagination and the double marker), t = TEXTLESS (name and portrait, no words).
+# DIALOG_EXPR=<expr> forces one expression portrait on every line (neutral, smile, laugh, biglaugh,
+# concern, sorrow, annoyed, angry, shock, resolve), falling back to the plain portrait when the file
+# has not been drawn:  DIALOG_EXPR=sorrow ./capture.sh --dialog 0110_the_board 1
 if [ "$1" = "--dialog" ]; then
     ROOT="$(cd "$(dirname "$0")" && pwd)"
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null

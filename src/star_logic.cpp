@@ -436,9 +436,14 @@ static void dev_send(const char *text) {
 
 enum Screen { SCR_TITLE, SCR_INTRO, SCR_END, SCR_FIELD };
 #define MAX_PANELS 12             // >= story_prompt.py's SCENE_MAX_PANELS (8), the most one scene can hold
-#define MAX_FACES 12              // distinct speaker portraits cached per scene; party scenes run to 7
+// Distinct portrait FILES cached per scene. A character now has up to ten expression portraits
+// (portrait_<name>_<expr>.png beside portrait_<name>.png), and only the ones a scene actually asks
+// for are ever loaded, so this is "speakers x expressions used", not "speakers x ten".
+#define MAX_FACES 32
+#define FACE_KEY 96               // a portrait file name: portrait_<name>_<expr>.png
 #define PANEL_IN 0.28f            // seconds for a panel to arrive
 #define FACE_IN 0.22f             // seconds for a portrait to slide in when the speaker changes
+#define FACE_POP 0.12f            // seconds for the little pop when the SAME speaker changes expression
 #define TYPE_CPS 42.0f            // typewriter characters per second
 
 struct Star {
@@ -459,12 +464,16 @@ struct Star {
     int panel_z[MAX_PANELS], z_next;
     int page;                     // page currently on screen; revealing a panel from another page clears it
     Tex tex[MAX_PANELS];
-    Tex face[MAX_FACES];          // speaker portraits, one per distinct file in the scene
-    const char *face_file[MAX_FACES];
+    Tex face[MAX_FACES];          // speaker portraits, one per distinct file the scene has asked for
+    char face_file[MAX_FACES][FACE_KEY];    // the file name, built (expressions), so it is owned here
+    unsigned char face_owned[MAX_FACES];    // 0 = an alias of another slot's texture: never delete it
     Tex backdrop;                 // talk scenes: the panel shown dimmed behind the conversation
     int tex_scene;                // which scene's textures are loaded (-1 = none)
     const char *face_cur;         // portrait on screen, so a change can slide the new one in
     float face_t;
+    char expr_cur[16];            // the expression on screen: a change on the SAME speaker pops, never slides
+    float face_pop;               // seconds since that pop started (>= FACE_POP = finished)
+    bool port_motion;             // Dev: the pop, the shake, the jolt and the sink. On by default.
     float dpi_scale;
     float title_t;
     char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
@@ -475,19 +484,24 @@ struct Star {
     char dlg_spec[160];           // DIALOG_CAPTURE=<scene>:<line>[:page][:n|:x], the box on the Mac
     int dlg_frames;
     int dlg_as_narr, dlg_no_port, dlg_small;  // capture-only: as a Narrator / no portrait / a short box
+    int dlg_textless;             // capture-only: the same line drawn with its text emptied (a reaction beat)
                                    // (the short box is how the paginator and the ▼▼ marker are shown working)
 };
 
 static void star_free_textures(Star *st) {
     for (int i = 0; i < MAX_PANELS; i++) if (st->tex[i].id) glDeleteTextures(1, &st->tex[i].id);
-    for (int i = 0; i < MAX_FACES; i++) if (st->face[i].id) glDeleteTextures(1, &st->face[i].id);
+    // Only OWNED slots hold a texture of their own: a slot whose expression file was missing carries
+    // a copy of the base portrait's Tex, and deleting that id twice would kill the base's texture.
+    for (int i = 0; i < MAX_FACES; i++) if (st->face[i].id && st->face_owned[i]) glDeleteTextures(1, &st->face[i].id);
     if (st->backdrop.id) glDeleteTextures(1, &st->backdrop.id);
     memset(st->tex, 0, sizeof(st->tex));
     memset(st->face, 0, sizeof(st->face));
     memset(st->face_file, 0, sizeof(st->face_file));
+    memset(st->face_owned, 0, sizeof(st->face_owned));
     st->backdrop = Tex{0, 0, 0};
     st->tex_scene = -1;
     st->face_cur = nullptr;
+    st->expr_cur[0] = 0;
 }
 
 static bool same_file(const char *a, const char *b) { return a == b || (a && b && !strcmp(a, b)); }
@@ -500,26 +514,66 @@ static bool same_file(const char *a, const char *b) { return a == b || (a && b &
 // Panel and talk scenes use it as freely as narration scenes do.
 static bool line_is_narrator(const CsLine *ln) { return ln->speaker && !strcmp(ln->speaker, CS_NARRATOR); }
 
-// The scene's portraits, loaded once in star_goto. Null file or an unknown one means "no portrait",
-// and the dialogue box is then drawn exactly as it is without one.
-static const Tex *face_tex(Star *st, const char *file) {
-    if (!file) return nullptr;
-    for (int i = 0; i < MAX_FACES; i++)
-        if (same_file(st->face_file[i], file)) return st->face[i].id ? &st->face[i] : nullptr;
-    return nullptr;
+// ── Expressions (the ten ids the export writes: neutral, smile, laugh, biglaugh, concern, sorrow,
+// annoyed, angry, shock, resolve). A line's expression names a SECOND portrait file for the same
+// speaker — portrait_hart_sorrow.png beside portrait_hart.png — and the line falls back to the
+// speaker's plain portrait when that file has not been drawn yet.
+//
+// CS_HAS_EXPR is defined by a cutscene_data.h whose CsLine carries `const char *expr`. The game
+// builds against a header with it and against one without, so the tool side can land separately.
+static char g_expr_force[16];     // DIALOG_EXPR=<expr>: force one expression, for a Mac capture only
+
+static const char *line_expr(const CsLine *ln) {
+    if (g_expr_force[0]) return g_expr_force;
+#ifdef CS_HAS_EXPR
+    return ln->expr ? ln->expr : "";
+#else
+    (void)ln;
+    return "";
+#endif
 }
 
-static void load_faces(Star *st, const CsScene *sc) {
-    int n = 0;
-    for (int i = 0; i < sc->line_count && n < MAX_FACES; i++) {
-        const char *f = sc->lines[i].portrait;
-        if (!f) continue;
-        bool seen = false;
-        for (int k = 0; k < n; k++) seen = seen || same_file(st->face_file[k], f);
-        if (seen) continue;
-        st->face_file[n] = f;
-        st->face[n++] = tex_load(f);
+// portrait_hart.png + "sorrow" -> portrait_hart_sorrow.png. An empty expression is the base file.
+static void face_key(const char *base, const char *expr, char *out, size_t n) {
+    if (!expr || !*expr) { snprintf(out, n, "%s", base); return; }
+    const char *dot = strrchr(base, '.');
+    int stem = dot ? (int)(dot - base) : (int)strlen(base);
+    snprintf(out, n, "%.*s_%s%s", stem, base, expr, dot ? dot : "");
+}
+
+// The scene's portraits, cached by file name. Loading is LAZY — the first line that asks for an
+// expression loads it — and a cache miss is cached too, so a missing (speaker, expression) pair is
+// looked for, and logged by tex_load, exactly once per scene.
+static const Tex *face_get(Star *st, const char *base, const char *expr) {
+    if (!base) return nullptr;
+    char key[FACE_KEY];
+    face_key(base, expr, key, sizeof(key));
+    int slot = -1, free_slot = -1;
+    for (int i = 0; i < MAX_FACES; i++) {
+        if (!st->face_file[i][0]) { if (free_slot < 0) free_slot = i; continue; }
+        if (!strcmp(st->face_file[i], key)) { slot = i; break; }
     }
+    if (slot < 0) {
+        if (free_slot < 0) return (expr && *expr) ? face_get(st, base, "") : nullptr;   // cache full
+        slot = free_slot;
+        snprintf(st->face_file[slot], FACE_KEY, "%s", key);
+        st->face[slot] = tex_load(key);
+        st->face_owned[slot] = st->face[slot].id ? 1 : 0;
+        if (!st->face[slot].id && expr && *expr) {                       // not drawn yet: use the base
+            const Tex *b = face_get(st, base, "");                       // may take another slot; ours is taken
+            if (b) { st->face[slot] = *b; st->face_owned[slot] = 0; }
+            SDL_Log("cutscene: no %s, falling back to %s", key, base);
+        }
+    }
+    return st->face[slot].id ? &st->face[slot] : nullptr;
+}
+
+// The plain portraits of every speaker in the scene, loaded up front as they always were, so a
+// speaker change never waits on a decode. Expression variants come in lazily on the line that uses
+// one; a scene with many of them simply fills more of the cache.
+static void load_faces(Star *st, const CsScene *sc) {
+    for (int i = 0; i < sc->line_count; i++)
+        if (sc->lines[i].portrait) face_get(st, sc->lines[i].portrait, "");
 }
 
 static void reveal_panel(Star *st, const CsScene *sc, int n, bool instant) {   // n is 1-based, 0 = none
@@ -557,10 +611,18 @@ static void star_goto(Star *st, int scene, int line, bool instant) {
     st->line = line;
     st->line_page = 0;                     // a new line always starts at its first page
     st->line_t = instant ? 99.0f : 0.0f;
-    if (!same_file(st->face_cur, sc->lines[line].portrait)) {              // a new speaker slides in
+    // A NEW SPEAKER slides in from their end of the box, as before. The SAME speaker changing
+    // expression is a different event — the face is already there and only its look changed — so it
+    // swaps with a tiny pop instead, which reads as a reaction rather than as somebody arriving.
+    const char *ex = line_expr(&sc->lines[line]);
+    if (!same_file(st->face_cur, sc->lines[line].portrait)) {
         st->face_cur = sc->lines[line].portrait;
         st->face_t = instant ? FACE_IN : 0.0f;
+        st->face_pop = FACE_POP;
+    } else if (strcmp(st->expr_cur, ex)) {
+        st->face_pop = instant ? FACE_POP : 0.0f;
     }
+    snprintf(st->expr_cur, sizeof(st->expr_cur), "%s", ex);
     reveal_panel(st, sc, sc->lines[line].reveal, instant);
     mus_start(sc->lines[line].mood);
 }
@@ -638,6 +700,7 @@ static void draw_scene(Star *st, int w, int h, float dt) {
     const CsScene *sc = &CS_INTRO[st->scene];
     const CsLine *ln = &sc->lines[st->line];
     bool narr = line_is_narrator(ln) || st->dlg_as_narr;   // dlg_* are set only by DIALOG_CAPTURE
+    const char *ltext = st->dlg_textless ? "" : ln->text;  // a textless line: name and portrait, no words
     bool port = h > w;
     dl->AddRectFilled(ImVec2(0, 0), ImVec2((float)w, (float)h), IM_COL32(0, 0, 0, 255));
 
@@ -709,7 +772,7 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         float size = text_size * 1.08f, width = (port ? w * 0.84f : w * 0.7f);
         float top = h * (port ? 0.30f : 0.26f), bot = h * (port ? 0.74f : 0.72f);
         DlgPages pg;
-        dlg_paginate(font, size, width, dlg_max_lines(bot - top, size), ln->text, &pg);
+        dlg_paginate(font, size, width, dlg_max_lines(bot - top, size), ltext, &pg);
         if (st->line_page >= pg.count) st->line_page = pg.count - 1;
         const char *pb = pg.beg[st->line_page], *pe = pg.end[st->line_page];
         int total = (int)(pe - pb);
@@ -735,9 +798,10 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         float pad = text_size * DLG_LINE_H * DLG_PAD_LINES;
         // Speaker portrait at one end of the box (Phantasy Star IV field talk), text narrowed to fit.
         // A Narrator line never has one: it is a document, not somebody speaking.
-        const Tex *fa = (narr || st->dlg_no_port) ? nullptr : face_tex(st, ln->portrait);
+        const Tex *fa = (narr || st->dlg_no_port) ? nullptr : face_get(st, ln->portrait, line_expr(ln));
         if (fa) {
             st->face_t += dt;
+            st->face_pop += dt;
             float inset = u * 2.0f, fh = (by1 - by0) - inset * 2.0f;
             float fw = fh * (float)fa->w / (float)fa->h, cap = (bx1 - bx0) * 0.3f;
             if (fw > cap) { fw = cap; fh = fw * (float)fa->h / (float)fa->w; }
@@ -746,6 +810,24 @@ static void draw_scene(Star *st, int w, int h, float dt) {
             float fx = right ? bx1 - inset - fw : bx0 + inset;
             float fy = by0 + ((by1 - by0) - fh) * 0.5f;
             ImVec2 f0(fx + (1.0f - a) * fw * 0.4f * (right ? 1.0f : -1.0f), fy), f1(f0.x + fw, f0.y + fh);
+            // PORTRAIT MOTION (Dev toggle). Cheap, no assets: the pop on an expression swap, and one
+            // per-expression idle held for as long as the line is up. `lpx` is a logical pixel — the
+            // same 2 px on the phone as on the Mac, because the box itself is laid out in real ones.
+            if (st->port_motion) {
+                float lpx = st->dpi_scale > 0.0f ? st->dpi_scale : 1.0f, ox = 0.0f, oy = 0.0f, scl = 1.0f;
+                if (st->face_pop < FACE_POP)                                    // 1.0 -> 1.06 -> 1.0
+                    scl = 1.0f + 0.06f * sinf((st->face_pop / FACE_POP) * 3.14159265f);
+                const char *ex = line_expr(ln);
+                if (!strcmp(ex, "biglaugh")) oy = sinf(st->line_t * 6.0f * 6.2831853f) * 2.0f * lpx;
+                else if (!strcmp(ex, "shock")) {                                // one sharp jolt, then still
+                    float j = st->line_t < 0.16f ? 1.0f - st->line_t / 0.16f : 0.0f;
+                    oy = -j * 5.0f * lpx;
+                    ox = j * 2.0f * lpx * (right ? 1.0f : -1.0f);
+                } else if (!strcmp(ex, "sorrow")) oy = 2.0f * lpx * (1.0f - expf(-st->line_t * 1.1f));
+                ImVec2 c((f0.x + f1.x) * 0.5f, (f0.y + f1.y) * 0.5f);
+                f0 = ImVec2(c.x + (f0.x - c.x) * scl + ox, c.y + (f0.y - c.y) * scl + oy);
+                f1 = ImVec2(c.x + (f1.x - c.x) * scl + ox, c.y + (f1.y - c.y) * scl + oy);
+            }
             dl->AddRectFilled(f0, f1, with_alpha(IM_COL32(6, 8, 22, 255), a));
             mip_on(dl);
             dl->AddImage((ImTextureID)(intptr_t)fa->id, f0, f1, ImVec2(0, 0), ImVec2(1, 1), with_alpha(IM_COL32_WHITE, a));
@@ -760,13 +842,18 @@ static void draw_scene(Star *st, int w, int h, float dt) {
         float gutter = text_size * 1.1f;                                   // the marker's own corner
         float tw = (cr.x1 - gutter) - cr.x0, th_avail = (cr.y1 - cr.y0) - name_h;
         DlgPages pg;
-        dlg_paginate(font, text_size, tw, dlg_max_lines(th_avail, text_size), ln->text, &pg);
+        dlg_paginate(font, text_size, tw, dlg_max_lines(th_avail, text_size), ltext, &pg);
         if (st->line_page >= pg.count) st->line_page = pg.count - 1;
         const char *pb = pg.beg[st->line_page], *pe = pg.end[st->line_page];
         int total = (int)(pe - pb);
         int chars = type_t <= 0 ? 0 : (int)(type_t * TYPE_CPS);
         typing = chars < total;
         more_pages = st->line_page + 1 < pg.count;
+        // A TEXTLESS LINE — an expression and no words, a reaction beat — is a box with the speaker's
+        // name and portrait in it and nothing to type. There is no typewriter to wait through and no
+        // timer: the marker is up from the first frame and the tap moves on, exactly as it does on a
+        // line whose typing has finished.
+        if (total == 0) typing = false;
         if (typing && chars > 0) {
             static int last_blip = -1;
             if (chars / 3 != last_blip && pb[chars - 1] != ' ') { last_blip = chars / 3; au_play(V_BLIP, narr ? 520.0f : 760.0f, 0.04f, 0.10f); }
@@ -979,6 +1066,8 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
         if (ImGui::Button(mood_names[i])) mus_start(i);
         if (cur) ImGui::PopStyleColor();
     }
+    ImGui::SameLine();
+    { bool pm = st->port_motion; if (ImGui::Checkbox("portrait motion", &pm)) st->port_motion = pm; }
     ImGui::Separator();
     if (st->screen == SCR_FIELD) {
         char line[224];
@@ -1015,8 +1104,13 @@ static void *game_create(float dpi_scale) {
     // DIALOG_CAPTURE=<scene>:<line>[:page] — one dialogue box, rendered by the real player and written
     // to build_desktop/dialog_<scene>_l<line>_p<page>.png, so the box can be judged on the longest
     // real lines without a phone. <scene> is an index or a scene id from cutscene_data.h.
+    st->port_motion = true;
     const char *dspec = SDL_getenv("DIALOG_CAPTURE");
     if (dspec) snprintf(st->dlg_spec, sizeof(st->dlg_spec), "%s", dspec);
+    // DIALOG_EXPR=<expr> forces one expression on every line, so a capture can show a portrait
+    // variant (and its fallback) before any scene file has been tagged. Desktop capture path only.
+    const char *espec = SDL_getenv("DIALOG_EXPR");
+    if (espec) snprintf(g_expr_force, sizeof(g_expr_force), "%s", espec);
     const char *spec = SDL_getenv("FIELD_CAPTURE");
     if (spec) snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec);
     spec = SDL_getenv("TILE_CAPTURE");                 // <map>:<scale>:<out.png>, the whole map in one PNG
@@ -1134,6 +1228,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
         st->dlg_as_narr = (flag[0] == 'n');            // the same line drawn with no name and no portrait
         st->dlg_no_port = (flag[0] == 'x') || st->dlg_as_narr;
         st->dlg_small = (flag[0] == 's');
+        st->dlg_textless = (flag[0] == 't');
         int scene = -1;
         for (int i = 0; i < CS_INTRO_COUNT; i++) if (!strcmp(CS_INTRO[i].id, id)) { scene = i; break; }
         if (scene < 0) { scene = atoi(id); if (scene < 0 || scene >= CS_INTRO_COUNT) scene = 0; }
@@ -1144,9 +1239,13 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
         st->fade = 0.0f; st->fade_to_scene = -1;
         st->line = line; st->line_page = page; st->line_t = 99.0f;      // typing finished, marker steady
         if (++st->dlg_frames >= 6) {
-            char out[320];
-            snprintf(out, sizeof(out), "build_desktop/dialog_%s_l%d_p%d%s.png", CS_INTRO[scene].id, line, page,
-                     st->dlg_as_narr ? "_narrator" : st->dlg_no_port ? "_noportrait" : st->dlg_small ? "_smallbox" : "");
+            char out[320], suffix[64] = "";
+            if (st->dlg_as_narr) snprintf(suffix, sizeof(suffix), "_narrator");
+            else if (st->dlg_no_port) snprintf(suffix, sizeof(suffix), "_noportrait");
+            else if (st->dlg_small) snprintf(suffix, sizeof(suffix), "_smallbox");
+            if (st->dlg_textless) snprintf(suffix + strlen(suffix), sizeof(suffix) - strlen(suffix), "_textless");
+            if (g_expr_force[0]) snprintf(suffix + strlen(suffix), sizeof(suffix) - strlen(suffix), "_%s", g_expr_force);
+            snprintf(out, sizeof(out), "build_desktop/dialog_%s_l%d_p%d%s.png", CS_INTRO[scene].id, line, page, suffix);
             unsigned char *px = (unsigned char *)malloc((size_t)w * h * 4);
             unsigned char *row = (unsigned char *)malloc((size_t)w * 4);
             if (px && row) {

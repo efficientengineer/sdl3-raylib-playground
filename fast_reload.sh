@@ -100,7 +100,9 @@ for n in $WANTED_PANELS; do
     [ -f "$f" ] || continue
     push_art "$f" "$n"
 done
-for f in "$SCRIPT_DIR"/story/portraits/*.png; do   # cutscene_data.h names these portrait_<name>.png
+# Every portrait, the expression variants included: <name>.png and <name>_<expr>.png both ship, as
+# portrait_<name>.png and portrait_<name>_<expr>.png, which is the name a CsLine asks for.
+for f in "$SCRIPT_DIR"/story/portraits/*.png; do
     [ -f "$f" ] || continue
     echo "portrait_$(basename "$f")" >> "$SHIP_CUT"
     push_art "$f" "portrait_$(basename "$f")"

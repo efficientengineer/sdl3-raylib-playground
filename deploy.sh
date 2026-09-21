@@ -20,6 +20,8 @@ mkdir -p "$ASSETS/cutscenes"
 for n in $(grep -o '"[a-z0-9_]*\.png"' src/cutscene_data.h | tr -d '"' | sort -u); do
     [ -f "story/panels/$n" ] && cp "story/panels/$n" "$ASSETS/cutscenes/$n"
 done
+# Every portrait, the expression variants included: <name>.png and <name>_<expr>.png both bundle, as
+# portrait_<name>.png and portrait_<name>_<expr>.png, which is the name a CsLine asks for.
 for f in story/portraits/*.png; do
     [ -f "$f" ] || continue
     cp "$f" "$ASSETS/cutscenes/portrait_$(basename "$f")"                 # the name cutscene_data.h uses
