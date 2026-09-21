@@ -1,23 +1,27 @@
 # LOOT — hidden items, chapter one
 
-One per map, off the main path, missable on a first run on purpose — **except the first one**, which
-is the teaching find and is meant to be got by anyone who pokes around at all. Every effect is a rule
-or a multiplier that is still worth having at level forty. No vendor stats.
+Rewritten 2026-09-21 for the hunt on the high pasture. The west road's items are gone with the road.
 
-| Ch | Map | Item | Where it is | What it does | Later payoff |
+**One hidden item per map, off the main path, missable on purpose — except the first**, which is the
+teaching find and is meant to be got by anyone who pokes around at all. Every effect is a **rule
+change or a multiplier**, never "+3 attack", and still worth having at level forty. Every name is a
+token in `NAMES.md`.
+
+| Ch | Map | Item | Exactly how it is reached | What it does | Why it lasts |
 |---|---|---|---|---|---|
-| 1 | {{HOME_TOWN}}, the grain shed | **the {{LOOT_TEACHING_FIND}}** — *the teaching find* | A lead weight off the grain scales, sitting on the scale bench two steps inside the shed door, in plain sight, with a glint on it. The route out is the gap in the far wall; the bench is one step the other way. Anyone who looks around at all gets it, and that is the point: this is where the player learns that looking around pays. | Use in battle: one character's attack is doubled for three rounds. Once per fight, never consumed. | None needed. It multiplies whatever your attack is, so it is as good in the last dungeon as in the second fight of the game. |
-| 1 | {{MENTOR}}'s yard | **the {{LOOT_YARD}}** | A flat tin nailed under the eaves, found only by climbing the ladder while he is inside at supper. He has never mentioned it and the game never points at it. | Whoever wears it cannot be held, wrapped or knocked down. | Counters {{ROAD_CREATURE_PL}} on the way out of town and every binding attack after that; the late ones are the nasty ones. Quietly: this is the thing that would have saved {{HERO}}'s father, and it has been in {{MENTOR}}'s roof for eleven years. |
-| 1 | The west road | **the {{LOOT_ROAD}}** | A {{THIEF_CREATURE_PL}}' hoard in the drain under the broken culvert — everything they have stolen on this road for a year. Only reachable on the rope, which most players spend on the crossing and walk away from. | Ten per cent critical chance for the wearer. | A flat multiplier on whatever weapon is in your hand, so it gets stronger every time you upgrade. Deliberately unimpressive in chapter one. |
-| 1 | North off the road | **the {{LOOT_SECOND_SWORD}}** | Deep in the {{CAVE_CREATURE}}'s cave, a roped descent off the path, behind the hardest fight in the chapter. | A plain sword, worse than your father's, that cannot break. | **Planned, not yet written:** at the {{SEA_WALL}} there is something that destroys the weapon that strikes it. A player who took the second sword has an answer; a player who did not chooses between losing his father's sword and walking away. |
-| 1 | Under the {{STAIR}} | **the {{LOOT_SHRINE}}** | Under one of the {{SHRINE_CREATURE_PL}}, found by examining the gap in the ring instead of walking through it. | Fleeing always succeeds, from anything, including fights that normally refuse. | Skips trash all game, and there is one fight late on that the player is supposed to run from and will not believe he is allowed to. |
+| 1 | Halm, the grain yard | **the {{LOOT_TEACHING_FIND}}** *(weight)* — **the teaching find** | Day one, on the errand. The yard's door is propped open and three {{GRAIN_CREATURE_PL}} are inside; the route through to the guild hall is the gap in the far wall. The lead weight off the grain scales is on the scale bench **one step the other way**, in plain sight, with a glint on it and an `!` prompt. Nobody points at it. Anyone who looks around at all gets it. | Use in a fight: one character's attack is **doubled for three rounds**. Once per fight, never consumed. | It multiplies whatever your attack is, so it is as good in the last dungeon as it is in the grain yard. |
+| 1 | {{MENTOR}}'s yard | **the {{LOOT_YARD}}** *(brace)* | A flat tin nailed under the eaves. The ladder is against the workshop wall from the first minute of the game and can be climbed at any time — but the tin is only reachable by climbing to the workshop roof and **jumping the gap to the house roof**, which is about three cells: the engine's running jump clears it and a standing one does not. Best taken on the night of day one, while Hart is inside at supper. | The wearer **cannot be held, knocked down, or put to sleep.** | Sleep is the {{HERDER_PEOPLE_PL}}' whole magic and the {{GUARD_BEAST}}'s whole method. A player who found this has a different boss fight, and it answers every binding attack in the game after it. |
+| 1 | {{HILL_PATH}} | **the {{LOOT_HILL}}** *(whistle)* | On the way up, the path switches back around a shoulder of rock. Off the outside of the bend there is a **drop of two cells onto a ledge** you can see from above and cannot see from the path. Drop onto it — the engine allows any drop onto walkable ground — and it is there, in an old fold wall. Getting back up is a ramp at the far end, so it costs nothing but nerve. | Once a fight, **one enemy skips its next turn.** No cost, no check, works on anything that takes turns. | A free round against anything, forever, including bosses. It is the "I need one more round" button and there is never a game where that is not worth a slot. |
+| 1 | {{HIGH_PASTURE}} | **the {{LOOT_PASTURE}}** *(lens)* | Only findable **after {{HERDER}} joins**, and only in the dark. There is a jump-only shelf above the fold — the pasture's jump-only region, the same kind the engine already detects and logs — and with night sight on, the thing on it glints where nothing should glint. Reached by a running jump off the fold's wall. A player without the herder walks past a black hillside. | **Enemy tells are always shown, for the whole party, permanently** — and shown early, the way night sight shows them, even when {{HERDER}} is not in the party. | It makes the game's one distinctive mechanic reliable forever. It is the single strongest item in chapter one and it is behind the chapter's only real piece of platforming, in the dark, after the player has understood what a tell is. |
 
 ## Rules for later chapters
 
-- One hidden item per map, one line each in this table before it appears in a chapter file.
-- **The teaching find happens once, in chapter one.** Everything after it has to be behind something:
-  an encounter, a side turning, a tool the player spent elsewhere, or an examine on a thing the game
-  never asks you to examine.
-- The effect is a rule change or a multiplier. If it can be written as "+3 attack", it is wrong.
-- Plain names, common words, no invented vocabulary — and every one of them is a token in `NAMES.md`.
-- If the item has a payoff, name the payoff here and plan it. Do not foreshadow it in the chapter.
+- One hidden item per map, one row in this table before it appears in a chapter file.
+- **The teaching find happens once, in chapter one.** Everything after it is behind something: an
+  encounter, a side turning, a drop or a jump, the dark, or an examine the game never asks for.
+- The effect is a rule change or a multiplier. If it can be written "+3 attack", it is wrong.
+- Plain names, common words, no invented vocabulary; every one a token in `NAMES.md`.
+- Name the later payoff here and plan it. Do not foreshadow it in the chapter.
+- **Use the engine's own shapes**: the jump-only regions `vx_build_nav` already finds and logs are
+  reserved for exactly this. Chapter one uses a jump (the eaves), a drop (the hill path), and a
+  jump-only region in the dark (the pasture) — one of each, so the player learns the whole vocabulary.
