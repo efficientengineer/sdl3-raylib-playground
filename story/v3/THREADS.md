@@ -31,7 +31,9 @@ screen, so by D23 none of them was canon. They are not owed.
   the player asks it.
 - {{MENTOR}} says tracks do not stop and somebody miscounted sheep. He is wrong, and he has not been
   told yet.
-- {{HERO}} owes {{RIVAL}} three coin for bread, and has been paid five for the job.
+- {{HERO}} owes {{RIVAL}} three coin. {{MENTOR}} sent him out with an empty pocket and {{RIVAL}} put
+  the coin on the counter for his bread in front of the clerk: *"Pay me back when you sign for
+  something."* He has since been paid five for the job and has not paid him back.
 - {{TOWN_HEALER}} gives {{HEALER}} full standing after a season's work outside the valley. {{HEALER}}
   is now doing one, and has not told her.
 - {{HEALER}} took {{HERDER}} along without asking anybody, including {{HERDER}}. Nothing on screen

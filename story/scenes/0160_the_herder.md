@@ -37,12 +37,12 @@
 - {{HEALER}} (shock) [4]: {{HERO}} — she's a girl. Put the sword down!
 - {{HERO}} (shock) [5]: What are you?
 - {{HERDER}} (neutral) [5]: {{HERDER_PEOPLE}}.
-- {{HEALER}} (smile) [6] {wonder}: You're a night herder. No one here has ever seen one.
+- {{HEALER}} (smile) [6] {wonder}: A night herder. No one here has ever seen one of you.
 - {{HERDER}} (annoyed) [6]: Now you have. Move your foot. You're standing on my lead.
-- {{HERDER}} (neutral) [6]: {{BEAST_NAME}} put them down. My {{GUARD_BEAST}}.
+- {{HERDER}} (neutral) [6]: My {{GUARD_BEAST}} put them down. {{BEAST_NAME}}.
 - {{HEALER}} (neutral) [6]: What is a {{GUARD_BEAST}}?
 - {{HERDER}} (neutral) [6]: He beds a flock down where he thinks it's safe.
-- {{HERDER}} (sorrow) [6]: He ran in the spring. He stopped knowing me.
+- {{HERDER}} (sorrow) [7]: He ran in the spring. He stopped knowing me.
 - {{HERO}} (concern) [7] {confront}: He's the monster on my job sheet.
 - {{HERDER}} (resolve) [7]: Hold him still and I'll calm him. Quietly — she's sleeping.
 - {{HERO}} (shock) [7]: That's a sheep!

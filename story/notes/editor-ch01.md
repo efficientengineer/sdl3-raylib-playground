@@ -193,3 +193,89 @@ a player is told "guard beast"; every other word in the game says **drover**. It
 5. **The sword handover.** De-ceremonialised as instructed — one hand, hilt first, a rag still in the
    other fist, no two-palmed held beat — and Falke's shock is now a face rather than a line. If the
    owner wanted the ceremony, this is the change to reverse, and it is two panels.
+
+---
+
+# 4.1 — the cold read polish (2026-09-21)
+
+Ten items from `story/notes/cold-read-ch01-draft4.md`, as the orchestrator ruled on them. Six scene
+files, `story/field/text.md` (words only — no id added, removed or renamed), `chapter01.md`,
+`THREADS.md`, the reading script. No commit, no `src/`, no maps, no packages.
+
+## Box counts
+
+| Scene | 4 | 4.1 | why |
+|---|---|---|---|
+| 0110 The Yard | 14 | **14** | untouched |
+| 0130 The Counter | 12 | **12** | the dawn/bell box out (the spine says C2 does not need it), the bread beat in: two boxes |
+| 0140 Supper | 10 | **10** | untouched |
+| 0150 The Sword | 15 | **16** | +1 textless `Falke (resolve)` on the new grip panel |
+| 0160 The Herder | 16 | **16** | two lines reordered, one retagged |
+| 0180 What Was On Him | 18 | **17** | −1: "He's dead." cut |
+| **total** | **85** | **85** | ceiling 86 |
+
+Silent boxes go from three to four: 0140 (Ottilie at the third place), 0150 (Falke on the sword),
+**0150 (Falke on the grip panel, new)**, 0180 (Distel after the apology). Longest line after
+substitution: 92 characters, still the clerk's restarted rule. `check --all`, `names` and
+`script 01` all clean.
+
+## Item by item
+
+1. **0150 — the parry has a cause now.** A new panel 4, `object_insert`: his top hand turning over on
+   the practice stick and his boots planting with the weight going back, revealed by a **textless**
+   `Falke (resolve)` box between "All right. Come on, then." and the winning blow. Nobody says
+   anything about it, then or ever. **The scene was already at the eight-panel ceiling**, so the
+   panel that paid for it is the old panel 2, the `portrait_inset` of Ottilie with the apple core —
+   the cold read's own note that her joke and her face sat on different pictures — and "Don't start
+   counting." now lands on the establishing shot with her line. She still gets her close-up at
+   panel 6, `profile_flat`, where the scene wants it. `eyes_slit` now says his eyes are on the
+   **counterweight**, not the arm, and the `## Beat` says the grip, the feet and the counterweight
+   for the artist.
+2. **0130 is a three-panel scene.** `- type: talk` gone, `- staging:` and acting lines in: (1) the
+   counter, Guildclerk behind it with the ledger, the catch between them and the **bare board of
+   planks and old nail holes on the wall behind**; (2) `full_body_reveal` of Stolz in the street
+   doorway, nineteen, a head taller, the new wine-red coat, the purse and the **sword on his hip**;
+   (3) `object_insert` of three coin going down on the counter under a wine-red cuff. The third panel
+   names no cast, so the hand does the acting. Twelve boxes still. The art tray gains one shot sheet.
+3. **0180 — "He's dead." cut.** Panel 1 is a picture of a dead animal; it does not need a caption.
+   The scene now opens on Falke's "I'm sorry." and **her first box is the silent one**, which is the
+   box the cold read said carried the whole death.
+4. **0160 — the briefing halved.** "You're a night herder. No one here has ever seen one." →
+   **"A night herder. No one here has ever seen one of you."** The two words stay, because the
+   mandatory field line that plants them (`halm.lamp_charm_2`) says *"moving sheep in the dark"* and
+   never says *night herder*; "of you" turns a briefing into something said to her face.
+5. **Declined, per the ruling.** Hart keeps "Take it to the clerk. He'll write your name in the
+   guild book." The sword's guild meaning stays plain.
+6. **0160 reordered.** "Klee put them down. My drover." → **"My drover put them down. Klee."**
+7. **0160 retagged, no new box.** "He ran in the spring. He stopped knowing me." moves off panel 6
+   (the pretty lamp-lit close-up, where it was the fifth line stacked) onto **panel 7**, the
+   over-shoulder from behind her, and Falke's job-sheet line answers it on the same picture.
+8. **The bread is one story everywhere.** `hart_yard.errand`: *"…and bread on the way back, enough
+   for three. There is no coin in the house until the winch is paid for."* `halm.bread` no longer
+   puts the loaves on Hart's slate: *"A coin a loaf, and you want three. Come back when you have
+   three coin in your hand."* 0130 ends on Falke's "I've got no coin for the bread." and Stolz's
+   "Three coin for his bread. Pay me back when you sign for something." — said to the clerk, over the
+   picture of the coin. `chapter01.md` P2 and C2 and `THREADS.md` all say the same thing now.
+9. **The three nouns are on screen first**, in words under existing ids only.
+   - *catch* — `hart_yard.bench_part` (MANDATORY) now names it: **"The catch for the well winch,
+     mended…"**, which also ties it to `halm.well`, where the winch is Hart's work.
+   - *guild* — `halm.guild_hall_door` (MANDATORY): **"The hunters' guild hall is open…"**. The bare
+     board came out of this line, which also kills the duplicate the cold read flagged.
+   - *job sheet* — `halm.board_closed` now carries it on the thing itself: **"The job sheets go up
+     here at dawn. Today it is bare planks and a lot of old nail holes."** In the clip, the board is
+     drawn behind the clerk in panel 1.
+10. **Declined after reading it aloud.** "I had a very good thing ready to say and now I'm not
+    saying it." stays whole. Trimmed to "I'm not saying it." the exchange dies: Falke's "Tell me!"
+    has nothing to point at and "You'd have it framed." loses the *praise she had prepared*, which is
+    the whole joke. The chapter's funniest line is not worth six words.
+
+## For the orchestrator
+
+- **The art tray gains one shot sheet** — `ch01/scenes/0130_the_counter` (3 panels) — and 0150's
+  sheet changes shape: its panel 2 is dropped and a new panel 4 added, so **0150 must be regenerated,
+  not patched**. `./story_prompt.py packages` and then the two sheets.
+- `story/refs/stolz.png` and `story/refs/guildclerk.png` are both needed before 0130 can be drawn;
+  they are the only two faces in the clip.
+- Still open from the merge pass and untouched here: the `hart_yard.hart_day2`, `halm.town_healer_2`
+  and `halm.shepherd_market_3` ids (ids are still frozen), and `"Find the guard beast."` in
+  `src/chapter01.h`.

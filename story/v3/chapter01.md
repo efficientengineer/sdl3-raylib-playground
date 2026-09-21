@@ -163,7 +163,10 @@ the town is a place with things in it.**
    Magic is ordinary and small and it is a **chore**, and the carter's saying about the
    {{HERDER_PEOPLE_PL}} comes out of him while he waits. That is the only time they are mentioned
    before Distel is standing in front of you, and it costs one trigger.
-2. *The square.* The baker (bread for three — an actual transaction, the player's first). The bell
+2. *The square.* The baker (bread for three — an actual transaction, the player's first, and **it
+   cannot be made yet**: a coin a loaf and {{MENTOR}} sent him out with an empty pocket, so the
+   player walks away from the stall and buys the loaves on the way home with {{RIVAL}}'s three coin
+   from C2). The bell
    tower, examinable, so the bell that rings tomorrow is a thing the player has stood under. The job
    board is visible across the square and **empty**: it is not dawn.
 3. *The grain yard.* The short way through to the guild hall is the gap in its far wall. The door is
@@ -189,13 +192,19 @@ around and you will be paid.* Everything else in the game is hidden properly.
 **Length.** 10 min with the examines, 5 if the player runs it.
 **Feel.** An ordinary afternoon in a town that is about to matter.
 
-### CLIP C2 — the counter *(1 min, talk)* — `0130_the_counter`
+### CLIP C2 — the counter *(1 min, panels)* — `0130_the_counter`
 **Purpose.** **One rule, said once: no sword, no signature.** *(Shortened after the cold read: the
 clip used to recite three rules and it was two minutes of dead time at minute twenty.)* Open on Falke
 asking when he can take a job and let the rest come out of him arguing with it. The **dawn** rule and
 the **closing bell** are not needed here — the player meets the empty board in play with
 `halm.board_closed` on it, and meets the closing bell as the timer in P5, which is a better teacher
 than a clerk. Not the job; there is no job yet.
+**Three panels (draft 4.1).** It used to be the one clip with no pictures and {{RIVAL}} was the one
+character with no face. Now: the counter with the bare board behind the clerk, {{RIVAL}} full length
+in the street doorway, and his three coin going down on the counter. **The bread is paid for here, in
+front of the clerk** — {{MENTOR}} sent the boy out with no coin on him (`hart_yard.errand`), the
+baker wants three (`halm.bread`), and {{RIVAL}} settles it out loud: *"Pay me back when you sign for
+something."* That is the debt in `THREADS.md`, and it is the last thing in the clip.
 *Back into:* free walk in Halm, goal line *Get home before supper.* The board can be walked up to and
 read: empty, with an examine line saying why.
 
@@ -290,7 +299,10 @@ them. **Optional.** {{LOOT_YARD}}, if it is still up there. **Failing costs noth
 because of one rule stated once yesterday the player already knows what that means: **he may sign.**
 Nobody re-explains it and **nobody narrates the parry he just did** (struck after the cold read: "He
 turned it aside and then he hit it" and "there's a click first" are both the game describing what the
-player watched). The bell starts underneath the last box.
+player watched). **One wordless panel (draft 4.1) does show the cause**: his top hand turning over on
+the grip and his feet planting with the weight going back, on a textless box, between *"All right.
+Come on, then."* and the parry. It is a picture, not an explanation, and nobody remarks on it.
+The bell starts underneath the last box.
 **THE SWORD GETS A BREATH.** The bell is **audible but not counting**. Control returns in the yard,
 no fade, the sword on his back, the old goal line still up — **and nothing is pressing.** The player
 can stand in that yard as long as they like and look at it. **The ring counter appears, and the timer

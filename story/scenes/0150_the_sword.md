@@ -8,18 +8,17 @@
 - dialogue_box: no
 
 ## Beat
-{{HERO}} has been at the swing since before first light and the player has lost with him all day. His arms are gone, which is the only reason he stops swinging: he stands still, lets the weight drop, turns the arm aside with the stick and hits the post while the arm is out of the way. **Nobody tells him to do it and nobody says afterwards what he did.** {{HEALER}} has watched him lose to that machine since he was twelve and she has never once known how it was beaten; she is knocked quiet for a moment and then spoils it on purpose. {{MENTOR}} has watched from the bench and is surprised. **He makes no ceremony of it**: he comes over with the sword in one hand, holds it out hilt first the way he hands over any finished thing, and says the one thing about it the boy needs — take it to the clerk. The boy has no words for a moment, and that silence is the beat. Then the evening bell starts down in the town, and the board closes on its last ring.
+{{HERO}} has been at the swing since before first light and the player has lost with him all day. His arms are gone, which is the only reason he stops swinging: he stands still, turns his top hand over on the stick and plants his feet with his weight going back instead of forward, watches the counterweight instead of the post, lets the weight drop, turns the arm aside with the stick and hits the post while the arm is out of the way. **Nobody tells him to do it and nobody says afterwards what he did.** {{HEALER}} has watched him lose to that machine since he was twelve and she has never once known how it was beaten; she is knocked quiet for a moment and then spoils it on purpose. {{MENTOR}} has watched from the bench and is surprised. **He makes no ceremony of it**: he comes over with the sword in one hand, holds it out hilt first the way he hands over any finished thing, and says the one thing about it the boy needs — take it to the clerk. The boy has no words for a moment, and that silence is the beat. Then the evening bell starts down in the town, and the board closes on its last ring.
 
 ## Panels
 1. establishing_wide | the hill yard in low evening light, the three training machines throwing long shadows across cut grass, {{HERO}} small and bent over in front of the swing, {{HEALER}} sitting on the stone wall at the left
    - {{HERO}}: head down, eyes on the grass, both hands on his knees, back heaving
    - {{HEALER}}: sitting on the wall, eyes right on {{HERO}}, chin on her fist, legs swinging
-2. portrait_inset | {{HEALER}} close up on the wall in the last of the light, an apple core in her fingers
-   - {{HEALER}}: eyes right on {{HERO}}, one brow up, mouth curved, an apple core turning in her fingers
-3. over_shoulder | the dark back of {{HERO}}'s head and shoulder at the left edge, the scarred machine beyond him, its iron counterweight dropping on its rope
+2. over_shoulder | the dark back of {{HERO}}'s head and shoulder at the left edge, the scarred machine beyond him, its iron counterweight dropping on its rope
    - {{HERO}}: seen from behind, head up, facing the machine, stick low in both hands, feet still
-4. eyes_slit | {{HERO}}'s eyes and brow filling the panel edge to edge, low evening light across them
-   - {{HERO}}: eyes fixed on the machine's arm, wide open, brows level, jaw loose with tiredness
+3. eyes_slit | {{HERO}}'s eyes and brow filling the panel edge to edge, low evening light across them
+   - {{HERO}}: eyes fixed on the machine's iron counterweight, wide open, brows level, jaw loose with tiredness
+4. object_insert | two young hands close up on a worn practice stick, the top hand turning over on the grip, and below them two boots planting in the cut grass with the weight settling back on the heels
 ---
 5. impact | the wooden practice stick meeting the swinging arm side on and turning it away, the arm going wide of {{HERO}}, his other shoulder already driving in at the post
    - {{HERO}}: eyes on the arm he is turning, teeth bared, both wrists locked, weight forward
@@ -33,9 +32,10 @@
 
 ## Dialogue
 - {{HEALER}} (neutral) [1] {tense}: I've eaten two meals up here.
-- {{HERO}} (sorrow) [2]: Don't start counting.
-- {{HERO}} (sorrow) [3]: My arms are gone.
-- {{HERO}} (resolve) [4]: All right. Come on, then.
+- {{HERO}} (sorrow) [1]: Don't start counting.
+- {{HERO}} (sorrow) [2]: My arms are gone.
+- {{HERO}} (resolve) [3]: All right. Come on, then.
+- {{HERO}} (resolve) [4]:
 - {{HERO}} (resolve) [5] {confront}: Come on!
 - {{HEALER}} (smile) [6] {wonder}: I had a very good thing ready to say and now I'm not saying it.
 - {{HERO}} (laugh) [6]: Tell me!

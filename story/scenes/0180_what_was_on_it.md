@@ -34,8 +34,7 @@ The plan worked and then it stopped working: {{HERDER}} held her {{GUARD_BEAST}}
    - {{HERO}}: eyes on the sheep walking past, sword slung, one fist closed round the coins
 
 ## Dialogue
-- {{HERDER}} (neutral) [1] {sorrow}: He's dead.
-- {{HERO}} (sorrow) [1]: I'm sorry.
+- {{HERO}} (sorrow) [1] {sorrow}: I'm sorry.
 - {{HERDER}} (sorrow) [1]:
 - {{HERDER}} (neutral) [1]: He'd have killed me.
 - {{HERDER}} (annoyed) [1]: You stank of fear the whole fight.

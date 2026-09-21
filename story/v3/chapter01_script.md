@@ -4,9 +4,11 @@ Generated from `story/scenes/01*.md` with the names of `story/v3/NAMES.md` subst
 moment it appears on screen, then the lines spoken over it. Between the scenes, in italics, is what the player is doing there,
 taken from the designer's `story/v3/ch01_room/flow.md` and `story/v3/chapter01.md`.
 
-**Draft four — the editor's merge pass, 2026-09-21.** Six clips, **85 boxes** of dialogue where draft
-three had 88 and draft two had 162. Every line carries an explicit panel tag and a face
-(`- Ottilie (biglaugh) [2]:`), and three boxes have a face and no words at all. Nobody coaches the
+**Draft 4.1 — the cold read polish, 2026-09-21.** Six clips, **85 boxes** of dialogue where draft
+three had 88 and draft two had 162. **Five clips have pictures now**: *The Counter* is three panels,
+so Stolz has a face and the bare board is seen behind the clerk. Falke's grip and feet get a wordless
+panel before the parry, so the player can see *why* it worked. Every line carries an explicit panel
+tag and a face (`- Ottilie (biglaugh) [2]:`), and four boxes have a face and no words at all. Nobody coaches the
 player; Ottilie is on the wall enjoying the show; nobody says how the swing is beaten, before or
 after; the player learns Ottilie's family from her own open door, not from a speech. Sixty-seven
 minutes of play to six of clip.
@@ -48,9 +50,9 @@ minutes of play to six of clip.
 
 *Halm by day: take the repaired catch off Hart's bench and carry it across town, stop in the road where a woman warms a carter's lamp wick alight with two fingers, buy bread for three, and find an iron weight kicked under the bench in the grain yard.*
 
-## 0130: The Counter  *(talk scene)*
+## 0130: The Counter  *(panel scene)*
 
-> *No pictures — a talk scene: the guild hall of Halm in the afternoon: a long low stone room with a plank counter, an open double doorway on the street, and an empty job board on the wall be*
+> 🖼 *a long plank counter in a low stone room, Guildclerk behind it with an open ledger, Falke in front of it, a repaired iron catch between them, a bare board of planks and old nail holes on the wall behind*
 
 **Clerk** *(neutral)*: The catch goes on the counter. Is there anything else?  
 **Falke** *(resolve)*: Yes. When can I take a job?  
@@ -60,10 +62,14 @@ minutes of play to six of clip.
 **Falke** *(angry)*: I've trained four years!  
 **Clerk** *(annoyed)*: The rule is that your teacher gives you your first sword. Then I write you in the guild book.  
 **Falke** *(resolve)*: I'll buy one, then.  
+> 🖼 *Stolz head to boots at the open street doorway from a low angle, nineteen and a head taller, a new wine-red coat, a fat purse on his belt and a plain sword hung at his hip, afternoon light behind him*
+
 **Stolz** *(smile)*: You can't buy one. Four years now, is it? Mine took two.  
 **Falke** *(annoyed)*: Stolz. How long have you been standing there?  
-**Stolz** *(neutral)*: Sheets go up at dawn. Don't be up a hill when the bell rings.  
-**Stolz** *(smile)*: Here — three coin for your bread.  
+> 🖼 *three small worn coins pressed down onto the plank counter under a black gloved hand with a wine-red cuff, the repaired catch and the edge of the open ledger beside them*
+
+**Falke** *(concern)*: I've got no coin for the bread.  
+**Stolz** *(smile)*: Three coin for his bread. Pay me back when you sign for something.  
 
 *The lane home at dusk goes past Ottilie's open door — one chair at the table, two coats on the hook — and then you sit down at Hart's table and look at the workshop book on the bench.*
 
@@ -89,8 +95,6 @@ minutes of play to six of clip.
 > 🖼 *the hill yard in low evening light, the three training machines throwing long shadows across cut grass, Falke small and bent over in front of the swing, Ottilie sitting on the stone wall at the left*
 
 **Ottilie** *(neutral)*: I've eaten two meals up here.  
-> 🖼 *Ottilie close up on the wall in the last of the light, an apple core in her fingers*
-
 **Falke** *(sorrow)*: Don't start counting.  
 > 🖼 *the dark back of Falke's head and shoulder at the left edge, the scarred machine beyond him, its iron counterweight dropping on its rope*
 
@@ -98,6 +102,9 @@ minutes of play to six of clip.
 > 🖼 *Falke's eyes and brow filling the panel edge to edge, low evening light across them*
 
 **Falke** *(resolve)*: All right. Come on, then.  
+> 🖼 *two young hands close up on a worn practice stick, the top hand turning over on the grip, and below them two boots planting in the cut grass with the weight settling back on the heels*
+
+**Falke** *(resolve)*:   
 > — *the page clears* —
 
 > 🖼 *the wooden practice stick meeting the swinging arm side on and turning it away, the arm going wide of Falke, his other shoulder already driving in at the post*
@@ -144,14 +151,14 @@ minutes of play to six of clip.
 **Distel** *(neutral)*: Mohn.  
 > 🖼 *Distel in close up, short grey fur and a cream mask, a short blunt muzzle, huge round black eyes with a thin pale ring, tall leaf ears, two braids in front of them, lamp light on one cheek*
 
-**Ottilie** *(smile)*: You're a night herder. No one here has ever seen one.  
+**Ottilie** *(smile)*: A night herder. No one here has ever seen one of you.  
 **Distel** *(annoyed)*: Now you have. Move your foot. You're standing on my lead.  
-**Distel** *(neutral)*: Klee put them down. My drover.  
+**Distel** *(neutral)*: My drover put them down. Klee.  
 **Ottilie** *(neutral)*: What is a drover?  
 **Distel** *(neutral)*: He beds a flock down where he thinks it's safe.  
-**Distel** *(sorrow)*: He ran in the spring. He stopped knowing me.  
 > 🖼 *Distel's small furred shoulder at the right edge, Falke and Ottilie beyond her standing together in the grass, the sword now pointing at the ground*
 
+**Distel** *(sorrow)*: He ran in the spring. He stopped knowing me.  
 **Falke** *(concern)*: He's the monster on my job sheet.  
 **Distel** *(resolve)*: Hold him still and I'll calm him. Quietly — she's sleeping.  
 **Falke** *(shock)*: That's a sheep!  
@@ -163,7 +170,6 @@ minutes of play to six of clip.
 
 > 🖼 *seen from above, a long shaggy animal lying dead in flattened grass with Distel, Falke and Ottilie round it, a lamp on the ground, sheep asleep in a wide ring beyond*
 
-**Distel** *(neutral)*: He's dead.  
 **Falke** *(sorrow)*: I'm sorry.  
 **Distel** *(sorrow)*:   
 **Distel** *(neutral)*: He'd have killed me.  

@@ -43,13 +43,13 @@ nothing else is. The job pays five coin, {{RIVAL}} lends three, the bread is thr
 # hart_yard — day one
 
 ## hart_yard.bench_part
-The repaired catch is on the bench among the half-built things, with a chalk line still on it.
+The catch for the well winch, mended, on the bench among the half-built things with a chalk line still on it.
 - what: **MANDATORY.** The errand's object, picked up off {{MENTOR}}'s bench; the player walks through the workshop to get it and works out what he is without a word about it
 
 ## hart_yard.errand
-Take the catch down to the guild hall. Bread on the way back, enough for three.
+Take the catch down to the guild hall, and bread on the way back, enough for three. There is no coin in the house until the winch is paid for.
 - name: {{MENTOR}}
-- what: {{MENTOR}} sets the errand in one box, right after C1; the player still has the stick
+- what: {{MENTOR}} sets the errand in one box, right after C1; the player still has the stick. He sends the boy out with nothing in his pocket, which is why {{RIVAL}} pays for the bread at the counter in C2 and why the player owes him three coin
 
 ## hart_yard.practice_posts
 {{MENTOR}} built all three of them, and each one teaches you a different way to get hit.
@@ -137,7 +137,7 @@ Up the valley I passed the {{HERDER_PEOPLE_PL}} once, moving sheep in the dark. 
 - what: **MANDATORY**, box two of the same stop; the first the player hears of the {{HERDER_PEOPLE_PL}}
 
 ## halm.bread
-A coin a loaf, and you're carrying three. Put them on {{MENTOR}}'s slate.
+A coin a loaf, and you want three. Come back when you have three coin in your hand.
 - name: Baker on the square
 - what: the bread stall, the only price the player sees in town
 
@@ -151,12 +151,12 @@ Something's in that shed again and it eats the sacks as well as the grain. Go in
 - what: the grain yard gate; points the player at the {{GRAIN_CREATURE_PL}} and the find
 
 ## halm.guild_hall_door
-The guild hall is open and the clerk is behind the counter. The board beside the door is bare.
-- what: **MANDATORY**, fires on entering. The word *guild* enters the game here
+The hunters' guild hall is open, and the clerk is behind the counter with the ledger.
+- what: **MANDATORY**, fires on entering. The word *guild* enters the game here, and it is the hunters' guild before it is anything else. The bare board is `halm.board_closed`'s, not this one's
 
 ## halm.board_closed
-Bare planks and a lot of old nail holes.
-- what: the job board on day one, before C2
+The job sheets go up here at dawn. Today it is bare planks and a lot of old nail holes.
+- what: the job board on day one, before C2. The words *job sheet* enter the game here, on the thing itself
 
 ## halm.bell
 The bell hangs over the square on an axle of {{MENTOR}}'s iron.
