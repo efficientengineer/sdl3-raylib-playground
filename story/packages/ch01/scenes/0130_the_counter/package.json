@@ -9,5 +9,8 @@
     "story/panels/0130_the_counter_p2_full_body_reveal.png",
     "story/panels/0130_the_counter_p3_object_insert.png"
   ],
-  "dir": "story/packages/ch01/scenes/0130_the_counter"
+  "dir": "story/packages/ch01/scenes/0130_the_counter",
+  "status": "to generate",
+  "status_why": "nothing drawn yet",
+  "status_label": "to generate"
 }

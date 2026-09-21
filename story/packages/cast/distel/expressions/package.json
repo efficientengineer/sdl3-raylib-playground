@@ -17,5 +17,8 @@
     "story/portraits/distel_resolve.png"
   ],
   "cut_fingerprint": "705cbd5d14016565",
-  "dir": "story/packages/cast/distel/expressions"
+  "dir": "story/packages/cast/distel/expressions",
+  "status": "done",
+  "status_why": "",
+  "status_label": "done"
 }

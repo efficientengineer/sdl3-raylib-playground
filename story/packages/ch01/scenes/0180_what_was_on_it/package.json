@@ -14,5 +14,8 @@
     "story/panels/0180_what_was_on_it_p7_object_insert.png",
     "story/panels/0180_what_was_on_it_p8_two_shot.png"
   ],
-  "dir": "story/packages/ch01/scenes/0180_what_was_on_it"
+  "dir": "story/packages/ch01/scenes/0180_what_was_on_it",
+  "status": "to generate",
+  "status_why": "nothing drawn yet",
+  "status_label": "to generate"
 }

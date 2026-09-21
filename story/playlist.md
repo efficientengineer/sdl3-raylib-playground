@@ -14,7 +14,7 @@ only name a scene listed here.
 
 ## chapter01
 
-*The Last Job Sheet* — six clips, matching the six slots in `story/v3/ch01_room/flow.md`. Four panel
+*The High Pasture* — six clips, matching the six slots in `story/v3/ch01_room/flow.md`. Four panel
 scenes (`0110`, `0150`, `0160`, `0180`) and two talk scenes (`0130`, `0140`). Everything else the
 chapter used to say in a box is now a field line in `story/field/text.md`. Maps in order: hart_yard,
 halm, hart_yard, hart_yard, high_pasture, high_pasture.

@@ -50,14 +50,14 @@ USAGE = """Story scene -> image prompt builder, and the art tray. Enforces story
                                                edit to a `look` line or a scene shows the art as STALE
 
   The pieces underneath, for driving one package by hand:
-  ./story_prompt.py refsheet Bron              a character reference sheet package
-  ./story_prompt.py expressions Bron [more]    ten numbered head-and-shoulders slots (neutral, smile,
+  ./story_prompt.py refsheet Falke             a character reference sheet package
+  ./story_prompt.py expressions Falke [more]   ten numbered head-and-shoulders slots (neutral, smile,
                                                laugh, biglaugh, concern, sorrow, annoyed, angry, shock,
                                                resolve) -> story/portraits/<name>_<id>.png, shipped as
                                                portrait_<name>_<id>.png. A line picks one with
-                                               '- Bron (biglaugh): text'; the line may be textless
+                                               '- Falke (biglaugh): text'; the line may be textless
   ./story_prompt.py portraits                  cut each reference sheet's middle panel to story/portraits/
-  ./story_prompt.py walker Bron [more names]   the 9-frame walk sheet (rows S, side, N; columns stand,
+  ./story_prompt.py walker Falke Distel [more] the 9-frame walk sheet (rows S, side, N; columns stand,
                                                step-A, step-B) at 128x192; up to 3 characters a sheet
   ./story_prompt.py walker compact [<id>...]   an old 16-frame sheet -> the 9-frame one
   ./story_prompt.py sprites burr klee [more]   THE VOXEL WORLD'S BILLBOARDS (WORLD.md): slots sized by

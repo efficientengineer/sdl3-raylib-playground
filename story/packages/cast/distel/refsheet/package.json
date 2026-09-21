@@ -10,5 +10,8 @@
     "story/portraits/distel.png"
   ],
   "cut_fingerprint": "705cbd5d14016565",
-  "dir": "story/packages/cast/distel/refsheet"
+  "dir": "story/packages/cast/distel/refsheet",
+  "status": "done",
+  "status_why": "",
+  "status_label": "done"
 }

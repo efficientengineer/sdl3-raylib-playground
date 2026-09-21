@@ -19,14 +19,17 @@ you have saved.
 
 ## Status words
 
+Five words and no others. `./story_prompt.py packages` decides each one and writes it,
+with its reason, into that package's `package.json`; this page and ArtTray both read it
+from there, so they can never disagree.
+
 | word | what it means |
 | --- | --- |
-| `to generate` | nothing drawn yet |
-| `done` | every file exists and the description it was drawn from has not changed |
-| `stale` | the files exist but an input changed since — the row says which |
-| `exists` | drawn, and good enough; redo it only if the note says something you want |
-| `image waiting` | you saved a `returned.png`; run `ingest` |
-| `blocked` | waiting on the reference sheet above it |
+| `to generate` | nothing usable is cut yet — the reason says whether it is untouched, half cut, or has an image waiting for `ingest` |
+| `blocked (needs …)` | it cannot be built yet; the reason names what it needs |
+| `stale — …` | every file exists, but an input has changed since they were cut |
+| `done` | every file exists and matches the description it was drawn from |
+| `frozen` | drawn, shipped and never regenerated (the valley tileset) |
 
 Scenes come from `story/playlist.md` — a scene file no chapter list names gets no package; 6 scene(s) selected.
 
@@ -41,7 +44,7 @@ Do these first. The dialogue portrait, the ten faces, the walk sprite and every 
 | # | what | folder | status | why / next |
 | --- | --- | --- | --- | --- |
 | 1 | Falke | [`cast/falke/refsheet`](cast/falke/refsheet/prompt.md) | done | — |
-| 2 | Ottilie | [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) | exists | exists and is good — only a weapon was taken off the `look` line. Regenerate ONLY if you want the mace gone from the full-body panel; the portrait is unaffected |
+| 2 | Ottilie | [`cast/ottilie/refsheet`](cast/ottilie/refsheet/prompt.md) | done | exists and is good — only a weapon was taken off the `look` line. Regenerate ONLY if you want the mace gone from the full-body panel; the portrait is unaffected |
 | 3 | Hart | [`cast/hart/refsheet`](cast/hart/refsheet/prompt.md) | done | — |
 | 4 | Guildclerk | [`cast/guildclerk/refsheet`](cast/guildclerk/refsheet/prompt.md) | done | — |
 | 5 | Stolz | [`cast/stolz/refsheet`](cast/stolz/refsheet/prompt.md) | done | — |
@@ -57,10 +60,10 @@ Ten head-and-shoulders faces a speaking character, one template sheet: `neutral`
 | 8 | Falke | [`cast/falke/expressions`](cast/falke/expressions/prompt.md) | done | — |
 | 9 | Ottilie | [`cast/ottilie/expressions`](cast/ottilie/expressions/prompt.md) | done | — |
 | 10 | Hart | [`cast/hart/expressions`](cast/hart/expressions/prompt.md) | done | — |
-| 11 | Guildclerk | [`cast/guildclerk/expressions`](cast/guildclerk/expressions/prompt.md) | to generate | `ingest cast/guildclerk/expressions` |
-| 12 | Stolz | [`cast/stolz/expressions`](cast/stolz/expressions/prompt.md) | to generate | `ingest cast/stolz/expressions` |
+| 11 | Guildclerk | [`cast/guildclerk/expressions`](cast/guildclerk/expressions/prompt.md) | to generate | nothing drawn yet |
+| 12 | Stolz | [`cast/stolz/expressions`](cast/stolz/expressions/prompt.md) | to generate | nothing drawn yet |
 | 13 | Distel | [`cast/distel/expressions`](cast/distel/expressions/prompt.md) | done | — |
-| 14 | Garbe | [`cast/garbe/expressions`](cast/garbe/expressions/prompt.md) | to generate | `ingest cast/garbe/expressions` |
+| 14 | Garbe | [`cast/garbe/expressions`](cast/garbe/expressions/prompt.md) | to generate | nothing drawn yet |
 
 ### Walk sprites
 
@@ -70,14 +73,14 @@ The nine-frame sheet the field animates (rows S, side, N; the engine mirrors the
 | --- | --- | --- | --- | --- |
 | 15 | Falke | [`cast/falke/walker`](cast/falke/walker/prompt.md) | stale | cut from the PREVIOUS reference sheet — the red-haired armoured design. Falke's sheet has since been redrawn, so this one is now the wrong character |
 | 16 | Ottilie | [`cast/ottilie/walker`](cast/ottilie/walker/prompt.md) | stale | cut from the reference sheet as it was before the weapon came off her `look` line |
-| 17 | Hart | [`cast/hart/walker`](cast/hart/walker/prompt.md) | to generate | `ingest cast/hart/walker` |
-| 18 | Guildclerk | [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) | to generate | `ingest cast/guildclerk/walker` |
-| 19 | Stolz | [`cast/stolz/walker`](cast/stolz/walker/prompt.md) | to generate | `ingest cast/stolz/walker` |
-| 20 | Distel | [`cast/distel/walker`](cast/distel/walker/prompt.md) | to generate | `ingest cast/distel/walker` |
-| 21 | Garbe | [`cast/garbe/walker`](cast/garbe/walker/prompt.md) | to generate | `ingest cast/garbe/walker` |
+| 17 | Hart | [`cast/hart/walker`](cast/hart/walker/prompt.md) | to generate | nothing drawn yet |
+| 18 | Guildclerk | [`cast/guildclerk/walker`](cast/guildclerk/walker/prompt.md) | to generate | nothing drawn yet |
+| 19 | Stolz | [`cast/stolz/walker`](cast/stolz/walker/prompt.md) | to generate | nothing drawn yet |
+| 20 | Distel | [`cast/distel/walker`](cast/distel/walker/prompt.md) | to generate | nothing drawn yet |
+| 21 | Garbe | [`cast/garbe/walker`](cast/garbe/walker/prompt.md) | to generate | nothing drawn yet |
 | 22 | villager_a | [`cast/villager_a/walker`](cast/villager_a/walker/prompt.md) | done | — |
 | 23 | villager_b | [`cast/villager_b/walker`](cast/villager_b/walker/prompt.md) | done | — |
-| 24 | linde | [`cast/linde/walker`](cast/linde/walker/prompt.md) | to generate | `ingest cast/linde/walker` |
+| 24 | linde | [`cast/linde/walker`](cast/linde/walker/prompt.md) | to generate | nothing drawn yet |
 
 ### Field sprites
 
@@ -85,9 +88,9 @@ The voxel world's billboards: the creatures, the animals and the training machin
 
 | # | what | folder | status | why / next |
 | --- | --- | --- | --- | --- |
-| 25 | field sprites — 3 billboard(s) (1 of 3) | [`ch01/sprites`](ch01/sprites/prompt.md) | to generate | `ingest ch01/sprites` |
-| 26 | field sprites — 4 billboard(s) (2 of 3) | [`ch01/sprites_2`](ch01/sprites_2/prompt.md) | to generate | `ingest ch01/sprites_2` |
-| 27 | field sprites — 4 billboard(s) (3 of 3) | [`ch01/sprites_3`](ch01/sprites_3/prompt.md) | to generate | `ingest ch01/sprites_3` |
+| 25 | field sprites — 3 billboard(s) (1 of 3) | [`ch01/sprites`](ch01/sprites/prompt.md) | to generate | nothing drawn yet |
+| 26 | field sprites — 4 billboard(s) (2 of 3) | [`ch01/sprites_2`](ch01/sprites_2/prompt.md) | to generate | nothing drawn yet |
+| 27 | field sprites — 4 billboard(s) (3 of 3) | [`ch01/sprites_3`](ch01/sprites_3/prompt.md) | to generate | nothing drawn yet |
 
 ### Scene shot sheets
 
@@ -95,11 +98,11 @@ One sheet per panel scene: all of its panels as separate white-bordered rectangl
 
 | # | what | folder | status | why / next |
 | --- | --- | --- | --- | --- |
-| 28 | 0110_the_yard | [`ch01/scenes/0110_the_yard`](ch01/scenes/0110_the_yard/prompt.md) | to generate | `ingest ch01/scenes/0110_the_yard` |
-| 29 | 0130_the_counter | [`ch01/scenes/0130_the_counter`](ch01/scenes/0130_the_counter/prompt.md) | to generate | `ingest ch01/scenes/0130_the_counter` |
-| 30 | 0150_the_sword | [`ch01/scenes/0150_the_sword`](ch01/scenes/0150_the_sword/prompt.md) | to generate | `ingest ch01/scenes/0150_the_sword` |
-| 31 | 0160_the_herder | [`ch01/scenes/0160_the_herder`](ch01/scenes/0160_the_herder/prompt.md) | to generate | `ingest ch01/scenes/0160_the_herder` |
-| 32 | 0180_what_was_on_it | [`ch01/scenes/0180_what_was_on_it`](ch01/scenes/0180_what_was_on_it/prompt.md) | to generate | `ingest ch01/scenes/0180_what_was_on_it` |
+| 28 | 0110_the_yard | [`ch01/scenes/0110_the_yard`](ch01/scenes/0110_the_yard/prompt.md) | to generate | nothing drawn yet |
+| 29 | 0130_the_counter | [`ch01/scenes/0130_the_counter`](ch01/scenes/0130_the_counter/prompt.md) | to generate | nothing drawn yet |
+| 30 | 0150_the_sword | [`ch01/scenes/0150_the_sword`](ch01/scenes/0150_the_sword/prompt.md) | to generate | nothing drawn yet |
+| 31 | 0160_the_herder | [`ch01/scenes/0160_the_herder`](ch01/scenes/0160_the_herder/prompt.md) | to generate | nothing drawn yet |
+| 32 | 0180_what_was_on_it | [`ch01/scenes/0180_what_was_on_it`](ch01/scenes/0180_what_was_on_it/prompt.md) | to generate | nothing drawn yet |
 
 ## Frozen — already drawn, do not redo
 

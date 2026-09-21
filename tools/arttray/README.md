@@ -30,17 +30,23 @@ remembered in UserDefaults.
 
 ## The window
 
-**Left — the queue.** Every package under `story/packages/`, in `README.md`'s order: the short path
-first (numbered as it numbers them), then everything else. Columns are step/kind (`×3` marks a
-package that is three generations), the package path, and its status, derived from the folder:
+**Left — the queue.** Every package under `story/packages/`, in `story/packages/README.md`'s order,
+then anything that page missed. Columns are step/kind (`×3` marks a package that is three
+generations), the package path, and its status.
 
-| status | means |
-| --- | --- |
-| `to generate` | no image has come back yet |
-| `1/3 returned` | a multi-step package with some of its images back |
-| `returned, not cut` | every image is back but the files it makes are missing or older |
-| `1/2 cut` | some of the files it makes exist, nothing waiting |
-| `done` | every file it makes exists and is newer than the image |
+**The status is not worked out here.** `./story_prompt.py packages` decides it and stamps it into
+each `package.json` (`status`, `status_why`); this app reads those fields, the README prints the
+same ones, and the five words they may hold are defined once, in `storytool/packages.py`
+(`STATUS_WORDS`) — see *"Package status: one source, two readers"* in `storytool/README.md` for the
+words and what each means. `--selftest` asserts this app's `StatusWord` enum against
+`tools/arttray/statuses.json`, which that command generates, so the two can never drift apart again.
+
+`stale` is drawn in **red** with its reason beside it: it is art that exists but no longer matches
+the description it was drawn from, and it is never counted as done.
+
+One badge is the app's own, and it is not a status: **image waiting** (orange) — a `returned.png`
+newer than the files it makes, i.e. `ingest` has not run yet. A multi-step package shows
+`1/3 returned` (teal) until every image is back.
 
 **Hide done** filters the queue. **Refresh** (⌘R) rescans, and so does bringing the window forward.
 

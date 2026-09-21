@@ -9,5 +9,8 @@
     "story/refs/guildclerk.png",
     "story/portraits/guildclerk.png"
   ],
-  "dir": "story/packages/cast/guildclerk/refsheet"
+  "dir": "story/packages/cast/guildclerk/refsheet",
+  "status": "done",
+  "status_why": "",
+  "status_label": "done"
 }

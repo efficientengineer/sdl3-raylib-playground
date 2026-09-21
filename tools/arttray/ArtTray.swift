@@ -50,6 +50,10 @@ struct PackageMeta {
     var handle: String?
     var scene: String?
     var map: String?
+    /// Stamped by `./story_prompt.py packages`. Read, never derived. An unknown or missing word
+    /// means the tray is looking at a package.json written before the stamping existed.
+    var status: StatusWord = .toGenerate
+    var statusWhy: String = ""
     /// Never empty: a package with no `steps` is one step returning returned.png.
     var steps: [PackageStep] = [.single]
 
@@ -67,6 +71,8 @@ struct PackageMeta {
         m.handle = obj["handle"] as? String
         m.scene = obj["scene"] as? String
         m.map = obj["map"] as? String
+        m.status = StatusWord(rawValue: obj["status"] as? String ?? "") ?? .toGenerate
+        m.statusWhy = obj["status_why"] as? String ?? ""
         if let raw = obj["steps"] as? [[String: Any]], !raw.isEmpty {
             m.steps = raw.enumerated().map { i, s in
                 PackageStep(title: s["title"] as? String ?? "Step \(i + 1)",
@@ -79,45 +85,69 @@ struct PackageMeta {
     }
 }
 
-enum PackageStatus: Equatable {
-    case toGenerate
-    case awaitingSteps(Int, Int)     // some of a multi-step package's images are back, not all
-    case returnedNotCut
-    case partial(Int, Int)
-    case done
+/// The five status words, and the ONLY ones. They are `storytool/packages.py`'s `STATUS_WORDS`:
+/// this app never decides a package's status, it reads the word and the one-line reason that
+/// `./story_prompt.py packages` stamped into that package's package.json. The three status sets
+/// (this app, the README, the tool) had drifted apart — the app had no `stale` at all, so a
+/// package whose `look` line had changed read `done` here and `stale` in the README, defeating the
+/// fingerprinting the owner relies on to not redo work. The selftest asserts this enum against
+/// `tools/arttray/statuses.json`, which packages.py writes.
+enum StatusWord: String, CaseIterable, Equatable {
+    case toGenerate = "to generate"
+    case blocked = "blocked"
+    case stale = "stale"
+    case done = "done"
+    case frozen = "frozen"
+}
+
+/// What the tray can see for itself between two `packages` runs: whether the images the owner has
+/// dropped in are still waiting to be cut. This is NOT a status — it is a live badge on top of one.
+enum ReturnState: Equatable {
+    case none                        // nothing dropped in, or what is here is already cut
+    case partial(Int, Int)           // a multi-step package: some images back, not all
+    case waiting                     // every image is back and newer than the outputs
+}
+
+struct PackageStatus: Equatable {
+    var word: StatusWord = .toGenerate
+    var why: String = ""
+    var returns: ReturnState = .none
+
+    static let toGenerate = PackageStatus()
 
     var label: String {
-        switch self {
-        case .toGenerate: return "○ to generate"
-        case .awaitingSteps(let have, let total): return "◔ \(have)/\(total) returned"
-        case .returnedNotCut: return "▲ returned, not cut"
-        case .partial(let have, let total): return "◒ \(have)/\(total) cut"
+        switch returns {
+        case .partial(let have, let total): return "◔ \(have)/\(total) returned"
+        case .waiting: return "▲ image waiting — run ingest"
+        case .none: break
+        }
+        switch word {
+        case .toGenerate: return why.isEmpty ? "○ to generate" : "○ to generate — \(why)"
+        case .blocked: return why.isEmpty ? "◻ blocked" : "◻ blocked (needs \(why))"
+        case .stale: return why.isEmpty ? "◆ stale" : "◆ stale — \(why)"
         case .done: return "● done"
+        case .frozen: return "◼ frozen"
         }
     }
 
-    var isDone: Bool { self == .done }
+    /// Nothing left to do here. `stale` is deliberately NOT done: that is the whole point of it.
+    var isDone: Bool { (word == .done || word == .frozen) && returns == .none }
 }
 
-/// The whole status rule, with no file system in it, so it can be tested directly.
+/// The return badge, with no file system in it, so it can be tested directly.
 /// `outputDates` is one entry per file the package makes: nil when that file does not exist.
 /// `returnsHave`/`returnsTotal` count the package's steps: a package is only ready to cut when
 /// every step's image is back.
-func statusFrom(returned: Date?, returnsHave: Int = 1, returnsTotal: Int = 1,
-                outputDates: [Date?]) -> PackageStatus {
+func returnStateFrom(returned: Date?, returnsHave: Int = 1, returnsTotal: Int = 1,
+                     outputDates: [Date?]) -> ReturnState {
     let have = outputDates.compactMap { $0 }
-    if returnsHave > 0 && returnsHave < returnsTotal {
-        let cut = !outputDates.isEmpty && have.count == outputDates.count
-            && !have.contains { out in returned.map { out < $0 } ?? false }
-        if !cut { return .awaitingSteps(returnsHave, returnsTotal) }
+    let cut = !outputDates.isEmpty && have.count == outputDates.count
+        && !have.contains { out in returned.map { out < $0 } ?? false }
+    if returnsHave > 0 && returnsHave < returnsTotal && !cut { return .partial(returnsHave, returnsTotal) }
+    if let ret = returned, have.count < outputDates.count || have.contains(where: { $0 < ret }) {
+        return .waiting
     }
-    if let ret = returned {
-        let stale = have.count < outputDates.count || have.contains { $0 < ret }
-        if stale { return .returnedNotCut }
-    }
-    if !outputDates.isEmpty && have.count == outputDates.count { return .done }
-    if !have.isEmpty { return .partial(have.count, outputDates.count) }
-    return .toGenerate
+    return .none
 }
 
 struct PromptDoc {
@@ -245,12 +275,16 @@ final class Package {
 
     var allStepsReturned: Bool { returnedImages().allSatisfy { $0 != nil } }
 
+    /// The word and the reason come off package.json verbatim; only the "image waiting" badge is
+    /// worked out here, because it changes the moment the owner drops a file in.
     func refreshStatus(repoRoot: URL) {
         let outs = meta.outputs.map { repoRoot.appendingPathComponent($0) }
         let returns = returnedImages().compactMap { $0 }.compactMap { fileDate($0) }
-        status = statusFrom(returned: returns.max(),
-                            returnsHave: returns.count, returnsTotal: steps.count,
-                            outputDates: outs.map { fileDate($0) })
+        status = PackageStatus(word: meta.status, why: meta.statusWhy,
+                               returns: returnStateFrom(returned: returns.max(),
+                                                        returnsHave: returns.count,
+                                                        returnsTotal: steps.count,
+                                                        outputDates: outs.map { fileDate($0) }))
     }
 
     func promptDoc() -> PromptDoc? {
@@ -868,12 +902,14 @@ final class TrayController: NSObject, NSWindowDelegate, NSTableViewDataSource, N
             table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
         showSelected()
-        let waiting = packages.filter { $0.status == .returnedNotCut }.count
+        let waiting = packages.filter { $0.status.returns == .waiting }.count
+        let stale = packages.filter { $0.status.word == .stale }.count
         let todo = packages.filter { !$0.status.isDone }.count
         if packages.isEmpty {
             say("No packages under story/packages. Run “Regenerate packages”.", error: true)
         } else {
-            say("\(packages.count) packages · \(todo) not done · \(waiting) waiting to be cut", error: false)
+            say("\(packages.count) packages · \(todo) not done · \(stale) stale · \(waiting) waiting to be cut",
+                error: false)
         }
     }
 
@@ -937,11 +973,13 @@ final class TrayController: NSObject, NSWindowDelegate, NSTableViewDataSource, N
         let pkg = shown[row]
         cell.textField?.stringValue = cellText(pkg, column: id.rawValue)
         if id.rawValue == "status" {
-            switch pkg.status {
-            case .done: cell.textField?.textColor = .secondaryLabelColor
-            case .returnedNotCut: cell.textField?.textColor = .systemOrange
-            case .awaitingSteps: cell.textField?.textColor = .systemTeal
-            default: cell.textField?.textColor = .labelColor
+            switch (pkg.status.returns, pkg.status.word) {
+            case (.waiting, _): cell.textField?.textColor = .systemOrange
+            case (.partial, _): cell.textField?.textColor = .systemTeal
+            case (_, .stale): cell.textField?.textColor = .systemRed      // a redraw, not a done row
+            case (_, .done), (_, .frozen): cell.textField?.textColor = .secondaryLabelColor
+            case (_, .blocked): cell.textField?.textColor = .tertiaryLabelColor
+            case (_, .toGenerate): cell.textField?.textColor = .labelColor
             }
         } else {
             cell.textField?.textColor = .labelColor
@@ -1564,22 +1602,40 @@ enum SelfTest {
         check(three.prompts[0].contains("## not a heading"), "a heading inside a fence stays prompt text")
         equal(three.attach, ["story/field/views/halm_square.png"], "attach list of a screen package")
 
-        // 4. status derivation.
+        // 4. the status word is READ, never derived; only the return badge is worked out here.
         let now = Date()
         let older = now.addingTimeInterval(-60)
         let newer = now.addingTimeInterval(60)
-        equal(statusFrom(returned: nil, outputDates: [nil, nil]), .toGenerate, "no image, no outputs → to generate")
-        equal(statusFrom(returned: nil, outputDates: [older, older]), .done, "outputs, no image → done")
-        equal(statusFrom(returned: now, outputDates: [older, older]), .returnedNotCut, "image newer than outputs")
-        equal(statusFrom(returned: now, outputDates: [newer, newer]), .done, "outputs newer than image → done")
-        equal(statusFrom(returned: now, outputDates: [newer, nil]), .returnedNotCut, "an output missing → not cut")
-        equal(statusFrom(returned: nil, outputDates: [older, nil]), .partial(1, 2), "half cut, no image waiting")
-        equal(statusFrom(returned: now, returnsHave: 1, returnsTotal: 3, outputDates: [nil]),
-              .awaitingSteps(1, 3), "one of three step images back")
-        equal(statusFrom(returned: now, returnsHave: 3, returnsTotal: 3, outputDates: [nil]),
-              .returnedNotCut, "every step back, nothing cut")
-        equal(statusFrom(returned: older, returnsHave: 2, returnsTotal: 3, outputDates: [now]),
-              .done, "an older part-returned package whose outputs are newer is done")
+        equal(returnStateFrom(returned: nil, outputDates: [nil, nil]), .none, "no image → no badge")
+        equal(returnStateFrom(returned: nil, outputDates: [older, older]), .none, "outputs, no image → no badge")
+        equal(returnStateFrom(returned: now, outputDates: [older, older]), .waiting, "image newer than outputs")
+        equal(returnStateFrom(returned: now, outputDates: [newer, newer]), .none, "outputs newer than image")
+        equal(returnStateFrom(returned: now, outputDates: [newer, nil]), .waiting, "an output missing → waiting")
+        equal(returnStateFrom(returned: nil, outputDates: [older, nil]), .none, "half cut, no image waiting")
+        equal(returnStateFrom(returned: now, returnsHave: 1, returnsTotal: 3, outputDates: [nil]),
+              .partial(1, 3), "one of three step images back")
+        equal(returnStateFrom(returned: now, returnsHave: 3, returnsTotal: 3, outputDates: [nil]),
+              .waiting, "every step back, nothing cut")
+        equal(returnStateFrom(returned: older, returnsHave: 2, returnsTotal: 3, outputDates: [now]),
+              .none, "an older part-returned package whose outputs are newer needs nothing")
+
+        // 4b. the five words, and how they read. `stale` must be visibly its own thing.
+        let staleStatus = PackageStatus(word: .stale, why: "the description it was drawn from has changed")
+        check(staleStatus.label.hasPrefix("◆ stale — "), "stale shows its reason: \(staleStatus.label)")
+        check(!staleStatus.isDone, "stale is NOT done — that is the whole point of it")
+        check(PackageStatus(word: .done).isDone, "done is done")
+        check(PackageStatus(word: .frozen).label == "◼ frozen", "frozen has its own label")
+        equal(PackageStatus(word: .blocked, why: "the reference sheet first").label,
+              "◻ blocked (needs the reference sheet first)", "blocked names what it needs")
+        equal(PackageStatus(word: .done, returns: .waiting).label, "▲ image waiting — run ingest",
+              "a dropped-in image badges over the stamped word")
+        let stamped = try! PackageMeta.parse("""
+        {"kind": "walker", "status": "stale", "status_why": "cut from the PREVIOUS reference sheet"}
+        """.data(using: .utf8)!)
+        equal(stamped.status, .stale, "the status word is read from package.json")
+        equal(stamped.statusWhy, "cut from the PREVIOUS reference sheet", "so is its reason")
+        equal((try! PackageMeta.parse("{\"kind\": \"walker\", \"status\": \"nonsense\"}".data(using: .utf8)!)).status,
+              .toGenerate, "an unknown word falls back to `to generate`")
 
         // 5. status straight off the file system, including returned_prev handling.
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("arttray-selftest-\(getpid())")
@@ -1594,7 +1650,8 @@ enum SelfTest {
         let pkg = Package(relPath: "ch01/halm/props", dir: pkgDir,
                           meta: try! PackageMeta.parse(metaJSON.data(using: .utf8)!))
         pkg.refreshStatus(repoRoot: tmp)
-        equal(pkg.status, .toGenerate, "fresh package folder → to generate")
+        equal(pkg.status.returns, .none, "fresh package folder → nothing waiting")
+        equal(pkg.status.word, .toGenerate, "and package.json with no stamp reads `to generate`")
 
         // A 4x4 red image, TIFF on the way in, PNG on the way out.
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 4, bitsPerSample: 8,
@@ -1613,7 +1670,7 @@ enum SelfTest {
 
         try! Img.writeReturned(png, into: pkgDir)
         pkg.refreshStatus(repoRoot: tmp)
-        equal(pkg.status, .returnedNotCut, "returned.png with no outputs → returned, not cut")
+        equal(pkg.status.returns, .waiting, "returned.png with no outputs → image waiting")
         check(pkg.returnedImage()?.lastPathComponent == "returned.png", "returned image found")
 
         try! Img.writeReturned(png, into: pkgDir)
@@ -1627,15 +1684,15 @@ enum SelfTest {
         try? FileManager.default.createDirectory(at: screenDir, withIntermediateDirectories: true)
         let screenPkg = Package(relPath: "ch01/halm/screens/square", dir: screenDir, meta: screenMeta)
         screenPkg.refreshStatus(repoRoot: tmp)
-        equal(screenPkg.status, .toGenerate, "screen package with nothing back → to generate")
+        equal(screenPkg.status.returns, .none, "screen package with nothing back → nothing waiting")
         try! Img.writeReturned(png, into: screenDir, named: "returned.png")
         screenPkg.refreshStatus(repoRoot: tmp)
-        equal(screenPkg.status, .awaitingSteps(1, 3), "one image back → 1/3 returned")
+        equal(screenPkg.status.returns, .partial(1, 3), "one image back → 1/3 returned")
         check(!screenPkg.allStepsReturned, "not ready to cut with one image")
         try! Img.writeReturned(png, into: screenDir, named: "returned_walk.png")
         try! Img.writeReturned(png, into: screenDir, named: "returned_fg.png")
         screenPkg.refreshStatus(repoRoot: tmp)
-        equal(screenPkg.status, .returnedNotCut, "all three back → returned, not cut")
+        equal(screenPkg.status.returns, .waiting, "all three back → image waiting")
         check(screenPkg.allStepsReturned, "ready to cut with all three")
         try! Img.writeReturned(png, into: screenDir, named: "returned_fg.png")
         check(FileManager.default.fileExists(atPath: screenDir.appendingPathComponent("returned_fg_prev.png").path),
@@ -1643,12 +1700,27 @@ enum SelfTest {
 
         try? Data([0, 1, 2]).write(to: outDir.appendingPathComponent("barrel.png"))
         pkg.refreshStatus(repoRoot: tmp)
-        equal(pkg.status, .done, "output newer than the image → done")
+        equal(pkg.status.returns, .none, "output newer than the image → nothing waiting")
         try? FileManager.default.removeItem(at: tmp)
 
         // 6. the real repository, when the binary can find one.
         if let root = Repo.discover(arguments: CommandLine.arguments, defaults: .standard) {
             let repo = Repo(root: root)
+
+            // 6a. THE DRIFT CHECK. tools/arttray/statuses.json is written by
+            // storytool/packages.py from its own STATUS_WORDS. If this enum and that list ever
+            // disagree, the tray is showing a status set the tool does not use — which is exactly
+            // the bug this assertion exists to prevent.
+            let wordsFile = root.appendingPathComponent("tools/arttray/statuses.json")
+            if let data = try? Data(contentsOf: wordsFile),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let words = obj["words"] as? [String] {
+                equal(Set(words), Set(StatusWord.allCases.map { $0.rawValue }),
+                      "StatusWord matches storytool/packages.py STATUS_WORDS")
+            } else {
+                check(false, "tools/arttray/statuses.json is readable (run ./story_prompt.py packages)")
+            }
+
             let packages = repo.scanPackages()
             packageCount = packages.count
             print("  note  repository \(root.path): \(packages.count) package(s)")

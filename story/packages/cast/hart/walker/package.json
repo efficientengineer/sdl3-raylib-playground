@@ -7,5 +7,8 @@
   "outputs": [
     "story/field/walkers/hart.png"
   ],
-  "dir": "story/packages/cast/hart/walker"
+  "dir": "story/packages/cast/hart/walker",
+  "status": "to generate",
+  "status_why": "nothing drawn yet",
+  "status_label": "to generate"
 }

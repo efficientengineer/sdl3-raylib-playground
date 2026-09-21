@@ -20,7 +20,7 @@ from .field import FIELD_KINDS
 from .keying import LOUD
 from .md import die, squash
 from .package_io import RETURNED, RETURN_SUFFIXES
-from .packages import PKG_META, pkg_returned, pkg_state, record_cut
+from .packages import PKG_META, pkg_returned, pkg_state, record_cut, stamp_status
 from .palette import PAL_TIMING
 from .paths import ROOT, SHEETS
 from .playlist import PACKAGES
@@ -130,6 +130,7 @@ def cmd_ingest(args):
         if ok:
             done += 1
             record_cut(d, meta)        # stamp what it was cut from, so a later edit reads as stale
+            stamp_status(d, meta)      # and the status the tray and the README both read back
             after, have, total = pkg_state(d, meta)
             print(f"ok    {rel}  ({returned.name} -> {have}/{total} file(s)){'  ' + line if line else ''}"
                   + (f"  [kept {kept.relative_to(ROOT.parent)}]" if kept else ""))

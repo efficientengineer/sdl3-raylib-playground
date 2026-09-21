@@ -9,5 +9,8 @@
     "story/refs/stolz.png",
     "story/portraits/stolz.png"
   ],
-  "dir": "story/packages/cast/stolz/refsheet"
+  "dir": "story/packages/cast/stolz/refsheet",
+  "status": "done",
+  "status_why": "",
+  "status_label": "done"
 }

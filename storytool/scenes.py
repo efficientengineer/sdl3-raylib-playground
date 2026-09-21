@@ -17,7 +17,7 @@ from .cast import alias_map, is_narrator, resolve_name, speaker_warnings
 from .md import die, existing, h2_sections, kv_lines, slug, squash
 from .names import DOUBLE_ARTICLE, NAMES_FILE, detok, load_names, token_phrase
 from .paths import PANELS, PORTRAITS, ROOT, SCENES, expr_portrait_path
-from .rules import ANCHOR_SCALES, EXPR_IDS, GAZE_WORDS, MAX_ACTING_WORDS, MAX_PANEL_WORDS, MOODS, PANELS_MAX, PANELS_MIN, PUNCH_SCALES, SCENE_KINDS, SCENE_MAX_PANELS, STYLE_WORDS, TEXT_WORDS
+from .rules import ANCHOR_SCALES, EXPR_IDS, GAZE_WORDS, MAX_ACTING_WORDS, MAX_PANEL_WORDS, MOODS, PAGES_MAX, PANELS_MAX, PANELS_MIN, PUNCH_SCALES, SCENE_KINDS, SCENE_MAX_PANELS, STYLE_WORDS, TEXT_WORDS
 
 
 
@@ -245,6 +245,8 @@ def validate(scene, style, cast):
         err.append("missing '- location:' line")
     if len(panels) > SCENE_MAX_PANELS:
         err.append(f"R1 panel count: {len(panels)} panels in the scene, max {SCENE_MAX_PANELS} (one shot sheet)")
+    if len(set(scene["pages"])) > PAGES_MAX:
+        err.append(f"R1 page count: the scene has {len(set(scene['pages']))} pages; the limit is {PAGES_MAX}")
     unknown = [sid for sid, _ in panels if sid not in shots]
     for sid in unknown:
         err.append(f"R2 menu only: unknown shot '{sid}' (run: story_prompt.py shots)")

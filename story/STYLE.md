@@ -7,9 +7,8 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
 ## Rules for anyone (human or model) writing image prompts
 
 1. **Never hand-write a final image prompt.** Write a scene file in `story/scenes/`
-   and run `./story_prompt.py sheet <scene>` (ChatGPT shot sheet, the normal path) or
-   `./story_prompt.py build <scene>` (single finished page, for generators without
-   reference images). The tool assembles the prompt from the locked blocks below, and
+   and run `./story_prompt.py sheet <scene>` — the one path to an image prompt.
+   The tool assembles the prompt from the locked blocks below, and
    refuses scenes that break the composition rules.
 2. **Never paraphrase the locked blocks or a character's `look`.** They are inserted
    verbatim so every image matches. To change the style, edit this file, not a prompt.
@@ -24,7 +23,7 @@ headings, the `- key: value` lines, and the fenced blocks are load-bearing.
    conversation: `## Dialogue` only, no panels and no `[n]` reveal tags, with each speaker's
    portrait drawn beside the dialogue box; an optional `- backdrop: <scene_stem>:<panel_number>`
    shows an existing panel from another scene dimmed behind it. Narration and talk scenes need no
-   art, so `sheet` and `build` refuse them. Portraits are not drawn by hand either: they are cut
+   art, so `sheet` refuses them. Portraits are not drawn by hand either: they are cut
    from the middle panel of each character's reference sheet by `./story_prompt.py portraits`, which
    is why the `refsheet` block puts a head-and-shoulders portrait in the middle. Within a scene the
    first speaker's portrait sits on the left, the second's on the right, and later speakers

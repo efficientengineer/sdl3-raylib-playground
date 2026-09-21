@@ -9,5 +9,8 @@
     "story/refs/lyra.png",
     "story/portraits/lyra.png"
   ],
-  "dir": "story/packages/cast/ottilie/refsheet"
+  "dir": "story/packages/cast/ottilie/refsheet",
+  "status": "done",
+  "status_why": "exists and is good \u2014 only a weapon was taken off the `look` line. Regenerate ONLY if you want the mace gone from the full-body panel; the portrait is unaffected",
+  "status_label": "done"
 }

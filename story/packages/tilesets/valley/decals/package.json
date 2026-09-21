@@ -47,5 +47,8 @@
     "story/field/tilesets/valley/decals/tuft_tall.png",
     "story/field/tilesets/valley/decals/twig.png"
   ],
-  "dir": "story/packages/tilesets/valley/decals"
+  "dir": "story/packages/tilesets/valley/decals",
+  "status": "frozen",
+  "status_why": "drawn and shipped; the voxel field reads it every frame",
+  "status_label": "frozen"
 }

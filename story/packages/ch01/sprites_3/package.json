@@ -15,5 +15,8 @@
     "story/field/sprites/sheep.png",
     "story/field/sprites/sleeping_animal.png"
   ],
-  "dir": "story/packages/ch01/sprites_3"
+  "dir": "story/packages/ch01/sprites_3",
+  "status": "to generate",
+  "status_why": "nothing drawn yet",
+  "status_label": "to generate"
 }

@@ -16,5 +16,8 @@
     "story/portraits/garbe_shock.png",
     "story/portraits/garbe_resolve.png"
   ],
-  "dir": "story/packages/cast/garbe/expressions"
+  "dir": "story/packages/cast/garbe/expressions",
+  "status": "to generate",
+  "status_why": "nothing drawn yet",
+  "status_label": "to generate"
 }

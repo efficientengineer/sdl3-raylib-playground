@@ -18,6 +18,9 @@ PANELS_MIN, PANELS_MAX = 2, 4                       # R1, per page
 SCENE_MAX_PANELS = 8                                # R1, per scene (one shot sheet)
 
 
+PAGES_MAX = 3                                       # R1, per scene ('---' in ## Panels starts a page)
+
+
 ANCHOR_SCALES = {"wide", "full", "medium"}          # R5
 
 

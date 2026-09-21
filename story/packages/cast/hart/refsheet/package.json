@@ -9,5 +9,8 @@
     "story/refs/hart.png",
     "story/portraits/hart.png"
   ],
-  "dir": "story/packages/cast/hart/refsheet"
+  "dir": "story/packages/cast/hart/refsheet",
+  "status": "done",
+  "status_why": "",
+  "status_label": "done"
 }

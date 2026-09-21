@@ -17,6 +17,22 @@ before and after a refactor is the whole test.
 Normalisation: absolute paths of the temp checkout become {ROOT}, and anything that
 looks like a wall-clock duration is dropped, because those legitimately vary.
 Stdlib only, like the tool it tests.
+
+INTENDED DIFFS — changes of behaviour a before/after pair is EXPECTED to show, newest
+first. Anything else in a diff is a regression. Append, never rewrite.
+
+  2026-09-21  R1 page count is enforced. `rules.PAGES_MAX = 3` and a new `check` error,
+              "R1 page count: the scene has N pages; the limit is 3". STYLE.md has said
+              1 to 3 pages all along; nothing enforced it, so a four-page scene passed.
+              No scene in the tree trips it, so the diff is the rule's existence only.
+  2026-09-21  One status set for the art tray. `packages` stamps `status`/`status_why`/
+              `status_label` into every package.json and writes tools/arttray/statuses.json;
+              story/packages/README.md reads them instead of deriving its own words.
+              Diff: every package.json gains three keys, the README's "Status words"
+              table and status column change wording, `exists` becomes `done` with its
+              note kept, `image waiting`/`N/M cut` become `to generate` plus a reason,
+              and the frozen tileset folders now say `frozen`.
+  2026-09-21  `--help` uses Falke/Distel, not the retired name Bron.
 """
 import hashlib
 import json

@@ -7,5 +7,8 @@
   "outputs": [
     "story/field/walkers/falke.png"
   ],
-  "dir": "story/packages/cast/falke/walker"
+  "dir": "story/packages/cast/falke/walker",
+  "status": "stale",
+  "status_why": "cut from the PREVIOUS reference sheet \u2014 the red-haired armoured design. Falke's sheet has since been redrawn, so this one is now the wrong character",
+  "status_label": "stale \u2014 cut from the PREVIOUS reference sheet \u2014 the red-haired armoured design. Falke's sheet has since been redrawn, so this one is now the wrong character"
 }

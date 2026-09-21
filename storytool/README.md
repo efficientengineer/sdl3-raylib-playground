@@ -25,6 +25,30 @@ public functions and what it may import. Read that before the code.
 | change a map rule | `tmap.py` (validate), `tmapview.py` (render), and `WORLD.md` §3-4 |
 | change what examine text may say | `fieldtext.py`, and the `BAN:` lists in `story/v3/STYLE.md` / `SMELLS.md`, which it reads |
 | change the generated headers | `export.py` and the struct in `src/` that reads them |
+| change a package's status word | `packages.py` `STATUS_WORDS` / `pkg_status` — and nowhere else (see below) |
+
+## Package status: one source, two readers
+
+A package's status is **decided in `packages.py` and nowhere else**. `pkg_status` returns one of
+`STATUS_WORDS` — `to generate`, `blocked`, `stale`, `done`, `frozen` — with a one-line reason;
+`stamp_status` writes both into that package's `package.json` as `status` / `status_why` /
+`status_label`; `story/packages/README.md` and `tools/arttray` then **read those fields verbatim**.
+Neither of them derives a status of its own. They used to, with three different sets, and the GUI's
+had no `stale` at all: a package whose `look` line had changed read `done` in the app and `stale` in
+the README, which defeats the fingerprinting the whole tray is built on.
+
+The stamp is refreshed by `./story_prompt.py packages` (every package, plus the frozen tileset
+folders) and by `ingest` the moment it cuts one.
+
+`packages` also writes `tools/arttray/statuses.json` — the word list as data, generated, never
+edited by hand. ArtTray's `StatusWord` enum carries the same five raw values and its selftest
+asserts the two sets are equal (`tools/arttray/run.sh --selftest`, check *"StatusWord matches
+storytool/packages.py STATUS_WORDS"*), so adding or renaming a word in Python fails the Swift
+selftest until the enum follows.
+
+The tray adds one thing of its own, and it is not a status: an **image waiting** badge, computed
+live from the file dates, because a `returned.png` dropped in five seconds ago cannot be in a
+`package.json` written this morning. It shows over the stamped word and disappears after `ingest`.
 
 ## The import graph
 

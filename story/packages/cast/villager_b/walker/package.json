@@ -7,5 +7,8 @@
   "outputs": [
     "story/field/walkers/villager_b.png"
   ],
-  "dir": "story/packages/cast/villager_b/walker"
+  "dir": "story/packages/cast/villager_b/walker",
+  "status": "done",
+  "status_why": "",
+  "status_label": "done"
 }
