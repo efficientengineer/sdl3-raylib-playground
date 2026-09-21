@@ -3,7 +3,7 @@
   "handle": "distel",
   "title": "Distel \u2014 reference sheet",
   "ref": "story/refs/distel.png",
-  "fingerprint": "5433bbe0742cb639",
+  "fingerprint": "705cbd5d14016565",
   "makes": "`story/refs/distel.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/distel.png",
