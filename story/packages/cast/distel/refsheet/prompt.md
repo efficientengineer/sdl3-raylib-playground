@@ -2,8 +2,8 @@
 
 ## What exists already
 
-- reference sheet `story/refs/distel.png` — missing
-- dialogue portrait `story/portraits/distel.png` — missing
+- reference sheet `story/refs/distel.png` — **exists**
+- dialogue portrait `story/portraits/distel.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -22,7 +22,7 @@ Image 2: the game's COLOUR PALETTE, one material ramp a row: use only these colo
 
 SHEET: A character reference sheet on a solid pure black background, three separate white-bordered panels in one row. Left panel: full-body standing pose, head to boots, three-quarter view. Middle panel: head-and-shoulders portrait in three-quarter view against a flat neutral mid-grey background. Right panel: the same head in strict profile. The character is identical in all three panels: same face, hair, outfit, and colors. The character carries nothing and holds nothing: no weapon of any kind anywhere on the sheet, including the full-body panel, and no sword, knife, staff, spear, bow, axe, gun, shield, tool, bag or prop slung, sheathed or strapped to them. Hands empty and visible. No text, no labels, no color swatches.
 
-CHARACTER: Distel, a very small slight girl of fourteen who stands a head shorter than a grown woman, with dusk-grey skin and a warm brown flush across the cheeks, huge round black eyes with a wide pale ring at the outer edge and no visible whites, short thick charcoal hair standing up in a shaggy crown with two long thin braids hanging in front of the ears, small round ears set low, a hooded sleeveless overdress of undyed felt in dusty violet with a wide folded collar, a broad woven belt of red and cream bands carrying a short curved horn and a coiled lead, loose grey leggings, bare feet with dark soles, and a long crook of pale wood taller than she is.
+CHARACTER: Distel, a Mohn, one of a small furred nocturnal people and plainly not human: a slight girl of fourteen who stands a head shorter than a grown woman, her whole face and body covered in short dense dusk-grey fur with a pale cream mask around the eyes and down the throat, a short blunt muzzle with a small dark nose and no human lips, huge round black eyes with a thin pale gold ring and no whites at all, large upright leaf-shaped ears tipped with charcoal tufts that stand well above her head, a shaggy crown of charcoal head-fur with two long thin braids hanging in front of the ears bound with bone beads, three-fingered furred hands with dark pads, a short tufted tail, a hooded sleeveless overdress of dusty violet felt with a wide folded collar, a broad woven belt of red and cream bands carrying a short curved horn and a coiled lead, loose grey leggings, bare furred feet with dark pads.
 
 CHARACTER DESIGN: 1990s Japanese anime and manga character design, like the cast of a 1993 sci-fantasy JRPG or OVA: youthful heroic young adults, large expressive eyes with simple highlights, small noses and pointed chins, big layered spiky hair with hard-edged shine bands, slim necks, clean readable silhouettes. Sci-fantasy costumes: high collars, bodysuits, long coats, half-capes, headbands, sashes, work clothes and travelling clothes. Armour only when the character's description asks for it. Simple clean shapes and large flat areas of color. Clean dark outlines, flat cel shading with only 2-3 tones per color, no gradients.
 

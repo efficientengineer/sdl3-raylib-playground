@@ -70,6 +70,11 @@ the cell.
   mouth a pixel wider in frame two, and the flip reads as the whole animal twitching sideways.
 - The engine loads them by file-exists and draws a placeholder otherwise, so a map may place a
   sprite before its art is drawn.
+- **The engine never reads `sprites.md`.** It binds a sprite by the id on the trigger line and loads
+  `story/field/sprites/<id>.png`, caching a miss. So `sprites.md` is authoritative for the *artist* —
+  it is what sizes the slot and writes the prompt — and the engine stays id-driven. The consequence
+  is that a typo in a sprite id is not a crash and not a black square: it is a silent placeholder,
+  and `tmap check` is the only thing that catches it.
 
 ---
 
@@ -77,6 +82,12 @@ the cell.
 
 Plain text, written and read by hand. `./story_prompt.py tmap check <map>|--all` validates it (and
 runs inside `check --all`); `tmap preview <map>` renders it on the Mac.
+
+> **`tmap check` is mandatory before a map ships, and it is the only gate there is.** The engine
+> validates none of these ids: an unknown `fight`, `pickup` or `sprite` id still *runs*, firing the
+> event with whatever string is on the line, and a wrong `message` or `npc` text id shows as silence
+> rather than as an error. Nothing downstream will fail loudly. A map that has not been through
+> `tmap check` is not finished.
 
 ```
 ## meta

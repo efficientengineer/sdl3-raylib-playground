@@ -1,0 +1,20 @@
+{
+  "kind": "expressions",
+  "handle": "garbe",
+  "title": "Garbe \u2014 expression sheet",
+  "fingerprint": "cad7622c71785855",
+  "makes": "10 dialogue-box faces in `story/portraits/`",
+  "outputs": [
+    "story/portraits/garbe_neutral.png",
+    "story/portraits/garbe_smile.png",
+    "story/portraits/garbe_laugh.png",
+    "story/portraits/garbe_biglaugh.png",
+    "story/portraits/garbe_concern.png",
+    "story/portraits/garbe_sorrow.png",
+    "story/portraits/garbe_annoyed.png",
+    "story/portraits/garbe_angry.png",
+    "story/portraits/garbe_shock.png",
+    "story/portraits/garbe_resolve.png"
+  ],
+  "dir": "story/packages/cast/garbe/expressions"
+}

@@ -1,0 +1,20 @@
+{
+  "kind": "expressions",
+  "handle": "distel",
+  "title": "Distel \u2014 expression sheet",
+  "fingerprint": "705cbd5d14016565",
+  "makes": "10 dialogue-box faces in `story/portraits/`",
+  "outputs": [
+    "story/portraits/distel_neutral.png",
+    "story/portraits/distel_smile.png",
+    "story/portraits/distel_laugh.png",
+    "story/portraits/distel_biglaugh.png",
+    "story/portraits/distel_concern.png",
+    "story/portraits/distel_sorrow.png",
+    "story/portraits/distel_annoyed.png",
+    "story/portraits/distel_angry.png",
+    "story/portraits/distel_shock.png",
+    "story/portraits/distel_resolve.png"
+  ],
+  "dir": "story/packages/cast/distel/expressions"
+}

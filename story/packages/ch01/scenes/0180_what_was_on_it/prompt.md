@@ -15,8 +15,10 @@
 ## 1. Start a new chat and attach these files, in this order
 
 1. `story/refs/style.png`
-2. `story/refs/bron.png`
-3. `story/refs/lyra.png`
+2. `story/refs/distel.png`
+3. `story/refs/bron.png`
+4. `story/refs/lyra.png`
+5. `story/refs/garbe.png`
 
 ## 2. Paste this prompt exactly
 
@@ -26,8 +28,10 @@ Create ONE image: a shot sheet of 7 separate comic panels. Canvas: portrait, 144
 
 ATTACHED REFERENCE IMAGES, in the order I attached them:
 Image 1: STYLE reference. Match this image's pixel art rendering, limited palette, dithering, outline weight, and panel border style. Do not copy its characters, setting, or composition.
-Image 2: CHARACTER reference for Falke. Keep the face, hair, outfit, and colors identical to this image in every panel Falke appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
-Image 3: CHARACTER reference for Ottilie. Keep the face, hair, outfit, and colors identical to this image in every panel Ottilie appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 2: CHARACTER reference for Distel. Keep the face, hair, outfit, and colors identical to this image in every panel Distel appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 3: CHARACTER reference for Falke. Keep the face, hair, outfit, and colors identical to this image in every panel Falke appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 4: CHARACTER reference for Ottilie. Keep the face, hair, outfit, and colors identical to this image in every panel Ottilie appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
+Image 5: CHARACTER reference for Garbe. Keep the face, hair, outfit, and colors identical to this image in every panel Garbe appears in. Use it only for the character's design: ignore its background colors and its three-panel layout, and do NOT copy its calm neutral expression or head angle. Expressions come from the acting notes.
 
 SHEET LAYOUT: This is a production shot sheet, not a finished comic page: the panels will be cut apart afterwards. Solid pure black background (#000000). Every panel is a separate rectangle with a thin white border and a 1-pixel dark inner line. Panels never overlap, never touch each other, and never touch the edge of the image: no panel covers any part of another, not even a corner, and all four corners and all four border lines of every panel are fully visible. If space is tight, draw the panels smaller rather than closer. Leave a gutter of pure black at least 5 percent of the image width between neighbouring panels and around the outside. The panels have clearly different sizes and proportions and sit at the stated positions; this is not an even grid and the panels do not fill the image. Nothing is drawn in the gutters: no numbers, labels, captions, arrows, or decorations. Each panel is a complete, self-contained picture of a single static camera shot.
 
@@ -53,7 +57,7 @@ Panel 6: Medium two-shot at eye level. Two or more characters from the waist or 
 Panel 7: Tightly cropped insert of a single object or a hand holding it, nothing else in the panel, flat dark background. Content: five small worn coins lying in a young open palm, grass seed and dried blood on the fingers, morning light across them.
 
 CHARACTERS, drawn identically in every panel they appear in:
-- Distel, a very small slight girl of fourteen who stands a head shorter than a grown woman, with dusk-grey skin and a warm brown flush across the cheeks, huge round black eyes with a wide pale ring at the outer edge and no visible whites, short thick charcoal hair standing up in a shaggy crown with two long thin braids hanging in front of the ears, small round ears set low, a hooded sleeveless overdress of undyed felt in dusty violet with a wide folded collar, a broad woven belt of red and cream bands carrying a short curved horn and a coiled lead, loose grey leggings, bare feet with dark soles, and a long crook of pale wood taller than she is.
+- Distel, a Mohn, one of a small furred nocturnal people and plainly not human: a slight girl of fourteen who stands a head shorter than a grown woman, her whole face and body covered in short dense dusk-grey fur with a pale cream mask around the eyes and down the throat, a short blunt muzzle with a small dark nose and no human lips, huge round black eyes with a thin pale gold ring and no whites at all, large upright leaf-shaped ears tipped with charcoal tufts that stand well above her head, a shaggy crown of charcoal head-fur with two long thin braids hanging in front of the ears bound with bone beads, three-fingered furred hands with dark pads, a short tufted tail, a hooded sleeveless overdress of dusty violet felt with a wide folded collar, a broad woven belt of red and cream bands carrying a short curved horn and a coiled lead, loose grey leggings, bare furred feet with dark pads.
 - Bron, a short, compact, sturdy boy of seventeen with a youthful clean-shaven face and an eager open expression, big spiky forest-green hair swept back under a plain white headband with long trailing ends, bright amber eyes, a cream long-sleeved shirt with the sleeves rolled to the elbow under a sleeveless quilted ochre training vest fastened with two toggles, a strip of white bandage wrapped round his right wrist, plain brown leather bracers, grey-green trousers, a brown belt with a small pouch, worn brown boots with turned-down tops.
 - Lyra, a tall, slender young woman with very long straight pale-gold hair, long bangs parted in the center, a thin gold circlet with a small red gem on her forehead, calm grey eyes, a white high-collared long coat with gold trim and wide gold-edged shoulder pieces over a dark navy bodysuit, a short white half-cape, a gold sun medallion on her chest, long white gloves, white heeled boots.
 - Garbe, a wide-shouldered woman in her forties with weather-reddened brown skin and pale creases at the eyes, dark hair scraped back hard into a short tail, heavy straight brows, a long sleeveless coat of oiled brown canvas over a high-necked cream shirt with the sleeves pushed past the elbow, a wide leather belt with a tally stick and a folded knife, thick green trousers, mud to the knee, laced boots, a coil of rope over one shoulder.

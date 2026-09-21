@@ -23,8 +23,8 @@ They are hard-coded in `LEGACY_STATUS` at the top of the tray section of `story_
 
 | package | ruling | why |
 |---|---|---|
-| `cast/falke/refsheet` | **stale** | the sheet on disk is the old red-haired armoured design; `characters.md`'s `look` is now green-haired in a quilted ochre training vest with a practice stick |
-| `cast/falke/walker` | **stale** | cut from that old reference sheet |
+| ~~`cast/falke/refsheet`~~ | **cleared** | was ruled stale (old red-haired armoured design). The owner redrew it through the tray the same day; verified against the `look` line — green hair, white headband, quilted ochre vest — so the ruling was removed and its `cut_fingerprint` stamped. It reads `done` and is computed from here on |
+| `cast/falke/walker` | **stale** | cut from the PREVIOUS reference sheet. Now more urgent, not less: Falke's sheet has been redrawn, so the walker is the wrong character |
 | `cast/ottilie/walker` | **stale** | cut from the reference sheet as it was before the weapon came off her `look` line |
 | `cast/ottilie/refsheet` | **exists** | good as it is. Redraw ONLY to get the mace out of the full-body panel; the portrait is unaffected |
 
@@ -48,6 +48,22 @@ says so, with the reason.
 The retired `003_the_warning` panels and their raw sheets were deleted with the rest of the Fair
 Copy. An earlier memory records that art as canon, and the scene it belongs to no longer exists.
 `git checkout legacy-final -- story/panels story/sheets` brings it all back if that was wrong.
+
+## Two bugs the fingerprint work flushed out (both fixed)
+
+Found by editing a `look` line and watching the status *not* change. Worth knowing because either
+one alone silently disables the whole staleness mechanism.
+
+1. **`write_package` erased `cut_fingerprint`.** `meta` is rebuilt from the source files on every
+   run and knows nothing about what has been cut, so writing it straight over `package.json` threw
+   away the one fact `ingest` had recorded — every `packages` run quietly forgot. Fixed by carrying
+   the `INGEST_KEYS` forward off disk.
+2. **`pkg_status` read `cut_fingerprint` from the in-memory `meta`**, which never has it. It was
+   therefore always `None`, the comparison never ran, and every drawn package reported `done` for
+   ever. Fixed with `pkg_cut_fingerprint(d)`, which reads `package.json`.
+
+Regression-tested end to end both ways: edit Falke's `look` → `stale`, revert → `done`; edit a panel
+line in `0110_the_yard` → `stale`, revert → `done`.
 
 ## Notes for whoever works on the tool next
 

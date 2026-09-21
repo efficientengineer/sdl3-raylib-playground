@@ -1,0 +1,11 @@
+{
+  "kind": "walker",
+  "handle": "garbe",
+  "title": "Garbe \u2014 walk sheet",
+  "fingerprint": "cad7622c71785855",
+  "makes": "`story/field/walkers/garbe.png`, the 9-frame walk sprite sheet",
+  "outputs": [
+    "story/field/walkers/garbe.png"
+  ],
+  "dir": "story/packages/cast/garbe/walker"
+}

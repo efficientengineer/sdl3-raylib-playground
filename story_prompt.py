@@ -5764,6 +5764,7 @@ def cmd_tmap(args):
 
 
 PKG_META = "package.json"          # the machine index in every package folder; `ingest` reads it
+INGEST_KEYS = ("cut_fingerprint",)  # keys `ingest` writes, which a `packages` rebuild must not erase
 
 def slug(text):
     return re.sub(r"[^a-z0-9_]", "", (text or "").strip().lower())
@@ -5928,7 +5929,19 @@ def write_package(d, meta, builder, args):
         (d / f).write_bytes(blob)
     if not ok:
         return False, msg or "no package written"
-    (d / PKG_META).write_text(json.dumps({**meta, "dir": str(d.relative_to(ROOT.parent))}, indent=2) + "\n")
+    # KEEP what `ingest` wrote. `meta` is rebuilt from the source files every run and knows nothing
+    # about what has been cut, so writing it straight over package.json erased `cut_fingerprint` and
+    # the staleness check could never fire: `packages` would quietly forget, every single run, the
+    # one fact it needs to tell the owner their art is out of date.
+    kept = {}
+    if (d / PKG_META).exists():
+        try:
+            kept = {k: v for k, v in json.loads((d / PKG_META).read_text()).items()
+                    if k in INGEST_KEYS}
+        except ValueError:
+            pass
+    (d / PKG_META).write_text(json.dumps({**meta, **kept, "dir": str(d.relative_to(ROOT.parent))},
+                                         indent=2) + "\n")
     write_return_here(d, meta)
     return True, ""
 
@@ -5946,10 +5959,13 @@ def write_package(d, meta, builder, args):
 # recover one. LEGACY_STATUS is the ruling on those few, by hand, from the facts.
 
 LEGACY_STATUS = {
-    ("refsheet", "bron"): ("stale", "the sheet on disk is the old red-haired armoured design; "
-                                    "characters.md's `look` is now green-haired in a quilted ochre "
-                                    "training vest with a practice stick"),
-    ("walker", "falke"): ("stale", "cut from that old red-haired reference sheet"),
+    # ("refsheet", "bron") WAS ruled stale here — the old red-haired armoured design against a `look`
+    # line that is now green-haired in a quilted ochre training vest. The owner redrew it through the
+    # tray on 2026-09-21 and it matches; the ruling is gone and its `cut_fingerprint` is stamped, so
+    # it reads `done` and is computed from here on like everything else.
+    ("walker", "falke"): ("stale", "cut from the PREVIOUS reference sheet — the red-haired armoured "
+                                   "design. Falke's sheet has since been redrawn, so this one is "
+                                   "now the wrong character"),
     ("walker", "ottilie"): ("stale", "cut from the reference sheet as it was before the weapon came "
                                      "off her `look` line"),
     ("refsheet", "lyra"): ("keep", "exists and is good — only a weapon was taken off the `look` "
@@ -5997,7 +6013,11 @@ def pkg_status(d, meta):
     label, have, total = pkg_state(d, meta)
     if label != "done":
         return label, "", have, total
-    want, got = meta.get("fingerprint"), meta.get("cut_fingerprint")
+    # `meta` is rebuilt from the source files on every run, so it carries the fingerprint of the
+    # inputs AS THEY ARE NOW and never a `cut_fingerprint` — that one is written by `ingest` and
+    # lives only in package.json. Read it from there, or this comparison is always None and every
+    # drawn package reports `done` for ever.
+    want, got = meta.get("fingerprint"), pkg_cut_fingerprint(d)
     if want and got:
         return ("done" if want == got else "stale",
                 "" if want == got else "the description it was drawn from has changed since",
@@ -6008,6 +6028,17 @@ def pkg_status(d, meta):
     if ruling == "keep":
         return "exists", why, have, total
     return "done", "", have, total
+
+
+def pkg_cut_fingerprint(d):
+    """The fingerprint `ingest` last cut this package at, off disk. None if it has never been cut."""
+    mf = d / PKG_META
+    if not mf.exists():
+        return None
+    try:
+        return json.loads(mf.read_text()).get("cut_fingerprint")
+    except ValueError:
+        return None
 
 
 def record_cut(d, meta):

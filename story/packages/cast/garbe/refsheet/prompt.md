@@ -2,8 +2,8 @@
 
 ## What exists already
 
-- reference sheet `story/refs/garbe.png` — missing
-- dialogue portrait `story/portraits/garbe.png` — missing
+- reference sheet `story/refs/garbe.png` — **exists**
+- dialogue portrait `story/portraits/garbe.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 
