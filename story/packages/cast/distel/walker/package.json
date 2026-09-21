@@ -2,7 +2,7 @@
   "kind": "walker",
   "handle": "distel",
   "title": "Distel \u2014 walk sheet",
-  "fingerprint": "705cbd5d14016565",
+  "fingerprint": "5433bbe0742cb639",
   "makes": "`story/field/walkers/distel.png`, the 9-frame walk sprite sheet",
   "outputs": [
     "story/field/walkers/distel.png"

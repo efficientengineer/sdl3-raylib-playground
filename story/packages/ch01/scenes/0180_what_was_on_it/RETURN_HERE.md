@@ -18,6 +18,7 @@ That cuts the image into:
 - `story/panels/0180_what_was_on_it_p5_establishing_tall.png`
 - `story/panels/0180_what_was_on_it_p6_two_shot.png`
 - `story/panels/0180_what_was_on_it_p7_object_insert.png`
+- `story/panels/0180_what_was_on_it_p8_two_shot.png`
 
 `returned.png` is never deleted, so a bad cut can be redone after a fix, and a regeneration is just
 saving the new image over it and running `ingest` again. `./story_prompt.py ingest` with no path does

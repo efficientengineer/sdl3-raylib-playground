@@ -12,13 +12,13 @@
 That cuts the image into:
 
 - `story/panels/0150_the_sword_p1_establishing_wide.png`
-- `story/panels/0150_the_sword_p2_portrait_inset.png`
-- `story/panels/0150_the_sword_p3_over_shoulder.png`
-- `story/panels/0150_the_sword_p4_eyes_slit.png`
+- `story/panels/0150_the_sword_p2_over_shoulder.png`
+- `story/panels/0150_the_sword_p3_eyes_slit.png`
+- `story/panels/0150_the_sword_p4_object_insert.png`
 - `story/panels/0150_the_sword_p5_impact.png`
 - `story/panels/0150_the_sword_p6_profile_flat.png`
 - `story/panels/0150_the_sword_p7_full_body_reveal.png`
-- `story/panels/0150_the_sword_p8_object_insert.png`
+- `story/panels/0150_the_sword_p8_two_shot.png`
 
 `returned.png` is never deleted, so a bad cut can be redone after a fix, and a regeneration is just
 saving the new image over it and running `ingest` again. `./story_prompt.py ingest` with no path does

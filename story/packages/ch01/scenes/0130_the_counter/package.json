@@ -1,0 +1,13 @@
+{
+  "kind": "sheet",
+  "scene": "0130_the_counter",
+  "title": "0130_the_counter \u2014 shot sheet",
+  "fingerprint": "d6e9131919877dad",
+  "makes": "3 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0130_the_counter_p1_two_shot.png",
+    "story/panels/0130_the_counter_p2_full_body_reveal.png",
+    "story/panels/0130_the_counter_p3_object_insert.png"
+  ],
+  "dir": "story/packages/ch01/scenes/0130_the_counter"
+}

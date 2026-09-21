@@ -74,3 +74,18 @@ field. They are the reason the colormap is shaped the way it is.
 - **Night and lamp tint by ADDING a cast in Oklab and taking chroma out, never by rotating hue.**
   Rotating a red roof toward blue runs it through magenta, which is how the first night table turned
   the town pink.
+- **The colormap is COLOUR, never a palette index.** Only art is palettised; the colormap ships as
+  RGBA and may hold any colour at all. v2 fitted every lit colour back to its nearest master index,
+  which cost up to dE 0.10 in Oklab — five times a just-noticeable difference — and, because the
+  nearest entry to a lit colour is often a step of a different ramp, it jumped families: a lit blue
+  (15,19,112) came back as a teal (3,34,59), and there were 373 hue breaks between *adjacent* light
+  levels of the day table alone, which is a staircase the eye sees as the light slides. Fixed
+  2026-09-21; the tables are now exact.
+- **Row (`day`, level 0) is the palette itself, column for column** — the identity row, reserved
+  cycle indices included. A reserved index's day row holds its base colour; cycling is the engine's
+  per-frame rewrite of those columns, not something the generator bakes in.
+- **Firelight bleaches; it does not saturate.** A lantern is a narrow warm spectrum, so a lit surface
+  keeps *less* of its own hue (`LAMP_CHROMA` 0.70), and the warm cast is what carries the reading.
+  v2 applied a 1.10 chroma *gain* with a cast too weak to register, so the party's lantern pool on
+  night pasture was the most saturated green on the screen — neon grass — instead of the warmest
+  thing on it. Grass under a lantern must read warm olive/straw.

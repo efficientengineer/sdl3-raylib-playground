@@ -2,18 +2,18 @@
 
 ## What exists already
 
-0 of 10 files in this package have been cut already.
+10 of 10 files in this package have been cut already.
 
-- slot 1 `story/portraits/lyra_neutral.png` — missing
-- slot 2 `story/portraits/lyra_smile.png` — missing
-- slot 3 `story/portraits/lyra_laugh.png` — missing
-- slot 4 `story/portraits/lyra_biglaugh.png` — missing
-- slot 5 `story/portraits/lyra_concern.png` — missing
-- slot 6 `story/portraits/lyra_sorrow.png` — missing
-- slot 7 `story/portraits/lyra_annoyed.png` — missing
-- slot 8 `story/portraits/lyra_angry.png` — missing
-- slot 9 `story/portraits/lyra_shock.png` — missing
-- slot 10 `story/portraits/lyra_resolve.png` — missing
+- slot 1 `story/portraits/lyra_neutral.png` — **exists**
+- slot 2 `story/portraits/lyra_smile.png` — **exists**
+- slot 3 `story/portraits/lyra_laugh.png` — **exists**
+- slot 4 `story/portraits/lyra_biglaugh.png` — **exists**
+- slot 5 `story/portraits/lyra_concern.png` — **exists**
+- slot 6 `story/portraits/lyra_sorrow.png` — **exists**
+- slot 7 `story/portraits/lyra_annoyed.png` — **exists**
+- slot 8 `story/portraits/lyra_angry.png` — **exists**
+- slot 9 `story/portraits/lyra_shock.png` — **exists**
+- slot 10 `story/portraits/lyra_resolve.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 

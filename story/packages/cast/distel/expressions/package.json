@@ -2,7 +2,7 @@
   "kind": "expressions",
   "handle": "distel",
   "title": "Distel \u2014 expression sheet",
-  "fingerprint": "705cbd5d14016565",
+  "fingerprint": "5433bbe0742cb639",
   "makes": "10 dialogue-box faces in `story/portraits/`",
   "outputs": [
     "story/portraits/distel_neutral.png",
@@ -16,5 +16,6 @@
     "story/portraits/distel_shock.png",
     "story/portraits/distel_resolve.png"
   ],
+  "cut_fingerprint": "705cbd5d14016565",
   "dir": "story/packages/cast/distel/expressions"
 }

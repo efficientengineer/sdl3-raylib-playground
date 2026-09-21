@@ -14,7 +14,7 @@ import json
 import math
 import time
 from .oklab import _from_oklab, _lerp_ang, _to_oklab
-from .palette import COLORMAP_JSON, COLORMAP_PNG, CYCLES_MD, LEVELS, PALETTE_DIR, PALETTE_VERSION, PAL_SIZE, PAL_TRANSPARENT, PalIndex, master_palette, read_hex
+from .palette import COLORMAP_JSON, COLORMAP_PNG, CYCLES_MD, LEVELS, PALETTE_DIR, PALETTE_VERSION, PAL_SIZE, PAL_TRANSPARENT, master_palette, read_hex
 from .paths import ROOT
 from .png import write_png
 
@@ -37,10 +37,23 @@ AMBIENT_SHADOW_HUE = 285.0            # where a colour drifts as the ambient dar
 NIGHT_CHROMA = 0.35                   # what a colour keeps of its own chroma at night
 
 
-NIGHT_TINT = (-0.004, -0.042)         # the moonlight itself, added in Oklab coordinates
+NIGHT_TINT = (0.004, -0.042)          # the moonlight itself, added in Oklab coordinates.
 
 
-LAMP_TINT = (0.005, 0.022)            # firelight, added the same way: red-yellow, not a rotation
+                                      # +a, -b: blue-VIOLET, as PALETTE.md says. It was -0.004 (a
+                                      # hair green) which made a moonlit neutral read as cold teal.
+LAMP_CHROMA = 0.70                    # firelight BLEACHES: a lantern is a narrow warm spectrum, so a
+
+
+                                      # lit surface keeps less of its own hue, not more. This was a
+                                      # 1.10 GAIN, which is why grass under the party's lantern came
+                                      # out neon green — the pool was the most saturated green on a
+                                      # night screen instead of the warmest thing on it.
+LAMP_TINT = (0.012, 0.075)            # firelight, added the same way: red-yellow, not a rotation.
+
+
+                                      # (0.005, 0.022) was far too weak to register against a green
+                                      # that had just been boosted; grass now lands warm olive/straw.
 
 
 def shade_colour(lab, s, table):
@@ -70,7 +83,7 @@ def shade_colour(lab, s, table):
         # Warm by ADDITION, for the same reason night is blue by addition: rotating a blue roof tile
         # toward orange takes it through magenta and a purple water trough is not firelight.
         L = L0 * (0.12 + 0.88 * s) + 0.05 * s
-        C = C0 * 1.10 * (0.45 + 0.55 * s)
+        C = C0 * LAMP_CHROMA * (0.72 + 0.28 * s)
         a, b = C * math.cos(H0) + LAMP_TINT[0] * s, C * math.sin(H0) + LAMP_TINT[1] * s
     elif table == "dusk":
         H = _lerp_ang(H, math.radians(55), 0.32 * (1 - s) + 0.12)
@@ -95,19 +108,32 @@ def shade_colour(lab, s, table):
 
 
 def build_colormap(pal):
-    """[(table, [row of 256 palette indices] per light level)] — row 0 is full light."""
-    idx = PalIndex(pal)
+    """[(table, [row of 256 (r,g,b)] per light level)] — row 0 is full light.
+
+    The rows hold COLOUR, not palette indices. They used to hold the nearest master index, which
+    was a quantiser sitting on the one output that never needed one: the colormap ships as RGBA and
+    only ART is palettised. Refitting cost up to dE 0.10 in Oklab — five times a just-noticeable
+    difference — and, worse, it jumped ramps, because the nearest entry to a lit green is often a
+    step of some other family: it is what turned a lit blue (15,19,112) into a teal (3,34,59) and
+    put 373 hue breaks between ADJACENT light levels of the day table alone. Levels are meant to
+    slide smoothly; a snapped one staircases and flickers as the light crosses a boundary.
+    """
     out = []
     for table in COLORMAP_TABLES:
         rows = []
         for lv in range(LEVELS):
             s = 1.0 - 0.95 * (lv / (LEVELS - 1))
-            row = bytearray(PAL_SIZE)
+            row = [(0, 0, 0)] * PAL_SIZE
             for i, c in enumerate(pal):
                 if i == PAL_TRANSPARENT:
                     continue
+                if table == "day" and lv == 0:
+                    row[i] = tuple(c)           # full daylight is the palette colour, exactly, for
+                    continue                    # every index — a reserved cycle index included: its
+                                                # day row holds its base colour and the engine's
+                                                # per-frame rewrite is what makes it cycle.
                 L, a, b = shade_colour(_to_oklab(*c), s, table)
-                row[i] = idx.of(*_from_oklab(L, a, b))
+                row[i] = tuple(_from_oklab(L, a, b))
             rows.append(row)
         out.append((table, rows))
         print(f"  {table}: {LEVELS} light levels")
@@ -129,7 +155,7 @@ def cmd_palette_colormap(args):
             # every sprite edge; it was patching that on load. There is nothing to patch now.
             line = bytearray()
             for i in range(PAL_SIZE):
-                line += bytes(pal[r[i]]) + bytes((0 if i == PAL_TRANSPARENT else 255,))
+                line += bytes(r[i]) + bytes((0 if i == PAL_TRANSPARENT else 255,))
             rows.append(line)
     PALETTE_DIR.mkdir(parents=True, exist_ok=True)
     write_png(COLORMAP_PNG, PAL_SIZE, len(rows), 4, rows)
@@ -137,8 +163,10 @@ def cmd_palette_colormap(args):
         "palette": "master.hex", "version": PALETTE_VERSION,
         "width": PAL_SIZE, "height": len(rows), "levels": LEVELS, "channels": "RGBA",
         "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. "
-                "Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest "
-                "MASTER palette index, so the engine may use the colormap directly as colour. "
+                "Level 0 is full light, level 31 the darkest. Each entry is the exact lit RGB, NOT "
+                "refitted to a palette index: the colormap is colour, only art is palettised. "
+                "Row (day, level 0) is the palette itself, column for column, reserved cycle "
+                "indices included. "
                 "Column 0 is the transparent index: RGBA (0,0,0,0) in every row, so the engine needs "
                 "no patch on load. Every other column is opaque.",
         "floor": SHADE_FLOOR,

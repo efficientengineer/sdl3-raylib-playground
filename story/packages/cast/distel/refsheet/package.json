@@ -3,12 +3,12 @@
   "handle": "distel",
   "title": "Distel \u2014 reference sheet",
   "ref": "story/refs/distel.png",
-  "fingerprint": "705cbd5d14016565",
+  "fingerprint": "5433bbe0742cb639",
   "makes": "`story/refs/distel.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/distel.png",
     "story/portraits/distel.png"
   ],
-  "cut_fingerprint": "e9155bbb24e5f35f",
+  "cut_fingerprint": "705cbd5d14016565",
   "dir": "story/packages/cast/distel/refsheet"
 }

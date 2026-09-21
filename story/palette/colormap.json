@@ -5,7 +5,7 @@
   "height": 256,
   "levels": 32,
   "channels": "RGBA",
-  "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. Level 0 is full light, level 31 the darkest. Each entry is the RGB of the nearest MASTER palette index, so the engine may use the colormap directly as colour. Column 0 is the transparent index: RGBA (0,0,0,0) in every row, so the engine needs no patch on load. Every other column is opaque.",
+  "note": "row (table.row0 + level) column i = the colour palette index i takes at that light. Level 0 is full light, level 31 the darkest. Each entry is the exact lit RGB, NOT refitted to a palette index: the colormap is colour, only art is palettised. Row (day, level 0) is the palette itself, column for column, reserved cycle indices included. Column 0 is the transparent index: RGBA (0,0,0,0) in every row, so the engine needs no patch on load. Every other column is opaque.",
   "floor": 0.15,
   "point_light_table": "lamp",
   "tables": [

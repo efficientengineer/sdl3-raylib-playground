@@ -2,18 +2,18 @@
 
 ## What exists already
 
-0 of 10 files in this package have been cut already.
+10 of 10 files in this package have been cut already.
 
-- slot 1 `story/portraits/bron_neutral.png` — missing
-- slot 2 `story/portraits/bron_smile.png` — missing
-- slot 3 `story/portraits/bron_laugh.png` — missing
-- slot 4 `story/portraits/bron_biglaugh.png` — missing
-- slot 5 `story/portraits/bron_concern.png` — missing
-- slot 6 `story/portraits/bron_sorrow.png` — missing
-- slot 7 `story/portraits/bron_annoyed.png` — missing
-- slot 8 `story/portraits/bron_angry.png` — missing
-- slot 9 `story/portraits/bron_shock.png` — missing
-- slot 10 `story/portraits/bron_resolve.png` — missing
+- slot 1 `story/portraits/bron_neutral.png` — **exists**
+- slot 2 `story/portraits/bron_smile.png` — **exists**
+- slot 3 `story/portraits/bron_laugh.png` — **exists**
+- slot 4 `story/portraits/bron_biglaugh.png` — **exists**
+- slot 5 `story/portraits/bron_concern.png` — **exists**
+- slot 6 `story/portraits/bron_sorrow.png` — **exists**
+- slot 7 `story/portraits/bron_annoyed.png` — **exists**
+- slot 8 `story/portraits/bron_angry.png` — **exists**
+- slot 9 `story/portraits/bron_shock.png` — **exists**
+- slot 10 `story/portraits/bron_resolve.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 

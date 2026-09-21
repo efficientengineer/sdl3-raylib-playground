@@ -2,18 +2,18 @@
 
 ## What exists already
 
-0 of 10 files in this package have been cut already.
+10 of 10 files in this package have been cut already.
 
-- slot 1 `story/portraits/distel_neutral.png` — missing
-- slot 2 `story/portraits/distel_smile.png` — missing
-- slot 3 `story/portraits/distel_laugh.png` — missing
-- slot 4 `story/portraits/distel_biglaugh.png` — missing
-- slot 5 `story/portraits/distel_concern.png` — missing
-- slot 6 `story/portraits/distel_sorrow.png` — missing
-- slot 7 `story/portraits/distel_annoyed.png` — missing
-- slot 8 `story/portraits/distel_angry.png` — missing
-- slot 9 `story/portraits/distel_shock.png` — missing
-- slot 10 `story/portraits/distel_resolve.png` — missing
+- slot 1 `story/portraits/distel_neutral.png` — **exists**
+- slot 2 `story/portraits/distel_smile.png` — **exists**
+- slot 3 `story/portraits/distel_laugh.png` — **exists**
+- slot 4 `story/portraits/distel_biglaugh.png` — **exists**
+- slot 5 `story/portraits/distel_concern.png` — **exists**
+- slot 6 `story/portraits/distel_sorrow.png` — **exists**
+- slot 7 `story/portraits/distel_annoyed.png` — **exists**
+- slot 8 `story/portraits/distel_angry.png` — **exists**
+- slot 9 `story/portraits/distel_shock.png` — **exists**
+- slot 10 `story/portraits/distel_resolve.png` — **exists**
 
 ## 1. Start a new chat and attach these files, in this order
 
@@ -38,7 +38,7 @@ TEMPLATE RULES: Return the whole template at the same size and proportions as th
 
 WHAT THIS IS: the dialogue-box faces for Distel. The game draws one of these beside the text box while Distel is speaking, so all ten have to read as the same person in the same shot with a different feeling.
 
-CHARACTER: Distel, a Mohn, one of a small furred nocturnal people and plainly not human: a slight girl of fourteen who stands a head shorter than a grown woman, her whole face and body covered in short dense dusk-grey fur with a pale cream mask around the eyes and down the throat, a short blunt muzzle with a small dark nose and no human lips, huge round black eyes with a thin pale gold ring and no whites at all, large upright leaf-shaped ears tipped with charcoal tufts that stand well above her head, a shaggy crown of charcoal head-fur with two long thin braids hanging in front of the ears bound with bone beads, three-fingered furred hands with dark pads, a short tufted tail, a hooded sleeveless overdress of dusty violet felt with a wide folded collar, a broad woven belt of red and cream bands carrying a short curved horn and a coiled lead, loose grey leggings, bare furred feet with dark pads.
+CHARACTER: Distel, a Mohn, one of a small furred nocturnal people and plainly not human: a slight girl of fourteen who stands a head shorter than a grown woman, her whole face and body covered in short dense dusk-grey fur with a pale cream mask around the eyes and down the throat, a short blunt muzzle with a small dark nose and no human lips, huge round black eyes with a thin pale gold ring and no whites at all, large upright leaf-shaped ears tipped with charcoal tufts that stand well above her head, a shaggy crown of charcoal head-fur with two long thin braids hanging in front of the ears bound with bone beads, three-fingered furred hands with dark pads, a short tufted tail, a hooded sleeveless overdress of dusty violet felt with a wide folded collar, a broad woven belt of red and cream bands carrying a short curved horn and a coiled lead, a long pale shepherd's crook taller than she is, loose grey leggings, bare furred feet with dark pads.
 
 SHEET: An expression sheet: the same head-and-shoulders portrait of one character drawn ten times, once in each numbered slot, against the flat neutral mid-grey that already fills the slot. Every slot is the same shot: three-quarter view, head and the top of the shoulders only, the head the same size and in the same place in the frame, the same lighting, the same hair, the same collar and the same colors. Only the face changes: brows, eyes, mouth, and a small tilt of the head. No hands, no arms raised into frame, no weapons, no props, no objects, no scenery, no effects, no sweat drops or anger marks or cartoon symbols. The grey behind the head stays flat and untouched.
 
