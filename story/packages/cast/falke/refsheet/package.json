@@ -9,5 +9,6 @@
     "story/refs/bron.png",
     "story/portraits/bron.png"
   ],
-  "dir": "story/packages/cast/falke/refsheet"
+  "dir": "story/packages/cast/falke/refsheet",
+  "cut_fingerprint": "c844a0f3545040f5"
 }
