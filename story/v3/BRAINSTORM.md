@@ -212,6 +212,15 @@ Accepted thereby: read "save it" as Falke saving the herder; two-phase boss; som
 the beast (meaning undecided → THREADS); the herder young and prickly; whether they stay is answered by
 "find the cause". Shared workspace for the two agents: `story/v3/ch01_room/`.
 
+**Combat (owner, 2026-09-21; sent to the designer for `story/v3/COMBAT.md`):** "I'd still like a
+traditional jrpg turn based combat. Maybe with a twist — I think we could have a slider for effort, and
+doing attacks at higher effort takes more stamina, but do more damage or magnitude. You can do any skill
+at any time as long as you have the minimum effort needed to use a skill." "Stamina regens over time."
+Orchestrator's fit with the story: Falke's flaw is full effort every turn (the last machine punishes
+it; "too tired to swing" = out of stamina → the cheap parry is the answer, then spend into the
+opening); Ottilie's "wasn't strong enough" = a small pool / low effort ceiling on healing, growing over
+the game; "magic only does light work" = low effort ceilings on magic for everyone; no MP, no hoarding.
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
