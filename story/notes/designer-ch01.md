@@ -32,6 +32,11 @@ sleeping-animal prop.
   the arm that holds, the swing. *(The barrel on a rope is cut — see §2a.)* The swing needs a
   **counterweight that visibly drops as its tell and climbs the post as a progress read-out**, with a
   mark that stays at the session's best.
+- **Two triggers to remove from `hart_yard.tmap`** when the map is next edited (map side, not the
+  writer's): `hart_yard.practice_posts` — the old "the row as a whole" examine, made redundant by
+  the three machines each having their own — and the old `machine_1..4` ids. Until the trigger goes,
+  the line has to exist or `check --all` fails, so the writer has kept one short line for it. **This
+  is the only known stale trigger in the chapter.**
 - **Hart's workshop as a place you walk into**, not a façade: the errand's part is on his bench at
   the back, past the vice and the half-built things and the hook with nothing on it. This is the only
   way the chapter says he is an engineer.
