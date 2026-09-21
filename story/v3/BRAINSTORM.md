@@ -221,6 +221,13 @@ it; "too tired to swing" = out of stamina → the cheap parry is the answer, the
 opening); Ottilie's "wasn't strong enough" = a small pool / low effort ceiling on healing, growing over
 the game; "magic only does light work" = low effort ceilings on magic for everyone; no MP, no hoarding.
 
+**CORRECTION (owner, 2026-09-21):** "Ottilie not being strong enough has been taken far too literally.
+That was just when she was young and couldn't save her parents. It doesn't have any bearing now."
+→ She is capable NOW. Struck everywhere: the small stamina pool / low healing ceiling, "heals once and
+has to sit down", "strength she will build", the carter who died under her hands. Apprentice in title
+only (standing is the town healer's to give). "Magic only does light work" is a world rule for
+everyone, not her flaw. (The orchestrator's earlier lines above that say otherwise are void.)
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
