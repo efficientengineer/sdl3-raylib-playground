@@ -61,6 +61,15 @@ accidentally spend what they do not have.
   so a fight never begins depleted unless the last one just ended.
 - **Guard adds +4 on top** (so a guarding turn nets +12), and a successful **parry adds +8** (nets
   +16). Waiting is not a dead turn; it is how you pay for the next one.
+- **WINDED — the one thing that cancels the regeneration.** A character who **attacks into a tell**
+  and is countered by something that winds (today: the swing) is **winded**: the counter drains
+  `5 + 4 × the counterweight's notches` stamina on the spot, and for `1 + notches ÷ 2` rounds the +8
+  at the top of the round **does not come**. Nothing else in the game suppresses the regeneration.
+  **Guarding clears it immediately** — a parry or an ordinary guard, either one — which is §3's
+  "waiting is how you pay for the next one" written as a rule. This is the mechanism §4a.3 calls
+  *closing the door*: with the regen off, a spent player really cannot afford Attack, and Guard,
+  which pays +4 by itself, is the only entry left lit. A parry also sets the counterweight back to
+  zero, so the drain and the winding both unwind on the same input the chapter is teaching.
 - **Items are extras, not the source.** Food restores a chunk out of battle. There is no MP potion.
 - **At zero you are never stuck**: every character can always Guard, and can always Attack at effort
   1 (cost 2) — which is affordable the moment the round's +8 lands. What you lose at low stamina is
@@ -116,9 +125,12 @@ Five things carry it, in this order, and none of them is a sentence:
 2. **Attacking makes it worse, on screen.** Every attack that is not into an opening winds the
    counterweight another notch up the post and it comes back harder. The post is a graph of the
    player's own impatience and it is standing in the middle of the yard.
-3. **The stamina drain closes the door.** Its counter drains the attacker. Within a session the
-   player cannot afford Attack, cannot afford Hard swing, and **Guard is the only command left that
-   costs nothing.** The game does not suggest Guard. It removes everything else.
+3. **The stamina drain closes the door, and WINDED is how it closes** (§3). The swing's counter
+   takes `5 + 4 × notches` off the attacker and then **stops their regeneration** for `1 + notches ÷ 2`
+   rounds, so the +8 does not arrive to bail them out. Within a session the player cannot afford
+   Attack, cannot afford Hard swing, and **Guard is the only command left that costs nothing.** The
+   game does not suggest Guard. It removes everything else — and the one input that gives the regen
+   back is guarding, which is also the answer.
 4. **The menu says it in light.** Anything unaffordable is **greyed with its cost shown**; Guard is
    never greyed and is **visibly lit**. At the bottom of a bad session the command list is one bright
    entry in a row of grey ones. That is the loudest the game is ever allowed to get.
@@ -242,11 +254,12 @@ player must read.
 
 Two phases, no break. Full staging in `chapter01.md` P8.
 
-**Phase one — hold it open** *(cannot be lost).* Goal line: *Hold it open so {{HERDER}} can calm it.*
+**Phase one — hold it open** *(cannot be lost).* Goal line: *Hold it open for {{HERDER}}.* (Six words is the rule; the longer form once written here and in `BESTIARY.md` is struck.)
 The mane lifts (a huge, slow tell), {{HERO}} parries **at effort 1, because Guard has no effort**, it
 is OPEN, and {{HERDER}} spends **Settle at effort 5** into the opening. Settle's minimum is 4 and its
-cost at 5 is 24, so **she can afford it perhaps three times** and the player watches her bar drain
-toward the floor while she does it. Attacking the beast does nothing at all in this phase — the
+cost at 5 is 24 against a pool of 30, so **she can afford it twice, and the second one hurts**: the
+first empties her, and three rounds of guarding are what buy the second. The player watches her bar
+drain toward the floor while she does it. Attacking the beast does nothing at all in this phase — the
 message says it is not hurt — so the phase is **entirely about restraint**: cheap parries, and
 everything the party has goes into her. It works. Then it does not: it looks at her and does not know
 her.

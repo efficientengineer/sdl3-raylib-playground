@@ -9,7 +9,7 @@ twenty years of talking to her, the moon that moved, the carters walking west, {
 receipts — went with the draft (BRAINSTORM, 2026-09-21: "no sunk cost"). None of them was ever on
 screen, so by D23 none of them was canon. They are not owed.
 
-## Chapter one, *The Last Job Sheet* (third draft, 2026-09-21 — not yet approved, so these are provisional)
+## Chapter one, *The High Pasture* (third draft, 2026-09-21 — not yet approved, so these are provisional)
 
 **The big one, and the reason the party walks out of the valley:**
 

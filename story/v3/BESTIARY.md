@@ -147,7 +147,7 @@ has only heard one described: long low body, a heavy head carried down, six legs
 fibres that stand up and move on their own when it works. Slate blue and bone white; the mane is the
 only bright thing in the fight and it is what you read.
 
-**What it is.** The {{HERDER_PEOPLE_PL}}' guard beast. It gathers animals at night, puts them to sleep with
+**What it is.** The guard beast of the {{HERDER_PEOPLE_PL}}. It gathers animals at night, puts them to sleep with
 its own light work, and moves them somewhere safe. It has done that job perfectly for years. It is
 still doing it. There is nobody in charge of it any more, so it gathers everything it finds, sleeps
 it, and moves it on — which is every clue in the job sheet, and the player should be able to assemble
@@ -157,9 +157,9 @@ that themselves before anybody says it.
 Something was done to it, and the chapter ends on the visible evidence of that and no explanation.
 
 ### Phase one — hold it open *(cannot be lost)*
-Goal line: *Hold it open so {{HERDER}} can calm it.*
+Goal line: *Hold it open for {{HERDER}}.*
 The mane lifts — the tell, enormous and slow, a full beat and a half. {{HERO}} parries (**Guard costs
-no effort**), it is OPEN, and {{HERDER}} spends **Settle at effort 5, 24 stamina**, into the opening.
+no effort**), it is OPEN, and {{HERDER}} spends **Settle at effort 5, 24 stamina**, into the opening, against a pool of 30 — twice in the phase, and the second one hurts.
 **Attacking it does nothing**: the message says it is not hurt, every time, which is the game stating
 its own rule out loud. So the phase is entirely **restraint** — cheap parries, everything the party
 has poured into her — and the player watches her bar fall and not come back.
@@ -170,7 +170,7 @@ Three cycles. It goes quiet, and its head comes down. Then the mane lifts again,
 The same tell, **faster, and the opening is one round but the window to choose is tighter.** Damage
 counts now. After round three it **stops attacking the party and turns on {{HERDER}}**, who cannot
 parry and cannot survive it; from then on every round the player does not open it is a round it is
-standing over her. {{HEALER}}'s pool of 24 and {{HERDER}}'s drained one are what the player has left,
+standing over her. {{HEALER}}'s pool of 36 and {{HERDER}}'s drained one are what the player has left,
 so a careless phase one costs something without ever having been a failure — **that, not reflex, is
 the difficulty.** This phase is the release: parry cheap, then spend everything into the opening.
 

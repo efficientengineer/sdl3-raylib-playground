@@ -77,16 +77,16 @@ into**. Scene file names go in the last column when the writer has them.
 - **Where.** Hart's yard, midday, day one. Panels (this is the game's first set piece).
 - **The one job.** Establish the three people and the fact that the last machine cannot be beaten by
   attacking. Nothing else.
-- **What the player just did.** Lost to machine 4 — three or four times, fast, funny losses.
-- **What they get back into.** Standing in the yard with a goal line: *Take the repaired part to the
-  guild hall.* Ottilie's patch-up happens inside the clip; she is NOT a follower yet.
+- **What the player just did.** Lost to **the swing** — three or four times, fast, funny losses. (The machines are named, never numbered: the post, the arm that holds, the swing.)
+- **What they get back into.** Standing in the yard with a goal line: *Deliver the part. Buy bread.* Ottilie's patch-up happens inside the clip; she is NOT a follower yet.
 - **Must not contain.** The job, the board, the sword, the herders, the father.
 - Writer's file: `0110_the_yard` **(confirmed by the writer, 2026-09-21)**
 
 ### C2 — the counter
 - **Where.** Guild hall, inside, afternoon. Talk scene (no art).
-- **The one job.** The clerk states two rules plainly: job sheets go up at dawn; the board closes on
-  the last ring of the evening bell. Then, because Falke asks, the third: **no sword, no signature.**
+- **The one job.** **One rule, said once: no sword, no signature.** The dawn opening and the closing
+  bell are not the clerk's — they fall out of {{RIVAL}} gloating on his way past, and the player
+  meets them in play (an empty board on day one, a ringing bell in P5).
 - **What the player just did.** Carried the part across town, done the bread, found the teaching find.
 - **What they get back into.** Free walk in Halm with a goal line: *Get home before supper.* The
   board is visible in the hall and readable — empty, because it is not dawn.
@@ -105,21 +105,22 @@ into**. Scene file names go in the last column when the writer has them.
 - **Where.** Hart's yard, evening of day two. Panels.
 - **The one job.** Hart gives the sword, and the player must understand it means **he may sign.**
   The evening bell starts in this clip and does not stop.
-- **What the player just did.** Beaten machine 4 with a parry, themself, after a day of losing.
+- **What the player just did.** Beaten **the swing** with a parry, themself, after a day of losing.
 - **What they get back into.** A timed run, immediately, with the bell audible and a counter of rings
   on screen. No pause between the last box and control.
 - Writer's file: `0150_the_sword` **(confirmed by the writer, 2026-09-21)**
 
 ### C5 — the herder
 - **Where.** The edge of the high pasture, full night. Panels.
-- **The one job.** The third party member exists, is a person, and does not want the beast killed.
-  Falke nearly swings at them; Ottilie stops him.
+- **The one job.** The third party member exists — small, furred, muzzled, big-eared, plainly not a
+  human — is a person, and does not want the beast killed. Falke nearly swings at her; Ottilie stops
+  him and is the one who names what she is.
 - **What the player just did.** Followed a trail of sleeping animals to the place the tracks stop.
 - **What they get back into.** A party of three, with the herder's night sight on: enemy tells now
-  show a beat earlier and the dark reads differently. The goal line: *Find the guard beast.*
+  show a beat earlier and the dark reads differently. The goal line: *Find the drover.*
 - Writer's file: `0160_the_herder` **(confirmed by the writer, 2026-09-21)**
 
-### C6 — what was on it
+### C6 — what was on him
 - **Where.** The pasture, after the boss. Panels.
 - **The one job.** Something visibly wrong is found on the beast; the sheep wake; the shepherd pays.
   Three people decide to find the cause.
@@ -137,17 +138,17 @@ Checked `beats.md`, `story/scenes/` and the writer's message against this flow.
   C3 `0140_supper`, C4 `0150_the_sword`, C5 `0160_the_herder`, C6 `0180_what_was_on_it`. Six files
   exist in `story/scenes/` and there is no seventh. Still open: **`story/playlist.md` `## chapter01`
   is the old twelve-scene list** — the writer's file, the writer's edit.
-  **CLOSED, same day:** the playlist is now the six clips (*The Last Job Sheet*), the old twelve are
-  deleted, `story/field/text.md` holds 80 written ids with no placeholders, and `check --all` is
+  **CLOSED, same day:** the playlist is now the six clips (*The High Pasture*), the old twelve are
+  deleted, `story/field/text.md` holds 66 written ids with no placeholders, and `check --all` is
   clean. Every field id in `designer_to_writer.md` §2 exists, including `halm.job_sheet`,
   `halm.clerk_signing_late` (assumption 5, covered), `high_pasture.boss_break` and
   `high_pasture.boss_turn`. The writer added `high_pasture.body`, which is better than what I asked
   for: the ring of nine healed holes is **found by the player in play**, and C6 is the three of them
   reacting. Folded into the spine. `{{MACHINE}}` is withdrawn — "machine" stays plain English.
 - **Nothing a scene says contradicts what the player did.** Two checked closely:
-  `0150_the_sword`'s "lost forty-one times" is **Ottilie's running count out loud, not a retry
-  counter** — the player loses about eight times across day two's four sessions (`chapter01.md` P4)
-  and her tally covers the day, which is exactly the joke. And "his arms are gone, which is the only
+  `0150_the_sword` no longer counts his losses at all — the line was cut in the editor's pass and
+  what is left is Ottilie's *"I've eaten two meals up here."*, which measures the day by her lunches
+  instead of by a retry counter. And "his arms are gone, which is the only
   reason he finally stops swinging" **is** the design: he is out of stamina, so the only thing he can
   afford is a guard (`COMBAT.md` §5). The scene and the system say the same thing.
   `0160_the_herder` has one lamp burning on the ground in the dark, which is what the high pasture's

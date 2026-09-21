@@ -15,7 +15,7 @@ The first minute of the game, at the end of a training session the player has ju
    - {{HERO}}: facing right at the biggest machine, stick raised, shoulders high, weight on the front foot
    - {{HEALER}}: sitting on the wall looking right at {{HERO}}, an apple halfway to her mouth, grinning
    - {{MENTOR}}: at the bench, eyes right on {{HERO}}, a file paused in one hand, face flat
-2. portrait_inset | {{HEALER}} close up on the stone wall, an apple in one hand and a roll of bandage in her lap, enjoying herself
+2. portrait_inset | {{HEALER}} close up on the stone wall, an apple in one hand and a roll of bandage in her lap
    - {{HEALER}}: eyes right on {{HERO}}, brows up, mouth open on a laugh, head tipped back
 3. impact | a heavy counterweighted wooden arm sweeping across the frame into {{HERO}}'s forearm, his practice stick flying out of frame, cut grass and chaff kicked up
    - {{HERO}}: eyes still on the machine's body and not its arm, mouth open, both feet off the ground
@@ -28,17 +28,17 @@ The first minute of the game, at the end of a training session the player has ju
    - {{MENTOR}}: looking down left at {{HERO}} off-panel, chin low, mouth a flat line, one worked hand flat on the bench
 
 ## Dialogue
-- {{HEALER}} [1] {wonder}: He's at the swing again. Best wall in {{HOME_TOWN}}, this.
-- {{HEALER}} [3]: Feet over his head. That's the best one all week.
-- {{HERO}} [4]: I hit it a dozen times!
-- {{HEALER}} [2]: It hit you once.
-- {{HERO}} [5]: How is anyone supposed to beat that thing?
-- {{HEALER}} [5]: Maybe hit it again?
-- {{HERO}} [5]: My wrist's fine.
-- {{HEALER}} [6]: Put it down, then. I can't patch a wrist you're holding on to.
-- {{HEALER}} [6]: There. Closed.
-- {{HERO}} [6]: That's it? That's all of it?
-- {{HEALER}} [6]: You fought a training dummy, not a bear.
-- {{MENTOR}} [7]: Again. From the gate.
-- {{HERO}} [7]: {{MENTOR}} — say it straight. Am I ready or am I not?
-- {{MENTOR}} [7] {sorrow}: Not quite ready yet.
+- {{HEALER}} (smile) [1] {wonder}: He's at the swing again. I've got the good seat.
+- {{HEALER}} (laugh) [3]: Feet over his head. That's the best one all week.
+- {{HERO}} (annoyed) [3]: I hit it a dozen times!
+- {{HEALER}} (biglaugh) [2]: It hit you once.
+- {{HERO}} (annoyed) [4]: How is anyone supposed to beat that thing?
+- {{HEALER}} (smile) [5]: Maybe hit it again?
+- {{HERO}} (annoyed) [5]: My wrist's fine.
+- {{HEALER}} (annoyed) [6]: Put it down, then. I can't patch a wrist you're holding on to.
+- {{HEALER}} (neutral) [6]: There. Closed.
+- {{HERO}} (shock) [6]: That's it?
+- {{HEALER}} (smile) [6]: You fought a training dummy, not a bear.
+- {{MENTOR}} (neutral) [7]: Again. From the gate.
+- {{HERO}} (resolve) [7]: {{MENTOR}}. Am I ready or not?
+- {{MENTOR}} (neutral) [7] {sorrow}: Not quite ready yet.

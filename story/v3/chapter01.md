@@ -1,4 +1,4 @@
-# CHAPTER ONE — the hunt on the high pasture
+# CHAPTER ONE — *The High Pasture*
 
 **THE SPINE.** Written by the designer, 2026-09-21, replacing *The Jar Run* completely. This file
 says what the player **does**; `story/scenes/` says what anyone says. Clip slots here are one
@@ -49,7 +49,7 @@ are doing without the game using a sentence to tell them. One line on screen at 
 | after signing | Find what is taking the animals. |
 | P6 | Get up to the pasture. |
 | P7 | Follow the sleeping animals. |
-| after the tracks stop | Find the guard beast. |
+| after the tracks stop | Find the {{GUARD_BEAST}}. |
 | P8 phase 1 | Hold it open for {{HERDER}}. |
 | P8 phase 2 | Stop it. It wants {{HERDER}}. |
 
@@ -234,10 +234,11 @@ as care. **Nobody states anything about Ottilie's family** — the player walked
 minutes ago and is sitting at the table she chose instead; that is the whole statement and it is made
 by the level, not by a line. If a line survives at all it is hers, flat and fast, and it does not
 explain. One beat, no speeches.
-**The one sanctioned sentence about the system** lives here and nowhere else: {{MENTOR}}'s *"You hit
-everything as hard as you can."* It is an observation about the boy, it names no input, it offers no
-answer, and he refuses to explain it — which is why it is allowed when nothing else is. It is also
-the last thing anyone says about the machine until the player has beaten it.
+**Nobody says anything about the system here either** *(struck 2026-09-21 by the editor's pass:
+{{MENTOR}}'s "You hit everything as hard as you can. Every single time." hands the player the
+answer, and "The swing is the one that is out there" is a proverb).* What he says at this table is a
+fact with no instruction in it — *"You have never beaten the swing."* — and then *"Eat."* The last
+thing anyone says about the machine before the player beats it is a flat statement of the score.
 *Back into:* his room, then sleep. Goal line *Be at the machines before light.*
 
 ---
@@ -250,6 +251,14 @@ the last thing anyone says about the machine until the player has beaten it.
 The long grind, and **it must be fun, not 41 literal retries.** It is built as **four sessions with
 visible progress and the light moving between them**, so the player experiences a whole day passing
 in fourteen minutes and can see themselves getting better.
+
+**P4 IS FOUR SESSIONS AND IT ENDS AT LAST LIGHT.** Stated plainly because the engine currently runs
+three steps and finishes at full day, which puts C4 — *"the last light of the second day"*, the low
+gold the sword is written into — in the middle of the afternoon. The intent, which the engine should
+be built to: **four** play rows in P4, and the light walks **grey dawn → sun up → high sun → low
+gold**, one step a session, ending on the low gold that C4 opens in. The number of sessions is what
+makes the day feel long; the last one's light is what makes the sword land. If only three rows are
+affordable, the one to drop is session 3, never session 4.
 
 | Session | Light | What is actually different | Fails |
 |---|---|---|---|
@@ -432,7 +441,7 @@ it is theirs, they raised it, and they do not want it killed. That is the one be
 the goal from *find it* to *stop it without killing it*.
 *Back into:* a party of three. **Night sight comes on and the map changes**: tells show a beat
 earlier, the {{NIGHT_CREATURE_PL}} are readable, and the shelf above the fold glints. No line explains
-this; the player sees the field change. Goal line *Find the guard beast.*
+this; the player sees the field change. Goal line *Find the {{GUARD_BEAST}}.* (the token reads **drover**; goal lines are hardcoded in the engine and must be written out as *Find the drover.* — the player is never told "guard beast", which is a designer's word)
 
 ---
 
@@ -442,8 +451,9 @@ this; the player sees the field change. Goal line *Find the guard beast.*
 Rules in full in `COMBAT.md` §9 and `BESTIARY.md`.
 
 **Phase one — hold it open** *(cannot be lost, 2.5 min).* Goal line: *Hold it open for {{HERDER}}.* The mane lifts — an enormous slow tell — {{HERO}} parries (**Guard costs no effort**), it
-is OPEN, and {{HERDER}} spends **Settle at effort 5** into the opening, 24 stamina a go, which she
-can afford about three times. **Attacking does nothing and the game says so each time.** So the phase
+is OPEN, and {{HERDER}} spends **Settle at effort 5** into the opening, 24 stamina a go against a
+pool of 30 with +8 a round. **She can afford it twice, and the second one hurts** — the first
+empties her, three rounds of guarding pay for the second, and the phase is over before a third. **Attacking does nothing and the game says so each time.** So the phase
 is restraint: cheap parries, everything poured into her, and her bar visibly not coming back. The
 chapter's thesis as a mechanic — *neither of them can do this alone* — and the player reads it off a
 bar rather than out of a box. Three cycles and it goes quiet.
@@ -460,14 +470,14 @@ Then the mane lifts again, and it looks at her, and it does not know her.
 
 **Phase two — a real fight** *(3.5 min).* Same tell, **faster, tighter window.** Damage counts; this
 is the release, and everything held back in phase one gets spent. After round three it stops
-attacking the party and **goes for {{HERDER}}**, who cannot parry. {{HEALER}}'s pool of 24 and
+attacking the party and **goes for {{HERDER}}**, who cannot parry. {{HEALER}}'s pool of 36 and
 {{HERDER}}'s drained one are what the player has left, which makes a careless phase one cost
 something without ever having been a failure. Open it and finish it. Losing restarts phase two only.
 
 **It is killed with a parry and the strike after it — the exact input the player learned on a machine
 in a yard yesterday afternoon.** That is the chapter.
 
-### CLIP C6 — what was on it *(1.6 min, panels)* — `0180_what_was_on_it`
+### CLIP C6 — what was on him *(1.6 min, panels)* — `0180_what_was_on_it`
 **The player finds it first, in play — mandatory (10).** `high_pasture.body` / `_2` is an examine on
 the body after the fight: **a ring of nine small healed holes behind the left ear.** The body is the
 only thing on a dark map and the party will not leave until it has been looked at; **the clip does
@@ -501,7 +511,7 @@ chapter is the part the whole thing is for.
 | C5 the herder | clip | — | 1.2 | −0.3 |
 | P7 the high pasture | play | 12 | — | — |
 | P8 the boss | play | 6 | — | — |
-| C6 what was on it | clip | — | 1.6 | −0.4 |
+| C6 what was on him | clip | — | 1.6 | −0.4 |
 | **Total** | | **67** | **6.3** | **73 minutes** |
 
 **Ratio 10.6:1**, up from 9:1 — the direction the owner asked for. **Total scene text is down about a

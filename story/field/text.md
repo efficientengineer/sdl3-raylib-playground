@@ -35,8 +35,8 @@ the designer leads the player through them (`story/v3/chapter01.md`, *The mandat
 carry the chapter's setup, which used to sit in the optional layer. They are marked **MANDATORY**
 below. Everything else is the reward for looking around.
 
-**Numbers.** Nine is the ring of holes and nothing else in this chapter. The flock is eleven, the job
-pays five coin, {{RIVAL}} lends three.
+**Numbers.** Nine is the ring of holes and nothing else in this chapter. The flock is eleven and
+nothing else is. The job pays five coin, {{RIVAL}} lends three, the bread is three loaves.
 
 ---
 
@@ -53,7 +53,7 @@ Take the catch down to the guild hall. Bread on the way back, enough for three.
 
 ## hart_yard.practice_posts
 {{MENTOR}} built all three of them, and each one teaches you a different way to get hit.
-- what: the row of machines as a whole; kept because hart_yard.tmap triggers it
+- what: the row of machines as a whole; no trigger points at it yet (see story/notes/editor-ch01.md)
 
 ## hart_yard.machine_post
 A split post on a spring. Hit it anywhere and it comes back straight at your face.
@@ -72,12 +72,12 @@ Every hit you land winds the weight up.
 - what: the workshop book on the bench, examine
 
 ## hart_yard.ladder
-A ladder up to the eaves, and something tucked under them out of the rain.
+A ladder up to the eaves.
 - what: the ladder to the hidden {{LOOT_YARD}}
 
 ## hart_yard.workshop_door
-Wood, iron, rope and counterweights, and a hook on the back wall with nothing hanging on it.
-- what: the workshop door. Untouchable: the chapter's best setup and it pays off in C4
+Wood, iron, rope and counterweights, and something long in oilcloth on a hook at the back.
+- what: the workshop door. The sword is on that hook on day one, wrapped, and no one says a word about it; it pays off in C4
 
 ## hart_yard.hart
 Hand me the short nails and don't start. The answer is the same as it was at breakfast.
@@ -85,7 +85,7 @@ Hand me the short nails and don't start. The answer is the same as it was at bre
 - what: {{MENTOR}} at his workbench, spoken to on day one
 
 ## hart_yard.ottilie_idle
-Go and do your errand. I'll be up here tomorrow and you'll be down there losing.
+Go and do your errand. I'll still be up here when you get back.
 - name: {{HEALER}}
 - what: {{HEALER}} on the wall, spoken to on day one
 
@@ -104,11 +104,11 @@ Four years of my suppers and you still hold the spoon like a hammer.
 # hart_yard — the night of day one
 
 ## hart_yard.room_sword_gap
-Two pegs on your wall with nothing across them. You put them up when you were thirteen.
+Two pegs on your wall, at the height you could reach when you were thirteen.
 - what: the empty sword pegs in {{HERO}}'s room, night of day one
 
 ## hart_yard.bed
-Sleep, and be out at the machines before it is light.
+Sleep.
 - what: the bed; interacting ends day one
 
 # hart_yard — day two
@@ -119,7 +119,7 @@ I've brought my dinner up. Don't let me down.
 - what: between day two's sessions; she has come out to the wall for the show, and says nothing about the machine
 
 ## hart_yard.day2_d
-That's the best one yet. You went over the post and everything.
+You went over the post and everything.
 - name: {{HEALER}}
 - what: the last between-session line before the parry lands; C4 follows. She never calls a swing
 
@@ -132,12 +132,12 @@ A carter holds his lamp out and a woman warms the wick between two fingers until
 - what: **MANDATORY.** Ordinary magic done as a chore, in the road, on the way out of the yard. No one explains it
 
 ## halm.lamp_charm_2
-My grandfather's saying: sleep like a {{HERDER_PEOPLE}}, wake like a {{HERDER_PEOPLE}}, get nothing done all day.
+Up the valley I passed the {{HERDER_PEOPLE_PL}} once, moving sheep in the dark. No one has seen one here.
 - name: Carter with no cart
 - what: **MANDATORY**, box two of the same stop; the first the player hears of the {{HERDER_PEOPLE_PL}}
 
 ## halm.bread
-Bread is a coin a loaf, and you'll be carrying three.
+A coin a loaf, and you're carrying three. Put them on {{MENTOR}}'s slate.
 - name: Baker on the square
 - what: the bread stall, the only price the player sees in town
 
@@ -159,30 +159,30 @@ Bare planks and a lot of old nail holes.
 - what: the job board on day one, before C2
 
 ## halm.bell
-The bell hangs over the square on an axle of {{MENTOR}}'s iron. It is rung once a day, at the end of it.
+The bell hangs over the square on an axle of {{MENTOR}}'s iron.
 - what: the bell tower; the player stands under the bell that rings on day two
 
 ## halm.well
-Capped and roped, and the winch over it is {{MENTOR}}'s work, same as the bell axle and the catch in your hands.
+Capped and roped, and the winch over it is {{MENTOR}}'s work.
 - what: the well; what an engineer is, without the word
 
 ## halm.shepherd_market
-Up the valley they trade with the {{HERDER_PEOPLE_PL}} twice a year. Not here — I have kept sheep forty years and never seen one.
+They trade with the {{HERDER_PEOPLE_PL}} up the valley. Twenty years here, I have never seen one.
 - name: {{SHEPHERD}}
 - what: {{SHEPHERD}} at the market on day one; she is the woman who posts the job sheet
 
 ## halm.shepherd_market_2
-Eleven of mine have gone off that pasture this month. I'm putting a job sheet up at dawn and the old hunters have laughed at it already.
+Eleven of mine have gone off that pasture this month. The old hunters laughed at my sheet already.
 - name: {{SHEPHERD}}
 - what: her second box; the job exists before the player can take it
 
 ## halm.healer_bench
-Is {{HEALER}} in today? I'd rather wait for her — she's quick, and she tells you what she's doing while she does it.
+Is {{HEALER}} in today? I'd rather wait — she tells you what she is doing while she does it.
 - name: Woman on the bench
 - what: outside {{TOWN_HEALER}}'s room; the town asks for {{HEALER}} by name
 
 ## halm.town_healer
-I took her in the winter the fever went through, and she has closed more in this room than I did at her age. One season's work outside this valley and the standing is hers.
+I took her in the fever winter. One season's work outside this valley and her standing is hers.
 - name: {{TOWN_HEALER}}
 - what: {{TOWN_HEALER}} in her room. The one place a person says the plain fact of {{HEALER}}'s family out loud, in passing, to somebody who is not {{HERO}} — he has always known
 
@@ -211,12 +211,12 @@ Go on, {{HERO}}! Straight through the grain yard, it's shorter!
 - what: the same woman, during the bell run; she gives the player the shortcut
 
 ## halm.ostler
-Eleven carts used to stand in that yard and I had work on every one of them. Ask me what I do now.
+That yard was full of carts and I had work on every one of them.
 - name: {{VILLAGER_2}}
 - what: townsperson, day one
 
 ## halm.ostler_after
-That's a hunter walking, that is. Mind the gate post!
+A hunter, and I knew you at ten. Mind the gate post!
 - name: {{VILLAGER_2}}
 - what: the same man, during the bell run
 
@@ -231,12 +231,12 @@ It pays five coin. Somebody has written "monster" across the top in a different 
 - what: **MANDATORY**, box two; the pay and the reason {{HERO}} wants it
 
 ## halm.clerk_signing
-You made it on the last ring, and you have a sword on your back. Give me the sheet and I will write your name in the book.
+The job sheet, please. I will write your name in the guild book.
 - name: Clerk
 - what: the clerk when the player reaches the counter in time
 
 ## halm.clerk_signing_late
-The bell has stopped and the shutter is halfway down. Put your hand on it and I will call that the last ring.
+The shutter is not down yet. Put your hand on it and that is the last ring.
 - name: Clerk
 - what: the clerk when the rings run out; the run cannot be failed permanently
 
@@ -246,12 +246,12 @@ Sheep. You waited two days for a sword and you've spent it on sheep.
 - what: {{RIVAL}} in the guild hall doorway during the bell run
 
 ## halm.ottilie_door
-{{HEALER}} — I signed for a job up on the {{HIGH_PASTURE}} and I'm going tonight. Come with me.
+{{HEALER}}! I signed for a job — come up the hill with me tonight.
 - name: {{HERO}}
 - what: **MANDATORY**, box one; her door is on the fast route and the bell is still ringing
 
 ## halm.ottilie_door_2
-Yes. My bag's by the door and I've been carrying bandages for you since you could walk — wait, where are we going?
+Yes. My bag's by the door — wait, where are we going?
 - name: {{HEALER}}
 - what: **MANDATORY**, box two; she joins as a follower on the spot
 
@@ -273,7 +273,7 @@ I've never been up here after dark. I've never been anywhere after dark.
 - what: an in-field exchange on the way up, box one
 
 ## hill_path.ottilie_dark_2
-{{TOWN_HEALER}} has wanted me out of this valley for a year. She'll be delighted, and I'm not telling her.
+She's wanted me out of this valley for a year. I'm not telling her I went.
 - name: {{HEALER}}
 - what: box two; her own reason for being here, said as a joke
 
@@ -318,11 +318,11 @@ A sheepfold of piled stone with its gate hanging off. There is nothing inside it
 - what: {{SHEPHERD}}'s empty fold
 
 ## high_pasture.find
-A flat disc of pale glass on a cord, dropped in the grass where you would only find it in the dark.
+A flat disc of pale glass on a cord, dropped in the grass.
 - what: the hidden find on the pasture, reached in the dark
 
 ## high_pasture.body
-{{BEAST_NAME}} lying in the flattened grass, still warm, bigger than he looked standing up. Under the matted hair behind his left ear the skin is not right.
+{{BEAST_NAME}} lying in the flattened grass, still warm. Behind his left ear the skin is not right.
 - what: **MANDATORY**, before C6 — the player finds the holes themself
 
 ## high_pasture.body_2
@@ -332,18 +332,18 @@ A ring of small round holes in the bare skin, all the same size, healed shut a l
 # high_pasture — the fight
 
 ## high_pasture.boss_break
-{{BEAST_NAME}} — stand! It's me, you great fool.
-- name: Distel
+{{BEAST_NAME}}, stand — it's me. Smell me.
+- name: {{HERDER}}
 - what: in-field exchange at the phase break; she calls him and it works for a moment
 
 ## high_pasture.boss_break_2
 He's standing — hold him just like that!
-- name: Distel
+- name: {{HERDER}}
 - what: box two of the phase break
 
 ## high_pasture.boss_turn
 He's looking at me the way he looks at a sheep.
-- name: Distel
+- name: {{HERDER}}
 - what: the turn; the beast goes for its own handler
 
 ## high_pasture.boss_turn_2
@@ -360,5 +360,5 @@ The road drops into the gap where the spring took the culvert out.
 - what: kept so the existing west_road.tmap validates; the road west is chapter two's
 
 ## west_road.west_end
-The road keeps going west, down to the river bridge. Your job is up the hill behind you.
+The road keeps going west, down to the river bridge.
 - what: kept so the existing west_road.tmap validates
