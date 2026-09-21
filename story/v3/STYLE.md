@@ -85,7 +85,12 @@ Rule 14 is the owner's too, and rule 0 and rule 14 are the two that outrank ever
     lines in the chapter. A rule the player has been told is not a rule the player has seen: state it
     in one place and pay it off in another, so that "no sword, no signature" is recited at a counter
     on day one and is what stops the argument on day two. The approved model of this register is the
-    dialogue of `story/scenes/0110_the_board.md`.
+    dialogue of `story/scenes/0130_the_counter.md` and `story/scenes/0150_the_sword.md` (it was
+    `0110_the_board.md`, which the 2026-09-21 rewrite of chapter one replaced).
+    **Register is per speaker, not one house style** (owner, 2026-09-21): plain does not mean formal.
+    {{HEALER}} is the loosest person in the game — contractions always, teasing, never a construction
+    like "I cannot look at a wrist you are holding" — and {{MENTOR}} is the clipped one. With the
+    names hidden, the three people in a scene must still be tellable apart.
 
 ## Names are tokens
 

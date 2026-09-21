@@ -226,10 +226,11 @@ follow.**
 **The board.** Four job sheets, three struck through. The fourth is the shepherd's: animals go
 missing off the high pasture at night and turn up miles away, asleep and unwakeable, and the tracks
 stop in open ground. It pays badly and it sounds like a tall tale, which is why it is the one still
-there. **Reading it is an examine, not a cutscene.** The clerk's reaction to Falke's sword is two
-NPC lines. He signs.
-**If the rings run out**, the clerk is closing the shutter and lets him sign anyway with a line about
-it. **The run is pressure, never a restart** — no chapter-one failure sends the player backwards.
+there. **Reading it is an examine, not a cutscene** — `halm.job_sheet` / `_2`, the only place in the
+chapter the job is ever written down. Signing is `halm.clerk_signing`.
+**If the rings run out**, `halm.clerk_signing_late` runs instead: the clerk pretends the shutter is
+not already down and signs him anyway. **The run is pressure, never a restart** — nothing in chapter
+one sends the player backwards.
 **Encounters.** None; the town is the obstacle. **Hazard.** The clock. **Optional.** None — the
 player has one thing to do and six minutes of adrenaline to do it in.
 **Length.** 6 min including the board and the door. **Feel.** The best two minutes of the chapter so
@@ -362,10 +363,12 @@ something without ever having been a failure. Open it and finish it. Losing rest
 in a yard yesterday afternoon.** That is the chapter.
 
 ### CLIP C6 — what was on it *(2 min, panels)* — `0180_what_was_on_it`
-**Purpose.** Something visibly wrong is on the beast, and the player finds it rather than being
-shown it (an examine on the body, before the clip, is the better version — writer's call). It is not
-explained. The sheep wake. The shepherd pays: the first coin Falke earns as a hunter. Three people
-who have no answer decide to go and find one. One beat: *this is solved on paper and not solved.*
+**The player finds it first, in play.** `high_pasture.body` / `_2` is an examine on the body after
+the fight: **a ring of nine small healed holes behind the left ear.** The player walks up and looks,
+and only then does the clip run — so the chapter's last discovery is made with the stick in hand.
+**Purpose of the clip.** The three of them react to what the player already found. It is not
+explained. The sheep wake. {{SHEPHERD}} pays: the first coin {{HERO}} earns as a hunter. Three
+people who have no answer decide to go and find one. One beat: *paid on paper, not solved.*
 
 ---
 

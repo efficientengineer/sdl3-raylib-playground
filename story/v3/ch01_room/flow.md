@@ -127,6 +127,13 @@ Checked `beats.md`, `story/scenes/` and the writer's message against this flow.
   C3 `0140_supper`, C4 `0150_the_sword`, C5 `0160_the_herder`, C6 `0180_what_was_on_it`. Six files
   exist in `story/scenes/` and there is no seventh. Still open: **`story/playlist.md` `## chapter01`
   is the old twelve-scene list** — the writer's file, the writer's edit.
+  **CLOSED, same day:** the playlist is now the six clips (*The Last Job Sheet*), the old twelve are
+  deleted, `story/field/text.md` holds 80 written ids with no placeholders, and `check --all` is
+  clean. Every field id in `designer_to_writer.md` §2 exists, including `halm.job_sheet`,
+  `halm.clerk_signing_late` (assumption 5, covered), `high_pasture.boss_break` and
+  `high_pasture.boss_turn`. The writer added `high_pasture.body`, which is better than what I asked
+  for: the ring of nine healed holes is **found by the player in play**, and C6 is the three of them
+  reacting. Folded into the spine. `{{MACHINE}}` is withdrawn — "machine" stays plain English.
 - **Nothing a scene says contradicts what the player did.** Two checked closely:
   `0150_the_sword`'s "lost forty-one times" is **Ottilie's running count out loud, not a retry
   counter** — the player loses about eight times across day two's four sessions (`chapter01.md` P4)

@@ -10,17 +10,22 @@ Renaming anything is a one-line edit here. Tokens are UPPER_SNAKE.
 
 | Token | Current name | What it is |
 |---|---|---|
-| `{{HERO}}` | Falke | Hunter's apprentice, seventeen. Given his first sword by his teacher. Has an introduction he doesn't know about. |
+| `{{HERO}}` | Falke | Hunter's apprentice, seventeen. Loses to his teacher's last training machine until he stops swinging at it. Given his first sword by his teacher, which is what lets him sign for a job. |
 | `{{HEALER}}` | Ottilie | Apprentice healer, twenty-three. Lives next door to {{MENTOR}}, alone since she was nine. Wants people she chooses to be family. |
 | `{{FATHER}}` | Rabe | {{HERO}}'s father. Hunter, carried the water out with {{MENTOR}} for twenty years, died on that road eleven years ago. Never appears on screen. |
 | `{{SCHOLAR}}` | Frage | One of eight people alive who read any of the ancients' language, and the worst of them. Joins chapter two. |
 | `{{THIEF}}` | Elster | Thief, small, loud. Sends money home to a sister a caretaker keeps alive. Joins chapter two. |
-| `{{MENTOR}}` | Hart | The old hunter, now the town's engineer. Bad knee, a workshop, a yard full of training dummies he built. |
+| `{{MENTOR}}` | Hart | The old hunter, now the town's engineer. Bad knee, a workshop, a yard full of training machines he built. His part in chapter one ends at the sword. |
 | `{{RIVAL}}` | Stolz | Nineteen, better, right about it. Takes the lord's coin in chapter one. |
 | `{{VILLAIN}}` | Durst | The young lord in the west. Bought a caretaker, had the {{SECOND_MOON}} moved, and is walking to {{THE_DOOR}}. |
 | `{{VILLAGER_1}}` | Bleibe | Woman by the square in {{HOME_TOWN}}. Her sister went west; she stayed. Minor. |
 | `{{VILLAGER_2}}` | Wagen | Kept the carters' horses in {{HOME_TOWN}} and has no work now the convoy is gone. Minor. |
 | `{{TOWN_HEALER}}` | Linde | The healer of {{HOME_TOWN}}, sixty. Took {{HEALER}} in at nine and has taught her since; decides when she gets full standing. |
+| `{{HERDER}}` | Distel | The young night herder, fourteen. Raised {{BEAST_NAME}} from a pup and came down the mountain after him alone. Joins the party at the end of chapter one. |
+| `{{HERDER_PEOPLE}}` | Mohn | One of the night herding people of the high country: small, large-eyed, awake at night. Known to the world; never seen in {{HOME_TOWN}} until now. |
+| `{{HERDER_PEOPLE_PL}}` | Mohnen | Plural of `{{HERDER_PEOPLE}}`. |
+| `{{SHEPHERD}}` | Garbe | Keeps sheep on the high pasture above {{HOME_TOWN}}. Put up the job sheet no one would take, and pays {{HERO}} his first coin. |
+| `{{HIGH_PASTURE}}` | *(descriptive)* | high pasture — the grazing ground on the hill above {{HOME_TOWN}}, an hour's walk up past the last wall. |
 | `{{HOME_TOWN}}` | Halm | Nine streets, a grain yard, a well. Where the hero starts. |
 | `{{CARETAKER}}` | *(unnamed yet)* | One of the people the ancients made. Few left, all old. Took the water at the {{STAIR}} for generations; bought and taken west before chapter one. |
 | `{{STAIR}}` | *(descriptive)* | A staircase the width of a town, down out of the cloud, stopping thirty feet above an empty field. The ancients' work nearest {{HOME_TOWN}}. |
@@ -55,6 +60,15 @@ long descriptions.
 | `{{CAVE_CREATURE_PL}}` | knuckles | Plural of `{{CAVE_CREATURE}}`. |
 | `{{SHRINE_CREATURE}}` | sitter | Knee-high grey thing in a ring round the shrine ground. Cannot be fought and nothing crosses it. |
 | `{{SHRINE_CREATURE_PL}}` | sitters | Plural of `{{SHRINE_CREATURE}}`. |
+| `{{GUARD_BEAST}}` | drover | The {{HERDER_PEOPLE_PL}}' guard animal: shaggy, long-backed, walks a flock together and puts it to sleep. Chapter one's boss is one gone wrong. |
+| `{{GUARD_BEAST_PL}}` | drovers | Plural of `{{GUARD_BEAST}}`. |
+| `{{BEAST_NAME}}` | Klee | {{HERDER}}'s own {{GUARD_BEAST}}, raised from a pup. The one she is tracking. |
+| `{{HILL_CREATURE}}` | burr | Bristled ball the size of a fist that rides your leg up the hill path and slows you down. |
+| `{{HILL_CREATURE_PL}}` | burrs | Plural of `{{HILL_CREATURE}}`. |
+| `{{NIGHT_CREATURE}}` | lantern | Slow pale light out on the night pasture that pulls whoever looks at it a step closer. |
+| `{{NIGHT_CREATURE_PL}}` | lanterns | Plural of `{{NIGHT_CREATURE}}`. |
+| `{{PASTURE_CREATURE}}` | fleece | White woolly thing standing among the sleeping sheep that is not a sheep until it moves. |
+| `{{PASTURE_CREATURE_PL}}` | fleeces | Plural of `{{PASTURE_CREATURE}}`. |
 | `{{LOOT_TEACHING_FIND}}` | weight | Chapter one's teaching find, off the grain scales. Doubles one character's attack. |
 | `{{LOOT_YARD}}` | brace | Tin under {{MENTOR}}'s eaves. The wearer cannot be held, wrapped or knocked down. |
 | `{{LOOT_ROAD}}` | tooth | In the {{THIEF_CREATURE_PL}}' hoard under the broken culvert. Critical chance. |
@@ -84,13 +98,23 @@ repeats the fact he just heard back as a question before he reacts to it. Never 
 > plain: "He walked out here every year for thirty years and sat under this step."
 > loud: "Never once? Not one job, ever?"
 
-**{{HEALER}}** — *Energy: easy, teasing, precise questions, rare exclamations that land.* The older
-kid next door: relaxed, warm, never condescending, and she teases {{HERO}} the way you tease someone
-you have known since he was small. Complete sentences, few contractions when she is correcting
-somebody, and she corrects the number or the date rather than the point. Talks about what she will
-have to patch up afterwards. Never raises her voice twice in a scene, and never says what she wants.
-> plain: "He left it the year he died, then. Eleven years under a rock."
-> loud: "Do you know he has never once asked me to come anywhere?"
+**{{HEALER}}** — *Energy: loose, teasing, warm; precise about numbers and nothing else.* The older
+cool neighbour, twenty-three to his seventeen. **Contractions always** — she is the least formal
+person in the chapter and a line like "I cannot look at a wrist you are holding" is wrong for her;
+she says "Put the wrist down, I can't look at it." She teases {{HERO}} the way you tease somebody you
+have known since he was small, counts his losses out loud for fun, and says the frightening thing in
+the same easy tone as the joke. Her worry arrives disguised as a tease. She never says what she
+wants, and she gets out of any moment that is about her by making it about him.
+> plain: "That's four times this week. I've got a running total, you know."
+> loud: "Falke — put it down! You're bleeding on my bandage!"
+
+**{{HERDER}}** — *Energy: blunt, literal, unsoftened.* She has never talked to a human before today,
+so she has no politeness and no idiom at all. She answers the question that was actually asked and
+stops. She states her own feelings as plain facts and keeps going — "I'm going to cry soon. Walk." —
+and she asks about human things as flatly as she answers. Short declaratives, contractions, no
+greetings, no thanks, no hedging. She says animals' names the way other people say people's names.
+> plain: "I raised him. He knew me in the dark. He doesn't now."
+> loud: "Don't kill him! He's mine!"
 
 **{{MENTOR}}** — *Energy: orders and grumbles.* Never asks a question. Fragments with the subject
 dropped off the front. Four or five words where most people use twelve. Says "again" and means do it
@@ -125,9 +149,11 @@ Never says thank you.
 
 ## Rename note
 
-The year's offering was called "the bread" and "the loaf" in earlier drafts; it is now a sealed jar of
-water from {{HOME_TOWN}}'s own well, carried unopened. The father's cloth under the shelf was cut.
-Grep the v3 files for "bread", "loaf" and "cloth" and expect zero hits outside this note.
+The jar of well water, the water run and the road west were the first draft's chapter one and were cut
+whole (BRAINSTORM, 2026-09-21: "no sunk cost"). Chapter one is now the shepherd's job sheet and the
+{{GUARD_BEAST}}. {{FATHER}}, {{STAIR}}, {{SECOND_MOON}}, {{CARETAKER}}, {{THE_DOOR}}, {{SEA_WALL}},
+{{VILLAIN}} and {{DRY_CITY}} are kept because `PREMISE.md` still uses them; none of them appears in
+chapter one, and none of them is canon until it is on screen (D23).
 
 ## Rules
 

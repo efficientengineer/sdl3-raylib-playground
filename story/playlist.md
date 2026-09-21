@@ -6,37 +6,24 @@ safe to list scenes whose art is not generated yet.
 
 ## intro
 
-What plays on the phone **today**, in chapter order: every talk scene, plus the two panel scenes whose
-sheets are already cut (`0110`, `0150`). Those two sheets are stale — they were drawn before the Hart
-redesign and before {{HERO}} had a sword on his back — and are queued for regeneration; they are here
-because a stale picture plays better than a black screen while the new sheets are made. `0101`, `0107` and `0170` are left out on purpose: `0101` and `0107` have no art at all and `0170` has three new
-panels, so `export` would skip them and warn. Add each one to this list the moment its sheet is cut.
+What plays on the phone **today**. Chapter one was rewritten on 2026-09-21 (*The Last Job Sheet*) and
+every panel scene's art is new and not yet generated, so `export` would skip the panel scenes and
+warn. Until the sheets are cut, the intro is the two **talk** scenes, which need no art. Add each
+panel scene to this list the moment its sheet is cut: `0110`, `0150`, `0160`, `0180`.
 
-- 0102_the_errand
-- 0103_the_counter
-- 0104_the_table
-- 0105_the_night
-- 0110_the_board
-- 0120_what_the_road_is
-- 0130_asking_her
-- 0150_the_road_west
-- 0160_the_fire
+- 0130_the_counter
+- 0140_supper
 
 ## chapter01
 
-*The Jar Run* — 12 scenes, one per clip of `story/v3/chapter01.md`. Five panel scenes (`0101`, `0107`,
-`0110`, `0150`, `0170`) and seven talk scenes. Maps in order: hart_yard, hart_yard, halm, hart_yard,
-hart_yard, hart_yard, halm, hart_yard, hart_yard, bridge, ridge_camp, stair_shrine.
+*The Last Job Sheet* — six clips, matching the six slots in `story/v3/ch01_room/flow.md`. Four panel
+scenes (`0110`, `0150`, `0160`, `0180`) and two talk scenes (`0130`, `0140`). Everything else the
+chapter used to say in a box is now a field line in `story/field/text.md`. Maps in order: hart_yard,
+halm, hart_yard, hart_yard, high_pasture, high_pasture.
 
-- 0101_the_dummies
-- 0102_the_errand
-- 0103_the_counter
-- 0104_the_table
-- 0105_the_night
-- 0107_the_sword
-- 0110_the_board
-- 0120_what_the_road_is
-- 0130_asking_her
-- 0150_the_road_west
-- 0160_the_fire
-- 0170_the_jar
+- 0110_the_yard
+- 0130_the_counter
+- 0140_supper
+- 0150_the_sword
+- 0160_the_herder
+- 0180_what_was_on_it

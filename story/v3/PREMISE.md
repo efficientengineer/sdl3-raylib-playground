@@ -33,11 +33,12 @@ those are the same thing.
 
 ## {{HERO}} — hunter's apprentice, seventeen
 
-Short, broad, red-haired, carrying the first sword his teacher made him. His father was the best hunter in town, died
-on a job no one will describe to him, and for twenty years carried the year's water out to the
-{{STAIR}} and sat under it talking to the woman who lives there.
-{{HERO}} has no gift and no destiny. What he has, and does not know he has, is an introduction.
-**Wants:** to be a real hunter, so that people stop saying his father's name before his.
+Short, broad, red-haired, carrying the first sword his teacher made him. He has no gift, no destiny
+and no knack for the workshop, and he loses to the last of {{MENTOR}}'s training machines every day
+for four years because the only thing he knows how to do is hit a thing as hard as he can. He beats
+it the day he is too tired to swing and has to wait instead. His first kill is an animal that
+belonged to somebody, killed to save her, and he is not proud of it.
+**Wants:** to be a real hunter, signed for in the book, with his own name in it.
 
 ## {{HEALER}} — healer, twenty-three
 
@@ -45,22 +46,36 @@ Tall, pale-gold hair, a gold sun medallion, a mace she is better with than she a
 the house next door to {{MENTOR}}'s and has lived in it on her own since she was nine, when a fever
 took her mother and her father in one winter. She tried to close it herself and was not strong
 enough; {{TOWN_HEALER}}, the healer of {{HOME_TOWN}}, saw what a nine-year-old had managed and came
-and got her. She has kept herself going since — the older kid next door, six years ahead of
-{{HERO}}, relaxed, capable, teasing, never condescending, and the first person who ever told him to
-his face that he would be good.
+and got her. {{TOWN_HEALER}}, the healer of {{HOME_TOWN}}, came and got her. She has been fine ever since — the
+older cool neighbour, six years ahead of {{HERO}}, relaxed, funny, warm, never formal, and the first
+person who ever told him to his face that he would be good.
 
-She is an **apprentice** healer, not a finished one. Small hurts she closes in a minute; anything big
-takes everything she has and then she has to sit down, and that is the gap the player watches close
-over the game. {{TOWN_HEALER}} gives full standing after a season of work away from home, and
-{{HEALER}} has never been further than the bridge in her life. That is why the water run is hers to
-want, and she wants it for herself before {{HERO}} ever opens his mouth.
+**She is good at her work today** (owner, 2026-09-21). The child who could not save her parents is
+backstory and nothing else: it says why she became a healer and it is said once, lightly, by somebody
+else. It is not a limit she carries around. She closes a wrist in a moment while teasing the patient
+and thinks nothing of it, and magic in this valley does light work for everybody, not just for her.
+She is an **apprentice** in standing only: {{TOWN_HEALER}} hands over full standing after a season's
+work outside the valley, and {{HEALER}} has never been further than the bridge — a formality she has
+not got round to, which is why walking up the hill with {{HERO}} suits her.
 
 **Wants:** people she chooses to be her family. She never says it. It is in the behaviour: she is
 always already there, she sits on the wall between the houses instead of knocking, she eats at
 {{MENTOR}}'s table most nights, she has {{HERO}}'s bandages rolled before he knows he is going
-anywhere, and when he finally asks her to come west her yes is instant and she covers it with a joke.
-Being asked matters because being asked means being chosen. Her own family is one plain fact, said
-once, by somebody else; she is the warm steady one and she is never tragic about it.
+anywhere, when he finally asks her to come her yes is instant and she covers it with a joke, and at
+the end of chapter one she takes a bereaved fourteen-year-old along without asking anyone, including
+the fourteen-year-old. Being asked matters because being asked means being chosen. Her own family is
+one plain fact, said once, by somebody else; she is the warm steady one and she is never tragic.
+
+## {{HERDER}} — night herder, fourteen (joins at the end of chapter one)
+
+One of the {{HERDER_PEOPLE_PL}}, the night herding people of the high country: small, huge dark eyes,
+awake after dark and half asleep in daylight. Everyone in the valley has heard of her people in a
+saying or a song and no one in {{HOME_TOWN}} has ever seen one. She raised {{BEAST_NAME}}, a
+{{GUARD_BEAST}}, from a pup, and came down the mountain alone when he ran. She is blunt, literal and
+completely unpolished, because {{HERO}} and {{HEALER}} are the first humans she has spoken to.
+{{HERO}} kills {{BEAST_NAME}} to save her, so she is rescued and bereaved in one minute.
+**Wants:** to find out what was done to her animal. A {{GUARD_BEAST}} does not forget his handler,
+and there is a ring of nine healed holes behind his ear that she has never seen before.
 
 ## {{SCHOLAR}} — reads a third of their marks (joins chapter two)
 
