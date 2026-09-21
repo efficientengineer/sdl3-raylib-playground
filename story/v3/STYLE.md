@@ -224,7 +224,7 @@ arrow reversed, throw the reveal out and find a third answer — a date, a proce
 an unfinished piece of admin. The building in chapter one is not hostile and not protective; it is
 doing a headcount from a day in the distant past and cannot close it.
 
-### The model-default story (forbidden by name, from `story/v4/DIFF.md` §4)
+### The model-default story (forbidden by name; derived from the retired `story/v4/DIFF.md` §4, deleted by D24 and in the `legacy-final` tag)
 ```
 BAN: the words "engine", "tower", "switch", "hum", "hatch", "crawler", "terrace", "console"
 BAN: the terraced valley home; the floor hatch; the blue stair; the crawler tutorial

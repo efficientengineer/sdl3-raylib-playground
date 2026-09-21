@@ -22,7 +22,7 @@ public functions and what it may import. Read that before the code.
 | change image reading, writing or resampling | `png.py` |
 | change a palette, a light table or a colour cycle | `palette.py`, `palette_fit.py`, `colormap.py`, and `PALETTE.md` |
 | change the tileset atlas or a mask | `tset.py` (where and how big), `masks.py` (the boundary), `atlas.py` (the cut and the cell) |
-| change a map rule | `tmap.py` (validate), `tmapview.py` (render), and `TILES.md` |
+| change a map rule | `tmap.py` (validate), `tmapview.py` (render), and `WORLD.md` §3-4 |
 | change what examine text may say | `fieldtext.py`, and the `BAN:` lists in `story/v3/STYLE.md` / `SMELLS.md`, which it reads |
 | change the generated headers | `export.py` and the struct in `src/` that reads them |
 

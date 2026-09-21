@@ -1,8 +1,15 @@
 # SMELLS — what four models and one draft all reached for
 
 Five versions of the same two scenes, written blind from the same brief:
-**W1–W4** = `variants/writer1–4.md`, **CH** = the two clips in `chapter01.md`
+**W1–W4** = `variants/writer1–4.md`, **CH** = the two clips then in `chapter01.md`
 (*The Board* and *The Axe on the Wall*).
+
+> **This file is EVIDENCE, not current story.** It was written against a draft that has since been
+> replaced: `variants/` was deleted by D24, `chapter01.md` is now *The High Pasture*, and the cast
+> quoted below under its old names (Bron, Dorn, Lyra, Cray) is now {{HERO}}, {{MENTOR}}, {{HEALER}},
+> {{RIVAL}} — see `story/v3/NAMES.md`. What is still live is the **`BAN:` list in §3**, which
+> `storytool/fieldtext.py` reads. The same lines are also listed in `story/v3/STYLE.md`; **the list
+> here is the source** and STYLE.md's copy is a convenience — change both together or neither.
 
 The premise: anything two or more of them found independently was not found. It was retrieved.
 The list below is the retrieval index.

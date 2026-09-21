@@ -1,13 +1,31 @@
 # CLAUDE.md
 
-SDL3 + OpenGL playground that is now one game: a Phantasy Star IV style JRPG in a **voxel world with
-billboard sprites**, written and built **one chapter at a time**. C11 own code, C++ deps allowed.
+## What this project is
 
-## Two rules that override everything
+A Phantasy Star IV style JRPG on SDL3 + OpenGL, built **one chapter at a time**. You walk around a
+**voxel world with billboard sprites** (`src/voxfield.cpp`), talk in dialogue boxes, watch manga-page
+cutscenes, and fight **turn-based battles whose twist is an effort slider** — every action is spent
+at effort 1-5 against a stamina bar (`story/v3/COMBAT.md`, `src/battle.cpp`). Chapter one is
+*The High Pasture*. Terrain and buildings need **no drawn art** — the engine generates them from
+`.tmap` text maps — so the only art is what moves or reads as a character, and it comes from ChatGPT
+through **the art tray** (`story/packages/`). **The phone is the target**; the Mac is where it is
+tested. C11 own code, C++ deps allowed.
 
-- **TARGET: Android.** Build and deploy to the phone only; don't build desktop.
-- **Nothing is pushed to the phone unless the owner asks** (D22). The Mac runs it, **muted**. There
-  is no session polling loop and no automatic `fast_reload.sh`.
+## Standing rules (they override everything)
+
+- **TARGET: Android.** Build and deploy to the phone only; don't build desktop for shipping.
+- **Nothing is pushed to the phone unless the owner asks in that moment** (D22). No session polling
+  loop, no automatic `fast_reload.sh`. Test on the Mac (`./run_desktop.sh`, `./capture.sh`).
+- **Every Mac run of the game is a test run and is muted** (`STAR_MUTE`; the scripts force it).
+- **Agents never commit and never deploy.** The owner/orchestrator makes every commit.
+- **One agent per file.** Conflicts and tool complaints go in `story/notes/<agent>.md`; the
+  orchestrator rules on them in `story/DECISIONS.md`.
+- **No sunk cost.** When the idea changes, rebuild from the new idea — don't preserve old work for
+  its own sake. Nothing is kept as "legacy": deleted work lives in the `legacy-final` git tag (D24).
+- **Brainstorm before dispatch.** A chapter is talked through with the owner in
+  `story/v3/BRAINSTORM.md` first; agents are spawned only after the owner says write.
+- **The story is written as we go** (D23). **Canon is only what is on screen in a finished chapter**,
+  plus `story/v3/NAMES.md`. `PREMISE.md` is a pool of ideas, not a schedule.
 
 ## The game
 
@@ -52,10 +70,12 @@ writer pass when the owner says write → a cold read by an agent who knows noth
 good in its own scene. `story/v3/THREADS.md` is the short list of what finished chapters have
 promised the player. **Art, maps and generators are built only for chapters that are written.**
 
-Chapter one is *The Last Job Sheet*: `story/v3/chapter01.md` (the spine — what the player does),
+Chapter one is *The High Pasture*: `story/v3/chapter01.md` (the spine — what the player does),
 `story/scenes/01*.md` (six scenes — what anyone says), `story/v3/chapter01_script.md`,
-`BESTIARY.md`, `LOOT.md`, `COMBAT.md`, and `story/field/text.md` (what the world says when you look
-at it).
+`story/v3/ch01_room/` (the slot contract and the designer's brief), `BESTIARY.md`, `LOOT.md`,
+`COMBAT.md`, and `story/field/text.md` (what the world says when you look at it).
+`src/chapter01.h` is the spine turned into a table of steps and flags — **hand-written**, not
+generated; it is the one file that knows the chapter's shape.
 
 **Everything is tokenised.** Every proper noun in story text is `{{TOKEN}}`, speaker labels included;
 `story/v3/NAMES.md` says what each is called this week and every command substitutes before it uses
@@ -113,6 +133,10 @@ Five kinds of package and nothing else:
 ./story_prompt.py palette build | apply | check | colormap
 ./tools/arttray/run.sh [--selftest]  # the Mac GUI; --selftest prints one PASS/FAIL line
 tools/script/golden.py record|diff   # the tool's own contract: every command's output, hashed
+./run_desktop.sh                    # play it on the Mac, muted, reading story/ directly
+./capture.sh --vox <map>            # one rendered frame to build_desktop/, no phone
+./capture.sh --vox-selftest | --vox-walktest [map] | --chapter-selftest | --battle-selftest
+./perf.sh [map] | --desktop | --watch   # the A/B benchmark (src/VOXFIELD_NOTES.md, "Performance")
 ./deploy.sh                         # android APK -> phone (only when the owner asks)
 ./fast_reload.sh                    # hot reload libgame_logic.so (~0.7s; only when the owner asks)
 ./compile_shaders.sh                # GLSL 450 -> SPIR-V -> glsl330, glsl300es, msl, hlsl
@@ -183,23 +207,39 @@ garbage input, not an ImGui bug. If it crashes on load, suspect `files/save.dat`
 reject a mismatched size, never "migrate" by copying bytes. Verify a fix by **launch**, not by
 compile: `$ADB shell pidof com.playground.sdlraylib` still returns a pid ten seconds later.
 
-## Index
+## The entry map — one task, one place to look
 
-- `src/` — `star_logic.cpp` the game, `voxfield.cpp` the world, `battle.cpp` combat, `host.cpp`
-  window/GL/hot reload; `cutscene_data.h`, `field_text.h`, `chapter01.h` generated
-- `story/` — `STYLE.md`, `characters.md` (chapter one's cast), `playlist.md`, `scenes/`, `panels/`,
-  `refs/`, `portraits/` (generated), `packages/` (the tray), `sheets/` (archived returns),
-  `palette/`, `v3/` (the live story: NAMES, PREMISE, THREADS, BRAINSTORM, chapter01*, BESTIARY,
-  LOOT, COMBAT, STYLE, SMELLS), `notes/` (kept agent reports), `DECISIONS.md`
-- `story/field/` — `sprites.md` + `sprites/` (billboards), `walkers.md` + `walkers/` (NPC walk
-  sheets), `tmaps/` (the maps), `tilesets/valley/` (terrain ids, atlas, decals — frozen),
-  `text.md` (what the world says), `manifest.md` (generated)
-- `story_prompt.py` — the entry point, and a shim. The tool is the `storytool/` package: one
-  responsibility a module, each with a docstring saying what it owns and what it must never do.
-  **`storytool/README.md` is the map** — it has a "where do I look to change X" table and the
-  import graph. Never grow a module past ~600 lines; split it and update that README.
-- `tools/script/golden.py` — the refactor contract: runs every command in a throwaway copy of the
-  repo and hashes everything it wrote. Take the before/after pair back to back (other agents edit
-  `story/` while you work) and require `IDENTICAL`
-- `tools/arttray/` — the Mac GUI over the tray
-- `shaders/`, `assets/`, `third_party/`, `android/`
+Find your row. Don't read the whole repo. ⚠ = over ~1500 lines and being split; read only the
+section you need (each has a banner comment), never top to bottom.
+
+| I want to… | Touch | Explained in |
+|---|---|---|
+| change dialogue in a cutscene | `story/scenes/01NN_*.md`, then `./story_prompt.py export` | `story/STYLE.md`, `story/v3/STYLE.md` |
+| change what the world says when examined | `story/field/text.md`, then `export` | `WORLD.md` §3 |
+| rename anything | `story/v3/NAMES.md` (one row), then `./story_prompt.py names` | `story/v3/NAMES.md` |
+| add or edit a map | `story/field/tmaps/<map>.tmap`, then `tmap check` + `tmap preview` | `WORLD.md` §3-4 |
+| change the chapter's order, flags or goals | `src/chapter01.h` (one row of `CH_STEPS`) | `story/v3/chapter01.md` |
+| add an enemy | `story/v3/BESTIARY.md`, a `fight` trigger in a `.tmap`, `src/battle.cpp` ⚠ | `story/v3/COMBAT.md` |
+| fix a battle bug | `src/battle.cpp` ⚠ / `src/battle.h`; `./capture.sh --battle-selftest` | `story/v3/COMBAT.md` |
+| change a combat number | `story/v3/COMBAT.md` **first** (it is the source), then `src/battle.cpp` ⚠ | `story/v3/COMBAT.md` |
+| fix a world/movement/render bug | `src/voxfield.cpp` ⚠; `./capture.sh --vox-selftest`, `--vox-walktest` | `src/VOXFIELD_NOTES.md` |
+| change a palette table or light | `story/palette/**` via `./story_prompt.py palette build \| colormap` — never by hand | `PALETTE.md` |
+| generate art | `./story_prompt.py packages` → the folder → `returned.png` → `ingest` | `story/packages/README.md` |
+| add a billboard sprite | `story/field/sprites.md`, then `packages` + `ingest` | `WORLD.md` §2 |
+| change a composition rule | `storytool/rules.py` **and** `story/STYLE.md` together | `storytool/README.md` |
+| change the tool | the module named in `storytool/README.md`'s table | `storytool/README.md` |
+| play it on the Mac | `./run_desktop.sh` (muted), `./capture.sh --vox halm` | `capture.sh` header |
+| run every test | `./story_prompt.py check --all`; `./capture.sh --vox-selftest`, `--vox-walktest all`, `--chapter-selftest`, `--battle-selftest`; `tools/script/golden.py record\|diff` | this file |
+| profile | `./perf.sh [map]`, Dev panel → Perf HUD | `src/VOXFIELD_NOTES.md` |
+| put it on the phone (**only when asked**) | `./fast_reload.sh`, or `./deploy.sh` for `host.cpp`/`game_api.h` | *Hot reload*, above |
+
+Where things live: `src/` (`star_logic.cpp` ⚠ the game shell, `voxfield.cpp` ⚠ the world,
+`battle.cpp` ⚠ combat, `host.cpp` window/GL/hot reload, `chapter01.h` the chapter table;
+`cutscene_data.h` and `field_text.h` are **generated** by `export`) · `story/` (`STYLE.md`,
+`characters.md`, `playlist.md`, `scenes/`, `panels/`, `refs/`, `portraits/` and `packages/` the
+tray, `sheets/` archived returns, `palette/`, `v3/` the live story, `notes/`, `DECISIONS.md`) ·
+`story/field/` (`sprites.md`+`sprites/`, `walkers.md`+`walkers/`, `tmaps/`, `tilesets/valley/`
+frozen, `text.md`, `manifest.md` generated) · `story_prompt.py` is a shim over the `storytool/`
+package — **`storytool/README.md` is its map**; no module past ~600 lines · `tools/arttray/` the Mac
+GUI, `tools/script/golden.py` the tool's refactor contract (require `IDENTICAL`, take the
+before/after pair back to back) · `shaders/`, `assets/`, `third_party/`, `android/`.
