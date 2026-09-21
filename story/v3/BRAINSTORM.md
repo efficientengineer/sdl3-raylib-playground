@@ -160,6 +160,20 @@ gathered with their night herd; the "monster" is their herd beast; two peoples s
 unknowingly) — orchestrator's pick; B tall folk of the wood; C burrow people (traders, a door in the
 pasture; good recurring shopkeepers). All names as tokens.
 
+**Owner on the peoples (2026-09-21):** "A is ok but why wouldn't we have seen them before now? I like
+the race for C too, might want to add them in later." Orchestrator's answer (owner not yet confirmed):
+the night herders are KNOWN, like Motavians — a high-country people above the tree line, seen in Halm
+once a year at the autumn market, everyone knows they herd by night with sleep; they never come this
+low, so nobody thinks of them. The hunt's discovery is that they HAVE come down — a family hiding by
+day on Halm's low pasture with their flock and guard beast; the sheep were swept up with theirs.
+Something drove them off the high ground; we don't need to know what yet. Fight the guard beast in the
+dark (parry), then someone small steps between.
+
+## Later pool (liked, not placed)
+
+- The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
+  pasture, sharp at bargaining; natural rival-and-friend for Hart; good recurring shopkeepers.
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
