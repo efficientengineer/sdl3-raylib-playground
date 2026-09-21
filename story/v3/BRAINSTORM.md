@@ -228,6 +228,20 @@ has to sit down", "strength she will build", the carter who died under her hands
 only (standing is the town healer's to give). "Magic only does light work" is a world rule for
 everyone, not her flaw. (The orchestrator's earlier lines above that say otherwise are void.)
 
+## Owner's notes on draft 2 (reading in progress, 2026-09-21) — HOLD for one revision pass
+
+"So far, there's too much text and exposition I'd say. I know we need some, but it's a bit much. I don't
+like that Ottilie tells Falke what to do, it's not her domain. She just thinks it's funny he's getting
+whomped. Also, why wouldn't Falke know her family died? That's a big oversight."
+→ (1) Cut scenes hard (22–31 lines now; aim ~10–14): rules shown by what happens, no line explaining
+what the player just saw or did. (2) Ottilie does NOT coach or call swings (that was the orchestrator's
+idea) — she enjoys the show, no tips; the machine's visible tell + stamina drain teach the parry; the
+realisation is Falke's and the player's alone; the designer's hint system must not run through her.
+(3) Falke has always known her family died (neighbours all his life) — nobody tells HIM; the player
+learns it from the world (her house, a townsperson, a passing reference between people who both know).
+Also pending for the same pass: the ten fixes in `story/notes/cold-read-ch01-draft2.md` (owner's notes
+win on any conflict).
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
