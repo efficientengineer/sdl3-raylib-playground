@@ -78,7 +78,7 @@ so a handle is never a common word and never a word that appears in the setting 
 - `- asymmetric: yes` (optional) — this character's design is not left-right symmetric (a sword on
   one hip, an eyepatch, a single pauldron), so their walk sheet keeps **both** side rows: 12 frames,
   rows S W E N, and the engine never mirrors them. Everybody else gets the 9-frame sheet with one
-  side row (`TILES.md`). Set it before generating the walk sheet, not after.
+  side row (`WORLD.md`). Set it before generating the walk sheet, not after.
 - `- alias: Name[, Name...]` (optional) — **display names** for a character known on screen by
   something other than their handle. A dialogue speaker equal to an alias resolves to that character:
   they get that character's portrait, their left/right side of the dialogue box, and no "not in

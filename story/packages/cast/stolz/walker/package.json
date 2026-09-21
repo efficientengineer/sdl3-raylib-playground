@@ -2,7 +2,8 @@
   "kind": "walker",
   "handle": "stolz",
   "title": "Stolz \u2014 walk sheet",
-  "makes": "`story/field/walkers/stolz.png`, the 4x4 walk sprite sheet",
+  "fingerprint": "95fef2f7a92d3696",
+  "makes": "`story/field/walkers/stolz.png`, the 9-frame walk sprite sheet",
   "outputs": [
     "story/field/walkers/stolz.png"
   ],

@@ -3,6 +3,7 @@
   "handle": "stolz",
   "title": "Stolz \u2014 reference sheet",
   "ref": "story/refs/stolz.png",
+  "fingerprint": "95fef2f7a92d3696",
   "makes": "`story/refs/stolz.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/stolz.png",

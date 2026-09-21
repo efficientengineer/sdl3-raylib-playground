@@ -3,6 +3,7 @@
   "handle": "bron",
   "title": "Falke \u2014 reference sheet",
   "ref": "story/refs/bron.png",
+  "fingerprint": "c844a0f3545040f5",
   "makes": "`story/refs/bron.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/bron.png",

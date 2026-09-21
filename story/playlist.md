@@ -1,18 +1,16 @@
 # playlist.md — what the game plays, in order
 
-`./story_prompt.py export` reads this and writes `src/cutscene_data.h`. A panel scene is
-skipped (with a warning) until every one of its panels exists in `story/panels/`, so it is
-safe to list scenes whose art is not generated yet.
+`./story_prompt.py export` reads this and writes `src/cutscene_data.h`. **The game plays
+chapters**: New Game runs the first `## chapterNN` list from its first scene. There is no `## intro`
+list any more — the chapter is the intro.
 
-## intro
+A panel scene with no art yet is **exported anyway**, every panel a placeholder box carrying that
+panel's one-line description, so a chapter plays end to end while its shot sheets are being drawn.
+`export` warns about each one; it never drops a scene.
 
-What plays on the phone **today**. Chapter one was rewritten on 2026-09-21 (*The Last Job Sheet*) and
-every panel scene's art is new and not yet generated, so `export` would skip the panel scenes and
-warn. Until the sheets are cut, the intro is the two **talk** scenes, which need no art. Add each
-panel scene to this list the moment its sheet is cut: `0110`, `0150`, `0160`, `0180`.
-
-- 0130_the_counter
-- 0140_supper
+This file is also the tool's definition of what counts: a scene file in `story/scenes/` that no list
+here names is a draft — no package, no count, no export — and a `scene` trigger in a `.tmap` may
+only name a scene listed here.
 
 ## chapter01
 

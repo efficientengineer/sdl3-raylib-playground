@@ -3,6 +3,7 @@
   "handle": "hart",
   "title": "Hart \u2014 reference sheet",
   "ref": "story/refs/hart.png",
+  "fingerprint": "0a4f6ef77407581b",
   "makes": "`story/refs/hart.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/hart.png",

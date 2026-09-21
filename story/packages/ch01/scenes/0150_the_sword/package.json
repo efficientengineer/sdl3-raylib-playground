@@ -1,0 +1,18 @@
+{
+  "kind": "sheet",
+  "scene": "0150_the_sword",
+  "title": "0150_the_sword \u2014 shot sheet",
+  "fingerprint": "d572405e0a7eebd2",
+  "makes": "8 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0150_the_sword_p1_establishing_wide.png",
+    "story/panels/0150_the_sword_p2_portrait_inset.png",
+    "story/panels/0150_the_sword_p3_over_shoulder.png",
+    "story/panels/0150_the_sword_p4_eyes_slit.png",
+    "story/panels/0150_the_sword_p5_impact.png",
+    "story/panels/0150_the_sword_p6_profile_flat.png",
+    "story/panels/0150_the_sword_p7_full_body_reveal.png",
+    "story/panels/0150_the_sword_p8_object_insert.png"
+  ],
+  "dir": "story/packages/ch01/scenes/0150_the_sword"
+}

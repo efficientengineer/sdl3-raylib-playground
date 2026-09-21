@@ -2,6 +2,7 @@
   "kind": "expressions",
   "handle": "hart",
   "title": "Hart \u2014 expression sheet",
+  "fingerprint": "0a4f6ef77407581b",
   "makes": "10 dialogue-box faces in `story/portraits/`",
   "outputs": [
     "story/portraits/hart_neutral.png",

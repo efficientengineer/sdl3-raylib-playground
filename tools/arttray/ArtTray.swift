@@ -1416,8 +1416,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 enum SelfTest {
     static var failures = 0
+    static var checksRun = 0
+    static var packageCount = -1
 
     static func check(_ ok: Bool, _ what: String) {
+        checksRun += 1
         if ok {
             print("  ok    \(what)")
         } else {
@@ -1427,6 +1430,7 @@ enum SelfTest {
     }
 
     static func equal<T: Equatable>(_ got: T, _ want: T, _ what: String) {
+        checksRun += 1
         if got == want {
             print("  ok    \(what)")
         } else {
@@ -1646,6 +1650,7 @@ enum SelfTest {
         if let root = Repo.discover(arguments: CommandLine.arguments, defaults: .standard) {
             let repo = Repo(root: root)
             let packages = repo.scanPackages()
+            packageCount = packages.count
             print("  note  repository \(root.path): \(packages.count) package(s)")
             check(!packages.isEmpty, "the repository has packages")
             check(packages.allSatisfy { !$0.meta.kind.isEmpty }, "every package.json has a kind")
@@ -1662,7 +1667,12 @@ enum SelfTest {
             print("  note  no repository found from here; skipped the live checks")
         }
 
-        print(failures == 0 ? "\nall checks passed" : "\n\(failures) check(s) failed")
+        // One line a script or a human can read at a glance: the verdict, how much was checked and
+        // how many packages the tray actually holds.
+        let tray = packageCount < 0 ? "no repository found" : "\(packageCount) packages in the tray"
+        print(failures == 0
+              ? "\nPASS — \(checksRun) checks, 0 failed, \(tray)"
+              : "\nFAIL — \(checksRun) checks, \(failures) failed, \(tray)")
         return failures == 0 ? 0 : 1
     }
 }

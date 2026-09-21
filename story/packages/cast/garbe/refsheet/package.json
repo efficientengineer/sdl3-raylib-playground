@@ -3,6 +3,7 @@
   "handle": "garbe",
   "title": "Garbe \u2014 reference sheet",
   "ref": "story/refs/garbe.png",
+  "fingerprint": "cad7622c71785855",
   "makes": "`story/refs/garbe.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/garbe.png",

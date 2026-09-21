@@ -1,0 +1,17 @@
+{
+  "kind": "sheet",
+  "scene": "0180_what_was_on_it",
+  "title": "0180_what_was_on_it \u2014 shot sheet",
+  "fingerprint": "a779b1f22d85562c",
+  "makes": "7 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0180_what_was_on_it_p1_high_angle_down.png",
+    "story/panels/0180_what_was_on_it_p2_object_insert.png",
+    "story/panels/0180_what_was_on_it_p3_full_body_reveal.png",
+    "story/panels/0180_what_was_on_it_p4_portrait_inset.png",
+    "story/panels/0180_what_was_on_it_p5_establishing_tall.png",
+    "story/panels/0180_what_was_on_it_p6_two_shot.png",
+    "story/panels/0180_what_was_on_it_p7_object_insert.png"
+  ],
+  "dir": "story/packages/ch01/scenes/0180_what_was_on_it"
+}

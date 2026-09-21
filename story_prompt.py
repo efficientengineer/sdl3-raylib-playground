@@ -1,102 +1,74 @@
 #!/usr/bin/env python3
-"""Story scene -> image prompt builder. Enforces story/STYLE.md.
+"""Story scene -> image prompt builder, and the art tray. Enforces story/STYLE.md.
 
   ./story_prompt.py shots                      list the shot menu
-  ./story_prompt.py check  story/scenes/*.md   validate scenes against the rules
+  ./story_prompt.py check  story/scenes/*.md | --all
+                                               validate scenes; --all also checks story/field/text.md,
+                                               every .tmap and the palette
   ./story_prompt.py brief  ["next beat"]       print a brief for an LLM to write the next scene file
+  ./story_prompt.py names                      the {{TOKEN}} table from story/v3/NAMES.md, and every token
+                                               used in the story that has no row in it (exit 1 if any)
+  ./story_prompt.py stats [--all]              per chapter: scenes by type, panels, lines, panel art
 
-  ChatGPT path (reference images, one shot sheet per generation, sliced into panels):
-  ./story_prompt.py refsheet Bron              write story/out/ref_bron.chatgpt.md (character reference sheet)
-  ./story_prompt.py sheet  story/scenes/001_x.md [more scenes]
-                                               write story/out/<name>.chatgpt.md + .sheet.json (max 6 panels)
-  ./story_prompt.py slice  story/out/<name>.sheet.json downloaded.png [--trim N] [--boxes "x,y,w,h;..."]
-                                               cut the sheet into story/panels/<scene>_pN_<shot>.png
+  THE LOOP: ./story_prompt.py packages -> open a folder -> generate -> save returned.png -> ingest.
+  ./story_prompt.py packages [--all]           (re)build story/packages/, the art tray: five kinds and
+                                               nothing else — cast/<name>/refsheet|expressions|walker,
+                                               chNN/sprites, chNN/scenes/<scene>. Each folder holds
+                                               prompt.md, sheet.json, template.png and RETURN_HERE.md,
+                                               and README.md is the ordered to-do with a status a row
+  ./story_prompt.py ingest [folder] [--force] [--fringe N] [--debug]
+                                               cut every returned.png waiting in the tray, and stamp
+                                               each package with the inputs it was cut from, so a later
+                                               edit to a `look` line or a scene shows the art as STALE
 
-  ./story_prompt.py portraits                  cut each character's reference sheet down to story/portraits/<name>.png
-                                               (the middle head-and-shoulders panel; shipped as portrait_<name>.png)
-  ./story_prompt.py expressions Bron [more]    the EXPRESSION SHEET: one template of ten numbered
-                                               head-and-shoulders slots (neutral, smile, laugh,
-                                               biglaugh, concern, sorrow, annoyed, angry, shock,
+  The pieces underneath, for driving one package by hand:
+  ./story_prompt.py refsheet Bron              a character reference sheet package
+  ./story_prompt.py expressions Bron [more]    ten numbered head-and-shoulders slots (neutral, smile,
+                                               laugh, biglaugh, concern, sorrow, annoyed, angry, shock,
                                                resolve) -> story/portraits/<name>_<id>.png, shipped as
-                                               portrait_<name>_<id>.png. A dialogue line picks one with
-                                               '- Bron (biglaugh): text'; the line may be textless.
-
-  Field art (parked paths; the tile field below is the live one): the tool draws the sheet's layout
-  itself as a template PNG, ChatGPT only fills
-  the numbered slots, and cutting needs no border detection because the boxes are in the package JSON.
-  ./story_prompt.py tiles  grass dirt water    story/out/tiles_....template.png + .chatgpt.md + .sheet.json
-  ./story_prompt.py props  well cart sign      slots sized by each prop's footprint in map cells
+                                               portrait_<name>_<id>.png. A line picks one with
+                                               '- Bron (biglaugh): text'; the line may be textless
+  ./story_prompt.py portraits                  cut each reference sheet's middle panel to story/portraits/
   ./story_prompt.py walker Bron [more names]   the 9-frame walk sheet (rows S, side, N; columns stand,
                                                step-A, step-B) at 128x192; up to 3 characters a sheet
-  ./story_prompt.py walker compact [<id>...]   an old 16-frame sheet -> the 9-frame one, and the dE
-                                               between its E row and a mirror of its W row
-  ./story_prompt.py building house_a           three slots a building: the front wall, a wall sample, a
-                                               roof sample -> story/field/buildings/<id>_{front,side,roof}.png
-  ./story_prompt.py screen halm square         (parked, see the tile field below) ChatGPT paints a map screen
-                                               from story/field/screens.md and the game is fitted to it —
-                                               one painting, two binary masks, one chat, three messages ->
-                                               story/field/screens/<map>_<zone>.screen for the engine
-  ./story_prompt.py view   halm square         paint the engine's block-out of one camera zone (the older path):
-                                               story/field/views/<map>_<zone>.png -> ..._paint.png
-  Tile field (TILES.md, D18/D20) — THE FIELD: 32x32 tiles, an atlas, grid walking. Under TILES2 a
-  terrain is one seamless SWATCH and its edges are GENERATED 1-bit masks, not art; a DECAL is a
-  cut-out the game hash-scatters over the ground. `tileset` writes masks.png and the swatch, decal
-  and stamp packages; `tmap preview` renders a map that way on the Mac.
-  ./story_prompt.py tileset valley             read story/field/tilesets/valley/tiles.md, assign any missing
-                                               atlas index, and write one template sheet package per sheet
-                                               under story/packages/tilesets/valley/<sheet>/ (slots at 4x:
-                                               a tile is a 128-px slot, a 4x3 stamp a 512x384 one)
+  ./story_prompt.py walker compact [<id>...]   an old 16-frame sheet -> the 9-frame one
+  ./story_prompt.py sprites burr klee [more]   THE VOXEL WORLD'S BILLBOARDS (WORLD.md): slots sized by
+                                               each entry's footprint in story/field/sprites.md, one slot
+                                               a frame -> story/field/sprites/<id>.png (+ .json when it
+                                               has frames). The ground, walls and houses need no art
+  ./story_prompt.py sheet  story/scenes/001_x.md [more scenes]
+                                               a shot sheet package (max 6 panels)
+  ./story_prompt.py slice  <sheet.json> downloaded.png [--trim N] [--boxes "x,y,w,h;..."]
+                                               cut a shot sheet into story/panels/<scene>_pN_<shot>.png
+  ./story_prompt.py cut    <sheet.json> downloaded.png [--fringe N]
+                                               cut a TEMPLATE sheet: key the magenta, localise each slot,
+                                               write the files ('slice' redirects here when it is one)
+  ./story_prompt.py preview story/scenes/003_x.md
+                                               story/out/<scene>.preview.html: the panels layered manga
+                                               style and revealed line by line (placeholders if not cut)
+
   ./story_prompt.py tmap check   halm | --all  validate story/field/tmaps/<map>.tmap against its tileset
   ./story_prompt.py tmap preview halm          render it from the atlas -> story/out/<map>.tmap.png
 
-  ./story_prompt.py cut    story/out/<name>.sheet.json downloaded.png [--fringe N]
-                                               key the magenta (--fringe N shaves N more pixels off the
-                                               edge), cut the slots, write story/field/tiles|props|walkers/
-                                               and regenerate story/field/manifest.md ('slice' redirects here).
-                                               A tileset sheet takes --palette N (quantise the sheet) and
-                                               --no-heal (leave a ground tile's wrap alone).
-
-  ./story_prompt.py preview story/scenes/003_x.md
-                                               write story/out/<scene>.preview.html: panels layered manga-style and
-                                               revealed line by line with a dialogue box (placeholders if not sliced yet)
-
-  ./story_prompt.py export                     write src/cutscene_data.h from story/playlist.md, and
-                                               src/field_text.h from story/field/text.md, for the game
-                                               (scenes whose panels are not all generated yet are skipped)
+  ./story_prompt.py export                     write src/cutscene_data.h from story/playlist.md (every
+                                               '## chapterNN' list; a panel scene with no art exports as
+                                               placeholder boxes carrying each panel's description), and
+                                               src/field_text.h from story/field/text.md
 
   Palette (PALETTE.md, D19) — 256 colours, one byte a pixel, and lighting as table rows.
   ./story_prompt.py palette build              fit story/palette/master.* to the raw returns in
                                                story/sheets + story/refs (cutscene panels excluded:
                                                they get their own palette per scene at slice time),
                                                then the colormap and cycles.md
-  ./story_prompt.py palette apply <files> [--palette master|<hex>]
-                                               convert anything by hand to an indexed PNG
+  ./story_prompt.py palette apply <files> [--palette master|<hex>]     convert by hand
   ./story_prompt.py palette check              every shipped image is indexed and holds only its own
                                                palette (also run by `check --all`)
-  ./story_prompt.py palette colormap           story/palette/colormap.png + .json: day/dusk/night/
-                                               flash/poison/stone x 32 light levels
-
-  ./story_prompt.py names                    the {{TOKEN}} table from story/v3/NAMES.md, and every token
-                                               used in the story that has no row in it (exit 1 if any)
-
-  ./story_prompt.py stats [--all]              per chapter: scenes by type, panels, dialogue lines, optional
-                                               scenes, panel art; then totals and the one-off NPC speakers
-  ./story_prompt.py packages [--all]           build story/packages/ as a folder tree, by chapter and map:
-                                               cast/<name>/refsheet|walker, chNN/<map>/tiles|props|scenes/<scene>,
-                                               each with prompt.md, sheet.json, template.png, RETURN_HERE.md
-                                               and a README index (one failing scene does not stop the run)
-  ./story_prompt.py ingest [folder] [--force] [--fringe N] [--debug]
-                                               cut every image saved as returned.png in story/packages/:
-                                               shot sheets into panels, templates into tiles/props/walkers,
-                                               a reference sheet into story/refs/ plus its portrait
+  ./story_prompt.py palette colormap           story/palette/colormap.png + .json
 
   stats and packages consider the scenes story/playlist.md names; --all takes story/scenes/ as it stands.
 
 Scene types (the '- type:' meta line): panels (default, manga page), narration (text over
 black), talk (dialogue box over black or a dimmed backdrop panel, with speaker portraits).
-
-  Single finished page (generators without reference images):
-  ./story_prompt.py build  story/scenes/001_x.md | --all    write story/out/001_x.prompt.txt + .json
 
 Style text, shots, and shapes are parsed from story/STYLE.md; character looks from
 story/characters.md. Nothing stylistic is hard-coded here except the rule thresholds
@@ -105,9 +77,15 @@ below, which mirror the "Composition rules" section of STYLE.md. Keep the two in
 Names are tokens (DECISIONS.md D13): the story text says {{HERO}}, story/v3/NAMES.md says what
 {{HERO}} is called this week, and every command substitutes before it uses the text, so the game
 and ChatGPT only ever see real names and a rename is one line. The files stay tokenised.
+
+The retired systems (tiles, props, buildings, painted screens, painted views, the tileset package
+generator, the single-page `build` mode) went on 2026-09-21 with the field designs that needed them:
+DECISIONS.md D24, and the `legacy-final` git tag. The tileset CUTTER stays, so the valley atlas can
+still be re-cut from story/sheets/ if the palette is refitted.
 Stdlib only.
 """
 import bisect
+import hashlib
 import json
 import math
 import random
@@ -120,7 +98,10 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent / "story"
-STYLE, CAST, PLOT = ROOT / "STYLE.md", ROOT / "characters.md", ROOT / "plot.md"
+STYLE, CAST = ROOT / "STYLE.md", ROOT / "characters.md"
+# The story state used to be one story/plot.md. Under D23 the chapter is written as a whole,
+# so the state a scene writer needs is the live chapter file plus the open threads.
+STATE_FILES = (ROOT / "v3" / "THREADS.md", ROOT / "v3" / "BRAINSTORM.md")
 SCENES, OUT, PANELS = ROOT / "scenes", ROOT / "out", ROOT / "panels"
 PORTRAITS = ROOT / "portraits"                      # generated by `portraits` from story/refs/
 SHEETS = ROOT / "sheets"                            # every raw generation, kept so a sheet can be re-cut
@@ -181,11 +162,9 @@ SHEET_MAX_PANELS = 8
 SHAPE_ASPECT = {"wide": 2.0, "tall": 0.5, "square": 1.0, "slit": 4.0}   # width / height
 SCENE_KINDS = ("panels", "narration", "talk")  # order = CsKind enum in the game
 PORTRAIT_TRIM = 0.022         # fraction of the panel's short side shaved off, to lose the white border
-PORTRAIT_H = 288              # a portrait ships this tall, aspect kept (tools/sizes/REPORT.md: the
+PORTRAIT_H = 288              # a portrait ships this tall, aspect kept (WORLD.md, "Sizes": the
                               # dialogue box draws it about 206 px tall on the phone and 275 at
                               # 1440p, so a ~850-px source was four times the size it is ever shown)
-ROW_CAPACITY = 4.0            # max summed aspect per row
-ROW_MIN_ASPECT = 2.0          # a lone small panel does not get a giant row
 BLACK_MAX = 40                # a pixel is background if max(r,g,b) <= this
 GRID = 4                      # slicer works on a 1/GRID downsample, then refines
 MIN_PANEL_AREA = 0.012        # ignore specks smaller than this fraction of the image
@@ -344,7 +323,7 @@ def names_table():
 
 # Files whose text is tokenised. Everything here is substituted when it is consumed, never rewritten.
 def tokenised_files():
-    out = (sorted(SCENES.glob("*.md")) + [CAST, PLOT, ROOT / "playlist.md", FIELD_TEXT]
+    out = (sorted(SCENES.glob("*.md")) + [CAST, ROOT / "playlist.md", FIELD_TEXT] + list(STATE_FILES)
            + list(FIELD_DOCS.values()))
     return [p for p in out if p.exists()]
 
@@ -829,32 +808,6 @@ def scene_context(scene, span=""):
     return out
 
 
-def assemble(scene, style, cast):
-    b, shots, shapes = style["blocks"], style["shots"], style["shapes"]
-    meta, panels = scene["meta"], scene["panels"]
-    present = []
-    for _, desc in panels:
-        for c in names_in(desc, cast):
-            if c not in present:
-                present.append(c)
-    lines = [b["header"], "", f"SUBJECT: {scene['title']}."] + scene_context(scene)
-    lines += ["", f"LAYOUT: Exactly {len(panels)} panels. {b['layout']}", "", "PANELS:"]
-    for n, ((sid, desc), notes) in enumerate(zip(panels, acting_for(scene, cast)), 1):
-        lines.append(f"Panel {n}, {shapes[shots[sid]['shape']]}: {panel_text(style, cast, sid, desc, notes)}")
-    if present:
-        lines += ["", "CHARACTERS, drawn identically in every panel they appear in:"]
-        lines += [f"- {cast[c]['look']}" for c in present]
-    lines += ["", b["acting"],
-              "", f"CAMERA AND FRAMING: {b['framing']}",
-              "", f"CHARACTER DESIGN: {b['character_design']}",
-              "", f"RENDERING: {b['rendering']}", ""]
-    if meta.get("dialogue_box", "no").lower() in ("yes", "true", "1"):
-        lines.append(f"DIALOGUE BOX: {b['dialogue_box']}")
-    else:
-        lines.append("No dialogue box. No text anywhere in the image.")
-    return "\n".join(lines), b["negative"]
-
-
 def scene_paths(args):
     if "--all" in args:
         return sorted(p for p in SCENES.glob("*.md") if not p.stem.startswith("000"))
@@ -867,7 +820,7 @@ def scene_paths(args):
     return paths
 
 
-def cmd_check_build(args, build):
+def cmd_check(args):
     style, cast = load_style(), load_cast()
     failed = 0
     for path in scene_paths(args):
@@ -880,30 +833,11 @@ def cmd_check_build(args, build):
             for e in err:
                 print(f"{path.name}: ERROR: {e}", file=sys.stderr)
             continue
-        if not build:
-            pg = len(set(scene["pages"])) if scene["panels"] else 0
-            what = f"{len(scene['panels'])} panels" if scene["kind"] == "panels" else \
-                   f"{scene['kind']}, {len(scene['dialogue'])} lines"
-            print(f"{path.name}: ok ({what}" + (f", {pg} pages)" if pg > 1 else ")"))
-            continue
-        if scene["talk"]:
-            print(f"{path.name}: skipped, a talk scene has no panels to draw. Its only art is the optional "
-                  f"'- backdrop:' panel, which belongs to another scene.", file=sys.stderr)
-            continue
-        if len(set(scene["pages"])) > 1:
-            print(f"{path.name}: skipped, 'build' draws one finished page and this scene has several. Use 'sheet'.", file=sys.stderr)
-            continue
-        prompt, negative = assemble(scene, style, cast)
-        OUT.mkdir(exist_ok=True)
-        txt = OUT / f"{scene['stem']}.prompt.txt"
-        txt.write_text(f"{prompt}\n\n--- NEGATIVE ---\n{negative}\n")
-        (OUT / f"{scene['stem']}.json").write_text(json.dumps({
-            "scene": scene["stem"], "title": scene["title"], "prompt": prompt, "negative": negative,
-            "panels": [{"shot": s, "content": d} for s, d in scene["panels"]],
-            "dialogue": [{"speaker": w, "line": l} for w, l in scene["dialogue"]],
-        }, indent=2) + "\n")
-        print(f"{path.name}: wrote {txt.relative_to(ROOT.parent)}")
-    if not build and "--all" in args:                    # the field's examine text answers to the same rules
+        pg = len(set(scene["pages"])) if scene["panels"] else 0
+        what = f"{len(scene['panels'])} panels" if scene["kind"] == "panels" else \
+               f"{scene['kind']}, {len(scene['dialogue'])} lines"
+        print(f"{path.name}: ok ({what}" + (f", {pg} pages)" if pg > 1 else ")"))
+    if "--all" in args:                    # the field's examine text answers to the same rules
         err, warn = check_field_text()
         for w in warn:
             print(f"warning: {w}", file=sys.stderr)
@@ -938,13 +872,16 @@ def cmd_shots():
 def cmd_brief(args):
     style = load_style()
     load_cast()
-    plot = PLOT.read_text() if PLOT.exists() else ""
+    plot = "\n\n".join(f"## From {p.relative_to(ROOT.parent)}\n\n{p.read_text().strip()}"
+                        for p in STATE_FILES if p.exists())
     beat = " ".join(args).strip()
     if not beat:
-        m = re.search(r"^## Next beat\s*\n(.+?)(?=^## |\Z)", plot, flags=re.M | re.S)
+        m = re.search(r"^#+ Next beat\s*\n(.+?)(?=^#+ |\Z)", plot, flags=re.M | re.S)
         beat = squash(m.group(1)) if m else ""
     if not beat:
-        die("no beat given and plot.md has no '## Next beat'")
+        die("no beat given, and no '## Next beat' heading in "
+            + " or ".join(str(p.relative_to(ROOT.parent)) for p in STATE_FILES)
+            + ". Pass the beat as an argument: ./story_prompt.py brief \"<what happens>\"")
     done = sorted(p for p in SCENES.glob("*.md") if not p.stem.startswith("000"))
     nums = [int(m.group(1)) for p in done if (m := re.match(r"(\d+)", p.stem))]
     nxt = (max(nums) + 1) if nums else 1
@@ -998,8 +935,8 @@ dimmed behind the conversation. Talk scenes take no '[n]' reveal tags and need n
 # Most recent scenes (for continuity; vary the camera from these)
 {recent}
 
-After the scene validates with `./story_prompt.py build`, update story/plot.md: append the beat
-to "Beats so far", revise "Open threads", write a new "Next beat", and update any changed
+After the scene validates with `./story_prompt.py check story/scenes/<file>`, add it to its chapter
+list in story/playlist.md, revise the open threads in story/v3/THREADS.md, and update any changed
 character status in story/characters.md.""")
 
 
@@ -1888,7 +1825,7 @@ def run_quiet(fn, args):
 
 # ───────────────────────── Field art: template sheets (tiles, props, walkers) ─────────────────────────
 #
-# The template sheet, from FIELD.md: the tool does not ask ChatGPT to invent a layout. It draws the
+# The template sheet: the tool does not ask ChatGPT to invent a layout. It draws the
 # sheet itself — a flat magenta (props, walkers) or black (tiles) canvas with white-bordered slots and
 # a painted number beside each — and the prompt says "fill slot 1 with ..., keep the borders and the
 # numbers exactly where they are, draw nothing outside a slot". Cutting the returned image needs no
@@ -1898,25 +1835,27 @@ def run_quiet(fn, args):
 # takes the pixels inside the border, and a digit drawn inside would end up baked into the tile.
 
 FIELD = ROOT / "field"
-FIELD_DIRS = {"tile": FIELD / "tiles", "prop": FIELD / "props", "walker": FIELD / "walkers",
-              "building": FIELD / "buildings"}
-FIELD_DOCS = {"tile": FIELD / "tiles.md", "prop": FIELD / "props.md", "walker": FIELD / "walkers.md",
-              "building": FIELD / "buildings.md"}
+FIELD_DIRS = {"walker": FIELD / "walkers", "sprite": FIELD / "sprites"}
+FIELD_DOCS = {"walker": FIELD / "walkers.md", "sprite": FIELD / "sprites.md"}
 FIELD_MANIFEST = FIELD / "manifest.md"
 FIELD_TEXT = FIELD / "text.md"        # examine text: '## <map>.<id>' -> one or two sentences
-VIEWS = FIELD / "views"               # <map>_<zone>.png = the engine's block-out; _paint.png = the painting
-VIEW_SIZES = ((1280, 720), (640, 360))   # what the engine captures; anything else is a warning
-VIEW_ATTACH_MAX = 6                   # prop and building cuts attached alongside the capture
 V3_STYLE, SMELLS = ROOT / "v3" / "STYLE.md", ROOT / "v3" / "SMELLS.md"   # the BAN: lists
 TEXT_MAX_SENTENCES = 2                # it is a box on a phone that a thumb dismisses
 TODO_RE = re.compile(r"^\[[\w.]+:\s*TODO\]$")   # a placeholder the writer has not filled yet
 FIELD_NAME_MAX = 24                   # '- name:' is drawn over the box, like a speaker name
-FIELD_KINDS = ("tiles", "props", "walker", "building")   # the four commands
-KIND_DIR = {"tiles": "tile", "props": "prop", "walker": "walker", "building": "building"}
+FIELD_KINDS = ("walker", "sprites")   # the two template commands the voxel world needs
+KIND_DIR = {"walker": "walker", "sprites": "sprite"}
 
-CELL_PX = 64                          # a map cell is 64 internal pixels (FIELD.md, "Art contract")
-TILE_PX = 64                          # every tile is 64x64 and seamless
+# Billboards (D22/D23). A still has no sidecar; a sprite with `- frames: N` writes <id>.json beside
+# the strip. The engine reads `frame` from there rather than dividing the sheet.
+SPRITE_MAX_FRAMES = 3
+SPRITE_SLOTS_MAX = 8                  # slots on one sheet. ChatGPT returns about 1.5 MP whatever it
+                                      # is asked for, so eighteen slots would give a creature 126 px
+                                      # to be drawn in and every one of them would come back mush.
+SPRITE_DEFAULT_FPS = 3
+SPRITE_LOOPS = ("pingpong", "loop")
 
+CELL_PX = 64                          # a map cell is 64 internal pixels (WORLD.md)
 # Buildings are map geometry with three textures on them, not sprites. The sizes and the mapping are
 # the engine's contract (src/FIELD_NOTES.md, "Face-texture contract"); change them there first.
 BUILDING_FACES = ("front", "side", "roof")
@@ -1929,7 +1868,7 @@ EXTRUDE_PX = 2                        # opaque colour bled outward under the tra
                                       # linear filtering never pulls black or magenta into a sprite
 WALK_W, WALK_H = 32, 48               # one walker frame in LOGICAL px (one tile wide, 1.5 tall)
 WALK_OUT_W, WALK_OUT_H = 128, 192     # ...and as stored: 4x logical, which the size study
-                                      # (tools/sizes/REPORT.md) measured as exactly the phone's
+                                      # (WORLD.md, "Sizes") measured as exactly the phone's
                                       # display size at 1440p. 256x384 was twice that in each axis.
 WALK_FOOT = 4                         # the lowest opaque row sits this far above the frame's bottom
 # The 9-frame layout (owner, 2026-09-19): rows S, side, N x columns stand, step-A, step-B. The engine
@@ -1939,14 +1878,11 @@ WALK_FOOT = 4                         # the lowest opaque row sits this far abov
 WALK_ROWS = ("S", "side", "N")
 WALK_ROWS_ASYM = ("S", "W", "E", "N")
 WALK_STEPS = ("stand", "step-A", "step-B")                   # column order
-WALK_FACINGS = ("S", "W", "E", "N")   # the old 4x4 row order, still read by `walker compact`
 WALK_OLD_STEPS = ("stand", "step-left", "stand", "step-right")
 WALK_MIN_SCALE = 4                    # frames drawn at least 4x up so ChatGPT has pixels to work with
 WALK_MAX_PER_SHEET = 3                # characters on one walk sheet. The frames would fit six, but
                                       # each needs its reference sheet attached and past three
                                       # attachments ChatGPT starts blending the designs.
-TILE_KINDS = ("ground", "wall")
-
 MAGENTA, BLACK, WHITE = (255, 0, 255), (0, 0, 0), (255, 255, 255)
 KEY_HARD = 56                         # RGB distance to magenta: at or under this the pixel is background
 #   Distance to magenta is a bad measure of how much magenta is *in* a pixel. A black outline blended
@@ -1969,13 +1905,7 @@ CUT_PAD = 2                           # extra pixels shaved off each side when c
 DIGIT_SCALE, DIGIT_GAP = 6, 8         # 3x5 digits at 6x are 18x30: they survive a regeneration
 TEMPLATE_CANVASES = ((1536, 1024, "landscape, 1536x1024"), (1024, 1536, "portrait, 1024x1536"))
 
-# Expected props and their box in map cells (W across, H tall). props.md's own '- footprint:' line wins;
-# this table is the fallback, and an id in neither gets 1x1 and a warning.
-PROP_FOOTPRINTS = {                   # houses and halls are not here: a building is geometry, see buildings.md
-    "well": (1, 2), "cart": (2, 2), "barrel": (1, 1), "practice_post": (1, 2), "fence": (2, 1),
-    "tree_a": (2, 3), "tree_b": (1, 2), "sign": (1, 2), "milestone": (1, 1),
-}
-DEFAULT_FOOTPRINT = (1, 1)
+DEFAULT_FOOTPRINT = (1, 1)            # an entry with no '- footprint: WxH' line, and a warning
 
 # A 3x5 bitmap font, drawn scaled. Slot numbers only, so digits are all it needs.
 DIGIT_FONT = {
@@ -2255,146 +2185,143 @@ def field_after(manifest, lines, makes="the files listed above"):
                             "```"])
 
 
-def cmd_tiles(args):
+def sprite_frames(i, entry, warn):
+    """(frames, fps, loop) for a sprite entry. A still is one frame and gets no sidecar json."""
+    raw = (entry.get("frames") or "1").strip()
+    if not raw.isdigit() or not 1 <= int(raw) <= SPRITE_MAX_FRAMES:
+        die(f"story/field/sprites.md: '## {i}' has '- frames: {raw}'; it must be 1 to {SPRITE_MAX_FRAMES}")
+    n = int(raw)
+    loop = (entry.get("loop") or SPRITE_LOOPS[0]).strip().lower()
+    if loop not in SPRITE_LOOPS:
+        die(f"story/field/sprites.md: '## {i}' has '- loop: {loop}'; it must be "
+            f"{' or '.join(SPRITE_LOOPS)}")
+    fps = (entry.get("fps") or str(SPRITE_DEFAULT_FPS)).strip()
+    if not fps.isdigit() or not 1 <= int(fps) <= 30:
+        die(f"story/field/sprites.md: '## {i}' has '- fps: {fps}'; it must be 1 to 30")
+    for f in range(2, n + 1):
+        if not (entry.get(f"frame{f}") or "").strip():
+            warn.append(f"'{i}' asks for {n} frames but has no '- frame{f}:' line saying what moves; "
+                        f"the prompt will describe frame {f} exactly like frame 1")
+    if n == 1 and (entry.get("loop") or entry.get("fps")):
+        warn.append(f"'{i}' is a single frame, so its '- loop:'/'- fps:' lines do nothing")
+    return n, int(fps), loop
+
+
+def sprite_meta_path(ident):
+    return FIELD_DIRS["sprite"] / f"{ident}.json"
+
+
+
+def cmd_sprites(args):
+    """The voxel world's billboards: creatures, animals and the machines, one slot per frame.
+
+    The same magenta-keyed template machinery the old `props` command used, with two differences:
+    a sprite may be several frames, and the frames of one sprite are cropped to ONE shared box so
+    they stay registered when the engine flips between them."""
     ids = [a.lower() for a in args if not a.startswith("--")]
     if not ids:
-        die("usage: tiles <id> [<id>...]   (ids come from story/field/tiles.md)")
-    entries, style, warn = field_entries(FIELD_DOCS["tile"], "tile"), load_style(), []
+        die("usage: sprites <id> [<id>...]   (ids come from story/field/sprites.md)")
+    entries, style, warn = field_entries(FIELD_DOCS["sprite"], "sprite"), load_style(), []
     ids = dedupe_ids(ids, warn)
     missing = [i for i in ids if i not in entries]
     if missing:
-        die(f"no entry in story/field/tiles.md for: {', '.join(missing)}. Add a '## <id>' with a one-line "
-            f"description and a '- kind: ground' or '- kind: wall' line.")
+        die(f"no entry in story/field/sprites.md for: {', '.join(missing)}. Add a '## <id>' with a "
+            f"one-line description and a '- footprint: WxH' line.")
+    cells, spec = [], {}
     for i in ids:
         if not entries[i]["desc"]:
-            die(f"story/field/tiles.md: '## {i}' has no description line")
-        if entries[i].get("kind", "") not in TILE_KINDS:
-            die(f"story/field/tiles.md: '## {i}' has '- kind: {entries[i].get('kind', '(none)')}'; "
-                f"use one of: {', '.join(TILE_KINDS)}")
-        check_description(entries[i]["desc"], i, "story/field/tiles.md")
-
-    W, H, label, u, boxes = layout_cells([(1, 1)] * len(ids), ids)
-    slots = [{"n": n, "id": i, "kind": entries[i]["kind"], "box": list(boxes[n - 1]),
-              "inner": list(inner_box(boxes[n - 1])), "target": [TILE_PX, TILE_PX],
-              "out": str((FIELD_DIRS["tile"] / f"{i}.png").relative_to(ROOT.parent))}
-             for n, i in enumerate(ids, 1)]
-    name = package_name("tiles", ids)
-    b = style["blocks"]
-    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
-    L = [f"Create ONE image: the attached template with all {len(ids)} numbered slots filled in. "
-         f"Canvas: {label}, the same size as the template.", b["header"], "",
-         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += ["", TEMPLATE_RULES, "",
-          "WHAT THESE ARE: ground and wall textures for a 2.5D field map, one per slot. Each slot is "
-          "filled edge to edge with its texture, right up to the white border, with no frame, no "
-          "vignette, no border of its own and no empty corner. Every tile is SEAMLESS: the right edge "
-          "continues into the left edge and the bottom edge into the top, so a floor tiled with copies "
-          "of it shows no seam and no repeating landmark. Keep the detail even: no single large feature "
-          "that the eye can count across a field, no object, no character, no shadow of anything "
-          "outside the tile. All of these tiles belong to one valley town and share one palette and one "
-          "pixel size.", "",
-          f"A ground tile is seen straight down from directly above. A wall tile is seen level from the "
-          f"front, is the face of a step in the ground, and repeats upward as well as sideways. In game "
-          f"every tile is {TILE_PX}x{TILE_PX} pixels, so keep the pixels large and the shapes simple.", "",
-          "SLOTS:"]
-    for s in slots:
-        e = entries[s["id"]]
-        view = "seen straight down from directly above" if e["kind"] == "ground" else \
-               "seen level from the front, the face of a step in the ground"
-        L.append(f"Slot {s['n']} ({s['id']}), {e['kind']} tile, {s['inner'][2]}x{s['inner'][3]} px in the "
-                 f"template: {e['desc'].rstrip('.')}. {view.capitalize()}, seamless on all four edges.")
-    L += ["", f"RENDERING: {field_rendering(b)}", "",
-          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, a border or "
-          f"frame inside a slot, a visible seam at a tile edge, one big feature in the middle of a tile, "
-          f"objects or characters, changing the size of the image"]
-    prompt = "\n".join(L)
-    template, manifest, md = write_field_package(
-        "tiles", name, label, W, H, BLACK, slots, prompt, attach, field_after(manifest_path(name), [
-            f"- [ ] All {len(ids)} slots filled, every border and number still exactly where it was",
-            "- [ ] Nothing drawn in the gutters; the black between the slots is still flat black",
-            "- [ ] Each tile fills its slot to the border, with no frame and no empty corner",
-            "- [ ] Tiling test: the left edge of a tile would meet its right edge without a seam",
-            "- [ ] No text, labels or swatches anywhere", "",
-            "If one tile fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot and "
-            "the whole template exactly as it is. <what was wrong>\"."],
-            makes=f"the {len(ids)} tile file(s) listed above"), status=field_status("tiles", slots))
-    report_field(kind_rows("tile", slots, package_label(name)), warn, md, template, f"{len(ids)} tiles, {label}")
-
-
-def cmd_props(args):
-    ids = [a.lower() for a in args if not a.startswith("--")]
-    if not ids:
-        die("usage: props <id> [<id>...]   (ids come from story/field/props.md)")
-    entries, style, warn = field_entries(FIELD_DOCS["prop"], "prop"), load_style(), []
-    ids = dedupe_ids(ids, warn)
-    missing = [i for i in ids if i not in entries]
-    if missing:
-        die(f"no entry in story/field/props.md for: {', '.join(missing)}. Add a '## <id>' with a one-line "
-            f"description and a '- footprint: WxH' line.")
-    cells = []
-    for i in ids:
-        if not entries[i]["desc"]:
-            die(f"story/field/props.md: '## {i}' has no description line")
-        check_description(entries[i]["desc"], i, "story/field/props.md")
-        cells.append(footprint_of(i, entries[i], warn))
+            die(f"story/field/sprites.md: '## {i}' has no description line")
+        check_description(entries[i]["desc"], i, "story/field/sprites.md")
+        fp = footprint_of(i, entries[i], warn)
+        n, fps, loop = sprite_frames(i, entries[i], warn)
+        spec[i] = {"footprint": fp, "frames": n, "fps": fps, "loop": loop}
+        cells += [fp] * n                            # one slot a frame, so every frame is drawn big
 
     W, H, label, u, boxes = layout_cells(cells, ids)
-    slots = [{"n": n, "id": i, "cells": list(cells[n - 1]), "box": list(boxes[n - 1]),
-              "inner": list(inner_box(boxes[n - 1])),
-              "target": [cells[n - 1][0] * CELL_PX, cells[n - 1][1] * CELL_PX],
-              "out": str((FIELD_DIRS["prop"] / f"{i}.png").relative_to(ROOT.parent))}
-             for n, i in enumerate(ids, 1)]
-    name = package_name("props", ids)
+    slots, k = [], 0
+    for i in ids:
+        s = spec[i]
+        for f in range(s["frames"]):
+            k += 1
+            slots.append({"n": k, "id": i, "frame": f, "frames": s["frames"],
+                          "cells": list(s["footprint"]), "box": list(boxes[k - 1]),
+                          "inner": list(inner_box(boxes[k - 1])),
+                          "target": [s["footprint"][0] * CELL_PX, s["footprint"][1] * CELL_PX],
+                          "fps": s["fps"], "loop": s["loop"],
+                          "out": str((FIELD_DIRS["sprite"] / f"{i}.png").relative_to(ROOT.parent))})
+    name = package_name("sprites", ids)
     b = style["blocks"]
     attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
-    L = [f"Create ONE image: the attached template with all {len(ids)} numbered slots filled in. "
+    anim = [i for i in ids if spec[i]["frames"] > 1]
+    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
          f"Canvas: {label}, the same size as the template.", b["header"], "",
          "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
     L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
     L += ["", TEMPLATE_RULES, "",
-          "WHAT THESE ARE: single objects for a 2.5D field map, one object per slot, each cut out "
-          "against the flat magenta. The magenta is not a backdrop, it is empty space: it runs right up "
-          "to the edge of the object on every side. No ground, no grass, no paving, no base plate, no "
-          "cast shadow, no glow, no scenery and no second object in a slot.", "",
-          "CAMERA, the same for every slot: a front three-quarter view from slightly above, looking "
-          "about fifty degrees down, as if all of these objects stood in one town seen from one fixed "
-          "camera. The object sits upright, centred left to right, and touches the bottom edge of its "
-          "slot, because that line is where it meets the ground in game.", "",
+          "WHAT THESE ARE: single living things and single objects for a game world, one per slot, "
+          "each cut out against the flat magenta. The magenta is not a backdrop, it is empty space: "
+          "it runs right up to the edge of the subject on every side. No ground, no grass, no "
+          "scenery, no base plate, no cast shadow, no glow, and never a second subject in a slot.", "",
+          "CAMERA, the same for every slot: seen from the front and very slightly above, at eye "
+          "level with the thing itself, as if all of these stood in one place and one camera looked "
+          "at them straight on. The subject sits upright, centred left to right, and its lowest "
+          "point touches the bottom edge of its slot, because that line is where it meets the "
+          "ground in game.", "",
           f"SCALE: a slot is a grid of map cells, {CELL_PX} pixels to the cell in game, and each slot "
-          f"below says how many cells it is. Objects share one scale across the sheet: a four-cell hall "
-          f"is four times the width of a one-cell barrel and is drawn with the same size of pixel.", "",
-          "SLOTS:"]
+          f"below says how many cells it is. Everything shares one scale across the sheet: a "
+          f"three-cell animal is three times the width of a one-cell one and is drawn with the same "
+          f"size of pixel.", ""]
+    if anim:
+        L += ["FRAMES: some of these are short animations, drawn as two or three slots in a row. "
+              "Every frame of one animation is THE SAME SUBJECT drawn again at the same size, from "
+              "the same camera, in the same place in its slot, with only the moving part changed. "
+              "Do not redesign it, do not recolour it, and do not move it up, down or sideways "
+              "between frames: the game flips between them on one spot and any drift reads as the "
+              "whole thing jumping.", ""]
+    L.append("SLOTS:")
     for s in slots:
         cw, chh = s["cells"]
-        L.append(f"Slot {s['n']} ({s['id']}), {cw} x {chh} cells, {s['inner'][2]}x{s['inner'][3]} px in the "
-                 f"template: {entries[s['id']]['desc'].rstrip('.')}. Front three-quarter view from above, "
-                 f"standing on the bottom edge of the slot, magenta on every other side.")
+        of = (f", frame {s['frame'] + 1} of {s['frames']}" if s["frames"] > 1 else "")
+        # Frame 1 is the entry's own description; frames 2 and 3 take a '- frame2:'/'- frame3:' line
+        # saying what MOVES. Without that the prompt repeats itself word for word and comes back as
+        # the same picture drawn twice, which is not an animation.
+        move = entries[s["id"]].get(f"frame{s['frame'] + 1}", "").strip()
+        note = (f" In this frame, and changing nothing else about it: {move.rstrip('.')}."
+                if move else "")
+        L.append(f"Slot {s['n']} ({s['id']}{of}), {cw} x {chh} cells, {s['inner'][2]}x{s['inner'][3]} px "
+                 f"in the template: {entries[s['id']]['desc'].rstrip('.')}.{note} Seen from the front, "
+                 f"filling the slot and standing on its bottom edge, magenta on every other side.")
     L += ["", f"RENDERING: {field_rendering(b)}", "",
-          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground or "
-          f"grass or paving under an object, a cast shadow on the magenta, a base plate or pedestal, a "
-          f"scene or background inside a slot, two objects in one slot, a soft blurred or glowing edge "
-          f"where an object meets the magenta, changing the size of the image"]
+          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, ground "
+          f"or grass under a subject, a cast shadow on the magenta, a base plate or pedestal, a "
+          f"scene or background inside a slot, two subjects in one slot, a soft blurred or glowing "
+          f"edge where a subject meets the magenta, changing the size of the image"]
     prompt = "\n".join(L)
+    check = [f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
+             "- [ ] The magenta is untouched outside the slots, and comes right up to each subject",
+             "- [ ] The edge of every subject is hard against the magenta, not soft, blurred or glowing",
+             "- [ ] No ground, shadow, base plate or scenery under or behind a subject",
+             "- [ ] Everything stands on the bottom edge of its slot and shares one camera angle",
+             "- [ ] One scale across the sheet: the big animal really is bigger than the small one"]
+    if anim:
+        check.append("- [ ] Each animation's frames are the same subject at the same size in the same "
+                     "spot, with only the moving part different")
+    check += ["", "If one sprite fails, reply in the same chat: \"Redraw only slot 2 and keep every "
+              "other slot and the whole template exactly as it is. <what was wrong>\"."]
     template, manifest, md = write_field_package(
-        "props", name, label, W, H, MAGENTA, slots, prompt, attach, field_after(manifest_path(name), [
-            f"- [ ] All {len(ids)} slots filled, every border and number still exactly where it was",
-            "- [ ] The magenta is untouched outside the slots, and comes right up to each object",
-            "- [ ] The edge of every object is hard against the magenta, not soft, blurred or glowing",
-            "- [ ] No ground, shadow, base plate or scenery under or behind an object",
-            "- [ ] Every object stands on the bottom edge of its slot and shares one camera angle",
-            "- [ ] One scale across the sheet: the big buildings really are bigger than the barrel", "",
-            "If one prop fails, reply in the same chat: \"Redraw only slot 2 and keep every other slot and "
-            "the whole template exactly as it is. <what was wrong>\"."],
-            makes=f"the {len(ids)} prop sprite(s) listed above"), status=field_status("props", slots))
-    report_field(kind_rows("prop", slots, package_label(name)), warn, md, template, f"{len(ids)} props, {label}")
+        "sprites", name, label, W, H, MAGENTA, slots, prompt, attach,
+        field_after(manifest_path(name), check, makes=f"the {len(ids)} sprite(s) listed above"),
+        status=field_status("sprites", slots))
+    report_field(kind_rows("sprite", slots, package_label(name)), warn, md, template,
+                 f"{len(ids)} sprites in {len(slots)} slots, {label}")
+
 
 
 def layout_walker(blocks):
     """The frame grid for `blocks` = [rows per character]. Three columns a character, side by side.
 
     Nine frames instead of sixteen (owner, 2026-09-19) and a frame stored at 128x192 instead of
-    256x384 (tools/sizes/REPORT.md) means a walk sheet is 384x576 — small enough that several
+    256x384 (WORLD.md, "Sizes") means a walk sheet is 384x576 — small enough that several
     characters fit one generation. They are laid out SIDE BY SIDE, each character its own block of
     three columns, because stacking them runs out of canvas height at two."""
     gutter, gap = 20, 40                  # across; the numbers sit in the gap ABOVE a slot, so the
@@ -2713,102 +2640,6 @@ def cmd_expressions(args):
         print(f"      {md.relative_to(ROOT.parent)}  — attach the template first, then paste the prompt")
 
 
-def cmd_building(args):
-    """Three slots per building: the whole front wall, a wall sample, a roof sample.
-
-    A building is not a sprite. The engine raises the box from the map and stretches the front across
-    the front wall, so the door and the windows are painted into that one square and land wherever the
-    artist put them; the side and the roof are seamless material, no openings and no landmark."""
-    ids = [a.lower() for a in args if not a.startswith("--")]
-    if not ids:
-        die("usage: building <id> [<id>...]   (ids come from story/field/buildings.md)")
-    entries, style, warn = field_entries(FIELD_DOCS["building"], "building"), load_style(), []
-    ids = dedupe_ids(ids, warn)
-    missing = [i for i in ids if i not in entries]
-    if missing:
-        die(f"no entry in story/field/buildings.md for: {', '.join(missing)}. Add a '## <id>' with a "
-            f"one-line description and a '- map:' line.")
-    for i in ids:
-        if not entries[i]["desc"]:
-            die(f"story/field/buildings.md: '## {i}' has no description line")
-        for key in ("desc", "wall", "roof"):
-            if entries[i].get(key):
-                check_description(entries[i][key], f"{i} ({key})", "story/field/buildings.md")
-
-    W, H, label, u, boxes = layout_cells([(1, 1)] * (len(ids) * 3), ids)
-    slots, n = [], 0
-    for i in ids:
-        for face in BUILDING_FACES:
-            n += 1
-            slots.append({"n": n, "id": i, "face": face, "box": list(boxes[n - 1]),
-                          "inner": list(inner_box(boxes[n - 1])), "target": list(FACE_PX[face]),
-                          "out": str((FIELD_DIRS["building"] / f"{i}_{face}.png").relative_to(ROOT.parent))})
-    name = package_name("buildings", ids)
-    b = style["blocks"]
-    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
-    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
-         f"Canvas: {label}, the same size as the template.", b["header"], "",
-         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += ["", TEMPLATE_RULES, "",
-          "WHAT THESE ARE: wall and roof textures for the buildings of a 2.5D field map. The buildings "
-          "themselves are built by the game out of flat walls and roof slopes; these slots are what "
-          "gets painted onto them. Each building has three slots in a row: its front wall, its wall "
-          "material, its roof material. Every slot is filled edge to edge, right up to the white "
-          "border, with no sky, no ground, no scenery, no frame and no empty corner.", "",
-          "THE FRONT SLOT is the whole front wall of that one building, seen square on and flat, as if "
-          "you stood in front of it and looked straight at the wall: no perspective, no corner of the "
-          "building turning away, nothing in front of it. The door and the windows are painted into it "
-          "where they belong on that wall, at the size they would really be, with the door standing on "
-          "the very bottom edge of the slot. The game stretches this square across the real width of "
-          "the wall, so draw the whole wall and nothing else: no roof above it, no ground below it, no "
-          "sky, and no margin around it.", "",
-          "THE SIDE AND ROOF SLOTS are material samples, not walls: a patch of the same stuff, filled "
-          "edge to edge, with NO door, NO window, NO opening and no single large feature the eye can "
-          "count across a building. Both are SEAMLESS: the right edge continues into the left and the "
-          "bottom into the top, because the game repeats them. The side sample is seen square on and "
-          "flat like the front; the roof sample is seen straight down from above.", "",
-          f"In game the front and side are {FACE_PX['front'][0]}x{FACE_PX['front'][1]} pixels and the "
-          f"roof is {FACE_PX['roof'][0]}x{FACE_PX['roof'][1]}, so keep the pixels large and the shapes "
-          f"simple. All of these buildings stand in one valley town and share one palette.", "",
-          "SLOTS:"]
-    for s in slots:
-        e = entries[s["id"]]
-        px = f"{s['inner'][2]}x{s['inner'][3]} px in the template"
-        if s["face"] == "front":
-            L.append(f"Slot {s['n']} ({s['id']} front), {px}: the whole front wall of this building, "
-                     f"square on and flat, door and windows included, filling the slot edge to edge. "
-                     f"The building is: {e['desc'].rstrip('.')}.")
-        elif s["face"] == "side":
-            what = e.get("wall") or e["desc"]
-            L.append(f"Slot {s['n']} ({s['id']} side), {px}: a seamless sample of this building's wall "
-                     f"material, square on and flat, with no door and no window: {what.rstrip('.')}.")
-        else:
-            what = e.get("roof") or e["desc"]
-            L.append(f"Slot {s['n']} ({s['id']} roof), {px}: a seamless sample of this building's roof "
-                     f"seen straight down from above: {what.rstrip('.')}.")
-    L += ["", f"RENDERING: {field_rendering(b)}", "",
-          f"AVOID: {b['negative']}, drawing outside a slot, moving or covering a slot number, sky or "
-          f"ground or scenery in a slot, a three-quarter or perspective view of a building, a roof "
-          f"drawn over a front wall, a door or window in a side or roof slot, a visible seam in a side "
-          f"or roof sample, a frame or margin inside a slot, changing the size of the image"]
-    prompt = "\n".join(L)
-    template, manifest, md = write_field_package(
-        "building", name, label, W, H, BLACK, slots, prompt, attach, field_after(manifest_path(name), [
-            f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
-            "- [ ] Each front is one flat wall seen square on: no corner turning away, no roof, no ground",
-            "- [ ] The door stands on the bottom edge of its front slot and is the right size for the wall",
-            "- [ ] No door, window or opening anywhere in a side or roof slot",
-            "- [ ] Side and roof samples tile: left edge would meet right, top would meet bottom",
-            "- [ ] Every slot is filled to its border, with no frame, no margin and no empty corner", "",
-            "If one slot fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot "
-            "and the whole template exactly as it is. <what was wrong>\"."],
-            makes=f"the {len(slots)} face texture(s) listed above"),
-        status=field_status("building", slots))
-    report_field(kind_rows("building", slots, package_label(name)), warn, md, template,
-                 f"{len(ids)} buildings, {len(slots)} faces, {label}")
-
-
 def dedupe_ids(ids, warn):
     out = []
     for i in ids:
@@ -2838,9 +2669,7 @@ def footprint_of(i, entry, warn):
     m = re.fullmatch(r"\s*(\d+)\s*x\s*(\d+)\s*", entry.get("footprint", ""))
     if m:
         return (int(m.group(1)), int(m.group(2)))
-    if i in PROP_FOOTPRINTS:
-        return PROP_FOOTPRINTS[i]
-    warn.append(f"'{i}' has no '- footprint: WxH' line and is not in PROP_FOOTPRINTS; "
+    warn.append(f"'{i}' has no '- footprint: WxH' line; "
                 f"drawn at {DEFAULT_FOOTPRINT[0]}x{DEFAULT_FOOTPRINT[1]} cells")
     return DEFAULT_FOOTPRINT
 
@@ -2884,33 +2713,32 @@ def read_manifest_rows():
 
 
 def field_art_exists(kind, ident):
-    """Is there a file on disk for this id? Buildings have three, and any one of them counts."""
+    """Is there a file on disk for this id?"""
     d = FIELD_DIRS.get(kind)
-    if d is None:
-        return False
-    if kind == "building":
-        return any((d / f"{ident}_{f}.png").exists() for f in BUILDING_FACES)
-    return (d / f"{ident}.png").exists()
+    return bool(d) and (d / f"{ident}.png").exists()
 
 
 def write_field_manifest(new_rows=()):
-    """Regenerate story/field/manifest.md: every id ever requested, plus every id the docs declare."""
+    """Regenerate story/field/manifest.md: every field art id, plus whether its file is on disk.
+
+    Two kinds now (D22/D23): the walkers and the billboard sprites. Tiles, props and building faces
+    left with the systems that read them. The engine does not read this file; people and agents do."""
     rows = read_manifest_rows()
     declared = []
-    tiles = field_entries(FIELD_DOCS["tile"], "tile") if FIELD_DOCS["tile"].exists() else {}
-    props = field_entries(FIELD_DOCS["prop"], "prop") if FIELD_DOCS["prop"].exists() else {}
     walkers = field_entries(FIELD_DOCS["walker"], "walker") if FIELD_DOCS["walker"].exists() else {}
-    builds = field_entries(FIELD_DOCS["building"], "building") if FIELD_DOCS["building"].exists() else {}
-    for i in tiles:
-        declared.append({"id": i, "kind": "tile", "target": f"{TILE_PX}x{TILE_PX}", "package": "-"})
-    for i, e in props.items():
-        cw, chh = footprint_of(i, e, [])
-        declared.append({"id": i, "kind": "prop", "target": f"{cw * CELL_PX}x{chh * CELL_PX}", "package": "-"})
+    try:
+        sprites = field_entries(FIELD_DOCS["sprite"], "sprite") if FIELD_DOCS["sprite"].exists() else {}
+    except SystemExit:
+        sprites = {}
     for i in walkers:
-        declared.append({"id": i, "kind": "walker", "target": f"{WALK_OUT_W * 4}x{WALK_OUT_H * 4}", "package": "-"})
-    for i in builds:
-        declared.append({"id": i, "kind": "building", "package": "-",
-                         "target": " / ".join(f"{f} {FACE_PX[f][0]}" for f in BUILDING_FACES)})
+        declared.append({"id": i, "kind": "walker", "package": "-",
+                         "target": f"{WALK_OUT_W * len(WALK_STEPS)}x{WALK_OUT_H * len(WALK_ROWS)}"})
+    for i, e in sprites.items():
+        cw, chh = footprint_of(i, e, [])
+        n = int((e.get("frames") or "1").strip() or 1)
+        declared.append({"id": i, "kind": "sprite", "package": "-",
+                         "target": f"{cw * CELL_PX * n}x{chh * CELL_PX}"
+                                   + (f" ({n} frames)" if n > 1 else "")})
     for r in declared:                                   # a declared id keeps whatever package asked for it
         key = (r["kind"], r["id"])
         r["package"] = rows.get(key, {}).get("package", "-")
@@ -2920,36 +2748,30 @@ def write_field_manifest(new_rows=()):
     live = {(r["kind"], r["id"]) for r in declared} | {(r["kind"], r["id"]) for r in new_rows}
     for key in [k for k in rows if k not in live and not field_art_exists(*k)]:
         del rows[key]                                    # an id its doc has dropped, with nothing on disk
-                                                         # (house_a was a prop before it became a building)
 
-    L = ["# story/field/manifest.md — every field art id",
-         "",
-         "Generated by `./story_prompt.py tiles|props|walker|building|cut`. The engine does not read it;",
-         "people and agents do. `package` is the last template sheet that asked for the id, `-` if none has",
-         "yet. Sizes are the target the pipeline writes; the last column is what is actually on disk.",
-         ""]
-    for kind, title, note in (("tile", "Tiles", f"{TILE_PX}x{TILE_PX}, opaque, seamless on all four edges"),
-                              ("prop", "Props", f"alpha, {CELL_PX} px to a map cell, standing on the bottom row"),
-                              ("walker", "Walkers", f"alpha, 4 rows (S, W, E, N) x 4 columns of "
-                                                    f"{WALK_OUT_W}x{WALK_OUT_H} frames"),
-                              ("building", "Buildings", "opaque faces on map geometry: front stretched once "
-                                                        "across the front wall, side and roof seamless")):
+    L = ["# story/field/manifest.md — every field art id", "",
+         "Generated by `./story_prompt.py walker|sprites|cut`. The engine does not read it; people and",
+         "agents do. `package` is the last template sheet that asked for the id, `-` if none has yet.",
+         "Sizes are the target the pipeline writes; the last column is what is actually on disk.", ""]
+    for kind, title, note in (
+            ("walker", "Walkers", f"alpha, rows {', '.join(WALK_ROWS)} x columns "
+                                  f"{', '.join(WALK_STEPS)} of {WALK_OUT_W}x{WALK_OUT_H} frames"),
+            ("sprite", "Field sprites", f"alpha billboards, {CELL_PX} px to a map cell, anchored "
+                                        f"bottom-centre; several frames become one strip plus a .json")):
         group = sorted((r for (k, _), r in rows.items() if k == kind), key=lambda r: r["id"])
-        L += [f"## {title} — {note}", "", "| id | kind | target | package | file |", "| --- | --- | --- | --- | --- |"]
+        L += [f"## {title} — {note}", "", "| id | kind | target | package | file |",
+              "| --- | --- | --- | --- | --- |"]
         for r in group:
-            if kind == "building":                       # three files to an id, so say which of them exist
-                have = [x for x in BUILDING_FACES if (FIELD_DIRS[kind] / f"{r['id']}_{x}.png").exists()]
-                state = ", ".join(have) if have else "missing"
-            else:
-                f = FIELD_DIRS[kind] / f"{r['id']}.png"
-                size = png_size(f) if f.exists() else None
-                state = f"yes, {size[0]}x{size[1]}" if size else ("yes" if f.exists() else "missing")
+            f = FIELD_DIRS[kind] / f"{r['id']}.png"
+            size = png_size(f) if f.exists() else None
+            state = f"yes, {size[0]}x{size[1]}" if size else "missing"
             L.append(f"| `{r['id']}` | {r['kind']} | {r['target']} | `{r['package']}` | {state} |")
         if not group:
             L.append("| — | | | | |")
         L.append("")
     FIELD.mkdir(parents=True, exist_ok=True)
     FIELD_MANIFEST.write_text("\n".join(L))
+
 
 
 # ── field text: what the world says when you look at it ──
@@ -3034,7 +2856,7 @@ def check_field_text():
             continue
         mp = ident.split(".")[0]
         if maps and mp not in maps:
-            warn.append(f"{where}: no story/field/maps/{mp}.map, so nothing can trigger this line")
+            warn.append(f"{where}: no story/field/tmaps/{mp}.tmap, so nothing can trigger this line")
         if not e["raw"]:
             err.append(f"{where}: no text under the heading")
             continue
@@ -3068,196 +2890,6 @@ def check_field_text():
 # The owner's direction is the Final Fantasy VIII arrangement: the game keeps the 3D block-out for
 # collision, depth and camera, and what you see is a painting laid over it. So the capture is not a
 # reference for the painter to interpret — it is the layout, and nothing in it may move.
-
-def capture_path(mp, zone):
-    return VIEWS / f"{mp}_{zone}.png"
-
-
-def paint_path(mp, zone):
-    return VIEWS / f"{mp}_{zone}_paint.png"
-
-
-def captures():
-    """[(map, zone, path)] for every block-out the engine has written, paintings excluded."""
-    out = []
-    for p in sorted(VIEWS.glob("*.png")) if VIEWS.is_dir() else []:
-        if p.stem.endswith("_paint"):
-            continue
-        maps = sorted((FIELD / "maps").glob("*.map")) if (FIELD / "maps").is_dir() else []
-        mp = next((m.stem for m in maps if p.stem.startswith(m.stem + "_")), p.stem.split("_")[0])
-        out.append((mp, p.stem[len(mp) + 1:], p))
-    return out
-
-
-def map_meta(mp):
-    """The map's '## meta' block: plain 'key: value' lines, not the '- key:' the story files use."""
-    f = FIELD / "maps" / f"{mp}.map"
-    if not f.exists():
-        return {}
-    body = h2_sections(detok(f.read_text())).get("meta", "")
-    return {m.group(1).strip().lower(): m.group(2).strip()
-            for m in re.finditer(r"^\s*([\w ]+?):\s*(.+)$", body, flags=re.M)}
-
-
-def map_places(mp):
-    """{'props': [id...], 'buildings': [id...]} actually placed on a map, most-used first."""
-    f = FIELD / "maps" / f"{mp}.map"
-    out = {"props": [], "buildings": []}
-    if not f.exists():
-        return out
-    sec = None
-    for line in f.read_text().splitlines():
-        if line.startswith("## "):
-            sec = line[3:].strip().lower()
-            continue
-        if sec not in ("props", "buildings") or not line.strip() or line.lstrip().startswith("#"):
-            continue
-        bits = line.split()
-        ident = next((b for b in bits if re.fullmatch(r"[a-z][a-z0-9_]*", b)), None)
-        if ident:
-            out[sec].append(ident)
-    for k in out:
-        seen = {}
-        for i in out[k]:
-            seen[i] = seen.get(i, 0) + 1
-        out[k] = sorted(seen, key=lambda i: (-seen[i], i))
-    return out
-
-
-def view_attachments(style, cap, mp, warn):
-    """The capture first — it is the layout — then the style, then what the map puts in the scene."""
-    out = [(cap, "THE BLOCK-OUT. This is the scene to paint, from the game's own camera. It is the "
-                 "layout, not a suggestion: every object, edge, road, wall and building stays exactly "
-                 "where it is and exactly the size it is.")]
-    sp = existing(style["refs"].get("style"))
-    if sp:
-        out.append((sp, "STYLE reference. " + style["refs"].get("style_note", "")))
-    else:
-        warn.append(f"no style reference at {style['refs'].get('style')}; the prompt text carries the style alone")
-    placed = map_places(mp)
-    for kind, ids in (("buildings", placed["buildings"]), ("props", placed["props"])):
-        for i in ids:
-            if len(out) >= VIEW_ATTACH_MAX + 2:
-                break
-            f = (FIELD_DIRS["building"] / f"{i}_front.png") if kind == "buildings" else \
-                (FIELD_DIRS["prop"] / f"{i}.png")
-            if f.exists():
-                out.append((f, f"The {i.replace('_', ' ')} as it is drawn in this game. The map puts it "
-                               f"in this scene; keep its design, colours and proportions."))
-    return out
-
-
-def map_description(mp, warn):
-    """What this place is, in the words the field docs already use for it."""
-    meta, placed = map_meta(mp), map_places(mp)
-    lines = []
-    if meta.get("landmark"):
-        lines.append(f"THE PLACE: {meta['landmark'].rstrip('.')}.")
-    docs = {k: (field_entries(FIELD_DOCS[k], k) if FIELD_DOCS[k].exists() else {})
-            for k in ("tile", "prop", "building")}
-    on_map = lambda e: mp in [slug(m) for m in (e.get("map") or "").split(",")]
-    ground = [f"{i} ({e['desc'].rstrip('.')})" for i, e in docs["tile"].items()
-              if on_map(e) and e.get("kind") == "ground"]
-    if ground:
-        lines.append("THE GROUND is made of: " + "; ".join(ground) + ".")
-    for i in placed["buildings"]:
-        e = docs["building"].get(i)
-        if e:
-            lines.append(f"BUILDING {i.replace('_', ' ')}: {e['desc'].rstrip('.')}.")
-    props = [f"{i.replace('_', ' ')} ({docs['prop'][i]['desc'].rstrip('.')})"
-             for i in placed["props"] if i in docs["prop"]]
-    if props:
-        lines.append("THE THINGS STANDING IN IT: " + "; ".join(props) + ".")
-    if not lines:
-        warn.append(f"no description for '{mp}': no story/field/maps/{mp}.map with a 'landmark:' line, "
-                    f"and nothing in tiles.md, props.md or buildings.md names the map")
-    elif len(lines) > 1:
-        lines.append("That list is what this town is made of, so a block in the picture can be read for "
-                     "what it is. Only what is actually in the block-out belongs in the painting: do not "
-                     "add a building, a tree or an object because it is named here.")
-    return lines
-
-
-def cmd_view(args):
-    """One painted background per camera zone, over the capture the engine wrote."""
-    pos = [a for a in args if not a.startswith("--")]
-    if len(pos) != 2:
-        die("usage: view <map> <zone>   (the engine writes story/field/views/<map>_<zone>.png)")
-    mp, zone = slug(pos[0]), slug(pos[1])
-    cap = capture_path(mp, zone)
-    if not cap.exists():
-        die(f"no block-out at {cap.relative_to(ROOT.parent)}. The engine captures it from the game — "
-            f"stand in the zone, use the Dev panel's capture, and pull the file — and this command paints "
-            f"over what it captured, so there is nothing to do until it exists.")
-    size = png_size(cap)
-    if not size:
-        die(f"{cap.relative_to(ROOT.parent)} is not a PNG the tool can read")
-    style, warn = load_style(), []
-    if tuple(size) not in VIEW_SIZES:
-        warn.append(f"{cap.name} is {size[0]}x{size[1]}, not one of "
-                    f"{' or '.join(f'{w}x{h}' for w, h in VIEW_SIZES)}; the painting is fitted back to "
-                    f"{size[0]}x{size[1]} whatever it is")
-    attach = view_attachments(style, cap, mp, warn)
-    b = style["blocks"]
-    L = ["Paint this exact scene. The attached image is a rough 3D block-out from the game's camera: "
-         "keep every object, edge, road, wall and building EXACTLY where it is and the same size — the "
-         "game uses this layout for collision and depth, so nothing may move — and repaint it as a "
-         "finished background.", "", b["header"], "",
-         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += [""] + map_description(mp, warn)
-    L += ["",
-          "WHAT TO CHANGE: only the surface. Flat block colours become real materials, bare boxes become "
-          "buildings with their own walls and roofs, the ground gets its grass, dirt, paving and ruts, "
-          "and the light and shadow of one time of day fall across all of it consistently. Paint in "
-          "everything a finished picture of this place would have that the block-out is too crude to "
-          "show: the grain of a wall, the wear along a road, a shutter, a hinge, a rope, a weed at the "
-          "foot of a post.", "",
-          "WHAT NOT TO CHANGE: the camera, the perspective, the frame, and the position, footprint and "
-          "height of every single thing in it. Do not move a building a few pixels to compose the shot, "
-          "do not widen a road, do not add or remove a structure, and do not crop or zoom. A player "
-          "walks this layout: anything that moves in the painting is a wall they will walk through and a "
-          "gap they will bump into.", "",
-          "NO PEOPLE, no characters, no animals: the game draws those on top as sprites, and a painted "
-          "one would stand still forever. No text, no signs with writing, no labels, no numbers, no "
-          "watermark, no user interface, no frame, no border, no vignette and no letterboxing.", "",
-          f"THE WHOLE FRAME is painted, edge to edge, 16:9, at the same size as the block-out "
-          f"({size[0]}x{size[1]}) if you can; a little smaller is fine and the tool fits it back.", "",
-          f"CAMERA AND FRAMING: {b['framing']}", "",
-          f"RENDERING: {b['rendering']}", "",
-          f"AVOID: {b['negative']}, moving anything from where the block-out puts it, changing the "
-          f"camera or the crop, people or animals, text or signs with writing, a user interface, a "
-          f"border or vignette, empty unpainted areas"]
-    prompt = "\n".join(L)
-    name = f"view_{mp}_{zone}"
-    out_file = str(paint_path(mp, zone).relative_to(ROOT.parent))
-    OUT.mkdir(exist_ok=True)
-    manifest = pkg_path(name, "sheet.json")
-    manifest.write_text(json.dumps({
-        "view": name, "kind": "view", "map": mp, "zone": zone,
-        "capture": str(cap.relative_to(ROOT.parent)), "size": list(size), "out": out_file,
-        "prompt": prompt,
-    }, indent=2) + "\n")
-    md = pkg_path(name, "chatgpt.md")
-    md.write_text(package(f"painted view {mp} / {zone}", attach, prompt, [
-        "Check the result against the block-out before accepting it — hold them side by side.", "",
-        "- [ ] Every building, wall, road edge and object is in the same place and the same size",
-        "- [ ] The camera, the crop and the horizon are unchanged",
-        "- [ ] No people, no animals, no text, no interface, no border",
-        "- [ ] Painted edge to edge, nothing left flat or unfinished",
-        "- [ ] It looks like the same world as the panels and the tiles", "",
-        "If one thing has drifted, reply in the same chat: \"The well has moved left and grown. Put it "
-        "back exactly where the block-out has it, at the same size, and keep everything else.\"", "",
-        *(return_lines(f"`{out_file}`, fitted back to {size[0]}x{size[1]}") or [
-            "When it passes, download it and fit it to the capture:", "", "```",
-            f"./story_prompt.py cut {manifest.relative_to(ROOT.parent)} ~/Downloads/<file>.png", "```"])],
-        status=[f"- block-out `{cap.relative_to(ROOT.parent)}` — **exists**, {size[0]}x{size[1]}",
-                f"- painting `{out_file}` — " + ("**exists**" if (ROOT.parent / out_file).exists()
-                                                 else "missing")]))
-    for w in warn:
-        print(f"warning: {w}", file=sys.stderr)
-    print(f"wrote {md.relative_to(ROOT.parent)}  (block-out {size[0]}x{size[1]}, {len(attach)} attachment(s))")
-
 
 def resize_box(rows, w, h, ch, nw, nh):
     """Area-average downscale. See cut_view for why this rather than nearest."""
@@ -3313,58 +2945,6 @@ def resample(rows, w, h, ch, nw, nh):
     if nw <= w and nh <= h:
         return resize_box(rows, w, h, ch, nw, nh)
     return resize_bilinear(rows, w, h, ch, nw, nh)
-
-
-def extrude_edges(px, w, h, n=EXTRUDE_PX):
-    """Bleed the colour of opaque pixels outward under the transparent ones. Alpha is not changed.
-
-    The engine filters the atlas linearly, so a texel just outside a sprite is still sampled at the
-    silhouette; if it is black or leftover magenta, that is what shows up as a dark or pink halo.
-    Giving it the colour of the art it borders makes the interpolation invisible."""
-    have = [[bool(px[y][x * 4 + 3]) for x in range(w)] for y in range(h)]
-    for _ in range(n):
-        add = []
-        for y in range(h):
-            for x in range(w):
-                if have[y][x]:
-                    continue
-                acc, k = [0, 0, 0], 0
-                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                    if 0 <= nx < w and 0 <= ny < h and have[ny][nx]:
-                        for c in range(3):
-                            acc[c] += px[ny][nx * 4 + c]
-                        k += 1
-                if k:
-                    add.append((x, y, bytes(v // k for v in acc)))
-        for x, y, c in add:
-            px[y][x * 4:x * 4 + 3] = c
-            have[y][x] = True
-    return px
-
-
-def cut_view(data, image, nearest=False):
-    """The returned painting, fitted to the block-out's exact size. (printed, written)
-
-    Box filter by default, not nearest. The painting comes back at about 1.5 MP whatever was asked
-    for, so this is a small non-integer reduction — 1620x912 to 1280x720 is 1.27x — and nearest at a
-    non-integer ratio throws away every fourth column and row. On a straight road edge or a wall that
-    has to line up with the block-out underneath, that shows as a torn staircase; averaging keeps the
-    line where the painter put it. `--nearest` is there for a painting that came back at an exact
-    integer multiple, where nearest is the crisper answer."""
-    cap = ROOT.parent / data["capture"]
-    tw, th = data["size"]
-    w, h, ch, rows = read_png(image)
-    if abs((w / h) / (tw / th) - 1) > 0.06:
-        die(f"{image.name} is {w}x{h}, the block-out is {tw}x{th}: a different shape, so the painting "
-            f"would not line up with the layout. Ask for it again at 16:9. Nothing written.")
-    px = (resize_nn(rows, w, h, ch, tw, th) if nearest else resize_box(rows, w, h, ch, tw, th))
-    if ch == 4:                                          # a background is opaque
-        px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
-    out = ROOT.parent / data["out"]
-    out.parent.mkdir(parents=True, exist_ok=True)
-    write_png(out, tw, th, 3, px)
-    print(f"{image.name}: {w}x{h} -> {out.relative_to(ROOT.parent)}  {tw}x{th} "
-          f"({'nearest' if nearest else 'box filter'}, block-out {cap.name})")
 
 
 # ── cutting a returned template ──
@@ -3977,6 +3557,66 @@ def cut_expressions(data, slots, rows, w, h, ch, sx, sy, neutral_main=False):
               "(pass --neutral-main to replace it with slot 1)")
 
 
+def cut_sprites(slots, rows, w, h, ch, sx, sy, fringe):
+    """The billboards. Like the old prop cut, with one difference that matters: the frames of ONE
+    sprite are trimmed to ONE shared box.
+
+    Trimming each frame to its own silhouette is what a prop cut does and it is exactly wrong here:
+    a creature that opens its mouth in frame two is a pixel wider there, so a per-frame trim would
+    shift every frame by a different amount and the engine's flip would read as the whole animal
+    twitching sideways. The union of the frames' bounds is taken instead, every frame is cut from
+    it, and the result is a strip of identical frames that are registered to each other."""
+    out_dir = FIELD_DIRS["sprite"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    by_id = {}
+    for s in slots:
+        by_id.setdefault(s["id"], []).append(s)
+    for ident, group in by_id.items():
+        group.sort(key=lambda s: s.get("frame", 0))
+        keyed, bounds = [], None
+        for s in group:
+            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
+            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
+            scrub_border(px, bw, bh, 4, True, max(2, int(round(2 * sx))))
+            b = opaque_bounds(px, bw, bh)
+            keyed.append((s, px, bw, bh, b))
+            if b:
+                bounds = b if bounds is None else (
+                    min(bounds[0], b[0]), min(bounds[1], b[1]),
+                    max(bounds[0] + bounds[2], b[0] + b[2]) - min(bounds[0], b[0]),
+                    max(bounds[1] + bounds[3], b[1] + b[3]) - min(bounds[1], b[1]))
+        if bounds is None:
+            print(f"  {ident}: nothing but background in {len(group)} slot(s); not written", file=sys.stderr)
+            continue
+        cx, cy, cw, chh = bounds
+        k = group[0]["target"][0] / keyed[0][2]        # the slot is the cell grid: back to 64 px a cell
+        fw, fh = max(1, round(cw * k)), max(1, round(chh * k))
+        frames = []
+        for s, px, bw, bh, _ in keyed:
+            frames.append(resize_nn(crop(px, 4, cx, cy, cw, chh), cw, chh, 4, fw, fh))
+        strip = [bytearray().join(f[y] for f in frames) for y in range(fh)]
+        sw = fw * len(frames)
+        out = ROOT.parent / group[0]["out"]
+        ship_png(out, sw, fh, 4, strip)
+        note = check_alpha(strip, sw, fh, out)
+        meta = sprite_meta_path(ident)
+        if len(frames) > 1:
+            meta.write_text(json.dumps({
+                "id": ident, "frames": len(frames), "frame": [fw, fh], "sheet": [sw, fh],
+                "footprint": list(group[0]["cells"]),
+                "fps": group[0].get("fps", SPRITE_DEFAULT_FPS),
+                "loop": group[0].get("loop", SPRITE_LOOPS[0]),
+                "anchor": "bottom-centre",
+                "note": "A billboard: no direction rows, it always faces the camera. Read `frame` "
+                        "from here rather than dividing the sheet.",
+            }, indent=2) + "\n")
+        elif meta.exists():                            # it used to animate and does not any more
+            meta.unlink()
+        print(f"  {ident}: {len(frames)} frame(s), trimmed {cw}x{chh} -> "
+              f"{out.relative_to(ROOT.parent)}  {sw}x{fh}{note}"
+              + (f"  + {meta.name}" if len(frames) > 1 else ""))
+
+
 def cmd_cut(args):
     pos, fringe, palette, it = [], 0, 0, iter(args)
     for a in it:
@@ -3988,15 +3628,11 @@ def cmd_cut(args):
             pos.append(a)
     heal, snap = "--no-heal" not in args, "--snap32" in args
     if len(pos) != 2:
-        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] [--nearest] "
+        die("usage: cut story/out/<name>.sheet.json <image> [--fringe N] "
             "[--palette N] [--no-heal] [--snap32]")
     data = json.loads(Path(pos[0]).read_text())
     image = Path(pos[1]).expanduser()
     kind = data.get("kind")
-    if kind == "view":                                   # a painting is fitted, not cut into slots
-        if not image.exists():
-            die(f"{image} not found")
-        return cut_view(data, image, "--nearest" in args)
     if kind not in FIELD_KINDS + ("tileset", "swatch", "decal", "expressions"):
         die(f"{pos[0]} is not a template package (kind '{kind}'). For a shot sheet use: story_prompt.py slice")
     if not image.exists():
@@ -4032,38 +3668,8 @@ def cmd_cut(args):
         return cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe)
     if kind == "expressions":                             # ten dialogue-box faces: opaque, like a portrait
         return cut_expressions(data, slots, rows, w, h, ch, sx, sy, "--neutral-main" in args)
-    if kind in ("tiles", "building"):                     # opaque faces: resize to the target, drop any alpha
-        FIELD_DIRS[KIND_DIR[kind]].mkdir(parents=True, exist_ok=True)
-        for s in slots:
-            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
-            tw_, th_ = s["target"]
-            px = resize_nn(crop(rows, ch, x, y, bw, bh), bw, bh, ch, tw_, th_)
-            scrub_border(px, tw_, th_, ch, False)
-            if ch == 4:
-                px = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in px]
-            out = ROOT.parent / s["out"]
-            ship_png(out, tw_, th_, 3, px)
-            what = f"{s['id']} {s['face']}" if s.get("face") else s["id"]
-            print(f"  slot {s['n']} {what}: {bw}x{bh} -> {out.relative_to(ROOT.parent)}  {tw_}x{th_}")
-    elif kind == "props":
-        FIELD_DIRS["prop"].mkdir(parents=True, exist_ok=True)
-        for s in slots:
-            x, y, bw, bh = scaled_inner(s, sx, sy, w, h)
-            px = key_magenta(crop(rows, ch, x, y, bw, bh), bw, bh, ch, fringe)
-            scrub_border(px, bw, bh, 4, True, max(2, int(round(2 * sx))))
-            bounds = opaque_bounds(px, bw, bh)
-            if not bounds:
-                print(f"  slot {s['n']} {s['id']}: nothing but background in the slot; not written", file=sys.stderr)
-                continue
-            cx, cy, cw, chh = bounds
-            px = crop(px, 4, cx, cy, cw, chh)
-            k = s["target"][0] / bw                       # the slot is the cell grid: bring it back to 64 px a cell
-            nw, nh = max(1, round(cw * k)), max(1, round(chh * k))
-            px = resize_nn(px, cw, chh, 4, nw, nh)
-            out = ROOT.parent / s["out"]
-            ship_png(out, nw, nh, 4, px)
-            print(f"  slot {s['n']} {s['id']}: {bw}x{bh} -> trimmed {cw}x{chh} -> "
-                  f"{out.relative_to(ROOT.parent)}  {nw}x{nh}{check_alpha(px, nw, nh, out)}")
+    if kind == "sprites":                                 # billboards: key, trim, one box per sprite
+        cut_sprites(slots, rows, w, h, ch, sx, sy, fringe)
     else:
         cut_walker(data, slots, rows, w, h, ch, sx, sy, fringe)
 
@@ -4077,7 +3683,7 @@ def cmd_cut(args):
 # ───────────────────────── Tile field (D18): tilesets, atlases and tmaps ─────────────────────────
 #
 # Owner's call, 2026-09-19, final: "Sega style, top down, using tile sheets, grid walking. No more
-# screen navmesh." TILES.md is the contract. The engine owns `story/field/tilesets/<set>/tiles.md`
+# screen navmesh." WORLD.md is the contract. The engine owns `story/field/tilesets/<set>/tiles.md`
 # (the names, the sizes, the solid rows, the layers); this half owns everything that turns that list
 # into art and back into an atlas.
 #
@@ -4102,17 +3708,13 @@ def cmd_cut(args):
 
 TILESETS = FIELD / "tilesets"
 TMAPS = FIELD / "tmaps"
-TSET_TILE = 32                        # a tile is 32x32 map cells' worth of design (TILES.md)
+TSET_TILE = 32                        # a tile is 32x32 map cells' worth of design
 TSET_SCALE = 4                        # ...drawn at 4x on the sheet, so one art pixel is a 4x4 block
 TSET_SLOT = TSET_TILE * TSET_SCALE    # 128: one tile's slot on a template sheet
 ATLAS_COLS = 16                       # the atlas is 16 tiles wide; index 0 is the empty tile
 TSET_CANVAS = (1536, 1024, "landscape, 1536x1024")   # one sheet, never bigger
-TSET_GREY = (56, 56, 60)              # the ground sheet's background: neutral, dark, not magenta
 TSET_LAYERS = ("ground", "object", "over")
-FRINGE_KINDS = ("edge", "corner_out", "corner_in")   # TILES.md: three fringe tiles a terrain, rotated
-FRINGE_DEPTH = 10                     # how far the bordering terrain creeps in, in the tile's 32 px
-SEAM_WARN = 24.0                      # mean per-channel difference across a ground tile's wrap: warn above
-TSET_ALPHA_CUT = 128                  # the engine alpha-tests at 0.5; a tile pixel is on or off
+FRINGE_KINDS = ("edge", "corner_out", "corner_in")   # three fringe tiles a terrain, rotated
 ATLAS_JSON = "atlas.json"
 
 # ── ground families: variants of one material, meant to be MIXED on the map ──
@@ -4152,12 +3754,6 @@ TSET_SHEET_WORDS = (
     ("nature", ("tree", "bush", "rock", "stump", "log", "flower", "grass_tuft", "reed", "cliff",
                 "boulder", "hedge", "crop", "vine", "water_", "fall")),
 )
-# Families that share a canvas. Ground and its fringes go together (they must share one palette —
-# a fringe is the same material as its ground, drawn ragged), which means one background for both:
-# magenta, with the ground slots painted edge to edge so nothing of it survives to be keyed.
-TSET_FAMILY = {"ground": "terrain", "fringes": "terrain"}
-TSET_OBJECT_FAMILIES = ("buildings", "nature", "props")
-
 
 def tileset_dir(name):
     return TILESETS / slug(name)
@@ -4177,10 +3773,6 @@ def cut_sheet_path(name, sheet):
 
 def is_fringe(name):
     return any(name.endswith("_" + k) for k in FRINGE_KINDS)
-
-
-def fringe_kind(name):
-    return next((k for k in FRINGE_KINDS if name.endswith("_" + k)), "")
 
 
 def sheet_guess(name, entry):
@@ -4212,7 +3804,7 @@ def tileset_entries(name):
     path = tileset_doc(name)
     if not path.exists():
         die(f"{path.relative_to(ROOT.parent)} not found. The engine writes it: one '## <id>' per tile "
-            f"or stamp, with '- layer:', '- solid:' and '- desc:' (see TILES.md).")
+            f"or stamp, with '- layer:', '- solid:' and '- desc:'.")
     out, unknown = {}, []
     for ident, body in h2_sections(detok(path.read_text(), unknown)).items():
         if not re.fullmatch(r"[a-z0-9_]+", ident):
@@ -4272,70 +3864,6 @@ def tileset_entries(name):
     if unknown:
         die(f"{path.name}: unknown name token(s) {', '.join('{{%s}}' % t for t in unknown)}")
     return out
-
-
-def atlas_cells(idx, w, h):
-    return [idx + ATLAS_COLS * r + c for r in range(h) for c in range(w)]
-
-
-def assign_indices(name, entries):
-    """Give every entry that has none an atlas index, and write just those lines back. [(id, index)]."""
-    used, path = {}, tileset_doc(name)
-    for e in entries.values():
-        if e["index"] is None:
-            continue
-        w, h = e["cells"]
-        if e["index"] < 1:
-            die(f"{path.name}: '## {e['id']}' has index {e['index']}; index 0 is the empty tile")
-        if e["index"] % ATLAS_COLS + w > ATLAS_COLS:
-            die(f"{path.name}: '## {e['id']}' at index {e['index']} is {w} cells wide and would wrap "
-                f"past column {ATLAS_COLS}. A stamp is one rectangle in the atlas; move it to a row start.")
-        for c in atlas_cells(e["index"], w, h):
-            if c in used:
-                die(f"{path.name}: '## {e['id']}' at index {e['index']} overlaps '## {used[c]}' at "
-                    f"atlas cell {c}. Indices already written are never moved by this tool; fix tiles.md.")
-            used[c] = e["id"]
-    fresh = []
-    for e in entries.values():                       # in file order, so a fresh file reads in order
-        if e["index"] is not None or e["kind"] == "terrain":
-            continue                                 # a terrain is a swatch sampled in world space;
-                                                     # it has no atlas cell. A DECAL does: the engine
-                                                     # draws it from the atlas like anything else.
-        w, h = e["cells"]
-        idx = 1
-        while True:
-            if idx % ATLAS_COLS + w <= ATLAS_COLS and all(c not in used for c in atlas_cells(idx, w, h)):
-                break
-            idx += 1
-        e["index"] = idx
-        for c in atlas_cells(idx, w, h):
-            used[c] = e["id"]
-        fresh.append((e["id"], idx, e["w"], e["h"], e["frames"]))
-    if fresh:
-        write_indices(path, fresh)
-    return fresh
-
-
-def write_indices(path, fresh):
-    """Insert a '- index:' line into each named entry, leaving every other byte of the file alone."""
-    lines = path.read_text().splitlines(keepends=True)
-    want = {ident: (idx, w, h) for ident, idx, w, h, _ in fresh}
-    starts = [i for i, l in enumerate(lines) if re.match(r"^## (?!#)", l)]
-    edits = []
-    for n, i in enumerate(starts):
-        ident = lines[i][3:].strip().lower()
-        if ident not in want:
-            continue
-        end = starts[n + 1] if n + 1 < len(starts) else len(lines)
-        idx, w, h = want[ident]
-        text = f"- index: {idx}" + (f" {w}x{h}" if w * h > 1 else "") + "\n"
-        at = next((j for j in range(i + 1, end) if re.match(r"^- [\w ]+?:", lines[j])), None)
-        if at is None:                               # no metadata at all: after the last non-blank line
-            at = max([j for j in range(i + 1, end) if lines[j].strip()], default=i) + 1
-        edits.append((at, text))
-    for at, text in sorted(edits, reverse=True):
-        lines.insert(at, text)
-    path.write_text("".join(lines))
 
 
 # ── laying the sheets out ──
@@ -4413,570 +3941,13 @@ class TsetSheet:
         return max((y + h for _, y, _, h in self.boxes), default=self.top) + TSET_MARGIN
 
 
-def tset_canvas_for(ids, entries):
-    """(W, H, boxes) — the smallest canvas this group packs onto, not the biggest.
-
-    ChatGPT caps what it returns at about 1.5 megapixels whatever canvas it is given, so half a blank
-    sheet is half the pixels thrown away: the twelve ground tiles on a 1536x1024 template came back
-    with a quarter of the detail they could have had. So every width from the widest down is tried and
-    the canvas is trimmed to the content; the smallest sensibly-shaped one wins, and a sheet that
-    really does need the full width (an 8x6 hall) simply keeps it."""
-    MAXW, MAXH, _ = TSET_CANVAS
-    sizes = [entries[i]["cells"] for i in ids]
-    best = None
-    for W in range(640, MAXW + 1, 64):
-        sheet = TsetSheet(W, MAXH)
-        boxes = [sheet.place(c, commit=True) for c in sizes]
-        if any(b is None for b in boxes):
-            continue
-        H = min(MAXH, sheet.used())
-        if not (0.6 <= W / H <= 2.0) and W != MAXW:
-            continue
-        if best is None or W * H < best[0] * best[1]:
-            best = (W, H, boxes)
-    if best is None:                                     # nothing shapely fits: the full sheet, as before
-        sheet = TsetSheet()
-        boxes = [sheet.place(c) for c in sizes]
-        if any(b is None for b in boxes):
-            return None
-        best = (MAXW, min(MAXH, sheet.used()), boxes)
-    return best
 
 
-def tileset_sheets(entries):
-    """{pool: [ids]} in file order. Families are merged; a '- sheet:' line keeps its own pool."""
-    by_pool = {}
-    for ident, e in entries.items():
-        if e["kind"] != "tile":                       # terrains and decals have sheets of their own
-            continue                                  # (a decal is in the atlas, but not on these)
-        if e["raw"].get("sheet"):                     # the author named a sheet: leave it alone
-            pool = slug(e["raw"]["sheet"])
-        else:
-            pool = TSET_FAMILY.get(e["sheet"], "objects")
-        by_pool.setdefault(pool, []).append(ident)
-    # Within a pool, the whole tiles before the fringes, each in file order: that is what numbers a
-    # terrain sheet's ground tiles 1-12 and its fringes 13-24, so the prompt can say so in one line.
-    return {k: sorted(v, key=lambda i: (is_fringe(i), v.index(i))) for k, v in by_pool.items()}
-
-
-def tileset_pack(ids, entries):
-    """[[ids]] split into canvas-fuls: biggest first, then the single tiles filling the gaps.
-
-    Each group comes back in the order it was placed, which is the order `tileset_slots` replays."""
-    # Tallest first, then widest, then the order the author wrote them in. Height leads because that
-    # is what the skyline has to fit round; it also leaves a sheet of same-height tiles (a terrain
-    # sheet) in file order, so the ground tiles are numbered before their fringes.
-    cells = lambda i: entries[i]["cells"]
-    order = sorted(range(len(ids)), key=lambda n: (-cells(ids[n])[1], -cells(ids[n])[0], n))
-    big = [ids[n] for n in order if entries[ids[n]]["cells"] != (1, 1)]
-    small = [ids[n] for n in order if entries[ids[n]]["cells"] == (1, 1)]
-    groups = []
-    while big or small:
-        sheet, cur = TsetSheet(), []
-        for pool in (big, small):                     # the big things first, then fill round them
-            for i in list(pool):
-                if sheet.place(entries[i]["cells"]) is not None:
-                    cur.append(i)
-                    pool.remove(i)
-        if not cur:
-            i = (big or small)[0]
-            cw, chh = entries[i]["cells"]
-            W, H, _ = TSET_CANVAS
-            die(f"'{i}' is {cw}x{chh} tiles ({cw * TSET_SLOT}x{chh * TSET_SLOT} px at {TSET_SCALE}x) "
-                f"and does not fit a {W}x{H} sheet on its own. Split the stamp or shrink it in "
-                f"tiles.md.")
-        groups.append(cur)
-    return groups
-
-
-def tileset_slots(ids, entries):
-    """(W, H, label, slots) for one sheet: the same skyline pack, trimmed, numbered in reading order."""
-    got = tset_canvas_for(ids, entries)
-    if got is None:
-        die(f"{len(ids)} slots do not fit a {TSET_CANVAS[0]}x{TSET_CANVAS[1]} sheet: "
-            + ", ".join(ids))
-    W, H, boxes = got
-    label = f"{'landscape' if W >= H else 'portrait'}, {W}x{H}"
-    placed = list(zip(ids, boxes))
-    placed.sort(key=lambda p: (p[1][1], p[1][0]))     # number them left to right, top to bottom
-    slots = []
-    for n, (i, box) in enumerate(placed, 1):
-        # The white border goes OUTSIDE the art, unlike the older field templates: a tile slot has to
-        # be exactly 4x the tile (128 px) so the returned image can be cropped and read back on the
-        # 4x4 art-pixel grid with no resampling at all.
-        inner = (box[0] + SLOT_BORDER, box[1] + SLOT_BORDER,
-                 box[2] - 2 * SLOT_BORDER, box[3] - 2 * SLOT_BORDER)
-        e = entries[i]
-        slots.append({"n": n, "id": i, "box": list(box), "inner": list(inner),
-                      "cells": list(e["cells"]), "index": e["index"], "layer": e["layer"],
-                      "frames": e["frames"], "opaque": e["opaque"],
-                      "kind": ("ground" if e["opaque"] else "fringe" if is_fringe(i) else "stamp"),
-                      "target": [e["cells"][0] * ATLAS_CELL, e["cells"][1] * ATLAS_CELL]})
-    return W, H, label, slots
-
-
-def num_ranges(nums):
-    """[1,2,3,7,9,10] -> '1-3, 7, 9-10' — how the prompt names a group of slots."""
-    out, nums = [], sorted(nums)
-    for n in nums:
-        if out and out[-1][1] == n - 1:
-            out[-1][1] = n
-        else:
-            out.append([n, n])
-    return ", ".join(str(a) if a == b else f"{a}-{b}" for a, b in out)
-
-
-FRINGE_RULE = (
-    "These are the ids ending in _edge, _corner_out and _corner_in, and they are not whole tiles: "
-    "each one is a ragged scrap of its own terrain drawn over the empty background, which the game lays on top "
-    "of the neighbouring ground so the boundary between two terrains is not a straight line. Draw "
-    f"only the terrain, never the neighbour, and let the background show through the rest:\n"
-    f"  - _edge: a band of the terrain along the NORTH edge of the slot, solid and full width at the "
-    f"very top, reaching about {FRINGE_DEPTH} of the tile's 32 pixels down at its deepest, with a "
-    f"ragged, organic, uneven southern boundary — clumps and gaps, never a straight line and never a "
-    f"repeating scallop. The bottom two thirds of the slot is background.\n"
-    f"  - _corner_out: the same terrain filling only the NORTH-EAST corner, reaching about "
-    f"{FRINGE_DEPTH} pixels in from the north edge and {FRINGE_DEPTH} pixels in from the east edge, a "
-    f"ragged quarter-round. Everything else is background.\n"
-    f"  - _corner_in: the exact inverse — the terrain fills the whole slot EXCEPT a ragged bite out of "
-    f"the SOUTH-WEST corner about {FRINGE_DEPTH} pixels deep from the south edge and {FRINGE_DEPTH} "
-    f"pixels in from the west edge. Only that bite is background.\n"
-    "A slot's own description below gives the MATERIAL only — what the terrain is made of. Where it "
-    "also mentions an edge or a corner, the three shapes above win: draw the shape described here, in "
-    "that material.\n"
-    "The north / north-east / south-west wording is fixed: the game rotates each of these three by 90, 180 and "
-    "270 degrees to cover the other sides and corners, so all three must be drawn at the orientation "
-    "described and the terrain must meet the slot's edges at full strength wherever it touches them."
-)
-
-
-KIND_TITLE = {"ground": "GROUND TILES", "fringe": "FRINGE TILES", "stamp": "STAMPS (objects)"}
-
-
-def ground_rule(on_magenta):
-    """What a ground slot is. On a mixed sheet the magenta must not show through one."""
-    return ("GROUND TILES are flat terrain seen from straight above, and each one is FILLED EDGE TO "
-            "EDGE with its material, right up to the inside of its white border: opaque, no frame, no "
-            "vignette, no empty corner"
-            + (", AND NO MAGENTA ANYWHERE INSIDE THE SLOT — the background colour must not show "
-               "through a ground tile at all, not even in a corner or as a tint along an edge. "
-               if on_magenta else ". ")
-            + "Each one is SEAMLESS on all four edges: the right edge continues into the left edge "
-              "and the bottom edge into the top, so a floor tiled with copies of it shows no seam. "
-              "Keep the detail even and small — no single large feature the eye can count across a "
-              "field, no object standing on the ground, no character, and no shadow cast by anything "
-              "outside the tile.")
-
-
-STAMP_RULE = (
-    "STAMPS are objects that stand on the ground: a house, a tree, a barrel. Each one is drawn to "
-    "fill its slot's width and STANDS ON THE SLOT'S BOTTOM EDGE — its base touches the bottom inside "
-    "edge of the border, centred left to right — and everything else in the slot is left as the flat "
-    "background, which the tool keys out. No ground under it (the map draws its own), no cast shadow "
-    "beyond a contact shadow no more than one tile high tucked under its south face. Every stamp on "
-    "this sheet is drawn to ONE COMMON SCALE: a tile is a stride, a person would be one tile wide and "
-    "about one and a half tiles tall, and a door is one tile wide and about 1.3 tiles tall, centred on "
-    "a tile column so it lines up with the grid."
-)
-
-
-def tileset_package_lines(setname, sheet, ids, entries, slots, style, label, opaque_sheet, attach):
-    b = style["blocks"]
-    on_magenta = not opaque_sheet
-    by_kind = {}
-    for s in slots:
-        by_kind.setdefault(s["kind"], []).append(s)
-    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
-         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
-         f"PIXEL GRID — THE MOST IMPORTANT RULE ON THIS SHEET. Everything is drawn at {TSET_SCALE}x. "
-         f"Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block of identical colour, aligned to the "
-         f"slot: the blocks start at the slot's top-left inside corner and run in an even grid across "
-         f"and down it, so a {TSET_SLOT}-pixel slot is a {TSET_TILE}x{TSET_TILE} pixel-art tile blown "
-         f"up {TSET_SCALE} times. No block is half a colour, no edge falls between blocks, no detail "
-         f"is finer than one block, and no two objects on the sheet use different block sizes. This "
-         f"is pixel art at 4x, not a smooth drawing shrunk down.", "",
-         b["map_header"], "",
-         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += ["", TEMPLATE_RULES, "",
-          f"WHAT THIS SHEET IS: the '{sheet}' tile sheet for the '{setname}' tileset of a top-down "
-          f"16-bit JRPG field map. Every slot is one tile or one multi-tile object, and in game each "
-          f"tile is exactly {TSET_TILE}x{TSET_TILE} pixels, so a {TSET_SLOT}-pixel slot is one tile "
-          f"and a {2 * TSET_SLOT}x{3 * TSET_SLOT} slot is a 2x3-tile object.", "",
-          "THIS SHEET HOLDS " + " AND ".join(
-              f"{len(v)} {k} tile(s) in slot(s) {num_ranges([s['n'] for s in v])}"
-              for k, v in by_kind.items()) + ". The rules for each kind:", ""]
-    for kind in ("ground", "fringe", "stamp"):
-        if kind not in by_kind:
-            continue
-        nums = num_ranges([s["n"] for s in by_kind[kind]])
-        head = f"{KIND_TITLE[kind]} — SLOT(S) {nums}. "
-        L += [head + (ground_rule(on_magenta) if kind == "ground" else
-                      FRINGE_RULE if kind == "fringe" else STAMP_RULE), ""]
-    if on_magenta:
-        L += ["BACKGROUND: the flat magenta around and between the objects is empty space and is keyed "
-              "out by the tool. Leave it completely untouched right up to the edge of what you draw: "
-              "no magenta tint on an object, no soft halo, no gradient, no drop shadow lying on the "
-              "magenta."
-              + (" The ground slots listed above are the exception and the one thing to get right: "
-                 "they are painted over completely, so no magenta survives inside them."
-                 if "ground" in by_kind else ""), ""]
-    else:
-        L += ["BACKGROUND: the flat dark grey around the slots is the template and is thrown away. "
-              "Every slot on this sheet is painted over it edge to edge.", ""]
-    L += ["PROJECTION — top-down oblique, the Phantasy Star IV field view, the same for every slot:", "",
-          "- The ground is seen from straight above: a patch of grass, dirt, paving or water is a flat "
-          "texture with no thickness and no side visible.",
-          "- An object standing on the ground is seen from slightly in front of straight above: you see "
-          "its top or roof AND its south-facing front, and nothing of its north, east or west sides.",
-          "- Every vertical edge in the world — a wall corner, a tree trunk, a post — runs straight up "
-          "the image. Nothing leans, nothing converges, nothing is foreshortened.",
-          "- No perspective, no vanishing point, no horizon, no sky. Nothing gets smaller because it is "
-          "further away: a thing the same size in the world is the same size in pixels wherever it sits.",
-          "- One light direction for the whole sheet, from the upper left. Every object's shading and "
-          "every contact shadow agrees with it."]
-    if "stamp" in by_kind:
-        L += ["- The slots are different sizes because the things in them are different sizes. Nothing "
-              "is scaled to fill a bigger slot: a barrel in a 1-tile slot and a barn in a 4x3 slot are "
-              "drawn at the same number of pixels to the foot."]
-    L += [""]
-    L += [f"SLOTS — {len(slots)} of them, grouped by kind:"]
-    for kind in ("ground", "fringe", "stamp"):
-        if kind not in by_kind:
-            continue
-        L += ["", f"{KIND_TITLE[kind]}:"]
-        for s in by_kind[kind]:
-            e = entries[s["id"]]
-            cw, chh = e["cells"]
-            size = (f"{s['inner'][2]}x{s['inner'][3]} px = {cw}x{chh} tile"
-                    + ("s" if cw * chh > 1 else ""))
-            what = []
-            if e["frames"] > 1:
-                what.append(f"{e['frames']} animation frames of the same tile side by side, left to "
-                            f"right, each one {e['w']}x{e['h']} tile"
-                            + ("s" if e["w"] * e["h"] > 1 else "")
-                            + ", the same subject with only the moving part changed, the motion "
-                              "looping from the last frame back to the first, and every frame obeying "
-                              "the rules above on its own")
-            if kind == "fringe":
-                what.append(f"drawn as the _{fringe_kind(s['id'])} fringe shape described above, in "
-                            f"this material")
-            elif kind == "ground":
-                what.append("seen straight down from directly above, seamless on all four edges, "
-                            "filled edge to edge, opaque")
-            else:
-                what.append("standing on the slot's bottom edge, everything else left as background")
-            L.append(f"Slot {s['n']} ({s['id']}), {size}: {e['desc'].rstrip('.')}. " + ". ".join(
-                w[0].upper() + w[1:] for w in what) + ".")
-    L += ["", f"RENDERING: {b['map_rendering']}", "",
-          f"AVOID: {b['map_negative']}, drawing outside a slot, moving or covering a slot number, a "
-          f"border or frame inside a slot, pixels not aligned to the {TSET_SCALE}x{TSET_SCALE} block "
-          f"grid, anti-aliased or soft edges, a visible seam at a ground tile's edge, background "
-          f"colour showing inside a ground tile, changing the size of the image"]
-    return "\n".join(L)
-
-
-def check_by_kind(slots):
-    """The 'afterwards' line for each kind of slot on this sheet — they are checked differently."""
-    nums = lambda k: num_ranges([s["n"] for s in slots if s["kind"] == k])
-    out, kinds = [], {s["kind"] for s in slots}
-    if "ground" in kinds:
-        out.append(f"- [ ] Each ground tile ({nums('ground')}) fills its slot right to the border with "
-                   f"no background colour showing through anywhere in it, and its left edge would meet "
-                   f"its right edge without a seam")
-    if "fringe" in kinds:
-        out.append(f"- [ ] Each fringe ({nums('fringe')}) is its own terrain only, ragged, at the "
-                   f"orientation asked for (north band / north-east corner / bitten south-west corner), "
-                   f"reaching the slot edges at full strength where it touches them, background "
-                   f"everywhere else")
-    if "stamp" in kinds:
-        out.append(f"- [ ] Each object ({nums('stamp')}) stands on its slot's bottom edge, with clean "
-                   f"background right up against it and no magenta tint on the object itself")
-    return out
-
-
-def build_tileset_sheet(setname, sheet, ids, entries=None, style=None):
-    """One sheet's package: template.png, sheet.json, prompt.md."""
-    entries = entries or tileset_entries(setname)
-    style, warn = style or load_style(), []
-    missing = [i for i in ids if i not in entries]
-    if missing:
-        die(f"{tileset_doc(setname).name}: no entry for {', '.join(missing)}")
-    W, H, label, slots = tileset_slots(ids, entries)
-    opaque_sheet = all(entries[i]["opaque"] for i in ids)
-    bg = TSET_GREY if opaque_sheet else MAGENTA
-    name = f"tileset_{setname}_{sheet}"
-    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
-    prompt = tileset_package_lines(setname, sheet, ids, entries, slots, style, label, opaque_sheet, attach)
-    atlas = str(atlas_path(setname).relative_to(ROOT.parent))
-    cutfile = str(cut_sheet_path(setname, sheet).relative_to(ROOT.parent))
-    status = [f"- `{atlas}` — " + ("**exists**" if atlas_path(setname).exists() else "not started yet"),
-              f"- `{cutfile}` — " + ("**cut already**" if cut_sheet_path(setname, sheet).exists()
-                                     else "not cut yet"), "",
-              f"This sheet carries {len(ids)} of the tileset's entries: " + ", ".join(f"`{i}`" for i in ids)]
-    after = field_after(pkg_path(name, "sheet.json"), [
-        f"- [ ] All {len(slots)} slots filled; every border and every number exactly where it was",
-        f"- [ ] Every art pixel is a {TSET_SCALE}x{TSET_SCALE} block on one grid — zoom in and check a "
-        f"diagonal edge is a clean staircase of blocks, not a soft ramp",
-        "- [ ] Nothing drawn in the gutters; the background between slots is still flat and untouched",
-        *check_by_kind(slots),
-        "- [ ] One light direction, upper left, across the whole sheet",
-        "- [ ] No text, labels, numbers of your own, swatches or signature", "",
-        "If one slot fails, reply in the same chat: \"Redraw only slot 4 and keep every other slot and "
-        "the whole template exactly as it is. <what was wrong>\"."],
-        makes=f"the {len(ids)} tile(s) into `{atlas}`")
-    template, manifest, md = write_field_package(
-        "tileset", name, label, W, H, bg, slots, prompt, attach, after,
-        out_file=atlas, status=status, digit=TSET_DIGIT)
-    data = json.loads(manifest.read_text())
-    data.update({"set": setname, "sheet": sheet, "cut": cutfile, "opaque_sheet": opaque_sheet,
-                 "tile": TSET_TILE, "scale": TSET_SCALE, "cols": ATLAS_COLS})
-    manifest.write_text(json.dumps(data, indent=2) + "\n")
-    for w in warn:
-        print(f"warning: {w}", file=sys.stderr)
-    kinds = sorted({s["kind"] for s in slots})
-    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} slots, {'+'.join(kinds)}, "
-          f"{100 * sum(s['box'][2] * s['box'][3] for s in slots) / (W * H):.0f}% of {label}, "
-          f"{'opaque ground' if opaque_sheet else 'magenta key'})")
-    return slots
-
-
-def tileset_plan(setname, entries=None):
-    """[(folder, meta, builder args)] for one tileset, freezing any sheet that has been drawn."""
-    entries = entries or tileset_entries(setname)
-    here = PACKAGES / "tilesets" / setname
-    plan = []
-    terr, decs = set_terrains(entries), set_decals(entries)
-    if terr:                                              # D20: one sheet for every terrain's swatch
-        plan.append((here / "swatches",
-                     {"kind": "swatch", "set": setname, "ids": terr,
-                      "title": f"{setname} — the ground swatches ({len(terr)} terrains)",
-                      "makes": f"{len(terr)} seamless swatch(es) and the generated masks",
-                      "outputs": [str(swatch_path(setname, t).relative_to(ROOT.parent)) for t in terr]},
-                     [setname, "--swatches"]))
-    if decs:                                              # ...and one for the whole biome's decals
-        plan.append((here / "decals",
-                     {"kind": "decal", "set": setname, "ids": decs,
-                      "title": f"{setname} — the decals ({len(decs)} cut-outs)",
-                      "makes": f"{len(decs)} decal sprite(s)",
-                      "outputs": [str(decal_path(setname, i).relative_to(ROOT.parent)) for i in decs]},
-                     [setname, "--decals"]))
-    for sheet, ids in tileset_sheets(entries).items():
-        done = frozen_packages(here, sheet, "tileset", ids)
-        taken = set()
-        for _, keep in done:
-            taken |= set(keep)
-        rest = [i for i in ids if i not in taken]
-        groups = tileset_pack(rest, entries) if rest else []
-        laid = list(done)
-        if not done and len(groups) == 1:
-            laid.append((sheet, groups[0]))
-        else:
-            for g in groups:
-                laid.append((next_package_name(sheet, {n for n, _ in laid}), g))
-        for n, (folder, group) in enumerate(laid, 1):
-            outs = [str(atlas_path(setname).relative_to(ROOT.parent)),
-                    str(cut_sheet_path(setname, folder).relative_to(ROOT.parent))]
-            plan.append((here / folder,
-                         {"kind": "tileset", "set": setname, "sheet": folder, "ids": group,
-                          "title": f"{setname} — {folder} tile sheet"
-                                   + (f" ({n} of {len(laid)})" if len(laid) > 1 else ""),
-                          "makes": f"{len(group)} tile(s) packed into `{outs[0]}`",
-                          "outputs": outs},
-                         [setname, "--sheet", folder, *group]))
-    return plan
-
-
-TILESETS_README = """\
-# story/field/tilesets — the tile art contract
-
-Generated by `./story_prompt.py tileset <set>`; do not edit by hand. `TILES.md` is the decision, this
-file is the part the art pipeline fixes so the engine can match it.
-
-## What a set is
-
-`story/field/tilesets/<set>/`
-
-- `tiles.md` — **the engine's file.** One `## <id>` per tile or stamp, with `- layer:`, `- solid:` and
-  `- desc:`. The art pipeline never changes a name, a size or a solid row. The one thing it writes
-  back is a `- index:` line for an entry that has none, so the atlas position is recorded in the file
-  the engine reads. An index already written is never moved.
-- `atlas.png` — {cols} cells across, **{cell}x{cell} each**, an **indexed PNG** on
-  `story/palette/master.hex` (PALETTE.md, D19): one byte a pixel, index 0 transparent. Index 0 is the empty tile. A stamp of
-  `WxH` occupies a `WxH` rectangle of cells whose top-left is its index, row-major, and never wraps
-  past the last column. A tile with `- frames: n` occupies `n` copies side by side starting at its
-  index.
-- `atlas.json` — the same thing for humans and for tools: name to index, size and frame count. Its
-  `cell` field is the atlas cell size in pixels; read it rather than assuming one.
-- `atlas32.png` — only when a sheet was cut with `--snap32`: the same atlas mode-snapped down to
-  {tile}x{tile} a cell, for comparing against the pixel-art reading of a sheet. Not shipped.
-- `masks.png` / `masks.json` — the transition masks, **generated by the tool**, never drawn. See
-  `TILES.md`, "Terrains, masks and decals".
-- `swatches/<terrain>.png` — one seamless swatch a terrain, sampled in world space. Not in the atlas.
-- `decals/<id>.png` — the loose cut-out, for the preview and for looking at one. The **game reads the
-  decal out of `atlas.png`**, one cell each, art in the cell's top-left, size under `px` in
-  `atlas.json`.
-- `cut/<sheet>.png` — what one returned sheet cut down to, kept so a sheet can be eyeballed.
-
-## Sizes — the art is kept, not reduced
-
-A tile is **{tile}x{tile}** as a unit of map design: that is what a cell of a `.tmap` means. The art
-is another matter. A sheet draws a tile at **{scale}x**, so one slot is **{slot}x{slot}** and a `4x3`
-stamp is a `{stamp_w}x{stamp_h}` slot — and the atlas keeps it at exactly that size, **{cell} px a
-cell**. The cut used to mode-snap each {scale}x{scale} block down to one art pixel; the owner compared
-the returns with the result and preferred the art as drawn, so nothing is thrown away here any more.
-`--snap32` still produces the old reading, into `atlas32.png` beside the atlas.
-
-What the cut does to a slot, in order:
-
-1. **Localise.** A return is never an exact scale of the template — it comes back at about 1.5
-   megapixels whatever was asked for, and the model redraws each white slot border a few pixels, or
-   a few tens of pixels, off. Every side is searched for the border that was actually drawn and the
-   art starts just inside it, past its anti-aliased skirt. Without this a sliver of white border is
-   cut into the tile: thin white lines all over the atlas, and a seam metric reading the white row.
-2. **Resample** the art area to exactly `cells x {cell}` — area-average going down, bilinear going
-   up. Never nearest: at a non-integer ratio nearest drops whole columns and tears straight edges.
-3. **Key** the magenta by its cast, on a keyed entry only, un-matting the colour so no pink shows
-   through the edge. Alpha is **hard** again (PALETTE.md, D19): the keying measures it softly, and
-   the palette step at the end turns anything under 0.5 into index 0 and anything above it into its
-   own nearest colour. An opaque ground tile is never keyed; background showing inside one is a hole
-   and is filled from the nearest painted pixel.
-4. **Scrub** what is left of the border: a near-white edge run, or a near-white edge pixel with no
-   bright pixel behind it. Nothing in the interior is touched, so white plaster and water foam stay.
-   There is **no edge extrusion** any more. It existed so linear filtering at a silhouette would
-   pull clean colour rather than black or magenta; with an indexed atlas there is no colour under a
-   transparent texel to bleed, and the tile shader blends the four neighbours' *colormap colours*
-   with premultiplied alpha instead, index 0 counting as zero. The cells still have to come out
-   clean, which is what the scrub is for.
-5. **Make a single-cell opaque ground tile seamless** — on by default, `--no-heal` to skip. Not by
-   blending: the tile is *rolled* along each axis in turn, so its first and last line were adjacent
-   lines of the drawing and the wrap is continuous by construction. The split is the **min-error**
-   one of the middle third, so the join lands where the art is quietest rather than across a mortar
-   course. The roll puts the original's own discontinuity in the middle of the tile, and that is
-   covered by a narrow strip of the tile's own interior (least-error source, 3 px held and 16 px of
-   feather) cut in with a **hashed dither** — each output pixel taken whole from one side or the
-   other, never averaged, so nothing is blurred. The old `--heal-seams` cross-blend is gone: it
-   removed the wrap error and left a soft ribbon at every border, which is what read on the phone as
-   a faint grid over grass, dirt and gravel.
-6. **Match the tone of a ground family.** `paving`/`paving_worn`, `grass`/`grass_tuft`/
-   `grass_flower`, `dirt`/`dirt_rut` are scattered through each other by the maps, so they must
-   differ in detail and not in overall tone. Every variant after the first is shifted to the first's
-   **mean Oklab lightness** and scaled to its **mean chroma** — an offset and a gain, so each pixel
-   keeps its own distance from the mean and the drawing is untouched. Without it a 0.05 gap in L
-   between `paving` and `paving_worn` made the square read as a checkerboard of pale and dark
-   squares.
-7. **Palettise, last.** Every step above happens in full colour — the seamless roll, the tone match,
-   the un-matting — and only then is the whole atlas converted to `story/palette/master.hex`: exact
-   nearest in Oklab, **no dithering**, alpha hard at 0.5. Change the palette and nothing needs
-   redrawing: `./story_prompt.py palette build && ./story_prompt.py ingest --force` re-derives every
-   tile from the sheet archived in `story/sheets/`.
-
-Two numbers are printed for every ground tile. `wrap h/v` is the mean difference across the tile's
-own edges, and `border/interior gradient` is that compared with the texture's mean gradient on the
-same axis: **above 1.15 is a line** (something is still discontinuous) and **near 0 is a band**
-(something was averaged). A tile made seamless by construction sits below 1, because the split was
-chosen where the art is quiet.
-
-## Sheets — as few generations as possible
-
-A slot is fixed at 4x and cannot be shrunk, so the only way to ask the owner for fewer images is to
-put more on each one. Entries are therefore grouped into two pools, not one per category:
-
-- `terrain` — every `layer: ground` entry **and its fringes**, on one sheet. They are the same
-  materials and have to share a palette, and a sheet has one background colour, so the background is
-  **magenta** and the ground slots are painted **edge to edge** over it: nothing of the background
-  survives inside a ground tile, and the cut keys the fringes only.
-- `objects` — buildings, nature and props together, biggest first, each sheet then filled up with
-  the single-tile stamps, so the barrels and fence posts stand in the space beside the guild hall.
-
-An explicit `- sheet:` line in `tiles.md` still wins and keeps its entries in a pool of their own.
-
-Packing is a **skyline**: each slot is dropped at the lowest, then leftmost, place it fits, with a
-20 px gutter (28 px vertically, which is where the slot number goes) and a 20 px margin. A sheet
-stops at **26 slots** or **85% of the canvas**, whichever comes first, and slots are numbered
-afterwards in reading order. The canvas is then **trimmed to the content**: ChatGPT returns about
-1.5 megapixels whatever it is given, so a half-empty 1536x1024 template throws half the detail away.
-1536x1024 is the largest a sheet gets.
-
-A sheet that has been generated is **frozen**: its slot boxes never change, so the image can always be
-recut. New entries go into a fresh `<sheet>_2` beside it.
-
-## The fringe convention — this is the part the engine has to match
-
-Each terrain that borders another has three fringe tiles, and the engine **rotates** them by 90, 180
-and 270 degrees to cover all four sides and all four corners. A fringe tile carries **only its own
-terrain**, ragged, over transparency, and is drawn **on top of the neighbouring tile** so the boundary
-is not a straight line.
-
-| id | what is drawn, at 0 degrees | what the engine does with it |
-| --- | --- | --- |
-| `<terrain>_edge` | a band of the terrain along the **north** edge, full width and solid at the very top, about {depth} of the tile's {tile} px deep at its deepest, ragged and uneven along its southern boundary; the rest transparent | laid on the neighbour tile that sits **south** of the terrain; rotate 90/180/270 for the other three sides |
-| `<terrain>_corner_out` | the terrain filling only the **north-east** corner, about {depth} px in from the north edge and {depth} px in from the east edge, a ragged quarter-round; the rest transparent | laid on the neighbour diagonally off an **outside (convex)** corner; rotate for the other three |
-| `<terrain>_corner_in` | the terrain filling the whole tile **except** a ragged bite out of the **south-west** corner, about {depth} px deep from the south edge and {depth} px in from the west edge | laid on the neighbour at an **inside (concave)** corner; rotate for the other three |
-
-`corner_in` is exactly the inverse of `corner_out` rotated 180 degrees, which is why three tiles cover
-a terrain instead of the forty-seven a full autotile needs.
-
-Alpha in a fringe is **hard** — one bit, index 0 or a colour — and the colour under the edge is clean,
-un-matted at the alpha the keying measured before it was hardened. A fringe's ragged boundary reads
-soft in game all the same, because the shader interpolates between four neighbouring texels'
-colormap colours with index 0 as transparent, rather than between the stored bytes.
-"""
-
-
-def write_tilesets_readme():
-    TILESETS.mkdir(parents=True, exist_ok=True)
-    (TILESETS / "README.md").write_text(TILESETS_README.format(
-        cols=ATLAS_COLS, tile=TSET_TILE, cell=ATLAS_CELL, scale=TSET_SCALE, slot=TSET_SLOT,
-        depth=FRINGE_DEPTH,
-        stamp_w=4 * TSET_SLOT, stamp_h=3 * TSET_SLOT))
-
-
-def cmd_tileset(args):
-    pos = []
-    sheet, what, it = None, None, iter(args)
-    for a in it:
-        if a == "--sheet":
-            sheet = next(it, None)
-        elif a in ("--swatches", "--decals"):
-            what = a[2:]
-        elif not a.startswith("--"):
-            pos.append(a)
-    if not pos:
-        die("usage: tileset <set> [--sheet <name> <id>...]   "
-            "(reads story/field/tilesets/<set>/tiles.md)")
-    setname = slug(pos[0])
-    entries = tileset_entries(setname)
-    fresh = assign_indices(setname, entries)
-    if what == "swatches":                           # called by `packages` as a builder
-        return build_swatch_sheet(setname, set_terrains(entries), entries)
-    if what == "decals":
-        return build_decal_sheet(setname, set_decals(entries), entries)
-    if sheet:                                        # one sheet, called by `packages` as a builder
-        return build_tileset_sheet(setname, sheet, pos[1:], entries)
-    write_tilesets_readme()
-    if set_terrains(entries):                        # the masks are generated, never drawn: do it now
-        mp, n = write_masks(setname, [entries[t]["edge_style"] for t in set_terrains(entries)])
-        print(f"wrote {mp.relative_to(ROOT.parent)}  ({n} masks, generated from the edge styles)")
-    for ident, idx, w, h, fr in fresh:
-        print(f"assigned index {idx} to '{ident}'" + (f" ({w}x{h})" if w * h > 1 else "")
-              + (f" x{fr} frames" if fr > 1 else ""))
-    plan, style = tileset_plan(setname, entries), load_style()
-    built = set()
-    for d, meta, bargs in plan:
-        ok, msg = write_package(d, meta, cmd_tileset, bargs)
-        built.add(d.resolve())
-        print(f"{'ok  ' if ok else 'FAIL'}  {d.relative_to(ROOT.parent)}  "
-              f"{len(meta['ids'])} slot(s)" + (f"  {msg}" if msg else ""))
-    write_atlas_json(setname, entries)
-    print(f"\n{len(plan)} sheet(s) for tileset '{setname}', {len(entries)} entries, "
-          f"atlas {atlas_path(setname).relative_to(ROOT.parent)}")
-    print(f"convention: {(TILESETS / 'README.md').relative_to(ROOT.parent)}")
 
 
 # ───────────────────── TILES2 (D20): terrains, masks, swatches, decals ─────────────────────
 #
-# TILES2_PROPOSAL.md is the research; TILES.md, "Terrains, masks and decals", is the contract.
+# Terrains, masks and decals (D20). The masks are generated; only the swatch is art.
 # The short version: drawn transition tiles are gone. A terrain is ONE seamless swatch sampled in
 # world space, and the boundary between two terrains is a 1-bit mask the TOOL computes — never art.
 # Every mask boundary crosses a tile edge at that edge's midpoint, perpendicular, which is the whole
@@ -4996,7 +3967,6 @@ EDGE_STYLES = {                       # amp/freq of two octaves of value noise d
 MASK_WINDOW = 0.16                    # the displacement is windowed to zero this close to the border,
                                       # so the pinned midpoints survive whatever the noise does
 SWATCH_MIN, SWATCH_MAX = 2, 4         # tiles a side
-DECAL_MIN_SLOT = 96                   # a decal slot smaller than this is not worth asking for
 TERRAIN_KINDS = ("terrain", "decal", "tile")
 
 
@@ -5071,7 +4041,7 @@ def dual_grid_cases():
 
     The 16 corner masks fall into exactly six classes under rotation — empty, corner (4), edge (4),
     diag (2), inv (4), full — and every class is already closed under reflection, which is the
-    research finding that says mirroring buys nothing for transitions (TILES2_PROPOSAL §3.1)."""
+    research finding that says mirroring buys nothing for transitions."""
     cases = {0: None, 15: ("full", 0)}
     for shape, b in (("corner", 1), ("edge", 3), ("diag", 5), ("inv", 11)):
         c = b
@@ -5228,76 +4198,6 @@ def swatch_path(setname, terrain):
 
 
 # ── the swatch sheet: one slot per terrain, and nothing else on it ──
-
-SWATCH_RULE = (
-    "WHAT THESE ARE: ground textures, one per slot, each one a piece cut from the middle of an "
-    "endless field of that material. Each slot is filled edge to edge, right up to its white border, "
-    "and is SEAMLESS on all four edges: the right edge continues into the left and the bottom into "
-    "the top, so a whole map tiled with copies of it shows no join and no landmark. "
-    "Draw them FLAT. No border of any kind, no frame, no vignette, no darker or lighter side, no "
-    "light falling across the slot, no shadow of anything outside it, no grass creeping in at an "
-    "edge, no object, no path, no water's edge, no single feature a player could point at and "
-    "remember. Calm and low in contrast: 3 or 4 flat tones of the material, close together, with "
-    "the detail even across the whole slot. This texture will have flowers, stones and tufts "
-    "scattered over it by the game, so it must be quiet enough to sit underneath them."
-)
-
-
-def build_swatch_sheet(setname, terrains, entries=None, style=None):
-    """One package: every terrain's seamless swatch on one sheet."""
-    entries = entries or tileset_entries(setname)
-    style, warn = style or load_style(), []
-    missing = [t for t in terrains if t not in entries]
-    if missing:
-        die(f"{tileset_doc(setname).name}: no entry for {', '.join(missing)}")
-    sizes = [entries[t]["swatch"] for t in terrains]
-    W, H, label, u, boxes = layout_cells(sizes, list(terrains))
-    slots = []
-    for n, (t, box) in enumerate(zip(terrains, boxes), 1):
-        e = entries[t]
-        slots.append({"n": n, "id": t, "kind": "swatch", "box": list(box),
-                      "inner": list(inner_box(box)), "tiles": list(e["swatch"]),
-                      "target": [e["swatch"][0] * ATLAS_CELL, e["swatch"][1] * ATLAS_CELL],
-                      "edge_style": e["edge_style"],
-                      "out": str(swatch_path(setname, t).relative_to(ROOT.parent))})
-    name = f"swatch_{setname}"
-    b = style["blocks"]
-    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
-    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
-         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
-         b["map_header"], "",
-         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += ["", TEMPLATE_RULES, "", SWATCH_RULE, "", "SLOTS:"]
-    for s in slots:
-        e = entries[s["id"]]
-        L.append(f"Slot {s['n']} ({s['id']}), {s['tiles'][0]}x{s['tiles'][1]} tiles of ground, "
-                 f"{s['inner'][2]}x{s['inner'][3]} px in the template: {e['desc']}")
-    L += ["", f"RENDERING: {field_rendering(b)}", "",
-          f"AVOID: {b['map_negative']}, a border or frame inside a slot, a lit or shaded side, a "
-          f"vignette, a visible seam at a slot edge, one big feature in the middle of a slot, an "
-          f"object, a path, a shoreline, a character, a shadow, noisy high-contrast texture, "
-          f"drawing outside a slot, moving or covering a slot number, changing the size of the image"]
-    after = field_after(pkg_path(name, "sheet.json"), [
-        f"- [ ] All {len(slots)} slots filled to the border, every number still where it was",
-        "- [ ] Each slot is FLAT: no lit side, no vignette, no border, no shadow",
-        "- [ ] Calm and even: nothing in a slot the eye goes to first",
-        "- [ ] Nothing that reads as an edge of the material — no grass rim, no shoreline, no path",
-        "- [ ] Tiling test: the top edge of a slot would meet its bottom edge with no join", "",
-        "If one slot fails, reply in the same chat: \"Redraw only slot 2 and keep every other slot "
-        "and the whole template exactly as it is. <what was wrong>\"."],
-        makes=f"the {len(slots)} seamless swatch(es) listed above")
-    status = [f"- `{s['out']}` — " + ("**exists**" if (ROOT.parent / s["out"]).exists() else "missing")
-              for s in slots]
-    template, manifest, md = write_field_package(
-        "swatch", name, label, W, H, TSET_GREY, slots, "\n".join(L), attach, after, status=status)
-    data = json.loads(manifest.read_text())
-    data.update({"set": setname, "cell": ATLAS_CELL})
-    manifest.write_text(json.dumps(data, indent=2) + "\n")
-    for w in warn:
-        print(f"warning: {w}", file=sys.stderr)
-    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} terrain swatch(es), {label})")
-    return slots
 
 
 def cut_swatches(data, slots, rows, w, h, ch, sx, sy):
@@ -5478,73 +4378,6 @@ def swatch_is_calm(px, w, h, limit=0.115):
 
 # ── the decal sheet: ~20 cut-outs of nothing but the object ──
 
-DECAL_RULE = (
-    "WHAT THESE ARE: small loose objects that the game scatters over its ground by the hundred — "
-    "a tuft of grass here, three pebbles there. Each slot holds ONE object, drawn against the flat "
-    "magenta and NOTHING else. The magenta is empty space, not a backdrop: it comes right up to the "
-    "object on every side, and the edge where they meet is hard, not soft, blurred or glowing. "
-    "There is NO ground under the object — no patch of grass, no earth, no stone, no dirt, no "
-    "shadow, no base, no plate, no circle of darker colour. An object that is drawn standing on "
-    "something is unusable, because the game puts it on a hundred different grounds. "
-    "Each object fills most of its slot, seen from straight above as the ground is, with the same "
-    "light from the upper left across the whole sheet."
-)
-
-
-def build_decal_sheet(setname, ids, entries=None, style=None):
-    """One package: a biome's decals, ~20 slots on magenta."""
-    entries = entries or tileset_entries(setname)
-    style, warn = style or load_style(), []
-    missing = [i for i in ids if i not in entries]
-    if missing:
-        die(f"{tileset_doc(setname).name}: no entry for {', '.join(missing)}")
-    sizes = [(1, 1)] * len(ids)
-    W, H, label, u, boxes = layout_cells(sizes, list(ids))
-    slots = []
-    for n, (i, box) in enumerate(zip(ids, boxes), 1):
-        e = entries[i]
-        t = max(16, int(round(e["tiles"] * ATLAS_CELL)))
-        slots.append({"n": n, "id": i, "kind": "decal", "box": list(box),
-                      "inner": list(inner_box(box)), "target": [t, t],
-                      "out": str((decal_path(setname, i)).relative_to(ROOT.parent))})
-    name = f"decal_{setname}"
-    b = style["blocks"]
-    attach = field_attachments(style, pkg_path(name, "template.png"), None, warn)
-    L = [f"Create ONE image: the attached template with all {len(slots)} numbered slots filled in. "
-         f"Canvas: {label}, exactly the same size and proportions as the template.", "",
-         b["map_header"], "",
-         "ATTACHED REFERENCE IMAGES, in the order I attached them:"]
-    L += [f"Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    L += ["", TEMPLATE_RULES, "", DECAL_RULE, "", "SLOTS:"]
-    for s in slots:
-        e = entries[s["id"]]
-        L.append(f"Slot {s['n']} ({s['id']}), on {', '.join(e['on'])}, "
-                 f"{s['inner'][2]}x{s['inner'][3]} px in the template: {e['desc']}")
-    L += ["", f"RENDERING: {field_rendering(b)}", "",
-          f"AVOID: {b['map_negative']}, ground or a patch of earth under an object, a shadow, a "
-          f"base plate, a frame, a soft blurred or glowing edge against the magenta, two objects in "
-          f"one slot, drawing outside a slot, moving or covering a slot number, changing the size "
-          f"of the image"]
-    after = field_after(pkg_path(name, "sheet.json"), [
-        f"- [ ] All {len(slots)} slots filled, every border and number still exactly where it was",
-        "- [ ] NOTHING under any object: no ground, no patch, no shadow, no base",
-        "- [ ] The magenta comes right up to every object, with a hard edge",
-        "- [ ] One object a slot, seen from straight above, lit from the upper left", "",
-        "If one decal fails, reply in the same chat: \"Redraw only slot 7 and keep every other slot "
-        "and the whole template exactly as it is. <what was wrong>\"."],
-        makes=f"the {len(slots)} decal sprite(s) listed above")
-    status = [f"- `{s['out']}` — " + ("**exists**" if (ROOT.parent / s["out"]).exists() else "missing")
-              for s in slots]
-    template, manifest, md = write_field_package(
-        "decal", name, label, W, H, MAGENTA, slots, "\n".join(L), attach, after, status=status)
-    data = json.loads(manifest.read_text())
-    data.update({"set": setname})
-    manifest.write_text(json.dumps(data, indent=2) + "\n")
-    for w in warn:
-        print(f"warning: {w}", file=sys.stderr)
-    print(f"wrote {md.relative_to(ROOT.parent)}  ({len(slots)} decals, {label})")
-    return slots
-
 
 def decal_path(setname, ident):
     """The loose cut-out. It is kept for the preview and for eyeballing; the GAME reads the atlas."""
@@ -5607,43 +4440,6 @@ def cut_decals(data, slots, rows, w, h, ch, sx, sy, fringe=0):
 
 # ── cutting a returned tile sheet ──
 
-def mode_region(rows, ch, x0, y0, bw, bh, ow, oh):
-    """Downsample a crop to ow x oh by taking each output pixel's MODE colour in the source.
-
-    This is the whole reason a ChatGPT sheet can be used as pixel art. The model draws something that
-    looks blocky but is not: a block's edge lands a pixel or two off, and its interior carries a faint
-    gradient. Averaging turns every hard tile edge into mush and two tiles stop meeting cleanly. The
-    mode is the colour the artist meant that art pixel to be, and it is one of the colours that is
-    actually there, so the palette never grows.
-
-    The region is computed straight from the crop rather than by resizing to 4x first, because the
-    sheet comes back at whatever size the app felt like (it caps at about 1.5 megapixels), so the
-    ratio is never a whole number. Resizing first would put the 4x4 art blocks half a pixel out of
-    step and the tile's last row would be its neighbour's."""
-    out = []
-    for y in range(oh):
-        sy0, sy1 = y0 + y * bh // oh, y0 + max(y * bh // oh + 1, (y + 1) * bh // oh)
-        dst = bytearray(ow * ch)
-        for x in range(ow):
-            sx0, sx1 = x0 + x * bw // ow, x0 + max(x * bw // ow + 1, (x + 1) * bw // ow)
-            counts, best, bn = {}, None, 0
-            for yy in range(sy0, sy1):
-                row = rows[yy]
-                for xx in range(sx0, sx1):
-                    pxl = bytes(row[xx * ch:xx * ch + ch])
-                    n = counts.get(pxl, 0) + 1
-                    counts[pxl] = n
-                    if n > bn:
-                        best, bn = pxl, n
-            if bn < 2:                               # a flat tie: take the middle of the region
-                mid = rows[(sy0 + sy1) // 2]
-                cx = (sx0 + sx1) // 2
-                best = bytes(mid[cx * ch:cx * ch + ch])
-            dst[x * ch:(x + 1) * ch] = best
-        out.append(dst)
-    return out
-
-
 def to_rgba(rows, w, h, ch, alpha=255):
     if ch == 4:
         return [bytearray(r) for r in rows]
@@ -5655,18 +4451,6 @@ def to_rgba(rows, w, h, ch, alpha=255):
             dst[x * 4 + 3] = alpha
         out.append(dst)
     return out
-
-
-def harden_alpha(px, w, h):
-    """A tile pixel is on or off: the engine alpha-tests at 0.5 and there is no blending in a tile."""
-    for y in range(h):
-        row = px[y]
-        for x in range(w):
-            if row[x * 4 + 3] < TSET_ALPHA_CUT:
-                row[x * 4:x * 4 + 4] = b"\0\0\0\0"
-            else:
-                row[x * 4 + 3] = 255
-    return px
 
 
 def seam_error(px, w, h):
@@ -6211,10 +4995,28 @@ def write_cut_sheet(setname, sheet, cut):
 
 # ── tmaps ──
 
-TRIGGER_KINDS = {"exit": 4, "door": 4, "message": 1, "npc": 3, "zone": 1, "trap": 1, "light": 2}
+TRIGGER_KINDS = {"exit": 4, "door": 4, "message": 1, "npc": 3, "zone": 1, "trap": 1, "light": 2,
+                 "scene": 1, "fight": 1, "pickup": 2, "goal": 1, "sprite": 1}
 # 'light <radius> <level> [flicker]' is a point light as a trigger box; the same thing written as a
 # 'lamp: x y radius level [flicker]' meta line is what the maps actually use. Both are checked, and
 # both are looked up in the colormap's point-light table (`lamp`), not in the map's ambient table.
+#
+# The chapter-one four (2026-09-21, asked for by the engine side):
+#   scene  <scene_id>              play a cutscene. Checked against story/playlist.md's scene stems.
+#   fight  <encounter_id>          start a battle. Checked against FIGHT_IDS below.
+#   pickup <item_id> <text_id>     a takeable. The text id is checked like `message`'s.
+#   goal   <Words_with_underscores>  the on-screen goal line, six words at most.
+#   sprite <sprite_id>            draw story/field/sprites/<id>.png as an upright billboard here.
+# Any trigger line (an `npc` included) may carry a bare trailing `nightsight`: hidden and
+# non-interactive until the party has night sight. A `fight` draws its encounter id as a sprite by
+# itself, so it never needs a `sprite` line beside it.
+FIGHT_IDS = {"post", "arm", "swing",          # hart_yard, the three training machines
+             "lid",                            # halm, the grain yard
+             "burr",                           # the hill path
+             "lantern", "fleece", "klee"}      # the high pasture, and its boss
+ITEM_IDS = {"bench_part",                     # the part carried to the guild counter on day one
+            "loot_yard", "loot_teaching_find", "loot_hill", "loot_pasture"}   # LOOT.md
+GOAL_MAX_WORDS = 6
 
 
 def tmap_path(mp):
@@ -6232,7 +5034,7 @@ def parse_tmap(mp):
     secs = h2_sections(path.read_text())
     for need in ("meta", "legend", "ground"):
         if need not in secs:
-            die(f"{path.name}: no '## {need}' section (see TILES.md, 'Maps')")
+            die(f"{path.name}: no '## {need}' section (see WORLD.md, 'Maps')")
     meta, metas = {}, {}
     for l in secs["meta"].splitlines():
         l = strip_comment(l)
@@ -6257,13 +5059,66 @@ def parse_tmap(mp):
                             if strip_comment(l).strip() and not l.lstrip().startswith("#")]
     trig = lines_of("triggers")
     return {"path": path, "meta": meta, "metas": metas, "legend": legend, "ground": grid("ground"),
-            "objects": grid("objects"), "triggers": trig,
+            "objects": grid("objects"), "height": height_grid(secs), "triggers": trig,
             # TILES2 (D20). Both are optional and both are LINE LISTS, never grids: a grid of the
             # same width as the map is a thing an author has to keep aligned, and neither of these
             # is dense enough to be worth that. `## decals` places one by hand where the scatter
             # cannot be trusted to (the flowers on a grave); `## flips` names the top-left cell of
             # a stamp placement that is drawn mirrored. A map with neither reads exactly as before.
             "decals": lines_of("decals"), "flips": lines_of("flips")}
+
+
+# '## height' — the cell's surface height in VOXELS above the map base, base 36: '0'-'9' is 0..9 and
+# 'a'-'z' is 10..35. A voxel is half a walk cell. '.' or a space leaves the cell unauthored and
+# procedural, exactly as before, and a map with no '## height' section at all behaves as it always
+# did. '~' is a bend — the mean of its authored orthogonal neighbours — parsed but not yet authored.
+# `base: <n>` in '## meta' is the map floor in voxels, default 4.
+#
+# The size of a step between two authored cells is DELIBERATELY not checked: an authored cell is
+# exempt from the engine's two-voxel neighbour clamp, so a cliff is legal and hill_path depends on
+# one. Stamps and trigger boxes are flattened by the engine to their top-left cell's height.
+HEIGHT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
+HEIGHT_FREE = ". "                    # leave it to the engine's noise
+HEIGHT_BEND = "~"
+HEIGHT_MAX = len(HEIGHT_CHARS) - 1    # 'z'
+
+
+def height_grid(secs):
+    """'## height' as written, keeping blank rows: a space means procedural, so a row of them is data.
+
+    The other grids drop blank lines, which is right for them and wrong here — an all-procedural row
+    written as spaces would silently vanish and every row below it would shift up a cell. Comment
+    lines still go, and the blank lines that pad the section top and bottom are trimmed."""
+    rows = [l.rstrip("\n") for l in secs.get("height", "").splitlines()
+            if not l.lstrip().startswith("#")]
+    while rows and not rows[0].strip():
+        rows.pop(0)
+    while rows and not rows[-1].strip():
+        rows.pop()
+    return rows
+
+
+def check_map_height(m, name, w, h):
+    """The optional '## height' grid and the 'base:' meta key."""
+    err, rows = [], m.get("height") or []
+    base = (m["meta"].get("base") or "").strip()
+    if base and not (base.isdigit() and 0 <= int(base) <= 64):
+        err.append(f"{name}: 'base: {base}' is the floor depth in voxels under height 0; "
+                   f"it must be a whole number 0 to 64")
+    if not rows:
+        return err                                    # no height section: all procedural, as today
+    if len(rows) != h:
+        err.append(f"{name}: '## height' has {len(rows)} rows, 'size:' says {h}")
+    for y, line in enumerate(rows):
+        line = line.ljust(w) if len(line) < w else line     # a row may stop at its last real cell
+        if len(line) > w:
+            err.append(f"{name}: '## height' row {y} is {len(line)} chars, 'size:' says {w}")
+        for x, c in enumerate(line[:w]):
+            if c not in HEIGHT_CHARS and c not in HEIGHT_FREE and c != HEIGHT_BEND:
+                err.append(f"{name}: '## height' cell {x},{y} is '{c}'; it must be 0-9 or a-z "
+                           f"(base 36, 0..{HEIGHT_MAX} voxels above the map base), '.' or a space "
+                           f"to leave it procedural, or '{HEIGHT_BEND}' for a bend")
+    return err
 
 
 def tmap_todo():
@@ -6545,6 +5400,7 @@ def check_tmap(mp):
     else:
         walkable(int(sp[0]), int(sp[1]), "spawn")
     err += check_map_light(m, name, w, h)
+    err += check_map_height(m, name, w, h)
     err += check_map_decals(m, name, w, h, entries)
     warn += stamp_fill_warnings(m, name, entries, setname)
     text_ids = set(load_field_text())
@@ -6559,6 +5415,14 @@ def check_tmap(mp):
             err.append(f"{name}: trigger '{' '.join(t)}' has a non-numeric box")
             continue
         kind, rest = t[4], t[5:]
+        # `nightsight` is a bare trailing flag on any trigger: hidden until the party has night
+        # sight. It is taken off before the arguments are counted, so it never looks like one.
+        nightsight = False
+        if len(rest) >= 2 and rest[-2].rstrip(":").lower() == "nightsight" \
+                and rest[-1].lower() in ("yes", "true", "1"):
+            rest, nightsight = rest[:-2], True             # 'nightsight: yes'
+        elif rest and rest[-1].rstrip(":").lower() == "nightsight":
+            rest, nightsight = rest[:-1], True             # the canonical bare trailing word
         if kind not in TRIGGER_KINDS:
             err.append(f"{name}: trigger kind '{kind}' is not one of {', '.join(sorted(TRIGGER_KINDS))}")
             continue
@@ -6584,7 +5448,49 @@ def check_tmap(mp):
             sprite = FIELD_DIRS["walker"] / f"{slug(rest[0])}.png"
             if not sprite.exists():
                 warn.append(f"{name}: npc walker '{rest[0]}' has no {sprite.relative_to(ROOT.parent)} yet")
+        elif kind == "scene":
+            if rest[0] not in played_stems():
+                err.append(f"{name}: scene trigger names '{rest[0]}', which no list in "
+                           f"{PLAYLIST.relative_to(ROOT.parent)} plays")
+        elif kind == "fight":
+            if rest[0] not in FIGHT_IDS:
+                err.append(f"{name}: fight id '{rest[0]}' is not one of {', '.join(sorted(FIGHT_IDS))}")
+            elif not sprite_art(rest[0]).exists():       # a fight draws its encounter as a billboard
+                warn.append(f"{name}: fight '{rest[0]}' has no "
+                            f"{sprite_art(rest[0]).relative_to(ROOT.parent)} yet")
+        elif kind == "pickup":
+            if rest[0] not in ITEM_IDS:
+                err.append(f"{name}: pickup item id '{rest[0]}' is not one of "
+                           f"{', '.join(sorted(ITEM_IDS))}")
+            if rest[1] not in text_ids:
+                err.append(f"{name}: pickup text id '{rest[1]}' has no '## {rest[1]}' entry in "
+                           f"{FIELD_TEXT.relative_to(ROOT.parent)}")
+        elif kind == "sprite":
+            known = field_entries(FIELD_DOCS["sprite"], "sprite") if FIELD_DOCS["sprite"].exists() else {}
+            if rest[0] not in known:
+                err.append(f"{name}: sprite '{rest[0]}' has no '## {rest[0]}' entry in "
+                           f"{FIELD_DOCS['sprite'].relative_to(ROOT.parent)}")
+            elif not sprite_art(rest[0]).exists():
+                warn.append(f"{name}: sprite '{rest[0]}' has no "
+                            f"{sprite_art(rest[0]).relative_to(ROOT.parent)} yet")
+        elif kind == "goal":
+            words = rest[0].split("_")
+            if len(words) > GOAL_MAX_WORDS:
+                err.append(f"{name}: goal line '{rest[0].replace('_', ' ')}' is {len(words)} words; "
+                           f"{GOAL_MAX_WORDS} at most")
+            if len(rest) > 1:
+                err.append(f"{name}: goal takes ONE word-joined argument; write "
+                           f"'{'_'.join(rest)}' as one token")
     return err, warn
+
+
+def sprite_art(ident):
+    return FIELD_DIRS["sprite"] / f"{slug(ident)}.png"
+
+
+def played_stems():
+    """Every scene stem any list in playlist.md names — what a `scene` trigger may point at."""
+    return {stem for rows in playlist_lists().values() for stem, _ in rows}
 
 
 def placeholder_rgb(name):
@@ -6857,1190 +5763,10 @@ def cmd_tmap(args):
         sys.exit(f"story_prompt: {bad} map(s) rejected")
 
 
-# ───────────────────────── Painted screens: a top-down map and its walkable mask ─────────────────────────
-#
-# Owner's direction, 2026-09-19: **the field is Phantasy Star IV, not Final Fantasy VIII.** The
-# angled three-quarter experiment is dropped — with an angled camera every object hides ground, the
-# walkable mask had to guess what was behind a statue, and the walker needed a per-screen scale. A
-# top-down 16-bit map has none of those problems: nothing is walked behind, one scale holds edge to
-# edge, and what the player can walk on is simply what the painter left as ground.
-#
-# So a screen is ONE PAINTING and ONE MASK, in one chat, one message each:
-#
-#   returned.png       the top-down map        -> story/field/screens/<map>_<zone>_paint.png
-#   returned_walk.png  green = walkable ground -> ..._walk.png, the `nav` polygons and the `door` lines
-#
-# and, only for a screen whose entry says `- overhead: yes`, a third:
-#
-#   returned_over.png  white = drawn OVER the player (an archway top, a bridge deck, a balcony)
-#                                              -> ..._over.png, painting pixels with alpha, `over` line
-#
-# Everything the engine needs is derived into story/field/screens/<map>_<zone>.screen in SCREEN
-# PIXELS. The painting is the world here: there is no block-out to agree with and nothing to line up,
-# which is why this path is the main one and `view` is the older one.
-
-SCREENS_DOC = FIELD / "screens.md"            # one '## <map>.<zone>' entry per painted screen
-SCREENS_DIR = FIELD / "screens"               # the paintings, the cleaned masks, the .screen files
-SCREEN_MAX_W = 1536                           # everything is fitted to the painting, capped to this
-SCREEN_DEFAULT_SIZE = (1536, 1024)            # what the prompt asks for when the entry says nothing
-SCREEN_EDGES = ("left", "right", "top", "bottom")
-SCREEN_WALKER = 64                            # a person's height in painting pixels, the scale of everything
-DOOR_FACTOR = 1.15                            # a door is about this much taller than the person
-PATH_PERSONS = 3                              # a path is at least this many people wide (FIELD.md 10b)
-WALK_OPEN = 3                                 # erode then dilate: kills traced outlines up to 2*3 px wide
-WALK_CLOSE = 2                                # then dilate then erode: shuts pinholes and hairline seams
-MASK_SPECK = 40                               # a mask blob smaller than this is the model's noise
-NAV_MIN_AREA = 600                            # a walkable island smaller than this is never kept
-NAV_RETRY_POLYS = 120                         # more than this and the outline is retraced coarser
-NAV_MAX_POLYS = 400                           # more than this and the mask is too fiddly to trust
-NAV_SIMPLIFY = 3.0                            # Douglas-Peucker tolerance, pixels
-NAV_COVER_SLACK = 0.03                        # a coarser outline is only taken if it still covers this well
-NAV_MAX_VERTS = 8                             # convex polygons stay at the size FIELD.md's nav uses
-EXIT_MIN_RUN = 12                             # a walkable run at the frame edge shorter than this is noise
-DOOR_MAX_WIDE = 1.5                           # a threshold notch is at most this many walkers wide
-DOOR_POCKET = 0.75                            # ...and has building within this much of a walker either side
-DOOR_MIN_AREA = 40                            # a notch smaller than this is mask noise, not a door
-
-WALK_MASK_PROMPT = """\
-Make a WALKABLE MASK of the map you just generated. This is a technical image for a game engine, not \
-an illustration.
-
-Output: the exact same image size and framing as the map, aligned pixel for pixel, so that it can be \
-laid over the map and every edge lines up. Do not re-imagine, re-compose, crop, zoom or shift \
-anything. Trace the map.
-
-Use exactly TWO flat colours and nothing else:
-- Pure green #00FF00 = ground a person could stand or walk on.
-- Pure black #000000 = everything else.
-
-No outlines, no line art, no shading, no gradients, no texture, no anti-aliasing, no third colour, no \
-text. Every pixel is either pure green or pure black. Edges are hard.
-
-GREEN (walkable): open ground, grass, dirt, paving, streets, paths and yards; steps and stairs (paint \
-a whole flight as one solid green shape, not tread by tread); ramps; bridges and plank walkways. \
-Walkable areas that connect on the map must connect in the mask: a path joins the square it runs \
-into, a bridge joins the bank at both ends. A doorway a person can enter gets a small green notch at \
-its threshold, in the wall, the width of the door.
-
-BLACK (not walkable): every object exactly as it is drawn, its whole drawn area — buildings and their \
-roofs, walls, fences, hedges, gates, wells, troughs, barrels, crates, carts, market stalls, signposts, \
-statues, trees, bushes, crops, rocks, cliffs, water and streams. If it is drawn on the map and it is \
-not ground, it is black, over the whole shape the painting gives it.
-
-Keep paths at least as wide as they are on the map. When unsure whether a person could walk there, \
-paint it black."""
-
-OVER_MASK_PROMPT = """\
-Now make an OVERHEAD MASK of the same map: the parts of the picture that are drawn ABOVE a person \
-walking there, rather than behind them. Same rules as the last one: exact same size and framing, \
-aligned pixel for pixel, traced from the map.
-
-Use exactly TWO flat colours: pure white #FFFFFF and pure black #000000. No outlines, no shading, no \
-gradients, no anti-aliasing, no text.
-
-WHITE = anything a person walks UNDERNEATH: the top of an archway or a gate, a bridge deck with a \
-path running under it, an overhanging balcony or awning with ground beneath it, the branches of a \
-tree whose trunk the path passes under, a roof that a walkway goes below.
-
-BLACK = everything else, including all the ordinary ground, and every object a person walks AROUND \
-rather than under.
-
-If nothing on this map is walked underneath, the whole image is black, and that is a correct answer."""
-
-# The locked blocks in STYLE.md that apply to a top-down field map. `layout`, `framing`, `acting`,
-# `character_design`, `dialogue_box` and the sheet blocks are all about a manga page — panels,
-# borders, crops, people acting — and a field map is none of those, so they are deliberately left out
-# and the package says so.
-SCREEN_BLOCKS = ("map_header", "map_rendering", "map_negative")
-
-
-def screen_key(mp, zone):
-    return f"{mp}.{zone}"
-
-
-def screen_entries():
-    """{'<map>.<zone>': {desc, exits, landmark, spawn, size, walker, overhead}} from screens.md."""
-    if not SCREENS_DOC.exists():
-        die(f"{SCREENS_DOC.relative_to(ROOT.parent)} not found; it holds one '## <map>.<zone>' entry "
-            f"per painted screen")
-    out, unknown = {}, []
-    for name, body in h2_sections(detok(SCREENS_DOC.read_text(), unknown)).items():
-        if not re.fullmatch(r"[a-z0-9_]+\.[a-z0-9_]+", name):
-            continue                                     # the prose at the top of the file
-        kv = kv_lines(body)
-        desc = squash(" ".join(l for l in body.splitlines()
-                               if l.strip() and not re.match(r"^\s*- [\w ]+?:", l)))
-        if not desc:
-            die(f"screens.md: '## {name}' has no description paragraph")
-        check_description(desc, name, "screens.md")
-        exits = {}
-        for part in (kv.get("exits") or "").replace("→", "->").split(","):
-            if not part.strip():
-                continue
-            bits = [b.strip().lower() for b in part.split("->")]
-            if len(bits) != 2 or bits[0] not in SCREEN_EDGES or not slug(bits[1]):
-                die(f"screens.md: '## {name}' exit '{squash(part)}' is not '<edge> -> <map>'; "
-                    f"edges are {', '.join(SCREEN_EDGES)}")
-            exits[bits[0]] = slug(bits[1])
-        size = SCREEN_DEFAULT_SIZE
-        if kv.get("size"):
-            m = re.fullmatch(r"(\d+)\s*[x×]\s*(\d+)", kv["size"].strip())
-            if not m:
-                die(f"screens.md: '## {name}' size '{kv['size']}' is not WxH")
-            size = (int(m.group(1)), int(m.group(2)))
-        spawn = None
-        if kv.get("spawn"):
-            bits = kv["spawn"].split()
-            if len(bits) != 2 or not all(b.lstrip("-").isdigit() for b in bits):
-                die(f"screens.md: '## {name}' spawn '{kv['spawn']}' is not 'x y' in screen pixels")
-            spawn = (int(bits[0]), int(bits[1]))
-        walker = SCREEN_WALKER
-        if kv.get("walker"):
-            if not kv["walker"].strip().isdigit():
-                die(f"screens.md: '## {name}' walker '{kv['walker']}' is not a height in pixels")
-            walker = int(kv["walker"])
-        mp, zone = name.split(".")
-        out[name] = {"key": name, "map": mp, "zone": zone, "desc": desc, "exits": exits,
-                     "landmark": squash(kv.get("landmark", "")), "spawn": spawn, "size": size,
-                     "walker": walker,
-                     "overhead": (kv.get("overhead", "no").strip().lower() in ("yes", "true", "1"))}
-    if unknown:
-        die(f"screens.md: unknown name token(s) {', '.join('{{%s}}' % t for t in unknown)}. "
-            f"Every token needs a row in {NAMES_FILE.relative_to(ROOT.parent)}.")
-    if not out:
-        die("screens.md: no '## <map>.<zone>' entries")
-    return out
-
-
-def screen_paths(mp, zone):
-    """Every file one screen owns."""
-    base = str(SCREENS_DIR / f"{mp}_{zone}")
-    return {"paint": Path(base + "_paint.png"), "walk": Path(base + "_walk.png"),
-            "over": Path(base + "_over.png"), "screen": Path(base + ".screen"),
-            "debug": Path(base + "_debug.png")}
-
-
-def screen_outputs(mp, zone, overhead=False):
-    p = screen_paths(mp, zone)
-    keys = ["paint", "walk"] + (["over"] if overhead else []) + ["screen"]
-    return [str(p[k].relative_to(ROOT.parent)) for k in keys]
-
-
-def screen_attachments(style, mp, warn):
-    """A map needs no block-out. The style sheet, then whatever this map already has drawn."""
-    out = []
-    sp = existing(style["refs"].get("style"))
-    if sp:
-        out.append((sp, "STYLE reference. " + style["refs"].get("style_note", "")))
-    else:
-        warn.append(f"no style reference at {style['refs'].get('style')}; the prompt text carries the style alone")
-    placed = map_places(mp)
-    for kind, ids in (("buildings", placed["buildings"]), ("props", placed["props"])):
-        for i in ids:
-            if len(out) >= VIEW_ATTACH_MAX:
-                break
-            f = (FIELD_DIRS["building"] / f"{i}_front.png") if kind == "buildings" else \
-                (FIELD_DIRS["prop"] / f"{i}.png")
-            if f.exists():
-                out.append((f, f"The {i.replace('_', ' ')} as it is drawn in this game. It belongs in "
-                               f"this place; keep its design, colours and proportions."))
-    return out
-
-
-def screen_paint_prompt(e, style, warn):
-    """Prompt A: the map itself, in the top-down oblique a 16-bit JRPG town is drawn in."""
-    b = style["blocks"]
-    missing = [k for k in SCREEN_BLOCKS if k not in b]
-    if missing:
-        die(f"STYLE.md: a map prompt needs the locked block(s) {', '.join(missing)}. They are the "
-            f"field-map half of the style: the panel blocks talk about skin, hair and skies, which a "
-            f"map has none of.")
-    w, h = e["size"]
-    P = e["walker"]
-    D = int(round(P * DOOR_FACTOR))
-    L = ["Paint one complete top-down map for a 16-bit JRPG: the whole place the player walks around "
-         "in, as one finished picture. This is a field map, not a comic page and not a scene — no "
-         "panels, no borders, no frame, one single image filling the canvas edge to edge.", "",
-         b["map_header"], "",
-         "THE PROJECTION, and it is the most important instruction here: the classic top-down oblique "
-         "those games are drawn in. The ground is seen from straight above, flat, as if the map were "
-         "laid on a table. Buildings and objects show their roof and their front — their south — face "
-         "only, and every vertical edge runs straight up the screen. There is NO perspective, NO "
-         "vanishing point, NO horizon and no sky. Nothing gets smaller further up the picture: one "
-         "uniform scale from edge to edge, the same size at the top as at the bottom. Nothing leans, "
-         "nothing is foreshortened, no side or three-quarter faces on anything.", ""]
-    if e["landmark"]:
-        L += [f"THE LANDMARK, which must be clearly on the map: {e['landmark'].rstrip('.')}.", ""]
-    L += ["THE PLACE:", e["desc"], "",
-          f"THE SCALE, which everything is drawn to: a person is about {P} pixels tall on this map and "
-          f"a door about {D} pixels tall, at {w}x{h}. A house is a few people wide, a well is about one "
-          f"person across, and every path, street and gap a person has to walk through is at least "
-          f"{PATH_PERSONS * P} pixels wide — {PATH_PERSONS} people abreast. Draw no people; the scale "
-          f"is there so the buildings and the gaps between them come out the right size.", "",
-          "THE GROUND A PERSON CAN WALK ON reads at a glance: open ground, paving, dirt and grass, with "
-          "a clear edge where it stops and a clear line where every object stands on it. Paths connect "
-          "to each other and to the places they lead; nothing walkable is left as an island that "
-          "cannot be reached.", ""]
-    if e["exits"]:
-        runs = "; ".join(f"the {edge} edge, the way to {t.replace('_', ' ')}"
-                         for edge, t in sorted(e["exits"].items()))
-        L += [f"THE WAYS OUT run off the edge of the map as roads or paths: {runs}. Each one reaches "
-              f"the very edge of the canvas, at least {PATH_PERSONS * P} pixels wide, not stopping "
-              f"short of it and not blocked by anything.", ""]
-    L += ["HOW THE PLACE IS SHAPED — people grew this, they did not lay it out. It spread from one "
-          "reason, so the oldest and densest part is round that and it thins toward the edges. Lanes "
-          "bend, fork, pinch and widen, and some end in a yard. Nothing is in a row: buildings are "
-          "staggered along the lanes at irregular spacings and in clearly different sizes and shapes, "
-          "set forward and back from the path rather than lined up, so no two edges run together for "
-          "long. No grid, no city blocks, no repeated spacing, no mirror symmetry — those belong to "
-          "the ancients and this is not one of their places. The map does not stop at a clean line: "
-          "the edges dissolve into orchard, hedge, wall, shed, rock and field.", "",
-          "NO PEOPLE, no characters, no animals: the game draws those on top as moving sprites, and a "
-          "painted one would stand still forever. No text, no letters, no numbers, no writing on signs "
-          "or boards, no labels, no watermark, no user interface, no map legend, no compass, no frame, "
-          "no border, no vignette and no letterboxing.", "",
-          f"RENDERING: {b['map_rendering']}", "",
-          f"SIZE: one landscape image, {w}x{h}, painted edge to edge, the map filling the whole frame "
-          f"like a piece cut out of a larger world.", "",
-          f"AVOID: {b['map_negative']}, empty unpainted areas, writing of any kind on signs or boards"]
-    return "\n".join(L)
-
-
-def cmd_screen(args):
-    """One painted top-down map per screen: the map and its walkable mask, asked for in one chat."""
-    pos = [a for a in args if not a.startswith("--")]
-    if len(pos) == 1 and "." in pos[0]:
-        pos = pos[0].split(".", 1)
-    if len(pos) != 2:
-        die("usage: screen <map> <zone>   (the entry lives in story/field/screens.md)")
-    mp, zone = slug(pos[0]), slug(pos[1])
-    entries = screen_entries()
-    e = entries.get(screen_key(mp, zone))
-    if not e:
-        die(f"no '## {mp}.{zone}' in {SCREENS_DOC.relative_to(ROOT.parent)}. It has: "
-            f"{', '.join(sorted(entries)) or '(nothing)'}")
-    style, warn = load_style(), []
-    attach = screen_attachments(style, mp, warn)
-    paint = screen_paint_prompt(e, style, warn)
-    w, h = e["size"]
-    over = e["overhead"]
-    p, name = screen_paths(mp, zone), f"screen_{mp}_{zone}"
-    outs = screen_outputs(mp, zone, over)
-    steps = [{"n": 1, "what": "paint", "save": f"{RETURNED}.png", "prompt": paint},
-             {"n": 2, "what": "walk", "save": f"{RETURNED}_walk.png", "prompt": WALK_MASK_PROMPT}]
-    if over:
-        steps.append({"n": 3, "what": "over", "save": f"{RETURNED}_over.png", "prompt": OVER_MASK_PROMPT})
-
-    manifest = pkg_path(name, "sheet.json")
-    manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text(json.dumps({
-        "screen": name, "kind": "screen", "map": mp, "zone": zone, "size": [w, h],
-        "landmark": e["landmark"], "exits": e["exits"], "spawn": list(e["spawn"]) if e["spawn"] else None,
-        "walker": e["walker"], "overhead": over, "outputs": outs,
-        "returns": {s["what"]: s["save"] for s in steps},
-        "steps": [{"n": s["n"], "what": s["what"], "save": s["save"]} for s in steps],
-        "prompts": {s["what"]: s["prompt"] for s in steps},
-    }, indent=2) + "\n")
-
-    rel = lambda q: q.relative_to(ROOT.parent)
-    here = PKG_DIR.relative_to(ROOT.parent) if PKG_DIR is not None else Path("story/out")
-    has = lambda o: "**exists**" if (ROOT.parent / o).exists() else "missing"
-    L = [f"# ChatGPT package: {PKG_TITLE or f'{mp} / {zone} — painted map'}", "",
-         f"**One chat, {len(steps)} messages.** The map first, then the mask" +
-         (", then the overhead mask" if over else "") + ", each in its own message in the same chat, so",
-         "ChatGPT is tracing a picture it can see. Do not start a new chat for the mask, and do not ask",
-         "for the map and the mask in one message — the mask must be traced from the finished map.", "",
-         "## What exists already", ""]
-    L += [f"- `{o}` — {has(o)}" for o in outs]
-    L += ["", f"Style blocks used from `story/STYLE.md`: {', '.join(SCREEN_BLOCKS)} (`negative` minus "
-              f"its comic-page complaints). The panel blocks — `layout`, `framing`, `acting`, "
-              f"`character_design`, `dialogue_box`, `sheet_layout` — are deliberately **not** used: "
-              f"this is a top-down field map, not a manga page.", "",
-          "## 1. Start a new chat and attach these files, in this order", ""]
-    L += [f"{n}. `{rel(q)}`" for n, (q, _) in enumerate(attach, 1)] or \
-         ["(nothing to attach yet — no style reference and no cut sprites for this map. The prompt "
-          "carries the style on its own.)"]
-    if attach:
-        L += [""] + [f"- Image {n}: {note}" for n, (_, note) in enumerate(attach, 1)]
-    titles = {"paint": f"the map ({w}x{h})", "walk": "the walkable mask",
-              "over": "the overhead mask (what is drawn above the player)"}
-    for s in steps:
-        L += ["", f"## {s['n'] + 1}. Message {s['n']} — paste this and get {titles[s['what']]}", "",
-              "````", s["prompt"], "````", "",
-              f"Save it in **this folder** as `{s['save']}`" +
-              (f" (the whole path is `{here}/{s['save']}`). A .jpg or .webp works too; the tool "
-               f"converts it." if s["n"] == 1 else ".")]
-    L += ["", f"## {len(steps) + 2}. Check before cutting", "",
-          "- [ ] Top-down: the ground is seen from straight above, objects show only roof and front face",
-          "- [ ] No perspective, no vanishing point, no horizon, no sky, nothing shrinking with distance",
-          f"- [ ] One scale everywhere: a door about {D_of(e)} px tall, paths {PATH_PERSONS * e['walker']} px wide",
-          "- [ ] Lanes bend; buildings are staggered, different sizes, never in rows; no grid",
-          "- [ ] Every way out runs off its edge of the frame"
-          + (f" ({', '.join(sorted(e['exits']))})" if e["exits"] else ""),
-          "- [ ] No people, no animals, no text, no interface, no border",
-          "- [ ] The mask is the same size and framing as the map, pixel for pixel",
-          "- [ ] The mask is two flat colours only — no outlines, no shading, no third colour",
-          "- [ ] Green is only ground: every object, roof, tree, wall and stretch of water is black",
-          "- [ ] Every enterable door has a small green notch at its threshold", "",
-          "If a mask drifts, reply in the same chat: \"Trace the map exactly — same size and framing,",
-          "two flat colours only, no outlines.\"", "",
-          f"## {len(steps) + 3}. Then cut", "", "```", f"./story_prompt.py ingest {here}", "```", "",
-          "That fits everything to one size and writes " + ", ".join(f"`{o}`" for o in outs) + " — the",
-          "size, the nav polygons, the doors, the exits, the spawn and the walker height, all in screen",
-          "pixels, which is what the engine loads.",
-          f"Add `--debug` to also write `{rel(p['debug'])}`: the map with the nav polygons outlined and",
-          "the doors and exits marked, so what the tool understood can be seen at a glance.", ""]
-    pkg_path(name, "chatgpt.md").write_text("\n".join(L))
-    for x in warn:
-        print(f"warning: {x}", file=sys.stderr)
-    print(f"wrote {pkg_path(name, 'chatgpt.md').relative_to(ROOT.parent)}  "
-          f"({w}x{h}, walker {e['walker']} px, {len(steps)} step(s), {len(e['exits'])} exit(s), "
-          f"{len(attach)} attachment(s))")
-
-
-def D_of(e):
-    return int(round(e["walker"] * DOOR_FACTOR))
-
-# ── binary masks, as one big integer a row ──
-#
-# Erode and dilate a 1536x1024 mask pixel by pixel in Python and a screen takes minutes. A row is a
-# W-bit integer instead, so a dilation is five shifts and an or per row and the whole pass is a
-# thousand big-integer operations. The structuring element is the 4-neighbour plus, applied n times,
-# which is a diamond of radius n.
-
-def mask_of(rows, w, h, ch, test):
-    """A flat bytearray of 0/1, one byte a pixel, from a pixel test."""
-    g = bytearray(w * h)
-    for y in range(h):
-        line, o = rows[y], y * w
-        for x in range(w):
-            i = x * ch
-            if test(line[i], line[i + 1], line[i + 2]):
-                g[o + x] = 1
-    return g
-
-
-def walk_test(r, g, b):
-    return g > 128 and r < 128 and b < 128
-
-
-def fg_test(r, g, b):
-    return (r * 299 + g * 587 + b * 114) > 128000
-
-
-def bits_of(g, w, h):
-    return [int("".join("1" if v else "0" for v in g[y * w:(y + 1) * w]), 2) for y in range(h)]
-
-
-def grid_of(bits, w, h):
-    g = bytearray(w * h)
-    for y in range(h):
-        o = y * w
-        for x, cch in enumerate(format(bits[y], "b").rjust(w, "0")[-w:]):
-            if cch == "1":
-                g[o + x] = 1
-    return g
-
-
-def dilate_bits(bits, w, n):
-    m = (1 << w) - 1
-    for _ in range(n):
-        out = []
-        for y, r in enumerate(bits):
-            v = r | (r << 1) | (r >> 1)
-            if y:
-                v |= bits[y - 1]
-            if y + 1 < len(bits):
-                v |= bits[y + 1]
-            out.append(v & m)
-        bits = out
-    return bits
-
-
-def erode_bits(bits, w, n):
-    """Erode = the complement of the dilated complement, with everything outside the frame empty."""
-    m = (1 << w) - 1
-    for _ in range(n):
-        comp = [m & ~r for r in bits]
-        grown = []
-        for y, r in enumerate(comp):
-            v = r | (r << 1) | (r >> 1) | (~m)           # outside the side edges is empty
-            v |= comp[y - 1] if y else m                 # outside the top and bottom too
-            v |= comp[y + 1] if y + 1 < len(comp) else m
-            grown.append(v & m)
-        bits = [b & (m & ~gq) for b, gq in zip(bits, grown)]
-    return bits
-
-
-def morph(g, w, h, opening=0, closing=0):
-    """Open by `opening` px (kill lines), then close by `closing` px (shut pinholes)."""
-    bits = bits_of(g, w, h)
-    if opening:
-        bits = dilate_bits(erode_bits(bits, w, opening), w, opening)
-    if closing:
-        bits = erode_bits(dilate_bits(bits, w, closing), w, closing)
-    return grid_of(bits, w, h)
-
-
-def grid_components(g, w, h, value=1):
-    """[[pixel index, ...]] for each 4-connected run of `value`. Iterative, so a big blob is safe."""
-    seen, out = bytearray(w * h), []
-    for start in range(w * h):
-        if g[start] != value or seen[start]:
-            continue
-        seen[start] = 1
-        stack, comp = [start], []
-        while stack:
-            i = stack.pop()
-            comp.append(i)
-            x, y = i % w, i // w
-            if x and g[i - 1] == value and not seen[i - 1]:
-                seen[i - 1] = 1
-                stack.append(i - 1)
-            if x + 1 < w and g[i + 1] == value and not seen[i + 1]:
-                seen[i + 1] = 1
-                stack.append(i + 1)
-            if y and g[i - w] == value and not seen[i - w]:
-                seen[i - w] = 1
-                stack.append(i - w)
-            if y + 1 < h and g[i + w] == value and not seen[i + w]:
-                seen[i + w] = 1
-                stack.append(i + w)
-        out.append(comp)
-    return out
-
-
-def fill_pinholes(g, w, h, speck=MASK_SPECK):
-    filled = 0
-    for comp in grid_components(g, w, h, 0):
-        if len(comp) >= speck or any(i % w in (0, w - 1) or i // w in (0, h - 1) for i in comp):
-            continue
-        filled += 1
-        for i in comp:
-            g[i] = 1
-    return filled
-
-
-def comp_box(comp, w):
-    xs = [i % w for i in comp]
-    ys = [i // w for i in comp]
-    return min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
-
-
-def reachable_walk(g, w, h, spawn, declared, report, debug=False):
-    """Only the ground the player can actually stand on: their own island, plus the ways out.
-
-    The first real mask painted green on aqueduct arches on the skyline, on windows, on the inside of
-    archways and on roof terraces — all of it unreachable, none of it connected to the plaza. So one
-    component survives (the one the spawn point is in, or the biggest), together with any component
-    that reaches a declared exit edge, and everything else is named in the report and dropped."""
-    comps = grid_components(g, w, h, 1)
-    if not comps:
-        return g, []
-    edge_of = {}
-    for n, comp in enumerate(comps):
-        edges = set()
-        for i in comp:
-            x, y = i % w, i // w
-            if x == 0:
-                edges.add("left")
-            if x == w - 1:
-                edges.add("right")
-            if y == 0:
-                edges.add("top")
-            if y == h - 1:
-                edges.add("bottom")
-        edge_of[n] = edges
-    home = None
-    if spawn:
-        sx, sy = int(spawn[0]), int(spawn[1])
-        if 0 <= sx < w and 0 <= sy < h:
-            idx = sy * w + sx
-            home = next((n for n, comp in enumerate(comps) if idx in set(comp)), None)
-    if home is None:
-        home = max(range(len(comps)), key=lambda n: len(comps[n]))
-    keep = {home}
-    for n, comp in enumerate(comps):
-        if len(comp) >= NAV_MIN_AREA and edge_of[n] & set(declared):
-            keep.add(n)
-    dropped = []
-    for n, comp in enumerate(comps):
-        if n in keep:
-            continue
-        for i in comp:
-            g[i] = 0
-        if len(comp) >= NAV_MIN_AREA:
-            dropped.append(comp)
-    # One line per island is dozens of lines on a painted screen and says nothing the summary does
-    # not; the detail is there under --debug when an island is actually being hunted.
-    if dropped and debug:
-        for comp in dropped:
-            x, y, bw, bh = comp_box(comp, w)
-            report.append(f"dropped an unreachable walkable island of {len(comp)} px at "
-                          f"{x},{y} {bw}x{bh} (nothing connects it to the ground the player stands on)")
-    elif dropped:
-        report.append(f"dropped {len(dropped)} unreachable walkable island(s), "
-                      f"{sum(len(c) for c in dropped)} px in all (nothing connects them to the ground "
-                      f"the player stands on); rerun with --debug for each one's box")
-    return g, sorted(keep)
-
-
-# ── from a binary grid to convex polygons ──
-
-def trace_loops(g, w, h):
-    """Closed loops along the pixel boundary of a binary grid, interior on the right.
-
-    Every filled cell contributes the four unit edges its empty neighbours leave exposed; shared
-    edges cancel by never being emitted. Chaining them gives one loop per outline, positive shoelace
-    for an outer boundary and negative for a hole. At a pinch — two cells touching only at a corner —
-    a point has two ways out, and taking the sharpest right turn splits the figure the way the eye
-    does instead of knotting the two loops together."""
-    edges = {}
-    def add(a, b):
-        edges.setdefault(a, []).append(b)
-    for y in range(h):
-        o = y * w
-        for x in range(w):
-            if not g[o + x]:
-                continue
-            if y == 0 or not g[o + x - w]:
-                add((x, y), (x + 1, y))
-            if x + 1 >= w or not g[o + x + 1]:
-                add((x + 1, y), (x + 1, y + 1))
-            if y + 1 >= h or not g[o + x + w]:
-                add((x + 1, y + 1), (x, y + 1))
-            if x == 0 or not g[o + x - 1]:
-                add((x, y + 1), (x, y))
-    loops = []
-    while edges:
-        start = next(iter(edges))
-        loop, cur, d = [], start, None
-        while True:
-            outs = edges.get(cur)
-            if not outs:
-                break
-            if len(outs) == 1 or d is None:
-                nxt = outs.pop()
-            else:                                        # sharpest right turn first
-                pick = 0
-                for want in ((-d[1], d[0]), d, (d[1], -d[0]), (-d[0], -d[1])):
-                    cand = (cur[0] + want[0], cur[1] + want[1])
-                    if cand in outs:
-                        pick = outs.index(cand)
-                        break
-                nxt = outs.pop(pick)
-            if not outs:
-                del edges[cur]
-            loop.append(cur)
-            d = (nxt[0] - cur[0], nxt[1] - cur[1])
-            cur = nxt
-            if cur == start:
-                break
-        if len(loop) >= 4:
-            loops.append(loop)
-    return loops
-
-
-def shoelace(pts):
-    s = 0.0
-    for i in range(len(pts)):
-        x0, y0 = pts[i]
-        x1, y1 = pts[(i + 1) % len(pts)]
-        s += x0 * y1 - x1 * y0
-    return s / 2.0
-
-
-def drop_collinear(pts, eps=1e-9):
-    out, n = [], len(pts)
-    for i in range(n):
-        a, b, c = pts[i - 1], pts[i], pts[(i + 1) % n]
-        if abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) > eps:
-            out.append(b)
-    return out or pts
-
-
-def dp_simplify(chain, eps):
-    """Douglas-Peucker on an open chain of points."""
-    if len(chain) < 3:
-        return list(chain)
-    keep = [False] * len(chain)
-    keep[0] = keep[-1] = True
-    stack = [(0, len(chain) - 1)]
-    while stack:
-        a, b = stack.pop()
-        if b <= a + 1:
-            continue
-        ax, ay = chain[a]
-        bx, by = chain[b]
-        dx, dy = bx - ax, by - ay
-        norm = (dx * dx + dy * dy) ** 0.5
-        best, bi = -1.0, a
-        for i in range(a + 1, b):
-            px, py = chain[i]
-            d = (abs(dx * (ay - py) - dy * (ax - px)) / norm) if norm else \
-                ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5
-            if d > best:
-                best, bi = d, i
-        if best > eps:
-            keep[bi] = True
-            stack += [(a, bi), (bi, b)]
-    return [p for p, k in zip(chain, keep) if k]
-
-
-def simplify_loop(loop, eps):
-    """Douglas-Peucker on a closed loop: split it at two far-apart points first."""
-    pts = drop_collinear([(float(x), float(y)) for x, y in loop])
-    if len(pts) < 4:
-        return pts
-    cx = sum(p[0] for p in pts) / len(pts)
-    cy = sum(p[1] for p in pts) / len(pts)
-    a = max(range(len(pts)), key=lambda i: (pts[i][0] - cx) ** 2 + (pts[i][1] - cy) ** 2)
-    b = max(range(len(pts)), key=lambda i: (pts[i][0] - pts[a][0]) ** 2 + (pts[i][1] - pts[a][1]) ** 2)
-    if a > b:
-        a, b = b, a
-    out = dp_simplify(pts[a:b + 1], eps)[:-1] + dp_simplify(pts[b:] + pts[:a + 1], eps)[:-1]
-    return drop_collinear(out) if len(out) >= 3 else pts
-
-
-def point_in_poly(p, poly):
-    x, y, inside = p[0], p[1], False
-    for i in range(len(poly)):
-        x0, y0 = poly[i]
-        x1, y1 = poly[(i + 1) % len(poly)]
-        if (y0 > y) != (y1 > y) and x < (x1 - x0) * (y - y0) / (y1 - y0) + x0:
-            inside = not inside
-    return inside
-
-
-def bridge_holes(outer, holes):
-    """Splice each hole into the outer ring with a two-way bridge, so one ring is left."""
-    ring = list(outer)
-    for hole in sorted(holes, key=lambda hh: -abs(shoelace(hh))):
-        if len(hole) < 3:
-            continue
-        best = None
-        for i, a in enumerate(ring):
-            for j, b in enumerate(hole):
-                d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
-                if best is None or d < best[0]:
-                    best = (d, i, j)
-        _, i, j = best
-        ring = ring[:i + 1] + hole[j:] + hole[:j + 1] + ring[i:]
-    return ring
-
-
-def ear_clip(ring):
-    """Triangles for a simple polygon, in positive (shoelace > 0) orientation."""
-    pts = list(ring)
-    if shoelace(pts) < 0:
-        pts.reverse()
-    idx, tris, guard = list(range(len(pts))), [], 0
-    def cross(a, b, c):
-        return (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - \
-               (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0])
-    while len(idx) > 3 and guard < 4 * len(ring) + 64:
-        guard += 1
-        cut = None
-        for k in range(len(idx)):
-            a, b, c = idx[k - 1], idx[k], idx[(k + 1) % len(idx)]
-            if cross(a, b, c) <= 1e-9:
-                continue
-            bad = False
-            for m in idx:
-                if m in (a, b, c):
-                    continue
-                px, py = pts[m]
-                d1 = (pts[b][0] - pts[a][0]) * (py - pts[a][1]) - (pts[b][1] - pts[a][1]) * (px - pts[a][0])
-                d2 = (pts[c][0] - pts[b][0]) * (py - pts[b][1]) - (pts[c][1] - pts[b][1]) * (px - pts[b][0])
-                d3 = (pts[a][0] - pts[c][0]) * (py - pts[c][1]) - (pts[a][1] - pts[c][1]) * (px - pts[c][0])
-                if d1 > 0 and d2 > 0 and d3 > 0:     # strictly inside: a bridge's doubled vertex
-                    bad = True                       # sits exactly on the ear and must not block it
-                    break
-            if not bad:
-                cut = k
-                break
-        if cut is None:                                  # a bridge slit or a rounding knot: force progress
-            cut = max(range(len(idx)), key=lambda k: cross(idx[k - 1], idx[k], idx[(k + 1) % len(idx)]))
-            if cross(idx[cut - 1], idx[cut], idx[(cut + 1) % len(idx)]) <= 0:
-                idx.pop(cut)
-                continue
-        a, b, c = idx[cut - 1], idx[cut], idx[(cut + 1) % len(idx)]
-        tris.append([pts[a], pts[b], pts[c]])
-        idx.pop(cut)
-    if len(idx) == 3:
-        tris.append([pts[i] for i in idx])
-    return [t for t in tris if abs(shoelace(t)) > 0.5]
-
-
-def is_convex(poly, eps=1e-6):
-    if len(poly) < 3:
-        return False
-    for i in range(len(poly)):
-        a, b, c = poly[i - 1], poly[i], poly[(i + 1) % len(poly)]
-        if (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < -eps:
-            return False
-    return True
-
-
-def merge_convex(tris, max_verts=NAV_MAX_VERTS):
-    """Hertel-Mehlhorn: drop a shared diagonal whenever what is left is still convex."""
-    polys, changed = [list(t) for t in tris], True
-    while changed:
-        changed = False
-        edges = {}
-        for pi, poly in enumerate(polys):
-            for k in range(len(poly)):
-                a, b = poly[k], poly[(k + 1) % len(poly)]
-                edges.setdefault(tuple(sorted((a, b))), []).append((pi, k))
-        cands = []                                       # longest diagonal first: fewer slivers
-        for key, uses in edges.items():
-            if len(uses) == 2:
-                (ax, ay), (bx, by) = key
-                cands.append((-((ax - bx) ** 2 + (ay - by) ** 2), uses))
-        for _d, uses in sorted(cands, key=lambda c: c[0]):
-            (pi, ki), (qi, kj) = uses
-            if pi == qi:
-                continue
-            p, q = polys[pi], polys[qi]
-            P = p[ki + 1:] + p[:ki + 1]                  # starts at the far end of the shared edge
-            Q = q[kj + 1:] + q[:kj + 1]
-            if P[0] != Q[-1] or P[-1] != Q[0]:
-                continue
-            merged = drop_collinear(P + Q[1:-1])
-            if len(merged) > max_verts or len(set(merged)) != len(merged):
-                continue
-            if shoelace(merged) <= 0 or not is_convex(merged):
-                continue
-            polys[pi] = merged
-            polys.pop(qi)
-            changed = True
-            break
-    return polys
-
-
-def polys_from_grid(g, w, h, eps):
-    loops = trace_loops(g, w, h)
-    outers = [l for l in loops if shoelace(l) > 0]
-    holes = [l for l in loops if shoelace(l) < 0]
-    out = []
-    for outer in outers:
-        ring = simplify_loop(outer, eps)
-        if len(ring) < 3:
-            continue
-        mine = [simplify_loop(hl, eps) for hl in holes
-                if abs(shoelace(hl)) > eps * eps and point_in_poly(hl[0], ring)]
-        out += merge_convex(ear_clip(bridge_holes(ring, [hl for hl in mine if len(hl) >= 3])))
-    return out
-
-
-def nav_polygons(g, w, h, report):
-    """Convex polygons in screen pixels covering the walkable ground."""
-    green = max(1, sum(g))
-    eps, tried = NAV_SIMPLIFY, []
-    while True:                                          # coarser until it is few enough, or too loose
-        polys = polys_from_grid(g, w, h, eps)
-        cover = sum(abs(shoelace(q)) for q in polys) / green
-        tried.append((eps, polys, cover))
-        if len(polys) <= NAV_RETRY_POLYS or eps >= NAV_SIMPLIFY * 16:
-            break
-        eps *= 2
-    fits = [t for t in tried if abs(t[2] - 1) <= NAV_COVER_SLACK and all(is_convex(q) for q in t[1])]
-    eps, polys, cover = (min(fits, key=lambda t: len(t[1])) if fits else
-                         min(tried, key=lambda t: abs(t[2] - 1)))
-    if len(tried) > 1:
-        report.append("the walkable outline came apart into a lot of convex polygons (an edge with "
-                      "trees and bushes cut into it): " +
-                      ", ".join(f"{n} at {e:.0f} px covering {100 * c:.0f}%"
-                                for e, ps, c in tried for n in [len(ps)]) +
-                      f" — kept {len(polys)} at {eps:.0f} px, the fewest that still cover the ground")
-    if len(polys) > NAV_MAX_POLYS:
-        polys.sort(key=lambda p: -abs(shoelace(p)))
-        report.append(f"still {len(polys)} polygons; keeping the {NAV_MAX_POLYS} biggest, which loses "
-                      f"walkable ground. The mask is probably speckled or has line art left in it.")
-        polys = polys[:NAV_MAX_POLYS]
-    return polys, eps
-
-
-# ── doors, exits, the .screen file ──
-
-def row_spans(g, w, y, value=1):
-    """[(x0, x1)] horizontal runs of `value` in one row."""
-    out, start, o = [], None, y * w
-    for x in range(w + 1):
-        v = (g[o + x] == value) if x < w else False
-        if v and start is None:
-            start = x
-        elif not v and start is not None:
-            out.append((start, x - 1))
-            start = None
-    return out
-
-
-def nearest_flags(line, n):
-    """(before, after): for each index, the index of the nearest set element at or before / after it."""
-    before, after, last = [-1] * n, [n] * n, -1
-    for i in range(n):
-        if line[i]:
-            last = i
-        before[i] = last
-    last = n
-    for i in range(n - 1, -1, -1):
-        if line[i]:
-            last = i
-        after[i] = last
-    return before, after
-
-
-def doors(walk, w, h, walker, report):
-    """Green notches poked into a building: the thresholds the mask prompt asks for.
-
-    A doorway is a pocket. On its own row it has non-walkable close by on both sides, and there is
-    non-walkable close above it too, because it is cut into the front wall of something. Anything
-    wider than about one and a half people is a gap between buildings, not a door."""
-    reach = max(4, int(DOOR_POCKET * walker))
-    wide = max(6, int(DOOR_MAX_WIDE * walker))
-    pocket = bytearray(w * h)
-    for y in range(h):
-        o = y * w
-        solid = bytearray(0 if walk[o + x] else 1 for x in range(w))
-        before, after = nearest_flags(solid, w)
-        for x0, x1 in row_spans(walk, w, y):
-            if x1 - x0 + 1 > wide:
-                continue
-            l, r = before[x0], after[x1]
-            if l < 0 or r >= w or x0 - l > reach or r - x1 > reach:
-                continue
-            for x in range(x0, x1 + 1):
-                pocket[o + x] = 1
-    for x in range(w):                                   # and something solid overhead: a wall, not a lane
-        col = bytearray(0 if walk[y * w + x] else 1 for y in range(h))
-        before, _ = nearest_flags(col, h)
-        for y in range(h):
-            if pocket[y * w + x] and (before[y] < 0 or y - before[y] > reach):
-                pocket[y * w + x] = 0
-    out = []
-    for comp in grid_components(pocket, w, h, 1):
-        if len(comp) < DOOR_MIN_AREA:
-            continue
-        x, y, bw, bh = comp_box(comp, w)
-        if bw > wide or bh > wide:
-            continue
-        out.append((x, y, bw, bh))
-    out.sort(key=lambda d: (d[1], d[0]))
-    if out:
-        report.append(f"{len(out)} doorway notch(es) found in the walkable mask; they are `door` lines "
-                      f"in the .screen and nothing is bound to them yet")
-    return out
-
-
-def edge_runs(g, w, h, edge):
-    """[(x0, y0, x1, y1)] walkable runs along one frame edge, in screen pixels."""
-    if edge in ("left", "right"):
-        x = 0 if edge == "left" else w - 1
-        line = [g[y * w + x] for y in range(h)]
-    else:
-        y = 0 if edge == "top" else h - 1
-        line = [g[y * w + x] for x in range(w)]
-    runs, start = [], None
-    for i, v in enumerate(list(line) + [0]):
-        if v and start is None:
-            start = i
-        elif not v and start is not None:
-            if i - start >= EXIT_MIN_RUN:
-                runs.append((start, i - 1))
-            start = None
-    if edge in ("left", "right"):
-        x = 0 if edge == "left" else w - 1
-        return [(x, a, x, b) for a, b in runs]
-    y = 0 if edge == "top" else h - 1
-    return [(a, y, b, y) for a, b in runs]
-
-
-def screen_exits(walk, w, h, declared, report):
-    out = []
-    for edge in SCREEN_EDGES:
-        runs = edge_runs(walk, w, h, edge)
-        target = declared.get(edge)
-        if target and not runs:
-            report.append(f"screens.md declares an exit on the {edge} edge to '{target}', but no "
-                          f"walkable ground reaches that edge — the map did not run the road off the "
-                          f"frame, or the mask cut it off. The engine gets no {edge} exit.")
-        for r in runs:
-            if not target:
-                report.append(f"walkable ground touches the {edge} edge ({r[0]},{r[1]} to {r[2]},{r[3]}) "
-                              f"but screens.md declares no exit there; written with target '-'")
-            out.append((edge, r, target or "-"))
-    return out
-
-
-def poly_centroid(poly):
-    a = shoelace(poly)
-    if abs(a) < 1e-6:
-        return (sum(p[0] for p in poly) / len(poly), sum(p[1] for p in poly) / len(poly))
-    cx = cy = 0.0
-    for i in range(len(poly)):
-        x0, y0 = poly[i]
-        x1, y1 = poly[(i + 1) % len(poly)]
-        f = x0 * y1 - x1 * y0
-        cx += (x0 + x1) * f
-        cy += (y0 + y1) * f
-    return (cx / (6 * a), cy / (6 * a))
-
-
-def fmt_pt(p):
-    return f"{int(round(p[0]))} {int(round(p[1]))}"
-
-
-def write_screen_file(path, meta, polys, door_list, exits, spawn):
-    L = [f"# {path.name} — generated by ./story_prompt.py ingest. Never edited by hand.",
-         "# A top-down 16-bit map. Everything is in SCREEN PIXELS of the painting, which is the world.",
-         f"map {meta['map']}", f"zone {meta['zone']}",
-         f"size {meta['w']} {meta['h']}",
-         f"paint {meta['paint']}", f"walk {meta['walk']}"]
-    if meta.get("over"):
-        L += ["# over: the painting's pixels that are drawn ABOVE the walker (an arch top, a bridge "
-              "deck), with alpha everywhere else. Drawn after the walker, at the same position.",
-              f"over {meta['over']}"]
-    L += [f"# walker: how tall the player's sprite is drawn on this map, in screen pixels.",
-          f"walker {meta['walker']}",
-          f"spawn {fmt_pt(spawn)}",
-          "# top-down: one scale over the whole map, so the walker never changes size.",
-          "scale_near 1.000 at " + str(meta["h"] - 1), "scale_far 1.000 at 0", "",
-          f"# nav: {len(polys)} convex polygon(s), vertices in order, walkable ground only"]
-    for n, poly in enumerate(polys, 1):
-        L.append(f"poly {n}: " + ", ".join(fmt_pt(p) for p in poly))
-    L += ["", "# door: a threshold notch cut into a building. Nothing is bound to it yet.",
-          *(f"door {x} {y} {bw} {bh}" for x, y, bw, bh in door_list),
-          "", "# exit: edge x0 y0 x1 y1 target_map"]
-    for edge, r, target in exits:
-        L.append(f"exit {edge} {r[0]} {r[1]} {r[2]} {r[3]} {target}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(L) + "\n")
-
-
-def draw_line(rows, x0, y0, x1, y1, rgb, thick=1):
-    dx, dy = abs(x1 - x0), -abs(y1 - y0)
-    sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
-    err = dx + dy
-    while True:
-        fill_rect(rows, x0 - thick // 2, y0 - thick // 2, thick, thick, rgb)
-        if x0 == x1 and y0 == y1:
-            break
-        e2 = 2 * err
-        if e2 >= dy:
-            err += dy
-            x0 += sx
-        if e2 <= dx:
-            err += dx
-            y0 += sy
-
-
-def screen_debug_image(paint, w, h, polys, door_list, exits, spawn, over, out):
-    """The map with the nav polygons outlined, the doors and exits marked, the overhead tinted."""
-    rows = [bytearray(r) for r in paint]
-    if over:
-        for y in range(h):
-            line, o = rows[y], y * w
-            for x in range(w):
-                if over[o + x]:
-                    i = x * 3
-                    line[i] = (line[i] + 255) // 2
-                    line[i + 1] = (line[i + 1] + 180) // 2
-                    line[i + 2] = (line[i + 2] + 255) // 2
-    for poly in polys:
-        for i in range(len(poly)):
-            a, b = poly[i], poly[(i + 1) % len(poly)]
-            draw_line(rows, int(a[0]), int(a[1]), int(b[0]), int(b[1]), (0, 255, 255), 2)
-    for x, y, bw, bh in door_list:
-        stroke_rect(rows, x - 2, y - 2, bw + 4, bh + 4, 2, (255, 200, 0))
-    for _edge, r, _t in exits:
-        draw_line(rows, r[0], r[1], r[2], r[3], (255, 32, 32), 9)
-    sx, sy = int(spawn[0]), int(spawn[1])
-    draw_line(rows, sx - 14, sy, sx + 14, sy, (255, 255, 255), 3)
-    draw_line(rows, sx, sy - 14, sx, sy + 14, (255, 255, 255), 3)
-    write_png(out, w, h, 3, rows)
-
-
-def flat_rows(g, w, h, rgb):
-    on, off = bytes(rgb), b"\x00\x00\x00"
-    return [bytearray(b"".join(on if g[y * w + x] else off for x in range(w))) for y in range(h)]
-
-
-def fit_to(rows, w, h, ch, tw, th, nearest):
-    if (w, h) == (tw, th):
-        return rows
-    return resize_nn(rows, w, h, ch, tw, th) if nearest else resize_box(rows, w, h, ch, tw, th)
-
-
-def screen_returns(data, folder):
-    """The images the owner saved, one per step. A missing one is a hard stop, nothing is written."""
-    want = {}
-    for what, fname in data["returns"].items():
-        f = folder / fname
-        if not f.exists():
-            alt = [p for p in folder.iterdir()
-                   if p.stem == f.stem and p.suffix.lower() in RETURN_SUFFIXES]
-            if not alt:
-                die(f"`{fname}` is missing from this package. It needs "
-                    f"{', '.join('`%s`' % v for v in data['returns'].values())}, one per message in "
-                    f"prompt.md. Nothing written.")
-            f = max(alt, key=lambda p: p.stat().st_mtime)
-        want[what] = f
-    return want
-
-
-SCREEN_SUMMARY = []      # the one line `ingest` prints for a screen, since it swallows the rest
-
-
-def cut_screen(data, folder, debug=False):
-    """The map and its walkable mask -> the cleaned files and the engine's .screen."""
-    SCREEN_SUMMARY.clear()
-    mp, zone = data["map"], data["zone"]
-    want, report = screen_returns(data, folder), []
-    walker = int(data.get("walker") or SCREEN_WALKER)
-    p = screen_paths(mp, zone)
-    SCREENS_DIR.mkdir(parents=True, exist_ok=True)
-
-    pw, ph, pch, prows = read_png(want["paint"])
-    W = min(pw, SCREEN_MAX_W)
-    H = max(1, int(round(ph * W / pw)))
-    prows = fit_to(prows, pw, ph, pch, W, H, nearest=False)
-    if pch == 4:
-        prows = [bytearray(b for i, b in enumerate(r) if i % 4 != 3) for r in prows]
-    write_png(p["paint"], W, H, 3, prows)
-    print(f"map {want['paint'].name}: {pw}x{ph} -> {p['paint'].relative_to(ROOT.parent)} {W}x{H}")
-
-    def read_mask(what, test, label):
-        mw, mh, mch, mrows = read_png(want[what])
-        if abs((mw / mh) / (W / H) - 1) > 0.06:
-            die(f"{want[what].name} is {mw}x{mh}, the map is {W}x{H}: a different shape, so the mask "
-                f"cannot be laid over it. Ask for it again, same size and framing. Nothing written.")
-        mrows = fit_to(mrows, mw, mh, mch, W, H, nearest=True)
-        g = mask_of(mrows, W, H, mch, test)
-        print(f"{label} {want[what].name}: {mw}x{mh} -> {W}x{H}, {sum(g)} px raw")
-        return g
-
-    walk = read_mask("walk", walk_test, "walkable mask")
-    if not sum(walk):
-        die(f"{want['walk'].name} has no pure green in it at all. Is this the right file? Nothing written.")
-    walk = morph(walk, W, H, opening=WALK_OPEN, closing=WALK_CLOSE)
-    filled = fill_pinholes(walk, W, H)
-    print(f"  cleaned: open {WALK_OPEN}, close {WALK_CLOSE}, {filled} pinhole(s) filled -> {sum(walk)} px")
-    walk, kept = reachable_walk(walk, W, H, data.get("spawn"), data.get("exits") or {}, report, debug)
-    print(f"  reachable: {sum(walk)} px in {len(kept)} island(s)")
-    if not sum(walk):
-        die("nothing walkable survived the cleaning: the green was all outlines and unreachable "
-            "islands. Check the walkable mask. Nothing more written.")
-    write_png(p["walk"], W, H, 3, flat_rows(walk, W, H, (0, 255, 0)))
-
-    over = None
-    if data.get("overhead") and "over" in want:
-        over = morph(read_mask("over", fg_test, "overhead mask"), W, H, closing=1)
-        if not sum(over):
-            report.append("the overhead mask is entirely black: nothing on this map is walked "
-                          "underneath, so no overhead layer is written")
-            over = None
-        else:
-            cut = []
-            for y in range(H):
-                line, o = bytearray(W * 4), y * W
-                for x in range(W):
-                    if over[o + x]:
-                        line[x * 4:x * 4 + 4] = bytes(prows[y][x * 3:x * 3 + 3]) + b"\xff"
-                cut.append(line)
-            write_png(p["over"], W, H, 4, cut)
-            print(f"  overhead: {sum(over)} px -> {p['over'].relative_to(ROOT.parent)}")
-
-    polys, eps = nav_polygons(walk, W, H, report)
-    green, covered = sum(walk), sum(abs(shoelace(q)) for q in polys)
-    bad = [n for n, q in enumerate(polys, 1) if not is_convex(q)]
-    if bad:
-        report.append(f"polygon(s) {bad} came out non-convex; the engine will not like them")
-    print(f"nav: {len(polys)} convex polygon(s) at {eps:.0f} px tolerance, covering {covered:.0f} of "
-          f"{green} walkable px ({100 * covered / max(1, green):.1f}%)")
-
-    door_list = doors(walk, W, H, walker, report)
-    print(f"doors: {len(door_list)}" + (": " + ", ".join(f"{x},{y} {bw}x{bh}"
-                                                         for x, y, bw, bh in door_list[:8])
-                                        if door_list else ""))
-    exits = screen_exits(walk, W, H, data.get("exits") or {}, report)
-    print("exits: " + (", ".join(f"{e} -> {t}" for e, _r, t in exits) or "none found"))
-
-    spawn = data.get("spawn")
-    if spawn:
-        k = W / (data["size"][0] or W)
-        spawn = (spawn[0] * k, spawn[1] * k)
-        sx, sy = int(spawn[0]), int(spawn[1])
-        if not (0 <= sx < W and 0 <= sy < H and walk[sy * W + sx]):
-            report.append(f"screens.md puts the spawn at {sx},{sy}, which is not walkable ground on "
-                          f"this map; using the middle of the biggest walkable polygon instead")
-            spawn = None
-    if not spawn:
-        spawn = poly_centroid(max(polys, key=lambda q: abs(shoelace(q)))) if polys else (W / 2, H - 1)
-    rel = lambda q: str(q.relative_to(ROOT.parent))
-    meta = {"map": mp, "zone": zone, "w": W, "h": H, "walker": walker,
-            "paint": rel(p["paint"]), "walk": rel(p["walk"]),
-            "over": rel(p["over"]) if over else None}
-    write_screen_file(p["screen"], meta, polys, door_list, exits, spawn)
-    print(f"wrote {p['screen'].relative_to(ROOT.parent)}  ({len(polys)} poly, {len(door_list)} door, "
-          f"{len(exits)} exit, spawn {fmt_pt(spawn)}, walker {walker} px)")
-    SCREEN_SUMMARY.append(f"{W}x{H}, {len(polys)} nav polygon(s) covering "
-                          f"{100 * covered / max(1, green):.1f}% of the walkable ground, "
-                          f"{len(door_list)} door(s), {len(exits)} exit(s), spawn {fmt_pt(spawn)}")
-    if debug:
-        screen_debug_image(prows, W, H, polys, door_list, exits, spawn, over, p["debug"])
-        print(f"wrote {p['debug'].relative_to(ROOT.parent)}  (nav polygons outlined, doors boxed, "
-              f"exits and spawn marked)")
-    for x in report:
-        LOUD.append(x)
-        print(f"warning: {x}", file=sys.stderr)
-
-
-def cmd_screen_cut(args):
-    """`ingest`'s half of a screen package: <sheet.json> <package folder> [--debug]."""
-    pos = [a for a in args if not a.startswith("--")]
-    if len(pos) != 2:
-        die("usage: (internal) screen-cut <sheet.json> <package folder> [--debug]")
-    data = json.loads(Path(pos[0]).read_text())
-    if data.get("kind") != "screen":
-        die(f"{pos[0]} is not a screen package (kind '{data.get('kind')}')")
-    cut_screen(data, Path(pos[1]), debug="--debug" in args)
-
-
-# ───────────────────────── The packages tree (the owner's art tray) ─────────────────────────
-#
-# `packages` builds story/packages/ as a folder tree the owner walks top to bottom. One folder per
-# generation: `prompt.md` is self-contained (what exists already, what to attach, the prompt in one
-# block, the review checklist), `sheet.json` and `template.png` are the machine's half, and
-# `RETURN_HERE.md` says the one thing to do afterwards — save the image in this folder as
-# `returned.png` and run `ingest`. The owner never types a path.
-#
-#   story/packages/README.md                    the index, in the order to generate
-#   story/packages/cast/<name>/refsheet/        the character reference sheet (everything attaches it)
-#   story/packages/cast/<name>/walker/          that character's 4x4 walk sheet (needs the refsheet)
-#   story/packages/ch01/<map>/tiles/            the ground and wall tiles that map uses
-#   story/packages/ch01/<map>/props_1/          its props, split so no slot is too small to draw in
-#   story/packages/ch01/<map>/scenes/<scene>/   a shot sheet per panel scene played on that map
-#
-# Rerunning is always safe: it rewrites prompts and templates, never a returned image, and it only
-# deletes a folder that has gone out of the playlist AND holds nothing the owner generated.
-
 PKG_META = "package.json"          # the machine index in every package folder; `ingest` reads it
-COMMON_MAP = "common"              # a scene or field entry with no '- map:' line yet
-
 
 def slug(text):
     return re.sub(r"[^a-z0-9_]", "", (text or "").strip().lower())
-
-
-def first_map(value):
-    """The map a '- map:' line names. Several maps means the art lives with the first."""
-    return slug((value or "").split(",")[0]) or COMMON_MAP
-
-
-def known_maps():
-    d = FIELD / "maps"
-    return sorted(p.stem for p in d.glob("*.map")) if d.exists() else []
 
 
 def cast_in_play(scenes, cast):
@@ -8207,8 +5933,134 @@ def write_package(d, meta, builder, args):
     return True, ""
 
 
+
+# ── the inputs fingerprint: what makes a package STALE ──
+#
+# A package is stale when the art in it was cut from inputs that have since changed: a character's
+# `look` line rewritten, a scene's panels rewritten, a sprite's slot list changed. Guessing that
+# from mtimes is unreliable (every `packages` run rewrites the prompt), so the fingerprint of the
+# inputs is written into package.json when the package is BUILT, and again under `cut_fingerprint`
+# when `ingest` successfully cuts it. Different -> stale. This is computed, never guessed.
+#
+# Packages cut before fingerprints existed have no `cut_fingerprint`, and there is no honest way to
+# recover one. LEGACY_STATUS is the ruling on those few, by hand, from the facts.
+
+LEGACY_STATUS = {
+    ("refsheet", "bron"): ("stale", "the sheet on disk is the old red-haired armoured design; "
+                                    "characters.md's `look` is now green-haired in a quilted ochre "
+                                    "training vest with a practice stick"),
+    ("walker", "falke"): ("stale", "cut from that old red-haired reference sheet"),
+    ("walker", "ottilie"): ("stale", "cut from the reference sheet as it was before the weapon came "
+                                     "off her `look` line"),
+    ("refsheet", "lyra"): ("keep", "exists and is good — only a weapon was taken off the `look` "
+                                   "line. Regenerate ONLY if you want the mace gone from the "
+                                   "full-body panel; the portrait is unaffected"),
+}
+
+
+def fingerprint(*parts):
+    """A short stable hash of whatever produced a package. Order matters; whitespace does not."""
+    h = hashlib.sha256()
+    for part in parts:
+        h.update(squash(str(part)).encode())
+        h.update(b"\x00")
+    return h.hexdigest()[:16]
+
+
+def cast_fingerprint(c):
+    """A character's design, as the refsheet, expression and walker prompts see it."""
+    return fingerprint(c["display"], c.get("look", ""), c.get("look_v3_day_one", ""),
+                       c.get("asymmetric", ""))
+
+
+def scene_fingerprint(sc):
+    """A shot sheet's inputs: the staging, the beat, and every panel with its acting lines."""
+    meta = sc.get("meta", {})
+    return fingerprint(meta.get("staging", ""), sc.get("beat", ""), meta.get("location", ""),
+                       meta.get("characters", ""),
+                       *[f"{sid}|{desc}" for sid, desc in sc["panels"]])
+
+
+def sprite_fingerprint(ids, entries):
+    """A sprite sheet's inputs: exactly the slots it asks for, in order."""
+    return fingerprint(*[f"{i}|{entries[i]['desc']}|{entries[i].get('footprint', '')}"
+                         f"|{entries[i].get('frames', '1')}|{entries[i].get('frame2', '')}"
+                         f"|{entries[i].get('frame3', '')}" for i in ids])
+
+
+def pkg_status(d, meta):
+    """(word, why, cut, total) — the one status the README, the prompt and ArtTray all read.
+
+    'done' / 'stale' / 'image waiting' / 'N/M cut' / 'to generate', and for stale a one-line reason,
+    which is the whole point: the owner must never be told to redo something without being told why.
+    """
+    label, have, total = pkg_state(d, meta)
+    if label != "done":
+        return label, "", have, total
+    want, got = meta.get("fingerprint"), meta.get("cut_fingerprint")
+    if want and got:
+        return ("done" if want == got else "stale",
+                "" if want == got else "the description it was drawn from has changed since",
+                have, total)
+    ruling, why = LEGACY_STATUS.get((meta.get("kind"), slug(meta.get("handle") or "")), (None, ""))
+    if ruling == "stale":
+        return "stale", why, have, total
+    if ruling == "keep":
+        return "exists", why, have, total
+    return "done", "", have, total
+
+
+def record_cut(d, meta):
+    """`ingest` stamps the fingerprint it cut at, so the next change to the inputs shows as stale."""
+    mf = d / PKG_META
+    if not mf.exists() or not meta.get("fingerprint"):
+        return
+    body = json.loads(mf.read_text())
+    body["cut_fingerprint"] = meta["fingerprint"]
+    mf.write_text(json.dumps(body, indent=2) + "\n")
+
+
+# ── the tray ──
+
+# Packages the tool no longer generates but must never delete: the valley tileset sheets. Their
+# outputs (atlas.png, the decals, the swatches) are read by the voxel field every frame, and these
+# folders hold the only templates that can cut the archived returns in story/sheets/ again if the
+# palette is ever refitted. They are frozen: drawn, done, and off the to-do list.
+FROZEN_ROOTS = ("tilesets",)
+
+
+def is_frozen(d):
+    rel = d.relative_to(PACKAGES).parts
+    return bool(rel) and rel[0] in FROZEN_ROOTS
+
+
+def cap_sheets(ids, boxes, cap):
+    """Split `ids` into as FEW sheets as the cap allows, then balance the slots across them.
+
+    Greedy filling to the cap leaves a runt: eighteen slots at eight a sheet is 8, 8, 2, and the
+    two-slot sheet wastes a whole generation on one creature drawn enormous. Taking the sheet count
+    first and dividing evenly gives 6, 6, 6 instead."""
+    total = sum(len(boxes[i]) for i in ids)
+    sheets = max(1, -(-total // cap))
+    want = -(-total // sheets)
+    out, cur, used = [], [], 0
+    for i in ids:
+        if cur and used + len(boxes[i]) > want and len(out) < sheets - 1:
+            out.append(cur)
+            cur, used = [], 0
+        cur.append(i)
+        used += len(boxes[i])
+    if cur:
+        out.append(cur)
+    return out
+
+
 def cmd_packages(args):
-    """Rebuild story/packages/ as the folder tree the owner works through."""
+    """Rebuild story/packages/ as the folder tree the owner works through.
+
+    Five kinds and nothing else, because the voxel world (D22/D23) needs nothing else: the ground,
+    the walls and the houses are palette colours, shader detail and rule-built geometry, with no
+    generated art at all. What is left to draw is people and the things that move."""
     every = "--all" in args
     cast = load_cast()
     scenes = all_scenes(args)
@@ -8222,27 +6074,9 @@ def cmd_packages(args):
             failures.append((str(d.relative_to(ROOT.parent)), msg))
         index.append({"dir": d, "meta": meta, "ok": ok, **row})
 
-    # ── the tilesets: the tile field (D18), and the first thing on the page ──
-    # These come first because a tmap is walkable the moment its atlas has tiles in it, with no cast,
-    # no scenes and no maps drawn: it is the shortest route from nothing to a game you can walk around.
-    for setname in sorted({q.parent.name for q in TILESETS.glob("*/tiles.md")}):
-        try:
-            tset = tileset_entries(setname)
-            assign_indices(setname, tset)
-            plan = tileset_plan(setname, tset)
-        except SystemExit as exc:
-            failures.append((f"tileset {setname}", squash(str(exc.code))))
-            continue
-        write_tilesets_readme()
-        if set_terrains(tset):                       # generated, and regenerated whenever this runs
-            write_masks(setname, [tset[t]["edge_style"] for t in set_terrains(tset)])
-        for d, meta, bargs in plan:
-            add(d, meta, cmd_tileset, bargs, group="tileset", tileset=setname)
-        write_atlas_json(setname, tset)
-
-    # ── the cast: a reference sheet, then a walk sheet ──
-    # A folder is named for what the character is called now, not for the '## handle' behind it, because
-    # the map files name walkers the same way (`hart`, `falke`) and the owner reads the tree, not the code.
+    # ── 1-3. the cast: a reference sheet, then the faces, then the walk sprite ──
+    # A folder is named for what the character is called NOW, not for the '## handle' behind it,
+    # because the maps name walkers the same way (`hart`, `falke`) and the owner reads the tree.
     handles = cast_in_play(scenes, cast) or ([h for h, _ in refsheet_priority(cast)] if every else [])
     if every:
         handles += [h for h, _ in refsheet_priority(cast) if h not in handles]
@@ -8253,34 +6087,37 @@ def cmd_packages(args):
                 if (h := resolve_name(w, cast, aliases_now))}
     for handle in handles:
         c = cast[handle]
-        who, key = c["display"], slug(c["display"])
+        who, key, fp = c["display"], slug(c["display"]), cast_fingerprint(c)
         ref = c.get("ref") or f"story/refs/{handle}.png"
         add(PACKAGES / "cast" / key / "refsheet",
             {"kind": "refsheet", "handle": handle, "title": f"{who} — reference sheet", "ref": ref,
+             "fingerprint": fp,
              "makes": f"`{ref}` and the dialogue-box portrait cut out of it",
              "outputs": [ref, str((PORTRAITS / f"{handle}.png").relative_to(ROOT.parent))]},
             cmd_refsheet, [handle], group="refsheet", who=who)
         if handle in speakers or every:
             outs = [str(expr_portrait_path(handle, e).relative_to(ROOT.parent)) for e in EXPR_IDS]
             meta = {"kind": "expressions", "handle": handle, "title": f"{who} — expression sheet",
+                    "fingerprint": fp,
                     "makes": f"{len(EXPR_IDS)} dialogue-box faces in `story/portraits/`",
                     "outputs": outs}
             d = PACKAGES / "cast" / key / "expressions"
-            if existing(ref):                    # the prompt attaches the reference sheet, as the walker does
+            if existing(ref):                # the prompt attaches the reference sheet, as the walker does
                 add(d, meta, cmd_expressions, [who], group="expressions", who=who)
             else:
                 index.append({"dir": d, "meta": meta, "ok": False, "group": "expressions", "who": who,
                               "blocked": "needs the reference sheet first"})
         walker_out = str((FIELD_DIRS["walker"] / f"{key}.png").relative_to(ROOT.parent))
-        meta = {"kind": "walker", "handle": handle, "title": f"{who} — walk sheet",
-                "makes": f"`{walker_out}`, the 4x4 walk sprite sheet", "outputs": [walker_out]}
+        meta = {"kind": "walker", "handle": key, "title": f"{who} — walk sheet", "fingerprint": fp,
+                "makes": f"`{walker_out}`, the 9-frame walk sprite sheet", "outputs": [walker_out]}
         d = PACKAGES / "cast" / key / "walker"
         if existing(ref):
             add(d, meta, cmd_walker, [who], group="walker", who=who)
         else:                                    # the walker prompt attaches the reference sheet
             index.append({"dir": d, "meta": meta, "ok": False, "group": "walker", "who": who,
                           "blocked": "needs the reference sheet first"})
-    for ident in (field_entries(FIELD_DOCS["walker"], "walker") if FIELD_DOCS["walker"].exists() else {}):
+    for ident, e in (field_entries(FIELD_DOCS["walker"], "walker")
+                     if FIELD_DOCS["walker"].exists() else {}).items():
         owner = resolve_name(ident, cast)
         if owner:                                # the cast file has taken this name over since
             notes.append(f"story/field/walkers.md '## {ident}' is now {cast[owner]['display']} in "
@@ -8289,125 +6126,74 @@ def cmd_packages(args):
         out = str((FIELD_DIRS["walker"] / f"{ident}.png").relative_to(ROOT.parent))
         add(PACKAGES / "cast" / ident / "walker",
             {"kind": "walker", "handle": ident, "title": f"{ident} — walk sheet (no cast entry)",
-             "makes": f"`{out}`, the 4x4 walk sprite sheet", "outputs": [out]},
+             "fingerprint": fingerprint(ident, e.get("look", ""), e["desc"]),
+             "makes": f"`{out}`, the 9-frame walk sprite sheet", "outputs": [out]},
             cmd_walker, [ident], group="walker", who=ident)
 
-    # ── the field art, by the map it belongs to ──
-    tiles = field_entries(FIELD_DOCS["tile"], "tile") if FIELD_DOCS["tile"].exists() else {}
-    props = field_entries(FIELD_DOCS["prop"], "prop") if FIELD_DOCS["prop"].exists() else {}
-    houses = field_entries(FIELD_DOCS["building"], "building") if FIELD_DOCS["building"].exists() else {}
-    panel_scenes = [(ch, sc) for ch, sc in scenes if sc["kind"] == "panels" and sc["panels"]]
-    map_chapter, default_ch = {}, min([ch for ch, _ in scenes], default=1)
-    for ch, sc in scenes:
-        map_chapter.setdefault(first_map(sc["map"]), ch)
-    chap_of_map = lambda m: map_chapter.get(m, default_ch)
-
-    shared = {}                    # (map, kind) -> [(id, the map whose package draws it)]
-    builder = {"tiles": cmd_tiles, "props": cmd_props, "building": cmd_building}
-    for kind, entries, dirname in (("tiles", tiles, "tiles"), ("props", props, "props"),
-                                   ("building", houses, "buildings")):
-        by_map = {}
-        for i, e in entries.items():
-            maps = [slug(m) for m in (e.get("map") or "").split(",") if slug(m)] or [COMMON_MAP]
-            by_map.setdefault(maps[0], []).append(i)
-            for other in maps[1:]:            # drawn once, used on several maps: say so, never redraw it
-                shared.setdefault((other, kind), []).append((i, maps[0]))
-        box_of = lambda i: ([(1, 1)] if kind == "tiles" else
-                            [(1, 1)] * len(BUILDING_FACES) if kind == "building" else
-                            [footprint_of(i, entries[i], [])])
-        for mp in sorted(by_map):
-            ids = sorted(by_map[mp])
-            here = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp
-            done, taken = frozen_packages(here, dirname, kind, ids), set()
-            for _, keep in done:
-                taken |= set(keep)
-            rest = [i for i in ids if i not in taken]
-            groups, bad = split_field_ids(rest, [box_of(i)[0] if kind != "building" else box_of(i)
-                                                 for i in rest])
-            for i, why in bad:
-                failures.append((f"{kind} {i}", why))
-            plan = list(done)
-            if not done and len(groups) == 1:
-                plan.append((dirname, groups[0]))
-            else:
-                for g in groups:                         # a new id never disturbs a sheet already drawn
-                    plan.append((next_package_name(dirname, {n for n, _ in plan}), g))
-            for n, (folder, group) in enumerate(plan, 1):
-                d = here / folder
-                outs = ([str((FIELD_DIRS["building"] / f"{i}_{f}.png").relative_to(ROOT.parent))
-                         for i in group for f in BUILDING_FACES] if kind == "building" else
-                        [str((FIELD_DIRS[KIND_DIR[kind]] / f"{i}.png").relative_to(ROOT.parent)) for i in group])
-                what = "buildings" if kind == "building" else kind
-                add(d, {"kind": kind, "map": mp, "ids": group,
-                        "title": f"{mp} — {len(group)} {what}" + (f" ({n} of {len(plan)})" if len(plan) > 1 else ""),
-                        "makes": (", ".join(f"`{i}`" for i in group) + " — front, side and roof each"
-                                  if kind == "building" else ", ".join(f"`{o}`" for o in outs)),
-                        "outputs": outs},
-                    builder[kind], list(group), group=kind, map=mp, chapter=chap_of_map(mp))
-
-    # ── the painted screens: the main field path, so they come first under each map ──
-    ok_screens, why = True, ""
+    # ── 4. the field sprites: every billboard the voxel world stands up ──
+    ch_label = chapter_label(min([ch for ch, _ in scenes], default=1)).split()[0]
     try:
-        screens = screen_entries() if SCREENS_DOC.exists() else {}
+        sprites = field_entries(FIELD_DOCS["sprite"], "sprite") if FIELD_DOCS["sprite"].exists() else {}
     except SystemExit as exc:
-        ok_screens, screens, why = False, {}, squash(str(exc.code))
-    if not ok_screens:
-        failures.append((str(SCREENS_DOC.relative_to(ROOT.parent)), why))
-    for key in sorted(screens):
-        e = screens[key]
-        mp, zone = e["map"], e["zone"]
-        d = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp / "screens" / zone
-        outs = screen_outputs(mp, zone, e["overhead"])
-        add(d, {"kind": "screen", "map": mp, "zone": zone, "overhead": e["overhead"],
-                "title": f"{mp} / {zone} — painted map",
-                "makes": f"the top-down map, its cleaned walkable mask and `{outs[-1]}`",
-                "outputs": outs},
-            cmd_screen, [mp, zone], group="screen", map=mp, chapter=chap_of_map(mp), zone=zone)
+        sprites = {}
+        failures.append((str(FIELD_DOCS["sprite"].relative_to(ROOT.parent)), squash(str(exc.code))))
+    if sprites:
+        here = PACKAGES / ch_label
+        ids = sorted(sprites)
+        done, taken = frozen_packages(here, "sprites", "sprites", ids), set()
+        for _, keep in done:
+            taken |= set(keep)
+        rest = [i for i in ids if i not in taken]
+        warn = []
+        boxes = {i: [footprint_of(i, sprites[i], warn)] * sprite_frames(i, sprites[i], warn)[0]
+                 for i in rest}
+        groups, bad = split_field_ids(rest, [boxes[i] for i in rest])
+        groups = [c for g in groups for c in cap_sheets(g, boxes, SPRITE_SLOTS_MAX)]
+        for i, why in bad:
+            failures.append((f"sprite {i}", why))
+        plan = list(done)
+        for g in groups:                             # a new id never disturbs a sheet already drawn
+            plan.append((next_package_name("sprites", {n for n, _ in plan}), g))
+        for n, (folder, group) in enumerate(plan, 1):
+            outs = [str(sprite_art(i).relative_to(ROOT.parent)) for i in group]
+            add(here / folder,
+                {"kind": "sprites", "ids": list(group),
+                 "fingerprint": sprite_fingerprint(list(group), sprites),
+                 "title": f"field sprites — {len(group)} billboard(s)"
+                          + (f" ({n} of {len(plan)})" if len(plan) > 1 else ""),
+                 "makes": ", ".join(f"`{o}`" for o in outs), "outputs": outs},
+                cmd_sprites, list(group), group="sprites")
 
-    # ── one painted background per camera zone the engine has captured ──
-    for mp, zone, cap in captures():
-        d = PACKAGES / chapter_label(chap_of_map(mp)).split()[0] / mp / "views" / zone
-        out = str(paint_path(mp, zone).relative_to(ROOT.parent))
-        add(d, {"kind": "view", "map": mp, "zone": zone, "title": f"{mp} / {zone} — painted view",
-                "makes": f"`{out}`, painted over `{cap.relative_to(ROOT.parent)}`", "outputs": [out]},
-            cmd_view, [mp, zone], group="view", map=mp, chapter=chap_of_map(mp), zone=zone)
-
-    # ── one shot sheet per panel scene, filed under the map it is played on ──
-    for ch, sc in panel_scenes:
-        mp = first_map(sc["map"])
-        d = PACKAGES / chapter_label(ch).split()[0] / mp / "scenes" / sc["stem"]
+    # ── 5. one shot sheet per panel scene ──
+    # Flat under the chapter: the voxel world has no per-map art any more, so filing a scene under
+    # the map it happens to be played on bought nothing but two extra folders to click through.
+    for ch, sc in [(ch, sc) for ch, sc in scenes if sc["kind"] == "panels" and sc["panels"]]:
+        d = PACKAGES / chapter_label(ch).split()[0] / "scenes" / sc["stem"]
         outs = [str(panel_file(sc, n, sid).relative_to(ROOT.parent))
                 for n, (sid, _) in enumerate(sc["panels"], 1)]
-        add(d, {"kind": "sheet", "scene": sc["stem"], "map": mp, "title": f"{sc['stem']} — shot sheet",
+        add(d, {"kind": "sheet", "scene": sc["stem"], "title": f"{sc['stem']} — shot sheet",
+                "fingerprint": scene_fingerprint(sc),
                 "makes": f"{len(outs)} panel image(s) in `story/panels/`", "outputs": outs},
-            cmd_sheet, [str(sc["path"])], group="scene", map=mp, chapter=ch, scene=sc)
+            cmd_sheet, [str(sc["path"])], group="scene", chapter=ch, scene=sc)
 
-    by_stem = {sc["stem"]: sc for _, sc in scenes}                # playlist order, not file order
-    played = [by_stem[s] for rows in playlist_lists().values() for s, _ in rows if s in by_stem]
-    lead_map = next((first_map(sc["map"]) for sc in played if sc["map"]), None)
-    all_maps = {m: chap_of_map(m) for m in known_maps()}          # every map, art or not
-    for r in index:
-        if r.get("map"):
-            all_maps.setdefault(r["map"], r.get("chapter", default_ch))
-    for mp, _ in shared:
-        all_maps.setdefault(mp, chap_of_map(mp))
-    orphans = prune_packages(built)
-    write_packages_readme(index, orphans, failures, notes, every, scenes, shared, all_maps, lead_map, cast)
-    print(f"wrote {len(built)} package folder(s) under {PACKAGES.relative_to(ROOT.parent)}/")
-    for g, label in (("tileset", "tile sheets (tilesets)"), ("refsheet", "reference sheets"),
-                     ("expressions", "expression sheets"), ("walker", "walk sheets"),
-                     ("screen", "painted screens"), ("tiles", "tile sheets"),
-                     ("props", "prop sheets"), ("building", "building face sheets"),
-                     ("view", "painted views"), ("scene", "scene shot sheets")):
+    orphans, frozen, removed = prune_packages(built)
+    write_packages_readme(index, frozen, failures, notes, every, scenes, cast)
+    print(f"wrote {len(built)} package folder(s) under {PACKAGES.relative_to(ROOT.parent)}/"
+          + (f", removed {removed} legacy folder(s)" if removed else ""))
+    for g, label in (("refsheet", "reference sheets"), ("expressions", "expression sheets"),
+                     ("walker", "walk sheets"), ("sprites", "field sprite sheets"),
+                     ("scene", "scene shot sheets")):
         n = sum(1 for r in index if r["group"] == g and r["ok"])
         blocked = sum(1 for r in index if r["group"] == g and r.get("blocked"))
         if n or blocked:
             print(f"  {n:>3} {label}" + (f"   ({blocked} waiting on a reference sheet)" if blocked else ""))
+    if frozen:
+        print(f"  {len(frozen):>3} frozen, already drawn (the valley tileset) — left exactly as they are")
     print(f"index: {(PACKAGES / 'README.md').relative_to(ROOT.parent)}   "
           f"(then: generate -> save as {RETURNED}.png -> ./story_prompt.py ingest)")
     if orphans:
-        print(f"{len(orphans)} folder(s) no longer in the playlist but holding a {RETURNED} image were kept; "
-              f"they are listed at the end of the README.", file=sys.stderr)
+        print(f"{len(orphans)} folder(s) no longer generated were kept because they hold a "
+              f"{RETURNED} image; they are listed at the end of the README.", file=sys.stderr)
     if failures:
         print(f"\n{len(failures)} package(s) could not be built:", file=sys.stderr)
         for what, why in failures:
@@ -8415,243 +6201,138 @@ def cmd_packages(args):
 
 
 def prune_packages(built):
-    """Drop package folders that are no longer generated. A folder holding a returned image is kept."""
-    orphans = []
+    """Drop package folders the tool no longer generates. ([kept orphans], [frozen], removed count).
+
+    A folder under FROZEN_ROOTS is never touched. Everything else that this run did not write is a
+    package of a system the game does not have any more — the old tiles, props, buildings, painted
+    screens and painted views, the retired scenes' shot sheets, a cast member who has left the
+    chapter — and it goes, `returned.png` and all. The raw generations those folders were cut from
+    are archived in story/sheets/, and the whole pre-cleanup tree is on the `legacy-final` tag, so
+    nothing here is the last copy of anything."""
+    orphans, frozen, removed = [], [], 0
     for meta in sorted(PACKAGES.rglob(PKG_META)):
         d = meta.parent
-        if d.resolve() in built:
+        if is_frozen(d):
+            frozen.append(d)
             continue
-        if pkg_returned(d):
-            orphans.append(d)
+        if d.resolve() in built:
             continue
         for p in sorted(d.rglob("*"), reverse=True):
             p.unlink() if p.is_file() else p.rmdir()
         d.rmdir()
+        removed += 1
     for legacy in PACKAGES.glob("*.chatgpt.md"):          # the flat layout this tree replaced
         legacy.unlink()
     for d in sorted(PACKAGES.rglob("*"), reverse=True):   # tidy the empty shells left behind
-        if d.is_dir() and not any(d.iterdir()):
+        if d.is_dir() and not any(d.iterdir()) and not is_frozen(d):
             d.rmdir()
-    return orphans
+    return orphans, frozen, removed
 
 
-def write_packages_readme(index, orphans, failures, notes, every, scenes, shared, all_maps, lead_map,
-                          cast):
+def write_packages_readme(index, frozen, failures, notes, every, scenes, cast):
+    """The tray's front page: a count, then ONE ordered to-do, then the detail.
+
+    It used to open with a 'short path' section and then repeat everything under six more headings,
+    which meant a package appeared three times with three statuses. There is one list now, in the
+    order the work unblocks itself, and every row says done, stale (and why), or to do."""
     rel = lambda d: str(d.relative_to(PACKAGES))
-    cmd = lambda d: f"`ingest {rel(d)}`"
-    rows = lambda g: [r for r in index if r["group"] == g]
+    link = lambda r: (f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md)" if r["ok"]
+                      else f"`{rel(r['dir'])}`")
 
-    def state(r):
-        return r.get("blocked") or pkg_state(r["dir"], r["meta"])[0] if r["ok"] or r.get("blocked") \
-            else "_could not be built, see the command output_"
+    def row_status(r):
+        if r.get("blocked"):
+            return "blocked", r["blocked"]
+        if not r["ok"]:
+            return "broken", "could not be built — see the command output"
+        word, why, have, total = pkg_status(r["dir"], r["meta"])
+        return word, why or (f"{have} of {total} files cut" if word.endswith("cut") else "")
+
+    GROUPS = [
+        ("refsheet", "Reference sheets",
+         "Do these first. The dialogue portrait, the ten faces, the walk sprite and every scene "
+         "panel are all drawn from this one image."),
+        ("expressions", "Expression sheets",
+         "Ten head-and-shoulders faces a speaking character, one template sheet: `neutral`, `smile`, "
+         "`laugh`, `biglaugh`, `concern`, `sorrow`, `annoyed`, `angry`, `shock`, `resolve`. A line "
+         "picks one with `- Name (biglaugh): text`. Blocked until the reference sheet exists."),
+        ("walker", "Walk sprites",
+         "The nine-frame sheet the field animates (rows S, side, N; the engine mirrors the side "
+         "row). Blocked until the reference sheet exists, because the walker must match it."),
+        ("sprites", "Field sprites",
+         "The voxel world's billboards: the creatures, the animals and the training machines, cut "
+         "out against magenta and stood upright in the world. The ground, the walls and the houses "
+         "need no art at all — they are palette colours, shader detail and rule-built geometry."),
+        ("scene", "Scene shot sheets",
+         "One sheet per panel scene: all of its panels as separate white-bordered rectangles on "
+         "black, cut apart into `story/panels/`. Talk scenes need no art and are not listed. A "
+         "scene with no art still plays: every panel is a placeholder box with its description."),
+    ]
+    ordered = [r for g, _, _ in GROUPS for r in index if r["group"] == g]
+    todo = [r for r in ordered if row_status(r)[0] in ("to generate", "blocked", "stale")]
+    waiting = [r for r in ordered if row_status(r)[0].startswith("**image")]
+    done = [r for r in ordered if row_status(r)[0] in ("done", "exists")]
+    stale = [r for r in ordered if row_status(r)[0] == "stale"]
 
     L = ["# story/packages — the art tray", "",
+         f"**{len(todo)} to do"
+         + (f" ({len(stale)} of them a redraw of art that has gone stale)" if stale else "")
+         + f", {len(done)} already drawn and finished"
+         + (f", {len(waiting)} waiting to be cut" if waiting else "") + ".**", "",
          "Generated by `./story_prompt.py packages`. Every folder below is one ChatGPT generation.",
          "Nothing here is edited by hand; rerun the command after any change to a scene file,",
-         "`characters.md`, `story/field/*.md` or `STYLE.md`. Rerunning never touches an image you saved.", "",
+         "`characters.md`, `story/field/sprites.md` or `STYLE.md`. Rerunning never touches an image",
+         "you have saved.", "",
          "## The loop", "",
-         "1. Open a folder and read `prompt.md`: it lists the files to attach, in order, and the prompt to paste.",
+         "1. Open a folder and read `prompt.md`: the files to attach, in order, and the prompt to paste.",
          "2. Generate in ChatGPT, checking the result against the checklist at the end of `prompt.md`.",
          f"3. Save the image into that same folder as `{RETURNED}.png`.",
-         "4. From the repository root: `./story_prompt.py ingest` — it finds every waiting image, cuts each",
-         "   one into its panels, tiles, sprites or portrait, and says what it wrote.",
-         "5. `./fast_reload.sh` to see it on the phone.", "",
-         "Work down this page: the short path first, then everything else — reference sheets (every later",
-         "prompt attaches them), walk sprites, the field art for each map, the scene shot sheets.", "",
-         f"Scenes come from `story/playlist.md`" + ("" if every else " — a scene file no chapter list names "
-                                                    "gets no package") + f"; {len(scenes)} scene(s) selected.", ""]
+         "4. From the repository root: `./story_prompt.py ingest` — it finds every waiting image and",
+         "   cuts each one into its panels, sprites or portraits, and says what it wrote.", "",
+         "**Nothing goes to the phone unless you ask for it.**", "",
+         "## Status words", "",
+         "| word | what it means |", "| --- | --- |",
+         "| `to generate` | nothing drawn yet |",
+         "| `done` | every file exists and the description it was drawn from has not changed |",
+         "| `stale` | the files exist but an input changed since — the row says which |",
+         "| `exists` | drawn, and good enough; redo it only if the note says something you want |",
+         "| `image waiting` | you saved a `returned.png`; run `ingest` |",
+         "| `blocked` | waiting on the reference sheet above it |", "",
+         f"Scenes come from `story/playlist.md`" + ("" if every else " — a scene file no chapter list "
+         "names gets no package") + f"; {len(scenes)} scene(s) selected.", "",
+         "## The queue", "",
+         "In the order the work unblocks itself. Work down it.", ""]
 
-    # ── the tilesets, first on the page: this is the field now (TILES.md, D18) ──
-    tsets = [r for r in index if r["group"] == "tileset"]
-    L += ["## 1. Tilesets — the tile field", "",
-          "The field is tile sheets and grid walking (`TILES.md`). **Start with the two sheets at the",
-          "top of this table.** Under TILES2 (D20) a terrain is ONE seamless **swatch** and its edges",
-          "are computed, so the swatch sheet is the whole ground of the world in one generation; the",
-          "**decal** sheet is the variety scattered over it — tufts, flowers, pebbles, reeds — and",
-          "between them they replace every transition tile that used to have to match its neighbours.",
-          "The stamp sheets after them are unchanged: drawn at 4x, a 32x32 tile in a 128-px slot,",
-          "packed into the set's `atlas.png` at the index `tiles.md` gives it. A sheet that has been",
-          "generated is frozen; new ids go into a fresh `<sheet>_2` beside it.", "",
-          "The masks are **generated by the tool** into `<set>/masks.png` — there is nothing to draw",
-          "and nothing to review. The conventions are in `story/field/tilesets/README.md` and the",
-          "contract is `TILES.md`.", "",
-          "| set | sheet | slots | folder | status | after downloading |",
-          "| --- | --- | --- | --- | --- | --- |"]
-    order = {"swatch": 0, "decal": 1, "tileset": 2}
-    for r in sorted(tsets, key=lambda r: (order.get(r["meta"].get("kind"), 3), r["dir"])):
-        m = r["meta"]
-        what = m.get("sheet") or {"swatch": "swatches (the ground)",
-                                  "decal": "decals (the variety)"}.get(m.get("kind"), m.get("kind"))
-        L.append(f"| `{r['tileset']}` | `{what}` | {len(m['ids'])} | "
-                 f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | {state(r)} | {cmd(r['dir'])} |")
-    if not tsets:
-        L.append("| — | | | | no `story/field/tilesets/<set>/tiles.md` yet | |")
-    L.append("")
-
-    # ── the short path: the fewest generations that put something on the phone ──
-    short, seen = [], set()
-    def step(r, what):
-        if r and r["dir"] not in seen:
-            seen.add(r["dir"])
-            short.append((r, what))
-    todo_first = lambda rs: sorted(rs, key=lambda r: pkg_state(r["dir"], r["meta"])[0] == "done")
-    for r in todo_first(sorted(rows("tileset"),
-                               key=lambda r: order.get(r["meta"].get("kind"), 3))):
-        m = r["meta"]
-        if m.get("kind") == "swatch":
-            step(r, f"the `{r['tileset']}` ground swatches — {len(m['ids'])} terrains in one image, "
-                    f"and every edge between them is computed from it. This is the whole ground of "
-                    f"the world.")
-        elif m.get("kind") == "decal":
-            step(r, f"the `{r['tileset']}` decals — {len(m['ids'])} cut-outs the game scatters over "
-                    f"the ground, which is what stops it looking like a sheet of one colour")
-        else:
-            step(r, f"the `{m['sheet']}` sheet of the `{r['tileset']}` tileset — "
-                    f"{len(m['ids'])} tile(s) into that set's atlas, which the map is built from")
-    for r in todo_first(rows("refsheet")):       # what is left to do first, then the ones already cut
-        step(r, f"{r['who']}'s reference sheet — the portrait, the walker and every panel come from it")
-    for r in todo_first([x for x in rows("expressions") if not x.get("blocked")]):
-        step(r, f"{r['who']}'s expression sheet — the ten dialogue-box faces, so a line can change "
-                f"the face without changing the character")
-    for r in todo_first([x for x in rows("walker") if not x.get("blocked") and x["meta"].get("handle") in cast]):
-        step(r, f"{r['who']}'s walk sprite — the figure walking the map")
-    for r in [x for x in rows("screen") if x["map"] == lead_map]:
-        step(r, f"the top-down map `{r['zone']}` of `{lead_map}` — the whole place in one picture, "
-                f"which is what the player walks around in")
-    for g, what in (("tiles", "the ground and walls of {m}"), ("props", "everything standing in {m}"),
-                    ("building", "the front, wall and roof of every building in {m}")):
-        for r in [x for x in index if x["group"] == g and x["map"] == lead_map]:
-            part = re.search(r"\((\d+) of (\d+)\)", r["meta"].get("title", ""))
-            step(r, what.format(m=f"`{lead_map}`") + (f", sheet {part.group(1)} of {part.group(2)}"
-                                                      if part else ""))
-    for r in [x for x in rows("scene") if x["map"] == lead_map]:
-        step(r, f"the shot sheet for `{r['scene']['stem']}` — the first scene the game plays")
-    L += [f"## 2. The short path to something on the phone", "",
-          "The fewest generations that put the first scene and the first map on screen, in the order they",
-          "unblock each other. A checked box is already cut; everything below this section is the long tail.", ""]
-    for n, (r, what) in enumerate(short, 1):
-        label, have, total = pkg_state(r["dir"], r["meta"])
-        box = "x" if label == "done" else " "
-        L.append(f"- [{box}] **{n}.** {what}  \n      "
-                 f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) · {label} · {cmd(r['dir'])}")
-    if not short:
-        L.append("- (nothing to generate: no cast and no field art in the selected scenes)")
-    L += ["", f"Then `./story_prompt.py ingest` and `./fast_reload.sh`.", ""]
-
-    L += ["## 3. Character reference sheets", "",
-          "Do these first: the portrait beside the dialogue box, the walk sprite, and every scene panel",
-          "are all drawn from this one image.", "",
-          "| character | folder | status | after downloading |", "| --- | --- | --- | --- |"]
-    for r in rows("refsheet"):
-        L.append(f"| {r['who']} | [`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | {state(r)} | {cmd(r['dir'])} |")
-    if not rows("refsheet"):
-        L.append("| — | | no cast in the selected scenes | |")
-
-    L += ["", "## 4. Character expressions", "",
-          "Ten head-and-shoulders faces a speaking character, on one template sheet: `neutral`, `smile`,",
-          "`laugh`, `biglaugh`, `concern`, `sorrow`, `annoyed`, `angry`, `shock`, `resolve`. They cut to",
-          "`story/portraits/<name>_<id>.png` and ship as `portrait_<name>_<id>.png`; a dialogue line picks",
-          "one with `- Name (biglaugh): text`, and may be textless for a reaction beat. Blocked until the",
-          "reference sheet exists, because the ten faces must be the same person. No weapons, nothing held.", "",
-          "| who | folder | status | after downloading |", "| --- | --- | --- | --- |"]
-    for r in rows("expressions"):
-        link = f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md)" if r["ok"] else f"`{rel(r['dir'])}`"
-        after = "rerun `packages` once the sheet is in" if r.get("blocked") else cmd(r["dir"])
-        L.append(f"| {r['who']} | {link} | {state(r)} | {after} |")
-    if not rows("expressions"):
-        L.append("| — | | no speaking cast in the selected scenes | |")
-
-    L += ["", "## 5. Walk sprites", "",
-          "The 4x4 sheet the field renderer animates (rows S, W, E, N). A character's package is blocked",
-          "until their reference sheet exists, because the walker must match it.", "",
-          "| who | folder | status | after downloading |", "| --- | --- | --- | --- |"]
-    for r in rows("walker"):
-        link = f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md)" if r["ok"] else f"`{rel(r['dir'])}`"
-        after = "rerun `packages` once the sheet is in" if r.get("blocked") else cmd(r["dir"])
-        L.append(f"| {r['who']} | {link} | {state(r)} | {after} |")
-    if not rows("walker"):
-        L.append("| — | | | |")
-
-    field = [r for r in index if r["group"] in ("tiles", "props", "building")]
-    L += ["", "## 6. Field art, by chapter and map", "",
-          "A **screen** is the main path: one top-down painting of the whole map plus its walkable mask,",
-          "and the game is fitted to it. Tiles, props and buildings are the older sprite path — tiles are the big surfaces",
-          "the ground is made of; a building is map geometry wearing three textures (the front wall, a wall",
-          "sample, a roof sample); everything else is a prop sprite.",
-          f"A map named `{COMMON_MAP}` means the entry carries no `- map:` line yet.", ""]
-    for mp, ch in sorted(all_maps.items(), key=lambda kv: (kv[1], kv[0])):
-        mine = [x for x in field if x["map"] == mp]
-        borrowed = {k: shared.get((mp, k), []) for k in ("tiles", "props", "building")}
-        screens = [x for x in index if x["group"] == "screen" and x["map"] == mp]
-        if not mine and not screens and not any(borrowed.values()) \
-                and not any(x["group"] == "view" and x["map"] == mp for x in index):
-            continue                                  # a map with no field art of its own yet
-        mapfile = FIELD / "maps" / f"{mp}.map"
-        L += [f"### {chapter_label(ch)} — {mp}" + ("" if mapfile.exists() else "  (no map file yet)"), ""]
-        if screens:
-            L += ["**Screens — the main path.** ChatGPT paints the whole map, top-down and 16-bit, from",
-                  "its entry in `story/field/screens.md`, then traces a green-on-black walkable mask over it",
-                  "in the same chat, and the game is fitted to the painting: the mask becomes the nav",
-                  "polygons, the doorway notches and the exits. One more mask, only for a map with something",
-                  "the player walks underneath.", "",
-                  "| zone | folder | status | after downloading |", "| --- | --- | --- | --- |"]
-            for r in screens:
-                L.append(f"| `{r['zone']}` | [`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | "
-                         f"{state(r)} | {cmd(r['dir'])} |")
-            L.append("")
-        L += ["Tiles, props and buildings below are the sprite path, which a painted screen does not need.",
-              "" ] if screens and mine else []
-        L += ["| package | makes | status | after downloading |", "| --- | --- | --- | --- |"]
-        for r in mine:
-            L.append(f"| [`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | {r['meta']['makes']} | "
-                     f"{state(r)} | {cmd(r['dir'])} |")
-        if not mine:
-            L.append("| — | nothing in tiles.md or props.md calls this map home | | |")
+    n = 0
+    for group, heading, blurb in GROUPS:
+        rows = [r for r in index if r["group"] == group]
+        L += [f"### {len(L) and ''}{heading}", "", blurb, "",
+              "| # | what | folder | status | why / next |", "| --- | --- | --- | --- | --- |"]
+        for r in rows:
+            n += 1
+            word, why = row_status(r)
+            what = r.get("who") or (r["scene"]["stem"] if r.get("scene") else r["meta"]["title"])
+            after = why or ("—" if word in ("done", "exists")
+                            else "rerun `packages` once the sheet is in" if word == "blocked"
+                            else f"`ingest {rel(r['dir'])}`")
+            L.append(f"| {n} | {what} | {link(r)} | {word} | {after} |")
+        if not rows:
+            L.append("| — | | | nothing in this group | |")
         L.append("")
-        views = [x for x in index if x["group"] == "view" and x["map"] == mp]
-        if views:
-            L += ["**Painted views** — the block-out the engine captured, repainted as a finished "
-                  "background and laid back over it. Nothing in the picture may move.", "",
-                  "| zone | folder | status | after downloading |", "| --- | --- | --- | --- |"]
-            for r in views:
-                L.append(f"| `{r['zone']}` | [`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md) | "
-                         f"{state(r)} | {cmd(r['dir'])} |")
-            L.append("")
-        for kind, ids in borrowed.items():
-            if ids:
-                L += [f"Shared {'buildings' if kind == 'building' else kind}, drawn with another map "
-                      f"so one id is never drawn twice: "
-                      + ", ".join(f"`{i}` (with `{home}`)" for i, home in sorted(ids)), ""]
-    if not field:
-        L += ["(nothing in `story/field/tiles.md` or `story/field/props.md` yet)", ""]
 
-    scene_rows = rows("scene")
-    L += ["## 7. Scene shot sheets, by chapter and map", "",
-          "One sheet per panel scene: all of its panels as separate white-bordered rectangles on black,",
-          "cut apart into `story/panels/`. Talk and narration scenes need no art and are not listed.", ""]
-    for key in sorted({(r["chapter"], r["map"]) for r in scene_rows}):
-        ch, mp = key
-        L += [f"### {chapter_label(ch)} — {mp}", "",
-              "| scene | folder | panels | status | after downloading |", "| --- | --- | --- | --- | --- |"]
-        for r in [x for x in scene_rows if (x["chapter"], x["map"]) == key]:
-            have, total = panel_art(r["scene"])
-            link = f"[`{rel(r['dir'])}`]({rel(r['dir'])}/prompt.md)" if r["ok"] else f"`{rel(r['dir'])}`"
-            L.append(f"| `{r['scene']['stem']}` | {link} | {total} | {state(r)} | {cmd(r['dir'])} |")
-        L.append("")
-    if not scene_rows:
-        L += ["(no panel scenes in the selection yet)", ""]
+    if frozen:
+        L += ["## Frozen — already drawn, do not redo", "",
+              "The valley tileset sheets. The voxel field reads their `atlas.png`, `decals/` and",
+              "`swatches/` every frame, and these folders hold the only templates that could cut the",
+              "archived returns in `story/sheets/` again if the palette is ever refitted. They are",
+              "not regenerated, not pruned, and not on the queue above. **There is no work here.**", ""]
+        L += [f"- `{rel(d)}`" for d in sorted(frozen)] + [""]
 
     if notes:
-        L += ["## Notes", ""] + [f"- {n}" for n in notes] + [""]
-    if orphans:
-        L += ["## Kept, but no longer generated", "",
-              "These folders left the playlist while holding an image you generated. Nothing deletes them;",
-              "move the image somewhere safe and delete the folder by hand when you are done with it.", ""]
-        L += [f"- `{rel(d)}`" for d in orphans] + [""]
+        L += ["## Notes", ""] + [f"- {x}" for x in notes] + [""]
     if failures:
         L += ["## Could not be built", "",
-              "Each of these is a validation error in a scene file or a field description, not a missing",
-              "image. Fix the source file and rerun `packages`.", ""]
+              "A validation error in a scene file or a field description, not a missing image.",
+              "Fix the source file and rerun `packages`.", ""]
         L += [f"- `{what}` — {why}" for what, why in failures] + [""]
     (PACKAGES / "README.md").write_text("\n".join(L))
 
@@ -8680,7 +6361,6 @@ PALETTE_VERSION = 2           # v2 (2026-09-19): refitted to the owner's flat lu
                               # and the first version to reserve contiguous ramps for palette cycling
 PAL_SIZE = 256
 PAL_TRANSPARENT, PAL_BLACK, PAL_WHITE = 0, 1, 2
-PAL_FREE = PAL_SIZE - 3               # 253 colours the build gets to choose
 MERGE_DE = 0.015                      # two palette entries this close in Oklab are one colour
 LEVELS = 32                           # light levels a colormap table carries
 
@@ -8725,9 +6405,7 @@ RAMP_LO, RAMP_HI = 0.16, 0.93         # a ramp's lightness range: black and whit
 SHADOW_HUE, HILITE_HUE = 295.0, 95.0  # shadows rotate toward blue-violet, highlights toward yellow
 
 # Where shipped art lives. `palette check` walks these; everything in them must be an indexed PNG.
-SHIPPED_MASTER = ("field/tilesets", "field/walkers", "field/props", "field/tiles",
-                  "field/buildings", "portraits")
-SHIPPED_SCENE = "panels"
+SHIPPED_MASTER = ("field/tilesets", "field/walkers", "field/sprites", "portraits")
 
 
 # ── the hex file ──
@@ -8874,7 +6552,7 @@ def write_indexed_png(path, w, h, index_rows, pal):
         + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
-PALETTE_OFF = False       # tools/palette/proof.py: write the cut in full colour beside the shipped
+PALETTE_OFF = False       # a debug switch: write the cut in full colour beside the shipped
                           # file, as <name>.raw.png, so the two can be looked at side by side
 
 
@@ -9655,11 +7333,10 @@ def ingest_one(d, meta, returned, extra=()):
     kind = meta.get("kind")
     if kind == "sheet":
         return run_quiet(cmd_slice, [str(d / "sheet.json"), str(returned)])
-    if kind == "screen":                                     # three images in, the engine's .screen out
-        ok, msg = run_quiet(cmd_screen_cut, [str(d / "sheet.json"), str(d),
-                                             *[a for a in extra if a == "--debug"]])
-        return ok, (SCREEN_SUMMARY[0] if ok and SCREEN_SUMMARY else msg)
-    if kind in FIELD_KINDS or kind in ("view", "tileset", "swatch", "decal", "expressions"):
+    # `tileset`, `swatch` and `decal` are the tile era's: no package generates them any more, but the
+    # cutter stays so the frozen valley sheets in story/packages/tilesets/ can be cut again from the
+    # archived returns if the palette is ever refitted (WORLD.md, "What the world is made of").
+    if kind in FIELD_KINDS or kind in ("tileset", "swatch", "decal", "expressions"):
         return run_quiet(cmd_cut, [str(d / "sheet.json"), str(returned), *extra])
     if kind == "refsheet":
         handle = meta["handle"]
@@ -9718,6 +7395,7 @@ def cmd_ingest(args):
         line = squash(msg) if msg else ""
         if ok:
             done += 1
+            record_cut(d, meta)        # stamp what it was cut from, so a later edit reads as stale
             after, have, total = pkg_state(d, meta)
             print(f"ok    {rel}  ({returned.name} -> {have}/{total} file(s)){'  ' + line if line else ''}"
                   + (f"  [kept {kept.relative_to(ROOT.parent)}]" if kept else ""))
@@ -9755,9 +7433,18 @@ def c_str(text):
 
 def cmd_export(args):
     style, cast = load_style(), load_cast()
-    stems = [stem for stem, _ in playlist_lists().get("intro", [])]
-    if not stems:
-        die("playlist.md: no scenes listed under '## intro'")
+    lists = playlist_lists()
+    # THE GAME PLAYS CHAPTERS. New Game runs `## chapter01` from its first scene; there is no longer
+    # a separate `## intro` list with a special role (D23 — the game is written one chapter at a
+    # time). Every '## chapterNN' list in playlist.md is exported in order, art or no art: a panel
+    # scene with nothing generated yet exports with every panel a placeholder carrying its
+    # description, so the chapter always plays end to end while the sheets are being drawn.
+    want = {name: [stem for stem, _ in rows] for name, rows in lists.items()
+            if re.fullmatch(r"chapter\d+", name)}
+    if not want:
+        die("playlist.md: no '## chapterNN' list to export. The game plays chapters; add one.")
+    chapter_names = sorted(want)
+    stems = list(dict.fromkeys(s for n in chapter_names for s in want[n]))   # unique, in play order
     out = ["// GENERATED by ./story_prompt.py export. Do not edit: change story/scenes/*.md or story/playlist.md.",
            "#pragma once", "",
            "enum CsMood { " + ", ".join(f"CS_{m.upper()}" for m in MOODS) + ", CS_MOOD_COUNT };",
@@ -9765,7 +7452,10 @@ def cmd_export(args):
            "narration = text over black, talk = dialogue box over black or a dimmed backdrop",
            "enum CsSide { CS_LEFT, CS_RIGHT };                   // which end of the dialogue box a portrait sits at",
            "struct CsRect { float x, y, w, h; };                 // percent of the stage",
-           "struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen",
+           "struct CsPanel { const char *file; int page; CsRect land, port;   // a new page clears the screen",
+           "                 const char *desc; };   // the panel's one-line description, drawn small inside the",
+           "// placeholder box when file does not exist yet, so pacing can be judged before the art is generated.",
+           "#define CS_HAS_PANEL_DESC 1",
            "struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood;  // reveal 0 = none",
            "                const char *portrait; CsSide side;    // portrait file, or nullptr when the speaker has none",
            "                const char *expr; };                  // \"\" when untagged; else one of the ten ids below.",
@@ -9778,7 +7468,7 @@ def cmd_export(args):
            "struct CsScene { const char *id; const char *title; bool narration;   // narration == (kind == CS_NARRATION)",
            "                 CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr",
            "                 const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };", ""]
-    table, mood, emitted = [], "tense", set()
+    rows, mood, emitted = {}, "tense", set()
     for stem in stems:
         path = SCENES / f"{stem}.md"
         if not path.exists():
@@ -9795,9 +7485,10 @@ def cmd_export(args):
         missing = [panel_file(scene, n, sid).name for n, (sid, _) in enumerate(scene["panels"], 1)
                    if not panel_file(scene, n, sid).exists()]
         if scene["panels"] and len(missing) == len(scene["panels"]):
-            print(f"skipped {stem}: no panel art generated yet", file=sys.stderr)
-            continue
-        if missing:                                            # the game draws a placeholder box for these
+            # Exported anyway: the chapter script names this scene, and a clip that vanished would
+            # break the chapter. Every panel is a placeholder box with its description in it.
+            print(f"{stem}: no panel art generated yet; every panel is a placeholder", file=sys.stderr)
+        elif missing:                                          # the game draws a placeholder box for these
             print(f"{stem}: {len(missing)} of {len(scene['panels'])} panels have no art yet, shown as placeholders "
                   f"({', '.join(m.split('_', 3)[-1].removesuffix('.png') for m in missing)})", file=sys.stderr)
         ident = re.sub(r"\W", "_", stem)
@@ -9808,9 +7499,11 @@ def cmd_export(args):
             if scene["panels"]:
                 land, port = page_layout(scene, style, "land"), page_layout(scene, style, "port")
                 out.append(f"static const CsPanel CS_{ident}_PANELS[] = {{")
-                for a, b in zip(land, port):
+                descs = [d for _, d in scene["panels"]]
+                for i, (a, b) in enumerate(zip(land, port)):
                     rect = lambda r: "{" + ", ".join(f"{float(r[k]):.1f}f" for k in "xywh") + "}"
-                    out.append(f'    {{ "{a["file"]}", {a["page"]}, {rect(a)}, {rect(b)} }},')
+                    out.append(f'    {{ "{a["file"]}", {a["page"]}, {rect(a)}, {rect(b)}, '
+                               f'{c_str(descs[i] if i < len(descs) else "")} }},')
                 out.append("};")
             sides = speaker_sides(scene, cast)                    # first speaker left, second right, then alternating
             out.append(f"static const CsLine CS_{ident}_LINES[] = {{")
@@ -9827,15 +7520,31 @@ def cmd_export(args):
         panels = f"CS_{ident}_PANELS, {len(scene['panels'])}" if scene["panels"] else "nullptr, 0"
         bd = backdrop_panel(scene) if scene["talk"] else None
         backdrop = c_str(bd[2].name) if bd and bd[2] and bd[2].exists() else "nullptr"
-        table.append(f'    {{ "{stem}", {c_str(title)}, {"true" if scene["narration"] else "false"}, '
-                     f'CS_{scene["kind"].upper()}, {backdrop}, '
-                     f'{panels}, CS_{ident}_LINES, {len(scene["dialogue"])} }},')
-    if not table:
+        rows[stem] = (f'    {{ "{stem}", {c_str(title)}, {"true" if scene["narration"] else "false"}, '
+                      f'CS_{scene["kind"].upper()}, {backdrop}, '
+                      f'{panels}, CS_{ident}_LINES, {len(scene["dialogue"])} }},')
+    if not rows:
         die("nothing to export: no listed scene is complete")
-    out += ["static const CsScene CS_INTRO[] = {"] + table + ["};",
-            "static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);", ""]
+    for name in chapter_names:
+        arr = "CS_" + name.upper()                            # chapter01 -> CS_CHAPTER01
+        body = [rows[s] for s in want[name] if s in rows]
+        if not body:                                          # an empty chapter list is not an error
+            out += [f"static const CsScene {arr}[1] = {{}};", f"static const int {arr}_COUNT = 0;", ""]
+            continue
+        out += [f"static const CsScene {arr}[] = {{"] + body + ["};",
+                f"static const int {arr}_COUNT = sizeof({arr}) / sizeof({arr}[0]);", ""]
+    # One table over the lot, so the game walks chapters rather than naming each array. `number` is
+    # the chapter's own number (chapter01 -> 1), which is what a save file stores.
+    out += ["struct CsChapter { const char *id; int number; const CsScene *scenes; int count; };",
+            "#define CS_HAS_CHAPTERS 1",
+            "static const CsChapter CS_CHAPTERS[] = {"]
+    for name in chapter_names:
+        arr, number = "CS_" + name.upper(), int(name.removeprefix("chapter"))
+        out.append(f'    {{ "{name}", {number}, {arr}, {arr}_COUNT }},')
+    out += ["};", "static const int CS_CHAPTER_COUNT = sizeof(CS_CHAPTERS) / sizeof(CS_CHAPTERS[0]);",
+            "// New Game starts at CS_CHAPTERS[0].", ""]
     GAME_HEADER.write_text("\n".join(out))
-    print(f"wrote {GAME_HEADER.relative_to(ROOT.parent)}  ({len(table)} of {len(stems)} scenes)")
+    print(f"wrote {GAME_HEADER.relative_to(ROOT.parent)}  ({len(rows)} of {len(stems)} scenes)")
     export_field_text()
 
 
@@ -9869,8 +7578,8 @@ def main():
     cmd = args[0] if args else ""
     if cmd == "shots":
         cmd_shots()
-    elif cmd in ("check", "build"):
-        cmd_check_build(args[1:], build=(cmd == "build"))
+    elif cmd == "check":
+        cmd_check(args[1:])
     elif cmd == "brief":
         cmd_brief(args[1:])
     elif cmd == "sheet":
@@ -9881,24 +7590,14 @@ def main():
         cmd_portraits(args[1:])
     elif cmd == "slice":
         cmd_slice(args[1:])
-    elif cmd == "tiles":
-        cmd_tiles(args[1:])
-    elif cmd == "props":
-        cmd_props(args[1:])
+    elif cmd == "sprites":
+        cmd_sprites(args[1:])
     elif cmd == "walker":
         cmd_walker(args[1:])
     elif cmd == "expressions":
         cmd_expressions(args[1:])
-    elif cmd == "building":
-        cmd_building(args[1:])
-    elif cmd == "view":
-        cmd_view(args[1:])
-    elif cmd == "tileset":
-        cmd_tileset(args[1:])
     elif cmd == "tmap":
         cmd_tmap(args[1:])
-    elif cmd == "screen":
-        cmd_screen(args[1:])
     elif cmd == "cut":
         cmd_cut(args[1:])
     elif cmd == "preview":

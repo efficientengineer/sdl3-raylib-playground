@@ -1,0 +1,19 @@
+{
+  "kind": "sprites",
+  "ids": [
+    "machine_post",
+    "machine_swing",
+    "sheep",
+    "sleeping_animal"
+  ],
+  "fingerprint": "eabfca972974af2d",
+  "title": "field sprites \u2014 4 billboard(s) (3 of 3)",
+  "makes": "`story/field/sprites/machine_post.png`, `story/field/sprites/machine_swing.png`, `story/field/sprites/sheep.png`, `story/field/sprites/sleeping_animal.png`",
+  "outputs": [
+    "story/field/sprites/machine_post.png",
+    "story/field/sprites/machine_swing.png",
+    "story/field/sprites/sheep.png",
+    "story/field/sprites/sleeping_animal.png"
+  ],
+  "dir": "story/packages/ch01/sprites_3"
+}

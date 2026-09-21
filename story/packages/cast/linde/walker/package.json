@@ -1,0 +1,11 @@
+{
+  "kind": "walker",
+  "handle": "linde",
+  "title": "linde \u2014 walk sheet (no cast entry)",
+  "fingerprint": "0d5fffab6d74afdf",
+  "makes": "`story/field/walkers/linde.png`, the 9-frame walk sprite sheet",
+  "outputs": [
+    "story/field/walkers/linde.png"
+  ],
+  "dir": "story/packages/cast/linde/walker"
+}

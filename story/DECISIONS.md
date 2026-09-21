@@ -268,3 +268,57 @@ No planting for a future that is not decided (e.g. Hart's death, the workshop bo
 detail stays if it is good in its own scene. `story/v3/THREADS.md` keeps the short list of what finished
 chapters have promised the player, so discovery writing does not drop its own setups. Art, maps and
 level generators are only built for chapters that are written. To reverse: PREMISE.md is untouched.
+
+## D24. The legacy is deleted, not archived
+
+Owner (2026-09-21): *"Before anything else, clear my art tray tool. Make sure we have no legacy
+packages, only things that are in the new game, and ensure we're clear so I don't redo any work. …
+Remove all legacy content and systems. No sunk cost fallacy."*
+
+**Everything below is recoverable from the git tag `legacy-final`, which is the pre-cleanup state of
+the whole repository.** Nothing was copied into an archive folder; the tag is the archive.
+
+**The art tray now generates five kinds and nothing else** — `cast/<name>/refsheet|expressions|walker`,
+`chNN/sprites`, `chNN/scenes/<scene>` — because the voxel world's ground, walls and buildings need no
+generated art at all. `story/packages/README.md` is one ordered queue with a computed status a row.
+Scenes are filed flat under the chapter; the per-map folders went with the per-map art.
+
+**New:** `story/field/sprites.md` and `./story_prompt.py sprites` — the billboards (creatures,
+animals, the training machines), reusing the magenta template machinery of the old `props` command,
+with per-frame animation and a shared trim box. Contract in `WORLD.md` §2.
+
+**No redone work.** A package's `package.json` now records a fingerprint of the inputs it was built
+from, and `ingest` stamps the fingerprint it cut at, so `stale` is computed rather than guessed. The
+handful of packages cut before fingerprints existed are ruled on by hand in `LEGACY_STATUS`.
+
+**Removed from `story_prompt.py`** (about 2,250 lines): the `tiles`, `props`, `building`, `view`,
+`screen` and `tileset` package generators, the painted-screen navmesh derivation, the painted-view
+fitter, and the single-page `build` mode. **The tileset CUTTER stays** so the valley atlas can still
+be re-cut from `story/sheets/` if the palette is refitted — verified byte-identical.
+
+**Removed from `story/`:** `scenes_rejected/`, `outline/`, `canon.md`, `bible.md`, `plot.md`,
+`locations.md`, `REVIEW.md`, `TREATMENT.md`, `pitches/`, `v4/`, `v3/tableread/`, `v3/variants/`, 36 of
+40 agent reports in `notes/`, and the parked field data and art (`screens*`, `views`, `maps`,
+`props*`, `tiles.md` + `tiles/`, `buildings*`). `v3/sidestories/PITCHES.md` became
+`v3/ideas_interludes.md`. `characters.md` was cut from 54 entries to chapter one's seven.
+`story/panels/` and `story/sheets/` lost the retired scenes' art. **`003_the_warning`'s art went with
+them** — it was flagged as canon in an earlier memory, and it belongs to a scene the v3 rewrite
+retired; `git checkout legacy-final -- story/panels story/sheets` brings it back.
+
+**Removed from the root:** `FIELD.md`, `TILES.md` and `TILES2_PROPOSAL.md`, folded into the new
+short **`WORLD.md`** (what needs art, the `.tmap` format, the map design rules, the asset sizes from
+the retired `tools/sizes` study). `PALETTE.md` lost the tile-shader specifics. `tools/palette`,
+`tools/sizes`, `tools/tiles2` and `tools/script` are gone; `tools/arttray` stays. `CLAUDE.md` was
+rewritten to describe the project as it is.
+
+**`story/playlist.md`'s `## intro` list is gone** — the game plays chapters, New Game starts at the
+first scene of `## chapter01`, and `export` emits `CS_CHAPTERS[]` over every `## chapterNN` list. A
+panel scene with no art is exported as placeholder boxes carrying each panel's description instead of
+being skipped, so a chapter always plays end to end.
+
+**Kept on purpose:** `story/packages/tilesets/valley/**` and the `tilesets-valley-*` sheets in
+`story/sheets/` (the voxel field reads that atlas every frame; they are frozen and off the queue),
+the stale Falke and Ottilie walkers (so the demo has sprites until they are redrawn), and
+`villager_a`/`villager_b`.
+
+**To reverse:** `git checkout legacy-final -- <path>` for anything named above.

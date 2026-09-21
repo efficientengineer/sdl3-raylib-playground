@@ -3,6 +3,7 @@
   "handle": "guildclerk",
   "title": "Guildclerk \u2014 reference sheet",
   "ref": "story/refs/guildclerk.png",
+  "fingerprint": "af7c39a1ebc668b8",
   "makes": "`story/refs/guildclerk.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/guildclerk.png",

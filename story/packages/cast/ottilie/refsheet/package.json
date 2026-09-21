@@ -3,6 +3,7 @@
   "handle": "lyra",
   "title": "Ottilie \u2014 reference sheet",
   "ref": "story/refs/lyra.png",
+  "fingerprint": "768fc5fc5a668952",
   "makes": "`story/refs/lyra.png` and the dialogue-box portrait cut out of it",
   "outputs": [
     "story/refs/lyra.png",

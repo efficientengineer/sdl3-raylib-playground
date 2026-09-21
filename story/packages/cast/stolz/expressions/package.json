@@ -2,6 +2,7 @@
   "kind": "expressions",
   "handle": "stolz",
   "title": "Stolz \u2014 expression sheet",
+  "fingerprint": "95fef2f7a92d3696",
   "makes": "10 dialogue-box faces in `story/portraits/`",
   "outputs": [
     "story/portraits/stolz_neutral.png",

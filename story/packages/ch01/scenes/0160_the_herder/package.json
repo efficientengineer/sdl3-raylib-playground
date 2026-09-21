@@ -1,0 +1,17 @@
+{
+  "kind": "sheet",
+  "scene": "0160_the_herder",
+  "title": "0160_the_herder \u2014 shot sheet",
+  "fingerprint": "5b70852c66bbe892",
+  "makes": "7 panel image(s) in `story/panels/`",
+  "outputs": [
+    "story/panels/0160_the_herder_p1_establishing_tall.png",
+    "story/panels/0160_the_herder_p2_high_angle_down.png",
+    "story/panels/0160_the_herder_p3_eyes_slit.png",
+    "story/panels/0160_the_herder_p4_two_shot.png",
+    "story/panels/0160_the_herder_p5_full_body_reveal.png",
+    "story/panels/0160_the_herder_p6_portrait_inset.png",
+    "story/panels/0160_the_herder_p7_over_shoulder.png"
+  ],
+  "dir": "story/packages/ch01/scenes/0160_the_herder"
+}

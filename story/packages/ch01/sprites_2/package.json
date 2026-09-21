@@ -1,0 +1,19 @@
+{
+  "kind": "sprites",
+  "ids": [
+    "job_board",
+    "klee",
+    "lid",
+    "machine_arm"
+  ],
+  "fingerprint": "206cf6ee7aa6e2d5",
+  "title": "field sprites \u2014 4 billboard(s) (2 of 3)",
+  "makes": "`story/field/sprites/job_board.png`, `story/field/sprites/klee.png`, `story/field/sprites/lid.png`, `story/field/sprites/machine_arm.png`",
+  "outputs": [
+    "story/field/sprites/job_board.png",
+    "story/field/sprites/klee.png",
+    "story/field/sprites/lid.png",
+    "story/field/sprites/machine_arm.png"
+  ],
+  "dir": "story/packages/ch01/sprites_2"
+}

@@ -2,7 +2,8 @@
   "kind": "walker",
   "handle": "hart",
   "title": "Hart \u2014 walk sheet",
-  "makes": "`story/field/walkers/hart.png`, the 4x4 walk sprite sheet",
+  "fingerprint": "0a4f6ef77407581b",
+  "makes": "`story/field/walkers/hart.png`, the 9-frame walk sprite sheet",
   "outputs": [
     "story/field/walkers/hart.png"
   ],

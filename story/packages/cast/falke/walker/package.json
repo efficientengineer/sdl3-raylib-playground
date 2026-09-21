@@ -1,8 +1,9 @@
 {
   "kind": "walker",
-  "handle": "bron",
+  "handle": "falke",
   "title": "Falke \u2014 walk sheet",
-  "makes": "`story/field/walkers/falke.png`, the 4x4 walk sprite sheet",
+  "fingerprint": "c844a0f3545040f5",
+  "makes": "`story/field/walkers/falke.png`, the 9-frame walk sprite sheet",
   "outputs": [
     "story/field/walkers/falke.png"
   ],

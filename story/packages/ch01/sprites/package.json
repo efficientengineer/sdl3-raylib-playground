@@ -1,0 +1,17 @@
+{
+  "kind": "sprites",
+  "ids": [
+    "burr",
+    "false_lantern",
+    "fleece"
+  ],
+  "fingerprint": "8ced3bcbb6ac23c1",
+  "title": "field sprites \u2014 3 billboard(s) (1 of 3)",
+  "makes": "`story/field/sprites/burr.png`, `story/field/sprites/false_lantern.png`, `story/field/sprites/fleece.png`",
+  "outputs": [
+    "story/field/sprites/burr.png",
+    "story/field/sprites/false_lantern.png",
+    "story/field/sprites/fleece.png"
+  ],
+  "dir": "story/packages/ch01/sprites"
+}
