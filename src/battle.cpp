@@ -67,6 +67,13 @@
 // §0  small helpers
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
+// ── `battle:` logging. One tag, so a phone log tells the whole story of a fight. ───────────────
+#if BT_DRAW
+#define BT_LOGF(...) SDL_Log(__VA_ARGS__)
+#else
+#define BT_LOGF(...) do { printf("battle-log: " __VA_ARGS__); printf("\n"); } while (0)
+#endif
+
 static int bt_min(int a, int b) { return a < b ? a : b; }
 static int bt_max(int a, int b) { return a > b ? a : b; }
 static int bt_clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -307,6 +314,7 @@ static const BtPartyDef BT_PARTY_DEF[BT_PARTY] = {
 #define BT_EVQ 8
 
 enum BtCmd { BTC_NONE = 0, BTC_ATTACK, BTC_SKILL, BTC_GUARD, BTC_ITEM, BTC_RUN, BTC_COUNT };
+static_assert(BTC_COUNT == BT_CMD_MAX && BTC_ATTACK == BT_CMD_FIRST, "battle.h's command ids must match BtCmd");
 
 struct BtEnemyState {
     int def;                    // index into BT_ENEMIES
@@ -344,6 +352,7 @@ struct BtActorState {
 };
 
 enum BtPhase { BTP_INPUT = 0, BTP_RESOLVE, BTP_ENEMY, BTP_OVER };
+static const char *BT_PHASE_NAME[] = { "INPUT", "RESOLVE", "ENEMY", "OVER" };
 
 struct Battle {
     // ── the fight ──
@@ -388,7 +397,23 @@ struct Battle {
     char pending_text[64];      // a story text id to show as a mid-fight box, drawn by us AND
                                 // emitted as BTE_TEXT so the chapter can gate on it
     float pending_text_t;
+
+    // ── the WATCHDOG (owner bug, 2026-09-21: "stuck after attacking" on the phone) ──────────────
+    // A soft lock must never trap the player. Anything that is not an input-accepting state is a
+    // PRESENTATION state, and a presentation state that has run for BT_STUCK_S seconds is a bug:
+    // we say so loudly with the state's name and force it forward. `stuck_fires` is counted so the
+    // UI test and the Dev panel can assert it stayed at zero.
+    // Where the menu actually IS, in ImGui coordinates, recorded by the last bt_draw. The UI test
+    // taps these rather than recomputing the layout, so the test can never drift from the screen.
+    float ui_mx0, ui_my0, ui_mw, ui_rowh, ui_sy, ui_S, ui_U;
+    int ui_nrows, ui_rows[BTC_COUNT], ui_has_effort;
+    int last_phase, last_cur;
+    float phase_t;              // seconds in the current (phase, cur) pair
+    int stuck_fires;
+    int aborted;                // the Dev panel's "abort battle"
 };
+
+#define BT_STUCK_S 5.0f
 
 // ── the log and the event queue ────────────────────────────────────────────────────────────────
 static void bt_log(Battle *b, const char *fmt, ...) {
@@ -485,6 +510,43 @@ static int bt_skill_count(const char *owner) {
     return k;
 }
 
+static const char *BT_CMD_NAME[BTC_COUNT] = { "", "Attack", "Skill", "Guard", "Item", "Run" };
+static const uint32_t BT_CMD_BIT[BTC_COUNT] = {
+    0, BT_KNOWS_ATTACK, BT_KNOWS_SKILL, BT_KNOWS_GUARD, BT_KNOWS_ITEM, BT_KNOWS_RUN
+};
+
+// ── THE COMMAND LIST, built in ONE place ───────────────────────────────────────────────────────
+// bt_tick and bt_draw both need it and they must agree to the row, so neither builds its own any
+// more (they used to, and a disagreement would mean the tap committing a different command from
+// the one under the finger).
+//
+// THE GUARANTEE (owner bug, "stuck after attacking"): the list always contains at least one entry
+// the player can actually choose. Guard is free, so the moment nothing else is affordable Guard is
+// granted whether or not the teaching order has reached it — an unaffordable Attack with Guard not
+// yet "arrived" is a menu of one dead row, which is exactly the soft lock that was reported.
+static int bt_build_rows(Battle *b, int who, int *rows) {
+    const BtActor *a = &b->party->a[who];
+    int n = 0;
+    for (int pass = 0; pass < 2; pass++) {
+        n = 0;
+        for (int c = BTC_ATTACK; c < BTC_COUNT; c++) {
+            if (c == BTC_RUN && (b->enc->flags & BTE_NO_RUN)) continue;
+            if (c == BTC_SKILL && !bt_skill_count(a->id)) continue;
+            if (c == BTC_ITEM && !(b->party->items & (BT_ITEM_TEACHING | BT_ITEM_HILL))) continue;
+            if (!(b->party->known & BT_CMD_BIT[c])) continue;
+            rows[n++] = c;
+        }
+        bool any = false;
+        for (int r = 0; r < n; r++)
+            if (rows[r] == BTC_GUARD || bt_cheapest_affordable(b, who, rows[r]) > 0) { any = true; break; }
+        if (any) break;
+        if (b->party->known & BT_KNOWS_GUARD) break;            // already there; pass two would not help
+        b->party->known |= BT_KNOWS_GUARD;
+        BT_LOGF("battle: nothing affordable for %s — Guard granted early so the menu is never dead", a->name);
+    }
+    return n;
+}
+
 // ── starting a fight ───────────────────────────────────────────────────────────────────────────
 static void bt_setup_enemies(Battle *b, const char *const *ids) {
     b->enemy_count = 0;
@@ -519,8 +581,15 @@ static void bt_round_begin(Battle *b) {
         e->stam = bt_min(e->stam_max, e->stam + BT_REGEN);
         e->countered = 0; e->parried = 0;
     }
+    // WHOSE INPUT. It used to be slot 0 unconditionally; a dead slot 0 left the screen in INPUT
+    // with nothing able to commit, which is a soft lock with no way out. Always the first LIVING
+    // slot, and if nobody is alive the round is over anyway (bt_resolve checks straight after).
     b->cur = 0;
+    while (b->cur < b->party->count && !b->party->a[b->cur].alive) b->cur++;
+    if (b->cur >= b->party->count) b->cur = 0;
     b->phase = BTP_INPUT;
+    BT_LOGF("battle: round %d begins (party %d alive, %d enemies alive)", b->round,
+            bt_alive_party(b), bt_alive_enemies(b));
 }
 
 // ── damage ─────────────────────────────────────────────────────────────────────────────────────
@@ -649,6 +718,7 @@ static void bt_do_guard(Battle *b, int who) {
         b->pa[who].winded = 0;
         a->stam = bt_min(a->stam_max, a->stam + BT_PARRY_REGEN);      // nets +16 with the regen
         bt_log(b, "%s turns it aside. %s is open.", a->name, bt_edef(b, parried)->name);
+        BT_LOGF("battle: PARRY — %s turns aside %s; it is open next round", a->name, bt_edef(b, parried)->name);
         b->party->known |= BT_KNOWS_EFFORT;        // there is an opening to spend into (§7a row 5)
         b->party->fail_streak = 0;                 // both escalations reset the moment a parry lands
         b->tell_speed = 1.0f; b->guard_pulse = 0;
@@ -708,6 +778,8 @@ static void bt_enemy_phase(Battle *b) {
                         a->stam = bt_max(0, a->stam - drain);
                         b->pa[t].winded = 1 + e->wind / 2;   // and the regen does not come back
                         bt_log(b, "%s is winded. (-%d)", a->name, drain);
+                        BT_LOGF("battle: WINDED %s -%d stam (now %d), wind %d, no regen for %d round(s)",
+                                a->name, drain, a->stam, e->wind, b->pa[t].winded);
                     }
                 }
                 bt_hurt_actor(b, t, dmg, d->name);
@@ -742,6 +814,7 @@ static void bt_enemy_phase(Battle *b) {
         }
         e->tell_target = t;
         bt_log(b, "%s draws back.", d->name);
+        BT_LOGF("battle: tell — %s draws back at %s", d->name, b->party->a[t].name);
         // Guard APPEARS in the list the first time something telegraphs at you (§7a row 3).
         b->party->known |= BT_KNOWS_GUARD;
     }
@@ -891,9 +964,14 @@ static void bt_resolve(Battle *b) {
     }
 
     // ── the outcome ──
-    if (bt_alive_enemies(b) == 0) { b->outcome = BT_WIN; b->phase = BTP_OVER; return; }
+    if (bt_alive_enemies(b) == 0) {
+        BT_LOGF("battle: END win — %s, round %d", b->enc->id, b->round);
+        b->outcome = BT_WIN; b->phase = BTP_OVER; return;
+    }
     if (bt_alive_party(b) == 0) {
-        if (b->boss_phase == 2) { bt_boss_restart_phase_two(b); return; }   // restarts phase two only
+        if (b->boss_phase == 2) { BT_LOGF("battle: phase two restart"); bt_boss_restart_phase_two(b); return; }
+        BT_LOGF("battle: END lose — %s, round %d%s", b->enc->id, b->round,
+                bt_is_yard(b) ? " (yard: instant retry)" : "");
         b->outcome = BT_LOSE; b->phase = BTP_OVER; return;
     }
     bt_round_begin(b);
@@ -903,11 +981,6 @@ static void bt_resolve(Battle *b) {
 // §3  THE SCREEN.  Draws §2's state and decides nothing.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 #if BT_DRAW
-
-static const char *BT_CMD_NAME[BTC_COUNT] = { "", "Attack", "Skill", "Guard", "Item", "Run" };
-static const uint32_t BT_CMD_BIT[BTC_COUNT] = {
-    0, BT_KNOWS_ATTACK, BT_KNOWS_SKILL, BT_KNOWS_GUARD, BT_KNOWS_ITEM, BT_KNOWS_RUN
-};
 
 static ImU32 bt_col(int idx, ImU32 fallback) {
     uint32_t c = bt_pal(idx, fallback);
@@ -1172,20 +1245,16 @@ static void bt_draw(Battle *b, int W, int H, float dt, bool ui_blocked) {
         int who = b->cur;
         BtActor *a = &b->party->a[who];
         float mx0 = w * 0.05f, mw = w * 0.24f;
-        float rowh = h * 0.068f;
+        // A THUMB, at dpi_scale 3 on the phone. 0.068 of 1080 px is 73 px ≈ 24 dp — under half of
+        // the 48 dp a touch target is supposed to be. 0.095 is 103 px ≈ 34 dp of row with the hit
+        // rect overhanging it, which measures ~48 dp on the phone.
+        float rowh = h * 0.095f;
         float my0 = 0;                 // set below: the block grows UPWARD from a fixed bottom, so
                                        // the slider under it is never pushed off the screen as the
                                        // command list grows (§7a: the list grows, one entry at a time)
 
         // Build the visible list: an idea that has not arrived is ABSENT, never greyed (§7a).
-        int rows[BTC_COUNT], nrows = 0;
-        for (int c = BTC_ATTACK; c < BTC_COUNT; c++) {
-            if (c == BTC_RUN && (b->enc->flags & BTE_NO_RUN)) continue;
-            if (c == BTC_SKILL && !bt_skill_count(a->id)) continue;
-            if (c == BTC_ITEM && !(b->party->items & (BT_ITEM_TEACHING | BT_ITEM_HILL))) continue;
-            if (!(b->party->known & BT_CMD_BIT[c])) continue;
-            rows[nrows++] = c;
-        }
+        int rows[BTC_COUNT], nrows = bt_build_rows(b, who, rows);
         if (b->ui_cmd < 0 || b->ui_cmd >= nrows) b->ui_cmd = 0;
         my0 = h * 0.94f - rowh * 1.7f - nrows * rowh;
 
@@ -1254,44 +1323,70 @@ static void bt_draw(Battle *b, int W, int H, float dt, bool ui_blocked) {
         }
 
         // ── touch: one invisible button per row and per notch, big enough for a thumb ──
+        // COORDINATE SPACES, and this is the DPI bug the owner's report could have been:
+        // everything above is drawn in DRAWABLE pixels (the w/h host.cpp passes, from
+        // SDL_GetWindowSizeInPixels), but ImGui's cursor, window and mouse coordinates are
+        // DisplaySize — logical points. On Android the two are the same number, so the phone was
+        // never wrong here; on a Retina Mac they differ by 2 and every hit rect would sit at twice
+        // its drawn position. `U` is that ratio, and it is 1.0 on the phone.
+        float U = (ImGui::GetIO().DisplaySize.x > 0.0f) ? ImGui::GetIO().DisplaySize.x / w : 1.0f;
+        b->ui_mx0 = mx0; b->ui_my0 = my0; b->ui_mw = mw; b->ui_rowh = rowh;
+        b->ui_sy = sy; b->ui_S = S; b->ui_U = U; b->ui_nrows = nrows; b->ui_has_effort = has_effort ? 1 : 0;
+        for (int r = 0; r < nrows; r++) b->ui_rows[r] = rows[r];
         ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(w, h));
+        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
         ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        // SCREEN coordinates below, not window ones. The Dev panel's touch style sets
+        // WindowPadding to 8 * dpi * 1.3 — about 30 px on the phone — so SetCursorPos(x, y) put
+        // every hit rect 30 px right and 30 px down of the row it belongs to. A thumb aimed at
+        // Guard landed on Attack. SetCursorScreenPos has no origin to get wrong.
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         if (ImGui::Begin("##bt_touch", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
                                           ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar)) {
             for (int r = 0; r < nrows; r++) {
-                ImGui::SetCursorPos(ImVec2(mx0 - S * 0.2f, my0 + r * rowh - S * 0.1f));
+                ImGui::SetCursorScreenPos(ImVec2((mx0 - S * 0.3f) * U, (my0 + r * rowh - S * 0.2f) * U));
                 char lbl[24]; snprintf(lbl, sizeof(lbl), "##cmd%d", r);
-                if (ImGui::InvisibleButton(lbl, ImVec2(mw, rowh * 0.95f))) {
+                if (ImGui::InvisibleButton(lbl, ImVec2((mw + S * 0.6f) * U, rowh * U))) {
                     if (b->ui_cmd == r) b->phase = BTP_RESOLVE;         // a second tap commits
                     else { b->ui_cmd = r; b->ui_effort = bt_clamp(b->party->last_effort[rows[r]], 1, 5); }
                 }
             }
-            if (has_effort) for (int e = 1; e <= 5; e++) {
-                ImGui::SetCursorPos(ImVec2(mx0 + (e - 1) * (mw / 5.0f), sy - S * 0.2f));
-                char lbl[24]; snprintf(lbl, sizeof(lbl), "##eff%d", e);
-                if (ImGui::InvisibleButton(lbl, ImVec2(mw / 5.0f, S * 1.2f))) b->ui_effort = e;
+            // The effort notches: tappable AND draggable. A drag across them sets the effort under
+            // the finger, which is what a slider has to do — five separate buttons only answered a
+            // tap that landed and lifted inside one notch.
+            if (has_effort) {
+                for (int e = 1; e <= 5; e++) {
+                    ImGui::SetCursorScreenPos(ImVec2((mx0 + (e - 1) * (mw / 5.0f)) * U, (sy - S * 0.45f) * U));
+                    char lbl[24]; snprintf(lbl, sizeof(lbl), "##eff%d", e);
+                    if (ImGui::InvisibleButton(lbl, ImVec2((mw / 5.0f) * U, S * 1.6f * U))) b->ui_effort = e;
+                }
+                if (ImGui::IsMouseDown(0)) {
+                    ImVec2 m = ImGui::GetIO().MousePos;
+                    float y0 = (sy - S * 0.45f) * U, y1 = y0 + S * 1.6f * U;
+                    if (m.y >= y0 && m.y <= y1 && m.x >= mx0 * U && m.x <= (mx0 + mw) * U)
+                        b->ui_effort = bt_clamp(1 + (int)((m.x - mx0 * U) / (mw * U / 5.0f)), 1, 5);
+                }
             }
             if (cmd == BTC_SKILL) {
                 int n = bt_skill_count(a->id);
                 for (int k = 0; k < n; k++) {
-                    ImGui::SetCursorPos(ImVec2(mx0 + mw + S * 0.8f, my0 + k * S * 1.2f - S * 0.1f));
+                    ImGui::SetCursorScreenPos(ImVec2((mx0 + mw + S * 0.8f) * U, (my0 + k * S * 1.2f - S * 0.1f) * U));
                     char lbl[24]; snprintf(lbl, sizeof(lbl), "##sk%d", k);
-                    if (ImGui::InvisibleButton(lbl, ImVec2(mw, S * 1.05f))) b->ui_skill = k;
+                    if (ImGui::InvisibleButton(lbl, ImVec2(mw * U, S * 1.05f * U))) b->ui_skill = k;
                 }
             }
             // Target: tap an enemy.
             for (int i = 0; i < b->enemy_count; i++) {
                 if (!b->en[i].alive) continue;
-                ImGui::SetCursorPos(ImVec2(w * (0.13f + 0.14f * i) - w * 0.07f, h * 0.18f));
+                ImGui::SetCursorScreenPos(ImVec2((w * (0.13f + 0.14f * i) - w * 0.07f) * U, h * 0.18f * U));
                 char lbl[24]; snprintf(lbl, sizeof(lbl), "##tgt%d", i);
-                if (ImGui::InvisibleButton(lbl, ImVec2(w * 0.14f, h * 0.32f))) b->ui_target = i;
+                if (ImGui::InvisibleButton(lbl, ImVec2(w * 0.14f * U, h * 0.32f * U))) b->ui_target = i;
             }
         }
         ImGui::End();
-        ImGui::PopStyleVar();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor();
     }
 
@@ -1408,9 +1503,77 @@ bool bt_start(Battle *b, const char *encounter, BtParty *p, const char *map) {
         if (!b->tex[ti]) b->tex[ti] = bt_load_sprite(bt_edef(b, i)->sprite, &b->texw[ti], &b->texh[ti], &b->texfw[ti], &b->texfh[ti]);
     }
 #endif
+    {
+        char pnames[96] = ""; size_t o = 0;
+        for (int i = 0; i < p->count; i++)
+            o += (size_t)snprintf(pnames + o, sizeof(pnames) - o, "%s%s", i ? "+" : "", p->a[i].id);
+        char enames[96] = ""; o = 0;
+        for (int i = 0; i < b->enemy_count; i++)
+            o += (size_t)snprintf(enames + o, sizeof(enames) - o, "%s%s", i ? "+" : "", bt_edef(b, i)->id);
+        BT_LOGF("battle: START enc=%s map=%s party=%d [%s] enemies=%d [%s] known=0x%x items=0x%x",
+                enc->id, b->map, p->count, pnames, b->enemy_count, enames, p->known, p->items);
+    }
+    b->last_phase = BTP_INPUT; b->last_cur = 0; b->phase_t = 0.0f; b->stuck_fires = 0; b->aborted = 0;
     bt_round_begin(b);
     return true;
 }
+
+// ── what the UI test needs to know, and nothing more ───────────────────────────────────────────
+// Coordinates come back in IMGUI space (the same space a tap arrives in), taken from the last
+// frame's real layout. kind: 0 = command row, 1 = effort notch (idx 1..5), 2 = enemy.
+int bt_ui_phase(Battle *b) { return b ? b->phase : BTP_OVER; }
+int bt_ui_rows(Battle *b, int *rows) {
+    if (!b) return 0;
+    for (int i = 0; i < b->ui_nrows; i++) rows[i] = b->ui_rows[i];
+    return b->ui_nrows;
+}
+int bt_ui_has_effort(Battle *b) { return b ? b->ui_has_effort : 0; }
+int bt_ui_enemy_count(Battle *b) { return b ? b->enemy_count : 0; }
+int bt_ui_selected(Battle *b) { return b ? b->ui_cmd : 0; }
+int bt_ui_effort(Battle *b) { return b ? b->ui_effort : 0; }
+int bt_ui_target(Battle *b) { return b ? b->ui_target : 0; }
+int bt_ui_round(Battle *b) { return b ? b->round : 0; }
+int bt_ui_cur(Battle *b) { return b ? b->cur : 0; }
+// Is the row at `idx` one the player can actually commit right now? Guard always is — that is the
+// guarantee. Anything else needs an effort it can pay for.
+int bt_ui_affordable(Battle *b, int idx) {
+    if (!b || idx < 0 || idx >= b->ui_nrows) return 0;
+    int c = b->ui_rows[idx];
+    return (c == BTC_GUARD || bt_cheapest_affordable(b, b->cur, c) > 0) ? 1 : 0;
+}
+const char *bt_cmd_name(int cmd) { return (cmd > 0 && cmd < BTC_COUNT) ? BT_CMD_NAME[cmd] : "?"; }
+bool bt_ui_point(Battle *b, int kind, int idx, float *x, float *y) {
+#if BT_DRAW
+    if (!b || b->ui_rowh <= 0.0f) return false;
+    float U = b->ui_U;
+    if (kind == 0) {
+        if (idx < 0 || idx >= b->ui_nrows) return false;
+        *x = (b->ui_mx0 + b->ui_mw * 0.5f) * U;
+        *y = (b->ui_my0 + (idx + 0.4f) * b->ui_rowh) * U;
+        return true;
+    }
+    if (kind == 1) {
+        if (!b->ui_has_effort || idx < 1 || idx > 5) return false;
+        *x = (b->ui_mx0 + (idx - 0.5f) * (b->ui_mw / 5.0f)) * U;
+        *y = (b->ui_sy + b->ui_S * 0.35f) * U;
+        return true;
+    }
+    if (kind == 2) {
+        if (idx < 0 || idx >= b->enemy_count || !b->en[idx].alive) return false;
+        float w = ImGui::GetIO().DisplaySize.x / (U > 0 ? U : 1.0f);
+        float h = ImGui::GetIO().DisplaySize.y / (U > 0 ? U : 1.0f);
+        *x = (w * (0.13f + 0.14f * idx)) * U;
+        *y = (h * 0.34f) * U;
+        return true;
+    }
+#else
+    (void)b; (void)kind; (void)idx; (void)x; (void)y;
+#endif
+    return false;
+}
+
+// How many times the watchdog has fired this fight. --battle-ui-test asserts it is zero.
+int bt_stuck_count(Battle *b) { return b ? b->stuck_fires : 0; }
 
 bool bt_done(Battle *b) {
     if (!b || b->outcome == BT_RUNNING) return false;
@@ -1418,6 +1581,14 @@ bool bt_done(Battle *b) {
     // calls bt_start again.
     if (b->outcome == BT_LOSE && bt_is_yard(b)) return true;
     return b->dismissed != 0;
+}
+
+// Dev/test: end the fight as a loss, without having to grind the party down.
+void bt_force_lose(Battle *b) {
+    if (!b || !b->party) return;
+    for (int i = 0; i < b->party->count; i++) { b->party->a[i].hp = 0; b->party->a[i].alive = 0; }
+    b->outcome = BT_LOSE;
+    b->phase = BTP_OVER;
 }
 
 void bt_force_win(Battle *b) {
@@ -1434,24 +1605,36 @@ int bt_tick(Battle *b, int w, int h, float dt, bool ui_blocked, BtEvent *ev) {
     if (ev && b->evq_rd < b->evq_n) { *ev = b->evq[b->evq_rd++]; if (b->evq_rd >= b->evq_n) { b->evq_rd = b->evq_n = 0; } }
 
 #if BT_DRAW
-    if (b->phase == BTP_INPUT && !ui_blocked && b->party->a[b->cur].alive) {
-        const BtActor *a = &b->party->a[b->cur];
-        int rows[BTC_COUNT], nrows = 0;
-        for (int c = BTC_ATTACK; c < BTC_COUNT; c++) {
-            if (c == BTC_RUN && (b->enc->flags & BTE_NO_RUN)) continue;
-            if (c == BTC_SKILL && !bt_skill_count(a->id)) continue;
-            if (c == BTC_ITEM && !(b->party->items & (BT_ITEM_TEACHING | BT_ITEM_HILL))) continue;
-            if (!(b->party->known & BT_CMD_BIT[c])) continue;
-            rows[nrows++] = c;
-        }
-        bt_input(b, nrows, rows);
+    // ── THE COMMIT, and the bug the owner hit ──────────────────────────────────────────────────
+    // This used to live INSIDE `if (b->phase == BTP_INPUT)`, which worked for the keyboard and was
+    // a permanent soft lock for touch. bt_input() runs here, so a key press flipped the phase to
+    // BTP_RESOLVE and was consumed two lines later in the SAME frame. A TAP is different: the
+    // command rows are ImGui InvisibleButtons inside bt_draw(), which runs AFTER this block, so a
+    // tap set BTP_RESOLVE at the end of the frame — and on the next frame the phase was no longer
+    // BTP_INPUT, so neither this block NOR bt_draw's menu ran again. No commit, no menu, no input:
+    // stuck after the first tap on Attack, exactly as reported, with the last log line being the
+    // palette load because nothing after it ever logged. The commit is now checked on its own.
+    if (b->phase == BTP_RESOLVE && !b->party->a[b->cur].alive) {
+        // The chooser died between choosing and committing (a reload, a scripted hit): skip them.
+        b->phase = BTP_INPUT;
+    }
+    if (b->phase == BTP_INPUT || b->phase == BTP_RESOLVE) {
+        int rows[BTC_COUNT], nrows = bt_build_rows(b, b->cur, rows);
+        if (b->phase == BTP_INPUT && !ui_blocked) bt_input(b, nrows, rows);
         if (b->phase == BTP_RESOLVE) {
             // Commit this character's choice and move on to the next.
-            int cmd = rows[bt_clamp(b->ui_cmd, 0, bt_max(0, nrows - 1))];
+            int cmd = nrows > 0 ? rows[bt_clamp(b->ui_cmd, 0, nrows - 1)] : BTC_GUARD;
             int eff = bt_clamp(b->ui_effort, 1, 5);
             if (cmd != BTC_GUARD && !bt_can_pay(b, b->cur, cmd, eff)) {
                 int cheap = bt_cheapest_affordable(b, b->cur, cmd);
-                if (!cheap) { b->phase = BTP_INPUT; goto drawn; }    // greyed: the tap does nothing
+                if (!cheap) {
+                    // Greyed: the tap does nothing, and it SAYS so rather than looking broken.
+                    BT_LOGF("battle: %s cannot afford %s (stam %d) — choice ignored",
+                            b->party->a[b->cur].name, BT_CMD_NAME[cmd], b->party->a[b->cur].stam);
+                    bt_log(b, "%s cannot afford that.", b->party->a[b->cur].name);
+                    b->phase = BTP_INPUT;
+                    goto drawn;
+                }
                 eff = cheap;
             }
             b->cmd[b->cur] = cmd;
@@ -1460,6 +1643,9 @@ int bt_tick(Battle *b, int w, int h, float dt, bool ui_blocked, BtEvent *ev) {
             b->item[b->cur] = 0;
             b->target[b->cur] = b->ui_target;
             b->party->last_effort[cmd] = eff;
+            BT_LOGF("battle: %s chose %s effort %d cost %d (stam %d) target %d",
+                    b->party->a[b->cur].name, BT_CMD_NAME[cmd], cmd == BTC_GUARD ? 0 : eff,
+                    bt_cost(cmd, eff), b->party->a[b->cur].stam, b->ui_target);
             if (cmd == BTC_RUN && !(b->enc->flags & BTE_NO_RUN)) {   // running always works (§8)
                 b->outcome = BT_FLED; b->phase = BTP_OVER; goto drawn;
             }
@@ -1474,9 +1660,43 @@ drawn:
     bt_draw(b, w, h, dt, ui_blocked);
     if (b->phase == BTP_OVER) {
         b->banner_t += dt;
+        // Tap anywhere, any key, or simply wait: a results banner is a presentation state and may
+        // never be the thing that traps the player.
         if (b->banner_t > 1.2f && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_Space) ||
                                    ImGui::IsMouseClicked(0) || bt_is_yard(b)))
             b->dismissed = 1;
+        if (b->banner_t > 6.0f && !b->dismissed) {
+            BT_LOGF("battle: results banner timed out — dismissing");
+            b->dismissed = 1;
+        }
+    }
+
+    // ── THE WATCHDOG ───────────────────────────────────────────────────────────────────────────
+    // Anything that is not "waiting for the player" has a time limit. If one is exceeded we name
+    // the state in the log and force it forward, so a bug here costs a strange round, never the
+    // playthrough. stuck_fires is asserted at zero by --battle-ui-test.
+    {
+        int key = b->phase * 16 + b->cur;
+        if (key != b->last_phase * 16 + b->last_cur) {
+            if (b->phase != b->last_phase)
+                BT_LOGF("battle: state %s -> %s (round %d, %s)", BT_PHASE_NAME[b->last_phase],
+                        BT_PHASE_NAME[b->phase], b->round, b->party->a[b->cur].name);
+            b->last_phase = b->phase; b->last_cur = b->cur; b->phase_t = 0.0f;
+        } else {
+            b->phase_t += dt;
+        }
+        if (b->phase != BTP_INPUT && b->phase_t > BT_STUCK_S) {
+            b->stuck_fires++;
+            BT_LOGF("battle: WATCHDOG — stuck in %s for %.1fs (round %d, cur %d, outcome %d). Forcing on.",
+                    BT_PHASE_NAME[b->phase], b->phase_t, b->round, b->cur, b->outcome);
+            if (b->phase == BTP_OVER) b->dismissed = 1;
+            else { b->phase = BTP_INPUT; }
+            b->phase_t = 0.0f;
+        }
+    }
+    if (b->aborted && b->outcome == BT_RUNNING) {
+        BT_LOGF("battle: ABORTED from the Dev panel");
+        b->outcome = BT_FLED; b->phase = BTP_OVER; b->dismissed = 1;
     }
 #else
     (void)w; (void)h; (void)dt; (void)ui_blocked;
@@ -1490,7 +1710,11 @@ bool bt_dev_ui(Battle *b, char *out, int cap) {
     bool asked = false;
     ImGui::TextUnformatted("Battle");
     if (b->enc) ImGui::Text("%s  round %d  phase %d", b->enc->id, b->round, b->boss_phase);
+    ImGui::Text("state %s  stuck-fires %d", BT_PHASE_NAME[b->phase], b->stuck_fires);
     if (ImGui::Button("Win##bt")) { bt_force_win(b); }
+    ImGui::SameLine();
+    // A soft lock must never trap the player: this is the hand-operated watchdog.
+    if (ImGui::Button("Abort battle##bt")) b->aborted = 1;
     ImGui::SameLine();
     if (ImGui::Button("Know all##bt") && b->party)
         b->party->known |= BT_KNOWS_ATTACK | BT_KNOWS_GUARD | BT_KNOWS_EFFORT | BT_KNOWS_SKILL | BT_KNOWS_ITEM | BT_KNOWS_RUN;

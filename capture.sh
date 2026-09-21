@@ -77,6 +77,22 @@ if [ "$1" = "--vox-selftest" ]; then
     exit 0
 fi
 
+# The battle UI test: the REAL battle screen, in a real window, driven by injected TAPS. The
+# selftests call the battle API directly and never touch input, which is why they could not see the
+# owner's "stuck after attacking". This one taps every command at every effort, picks targets, drags
+# the effort slider, and asserts the battle accepts input again within 5 s after EVERY action. It
+# also prints the party-per-chapter-step table and checks that each CLIP hands back to gameplay.
+if [ "$1" = "--battle-ui-test" ]; then
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    OUT=$(BATTLE_UI_TEST=1 "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "UITEST|SELFCHECK battle-ui|battle: WATCHDOG")
+    echo "$OUT"
+    echo "$OUT" | grep -q "SELFCHECK battle-ui ok" || { echo "ERROR: --battle-ui-test FAILED" >&2; exit 1; }
+    exit 0
+fi
+
 if [ "$1" = "--vox" ]; then
     MAP=${2:-halm}
     shift 2 || true
@@ -120,5 +136,5 @@ if [ "$1" = "--vox" ]; then
     exit 1
 fi
 
-echo "usage: capture.sh --vox|--vox-selftest|--vox-walktest|--dialog|--chapter-selftest|--battle-selftest ..." >&2
+echo "usage: capture.sh --vox|--vox-selftest|--vox-walktest|--dialog|--chapter-selftest|--battle-selftest|--battle-ui-test ..." >&2
 exit 2

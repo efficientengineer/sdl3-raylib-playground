@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <time.h>
 
 #ifdef __ANDROID__
@@ -1068,6 +1069,25 @@ static void draw_goal(Star *st, int w, int h) {
     }
 }
 
+// Put the chapter on a step from the Dev panel. This is the ONLY way the owner moves the story by
+// hand now, and it is chapter-shaped rather than scene-shaped:
+//   * ch_jump sets every flag the steps before the target gated on, so a skipped gate stays open;
+//   * a PLAY step drops you into that map/spawn/light/party with its goal line up;
+//   * a CLIP step plays its scene — and because enter_field() retires a CLIP step when the scene
+//     ends, tapping through it lands on the PLAY step AFTER it, with gameplay, not on another clip.
+static void dev_step(Star *st, int step) {
+    if (step < 0) step = 0;
+    if (step >= CH_STEP_COUNT) step = CH_STEP_COUNT - 1;
+    if (!st->ch.started) ch_new_game(&st->ch);
+    st->in_battle = 0;
+    ch_jump(&st->ch, st->vx, step);
+    const ChStep *t = &CH_STEPS[st->ch.step];
+    if (t->kind == CHS_END) { st->screen = SCR_END; st->title_t = 0; return; }
+    if (st->screen != SCR_FIELD) enter_field(st);       // enter_field may retire a CLIP: re-read
+    if (st->ch.step != step) ch_jump(&st->ch, st->vx, step);
+    if (CH_STEPS[st->ch.step].kind == CHS_CLIP) field_scene(st, CH_STEPS[st->ch.step].arg);
+}
+
 // Small dev overlay: a corner button opening the phone <-> dev message log plus scene test controls.
 static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGuiStyle &s = ImGui::GetStyle();
@@ -1126,10 +1146,10 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGui::SetNextWindowSize(ImVec2(w * 0.96f, h * (w > h ? 0.88f : 0.42f)));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.06f, 0.06f, 0.10f, 0.96f));
     ImGui::Begin("Dev", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
-    if (ImGui::Button("Restart intro")) { st->fade_to_scene = 0; dev.open = false; }
-    ImGui::SameLine();
-    if (ImGui::Button("Next scene") && st->screen == SCR_INTRO) { st->fade_to_scene = st->scene + 1; dev.open = false; }
-    ImGui::SameLine();
+    // The intro-era buttons are GONE (owner, 2026-09-21: "the Dev tools next scene just goes to the
+    // next scene. And the next after that, no gameplay between them"). There is no scene list to
+    // walk any more — the chapter table is the only order the game has — so the controls below step
+    // the CHAPTER, and a CLIP step plays its scene and hands back to the PLAY step after it.
     if (ImGui::Button("Title")) { st->screen = SCR_TITLE; st->title_t = 0; dev.open = false; }
 
     // ── chapter one ───────────────────────────────────────────────────────────────────────────
@@ -1145,15 +1165,12 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
         ImGui::Text("mandatory ten: %d/%d   party %d   %s",
                     CH_MANDATORY - ch_mandatory_missing(&st->ch), CH_MANDATORY,
                     st->ch.party.count, st->ch.bell_started ? "bell running" : "bell idle");
-        if (ImGui::Button("New game")) { ch_new_game(&st->ch); enter_field(st); dev.open = false; }
+        ImGui::TextDisabled("skipping a step SETS the flags it gated on, so the gates stay consistent");
+        if (ImGui::Button("Restart chapter")) { ch_new_game(&st->ch); enter_field(st); dev.open = false; }
         ImGui::SameLine();
-        if (ImGui::Button("< step") && st->ch.step > 0) { ch_jump(&st->ch, st->vx, st->ch.step - 1); dev.open = false; }
+        if (ImGui::Button("< prev step") && st->ch.step > 0) { dev_step(st, st->ch.step - 1); dev.open = false; }
         ImGui::SameLine();
-        if (ImGui::Button("step >")) {
-            ch_jump(&st->ch, st->vx, st->ch.step + 1);
-            if (CH_STEPS[st->ch.step].kind == CHS_CLIP) field_scene(st, CH_STEPS[st->ch.step].arg);
-            dev.open = false;
-        }
+        if (ImGui::Button("next step >")) { dev_step(st, st->ch.step + 1); dev.open = false; }
         ImGui::SameLine();
         bool skip = st->ch.skip_fights != 0;
         if (ImGui::Checkbox("Skip fights", &skip)) st->ch.skip_fights = skip ? 1 : 0;
@@ -1164,12 +1181,7 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
                 const ChStep *t = &CH_STEPS[i];
                 snprintf(lbl, sizeof(lbl), "%2d  %s  %s", i + 1, KIND[t->kind],
                          t->kind == CHS_CLIP ? t->arg : (t->goal ? t->goal : (t->map ? t->map : "-")));
-                if (ImGui::Selectable(lbl, i == st->ch.step)) {
-                    ch_jump(&st->ch, st->vx, i);
-                    if (t->kind == CHS_CLIP) field_scene(st, t->arg);
-                    else if (st->screen != SCR_FIELD) enter_field(st);
-                    dev.open = false;
-                }
+                if (ImGui::Selectable(lbl, i == st->ch.step)) { dev_step(st, i); dev.open = false; }
             }
             ImGui::EndCombo();
         }
@@ -1297,6 +1309,338 @@ static int chapter_selftest() {
     return fails;
 }
 
+
+// ───────────────────────── --battle-ui-test: the battle driven by TAPS ─────────────────────────
+// BATTLE_UI_TEST=1 (capture.sh --battle-ui-test). The selftests drive the battle API directly and
+// never touch the UI or the input path, which is exactly why they could not see the owner's
+// "stuck after attacking": that bug lived in the frame ORDER between bt_tick's commit and
+// bt_draw's touch buttons, and only a real tap could reach it.
+//
+// This runs the REAL screen in the REAL window and injects REAL mouse events through ImGui's own
+// event queue (io.AddMouse*Event — the same entry points the SDL3 backend uses for a finger), then
+// asserts, after every single action, that the battle comes back to an input-accepting state
+// inside BUI_TIMEOUT seconds. Anything that does not is a soft lock by definition.
+#define BUI_TIMEOUT 5.0f
+
+struct BtUiTest {
+    int stage;              // which scenario
+    int phase;              // within the scenario
+    int frame;              // frames spent in this phase
+    float wait_t;           // seconds waited for the battle to accept input again
+    int actions, fails, restarts;
+    int pick, pre_round, pre_cur, pre_tgt;
+    int cmd_seen[BT_CMD_MAX + 2];
+    float tap_x, tap_y;
+    int tap_state;          // 0 none, 1 move+down queued, 2 up queued
+    char what[64];          // what we are waiting on, for the failure message
+};
+static BtUiTest bui;
+
+static void bui_fail(const char *fmt, ...) {
+    char msg[256]; va_list ap; va_start(ap, fmt); vsnprintf(msg, sizeof msg, fmt, ap); va_end(ap);
+    SDL_Log("UITEST FAIL: %s", msg);
+    bui.fails++;
+}
+
+// ONE TAP TAKES FOUR FRAMES, and every phase below waits for bui_idle() before issuing the next.
+// ImGui's event queue is drained by the NEXT NewFrame, so a down queued in frame N is seen in
+// N+1 and the matching up in N+2 — which is the frame IsMouseClicked() fires and the button under
+// the finger finally runs. Issuing a second tap before that has landed silently swallows the
+// first, which is how the test's own first draft "lost" every effort-notch tap.
+static void bui_tap(float x, float y) {
+    bui.tap_x = x; bui.tap_y = y; bui.tap_state = 1;
+}
+static bool bui_idle() { return bui.tap_state == 0; }
+
+// HOW A TAP IS INJECTED, and it has to be through SDL rather than through ImGui.
+// ImGui decides in NewFrame() which window the mouse is over, from the position the backend
+// pushed — so writing io.MousePos afterwards moves the cursor but not the hover, and no button
+// under it ever fires. ImGui_ImplSDL3_NewFrame also re-pushes the real OS position every frame,
+// which beats anything we queue. So the test moves the REAL pointer with SDL_WarpMouseInWindow
+// and then presses the real button: the events go through host.cpp's poll loop and the ImGui SDL3
+// backend exactly as a finger's would, which is the whole point of this test existing.
+//
+// Five frames: warp, settle, press, release, settle. InvisibleButton is PressedOnClickRelease, so
+// press and release have to be separate frames with the pointer parked on the item.
+static void bui_warp(float x, float y) {
+    SDL_Window *win = SDL_GetMouseFocus();
+    if (!win) win = SDL_GetKeyboardFocus();
+    if (win) SDL_WarpMouseInWindow(win, x, y);
+    ImGui::GetIO().AddMousePosEvent(x, y);
+}
+static void bui_pump() {
+    ImGuiIO &io = ImGui::GetIO();
+    if (bui.tap_state == 0) return;
+    bui_warp(bui.tap_x, bui.tap_y);
+    switch (bui.tap_state) {
+    case 1: bui.tap_state = 2; break;                                  // warp only; let it arrive
+    case 2: io.AddMouseButtonEvent(0, true);  bui.tap_state = 3; break;
+    case 3: io.AddMouseButtonEvent(0, false); bui.tap_state = 4; break;
+    case 4: bui.tap_state = 5; break;                                  // the click is delivered
+    default: bui.tap_state = 0; break;                                 // and read back
+    }
+}
+
+// The party the chapter would have at each step, checked against COMBAT.md / chapter01.md.
+static void bui_party_table() {
+    static const char *K[] = { "PLAY", "CLIP", "SET", "END" };
+    Chapter c; ch_new_game(&c);
+    SDL_Log("UITEST party per step:");
+    for (int i = 0; i < CH_STEP_COUNT; i++) {
+        ch_jump(&c, nullptr, i);
+        const ChStep *t = &CH_STEPS[i];
+        SDL_Log("UITEST   step %2d  %s  %-13s party %d  %s", i + 1, K[t->kind],
+                t->kind == CHS_CLIP ? t->arg : (t->map ? t->map : "(same)"), c.party.count,
+                t->goal ? t->goal : "");
+        if (t->kind == CHS_PLAY && t->party > 0 && c.party.count != t->party)
+            bui_fail("step %d wanted party %d, chapter gave %d", i + 1, t->party, c.party.count);
+    }
+    // The two yard fights are Falke ALONE; the boss is all three.
+    ch_new_game(&c);
+    if (c.party.count != 1 || strcmp(c.party.a[0].id, "falke"))
+        bui_fail("P1 (hart_yard) party is not Falke alone: %d members, first '%s'", c.party.count, c.party.a[0].id);
+    ch_jump(&c, nullptr, 10);                     // P4's winning session at the swing
+    if (c.party.count != 1) bui_fail("P4 (the swing win) party is %d, wanted 1", c.party.count);
+    ch_jump(&c, nullptr, CH_STEP_COUNT - 3);      // P8, the boss
+    if (c.party.count != 3) bui_fail("P8 (the boss) party is %d, wanted 3", c.party.count);
+}
+
+// Every CLIP step must hand back to a PLAY step, never to another clip — the second bug report.
+static void bui_clip_chain() {
+    static const char *K[] = { "PLAY", "CLIP", "SET", "END" };
+    Chapter c; ch_new_game(&c);
+    int clips = 0;
+    for (int i = 0; i < CH_STEP_COUNT; i++) {
+        if (CH_STEPS[i].kind != CHS_CLIP) continue;
+        clips++;
+        ch_jump(&c, nullptr, i);
+        ch_advance(&c, nullptr);                  // what enter_field() does when the clip ends
+        const ChStep *n = &CH_STEPS[c.step];
+        SDL_Log("UITEST   clip %-22s -> step %d %s %s", CH_STEPS[i].arg, c.step + 1, K[n->kind],
+                n->kind == CHS_PLAY ? (n->map ? n->map : "(same map)") : "");
+        if (n->kind == CHS_CLIP) bui_fail("clip '%s' hands straight to another clip", CH_STEPS[i].arg);
+        if (n->kind != CHS_PLAY && n->kind != CHS_END)
+            bui_fail("clip '%s' hands to a %s step", CH_STEPS[i].arg, K[n->kind]);
+    }
+    SDL_Log("UITEST clip chain: %d clips, each returns to gameplay", clips);
+}
+
+// Bring a scenario's battle up. Returns false when the encounter is unknown.
+static bool bui_start(Star *st, const char *enc, int party_n) {
+    if (!st->bat) st->bat = bt_create();
+    ch_new_game(&st->ch);
+    ch_party_resize(&st->ch, party_n);
+    if (!bt_start(st->bat, enc, &st->ch.party, "hart_yard")) { bui_fail("bt_start('%s') refused", enc); return false; }
+    snprintf(st->fight_enc, sizeof(st->fight_enc), "%s", enc);
+    st->in_battle = 1;
+    st->screen = SCR_FIELD;
+    return true;
+}
+
+static void battle_ui_test(Star *st, int w, int h, float dt) {
+    ImGuiIO &io = ImGui::GetIO();
+    bui_pump();                 // the frame's injected mouse state, before anything reads it
+    bui.frame++;
+    if (bui.stage == 0) {
+        SDL_Log("UITEST battle UI test: window %dx%d px, ImGui display %.0fx%.0f, dpi_scale %.2f",
+                w, h, io.DisplaySize.x, io.DisplaySize.y, st->dpi_scale);
+        if (fabsf(io.DisplaySize.x - (float)w) > 1.0f)
+            SDL_Log("UITEST note: ImGui space is %.2fx the drawable — hit rects are scaled by U",
+                    io.DisplaySize.x / (float)w);
+        bui_party_table();
+        bui_clip_chain();
+        if (!bui_start(st, "swing", 1)) { st->cap_state = 2; return; }
+        SDL_Log("UITEST scenario 1: the P1 swing, Falke alone, taps only");
+        bui.stage = 1; bui.phase = 0; bui.frame = 0;
+        return;
+    }
+
+    // ── the scenarios, in order. Each one is an encounter, a party, what the player already knows,
+    // and how many actions to commit by tap before moving on. A yard fight that ends early is
+    // simply restarted (that is what the yard IS), so the budget is always spent.
+    struct BuiScene { const char *enc; int party; unsigned known; int actions; const char *note; };
+    static const BuiScene SCENES[] = {
+        { "swing", 1, 0,      24, "P1: the swing, Falke alone, teaching order (Attack only at first)" },
+        { "swing", 1, 0x3Fu,  16, "the swing with every command known: Skill, Item, Run, effort 1-5" },
+        { "lid",   1, 0x3Fu,  12, "three lids: target selection with several enemies" },
+        { "klee",  3, 0x3Fu,  14, "the boss: all three, scripted phases, no Run" },
+    };
+    const int NSCENES = (int)(sizeof(SCENES) / sizeof(SCENES[0]));
+
+    // stage 1..NSCENES = the tapping scenarios; NSCENES+1 = win path; +2 = lose path; +3 = done.
+    if (bui.stage >= 1 && bui.stage <= NSCENES) {
+        const BuiScene *sc = &SCENES[bui.stage - 1];
+        if (bui.phase == 0) {                                   // (re)start this scenario's fight
+            if (!bui_start(st, sc->enc, sc->party)) { bui.stage++; bui.phase = 0; return; }
+            if (sc->known) st->ch.party.known |= sc->known;
+            if (bui.actions == 0) SDL_Log("UITEST scenario %d: %s", bui.stage, sc->note);
+            bui.phase = 1; bui.frame = 0; bui.restarts++;
+            return;
+        }
+        BtEvent bev;
+        int out = bt_tick(st->bat, w, h, dt, false, &bev);
+        int ph = bt_ui_phase(st->bat);
+
+        if (out != BT_RUNNING) {                                // over: tap the banner, then move on
+            if (bui.frame % 12 == 0) bui_tap(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+            if (bt_done(st->bat)) {
+                SDL_Log("UITEST   round %d, outcome %s after %d tapped actions%s", bt_ui_round(st->bat),
+                        out == BT_WIN ? "WIN" : out == BT_LOSE ? "LOSE" : "FLED", bui.actions,
+                        bui.actions < sc->actions ? " — restarting to spend the budget" : "");
+                if (bui.actions < sc->actions && bui.restarts < 12) { bui.phase = 0; bui.frame = 0; return; }
+                SDL_Log("UITEST   scenario %d done: %d actions, watchdog fired %d time(s)",
+                        bui.stage, bui.actions, bt_stuck_count(st->bat));
+                bui.stage++; bui.phase = 0; bui.frame = 0; bui.actions = 0; bui.restarts = 0;
+                return;
+            }
+            if (bui.frame * dt > 9.0f) { bui_fail("the result banner never handed back (outcome %d)", out); bui.stage++; bui.phase = 0; bui.frame = 0; }
+            return;
+        }
+        if (bui.actions >= sc->actions) {
+            SDL_Log("UITEST   scenario %d done: %d actions, %d round(s), watchdog fired %d time(s)",
+                    bui.stage, bui.actions, bt_ui_round(st->bat), bt_stuck_count(st->bat));
+            bui.stage++; bui.phase = 0; bui.frame = 0; bui.actions = 0; bui.restarts = 0;
+            return;
+        }
+
+        int rows[BT_CMD_MAX], n = bt_ui_rows(st->bat, rows);
+        // Which row to tap. Run ENDS the fight, so it is exercised exactly once per scenario and
+        // then left alone — otherwise every restart flees on action three and nothing else is
+        // ever tried.
+        // Never the row already selected: tap one = select, tap two = commit, and a row that was
+        // already highlighted would commit on the first tap and desynchronise the script.
+        float x, y;
+        if (!bui_idle()) return;                 // a tap is still in flight; let it land
+        int pick = bui.pick;
+        if (bui.phase <= 2) {                    // choose the row only at the start of an action
+            // THE GUARANTEE, asserted every single action: at least one row is committable.
+            int affordable = 0;
+            for (int i = 0; i < n; i++) if (bt_ui_affordable(st->bat, i)) affordable++;
+            if (affordable == 0) bui_fail("no committable command at all — the menu is a dead end (%d rows)", n);
+            // Pick a row that is affordable and not already selected (a selected row commits on the
+            // first tap, which would desynchronise select-then-commit). Run only once per scenario.
+            pick = n > 0 ? bui.actions % n : 0;
+            for (int guard = 0; guard < 2 * BT_CMD_MAX && n > 1; guard++) {
+                bool run_again = (rows[pick] == 5 && (bui.cmd_seen[5] & 2));
+                if (!run_again && pick != bt_ui_selected(st->bat) && bt_ui_affordable(st->bat, pick)) break;
+                pick = (pick + 1) % n;
+            }
+            if (!bt_ui_affordable(st->bat, pick))            // everything else is greyed: Guard it is
+                for (int i = 0; i < n; i++) if (bt_ui_affordable(st->bat, i) && i != bt_ui_selected(st->bat)) { pick = i; break; }
+            bui.pick = pick;
+        }
+        if (pick >= n) pick = bui.pick = (n > 0 ? n - 1 : 0);
+        switch (bui.phase) {
+        case 1:                                                 // wait for an input-accepting state
+            if (ph == 0 && n > 0) { bui.phase = 2; bui.frame = 0; }
+            else if (bui.frame * dt > BUI_TIMEOUT) {
+                bui_fail("never reached an input state (phase %s, %d rows)",
+                         ph == 0 ? "INPUT" : ph == 1 ? "RESOLVE" : ph == 2 ? "ENEMY" : "OVER", n);
+                bui.actions++; bui.frame = 0;
+            }
+            break;
+        case 2:                                                 // tap a row: select it
+            for (int i = 0; i < n; i++) bui.cmd_seen[rows[i]] |= 1;
+
+            bui.cmd_seen[rows[pick]] |= 2;
+            snprintf(bui.what, sizeof bui.what, "%s", bt_cmd_name(rows[pick]));
+            if (!bt_ui_point(st->bat, 0, pick, &x, &y)) { bui_fail("no screen point for row %d of %d", pick, n); bui.actions++; break; }
+            bui_tap(x, y);
+            bui.phase = 3; bui.frame = 0;
+            break;
+        case 3:                                                 // the effort slider: tap a notch
+            if (bt_ui_selected(st->bat) != pick)
+                bui_fail("tapped row %d (%s), the menu selects %d", pick, bt_cmd_name(rows[pick]), bt_ui_selected(st->bat));
+            bui.wait_t = 0.0f;
+            {
+                int want = 1 + (bui.actions % 5);
+                if (bt_ui_has_effort(st->bat) && bt_ui_point(st->bat, 1, want, &x, &y)) { bui_tap(x, y); bui.wait_t = (float)want; }
+            }
+            bui.phase = 4; bui.frame = 0;
+            break;
+        case 4:                                                 // the target, when there is a choice
+            if (bui.wait_t >= 1.0f && bt_ui_effort(st->bat) != (int)bui.wait_t)
+                bui_fail("effort notch %d tapped, the slider reads %d", (int)bui.wait_t, bt_ui_effort(st->bat));
+            {
+                int last = bt_ui_enemy_count(st->bat) - 1;
+                if (last > 0 && bt_ui_point(st->bat, 2, last, &x, &y)) bui_tap(x, y);
+            }
+            bui.phase = 5; bui.frame = 0;
+            break;
+        case 5:                                                 // the second tap on the row: COMMIT
+            {
+                int last = bt_ui_enemy_count(st->bat) - 1;
+                if (last > 0 && bt_ui_target(st->bat) != last)
+                    bui_fail("enemy %d tapped, the target reads %d", last, bt_ui_target(st->bat));
+            }
+            bui.pre_round = bt_ui_round(st->bat); bui.pre_cur = bt_ui_cur(st->bat);
+            if (bt_ui_point(st->bat, 0, pick, &x, &y)) bui_tap(x, y);
+            bui.phase = 6; bui.frame = 0; bui.wait_t = 0.0f;
+            break;
+        case 6:                                                 // THE ASSERTION
+            // The commit must (a) actually DO something — the round or the chooser moves on, or
+            // the fight ends — and (b) hand input back. (a) is what makes the test able to see a
+            // tap that was swallowed; (b) is the soft lock the owner reported.
+            bui.wait_t += dt;
+            if (out != BT_RUNNING ||
+                (ph == 0 && (bt_ui_round(st->bat) != bui.pre_round || bt_ui_cur(st->bat) != bui.pre_cur))) {
+                bui.actions++; bui.phase = 1; bui.frame = 0;
+            } else if (bui.wait_t > BUI_TIMEOUT) {
+                bui_fail("commit of '%s' did nothing / SOFT LOCK: %.1f s, state %s, round %d (was %d)",
+                         bui.what, bui.wait_t, ph == 0 ? "INPUT" : ph == 1 ? "RESOLVE" : ph == 2 ? "ENEMY" : "OVER",
+                         bt_ui_round(st->bat), bui.pre_round);
+                bui.actions++; bui.phase = 1; bui.frame = 0;
+                if (bui.fails > 3) bui.stage = NSCENES + 3;     // it is broken; stop hammering it
+            }
+            break;
+        default: bui.phase = 1; break;
+        }
+        return;
+    }
+
+    if (bui.stage == NSCENES + 1) {                             // the win path and the hand-back
+        if (bui.phase == 0) {
+            SDL_Log("UITEST scenario %d: the win path, dismissed by a tap, handed back to the field", bui.stage);
+            bui_start(st, "lid", 1);
+            bt_force_win(st->bat);
+            bui.phase = 1; bui.frame = 0;
+            return;
+        }
+        BtEvent bev; bt_tick(st->bat, w, h, dt, false, &bev);
+        if (bui.frame % 10 == 0) bui_tap(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
+        if (bt_done(st->bat)) {
+            SDL_Log("UITEST   win banner dismissed after %.1f s; field control returns", bui.frame * dt);
+            st->in_battle = 0;
+            ch_on_battle(&st->ch, "swing", true);
+            if (!ch_has(&st->ch, F_SWING_BEATEN)) bui_fail("a won swing did not set swing_beaten");
+            bui.stage++; bui.phase = 0; bui.frame = 0;
+        } else if (bui.frame * dt > 9.0f) { bui_fail("the win banner never handed back"); bui.stage++; bui.phase = 0; bui.frame = 0; }
+        return;
+    }
+
+    if (bui.stage == NSCENES + 2) {                             // the lose path: the yard is free
+        if (bui.phase == 0) {
+            SDL_Log("UITEST scenario %d: the lose path (the yard is an instant retry, no menu)", bui.stage);
+            bui_start(st, "swing", 1);
+            bt_force_lose(st->bat);
+            bui.phase = 1; bui.frame = 0;
+            return;
+        }
+        BtEvent bev; bt_tick(st->bat, w, h, dt, false, &bev);
+        if (bt_done(st->bat)) { SDL_Log("UITEST   lose handed back with no menu, as the yard should"); bui.stage++; }
+        else if (bui.frame * dt > 6.0f) { bui_fail("the lose path never handed back"); bui.stage++; }
+        return;
+    }
+
+    // Done.
+    int seen = 0, tried = 0;
+    for (int c = BT_CMD_FIRST; c < BT_CMD_MAX; c++) { if (bui.cmd_seen[c] & 1) seen++; if (bui.cmd_seen[c] & 2) tried++; }
+    SDL_Log("UITEST commands offered %d, committed by tap %d", seen, tried);
+    if (seen < 4) bui_fail("only %d distinct commands were ever offered", seen);
+    SDL_Log("SELFCHECK battle-ui %s  (%d failure(s))", bui.fails ? "FAILED" : "ok", bui.fails);
+    st->cap_state = 2;
+}
+
 // ───────────────────────── GameAPI ─────────────────────────
 
 static void *game_create(float dpi_scale) {
@@ -1324,6 +1668,9 @@ static void *game_create(float dpi_scale) {
     if (spec && spec[0] == '1') st->self_test = 1;
     spec = SDL_getenv("BATTLE_SELFTEST");
     if (spec && spec[0] == '1') st->self_test = 2;
+    // BATTLE_UI_TEST=1 — the real battle screen driven by injected TAPS, in a real window.
+    spec = SDL_getenv("BATTLE_UI_TEST");
+    if (spec && spec[0] == '1') st->self_test = 3;
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
@@ -1463,6 +1810,12 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             free(px); free(row);
             st->cap_state = 2;
         }
+    }
+    if (st->self_test == 3 && st->cap_state < 2) {
+        battle_ui_test(st, w, h, dt);
+        draw_dev(st, w, h, dt, dpi_scale);
+        au_update();
+        return;
     }
     if (st->self_test && st->cap_state < 2) {
         // Mode 1 (CHAPTER_SELFTEST) proves both, chapter first because it needs nothing. Mode 2

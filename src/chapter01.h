@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "battle.h"
+#include <SDL3/SDL.h>
 #include "voxfield.h"
 
 // ───────────────────────── flags ─────────────────────────
@@ -234,6 +235,26 @@ static inline bool ch_step_complete(const Chapter *c) {
     return true;
 }
 
+// ───────────────────────── the party ─────────────────────────
+// WHO FIGHTS, per step, and it is the STEP's `party` column that decides — not a flag, not whatever
+// the last battle left behind. The chapter's table is the single source (owner, 2026-09-21: a test
+// screenshot showed Falke+Ottilie+Distel against the swing, which is wrong for P1 three ways over:
+// Ottilie only watches, and Distel is not met until C5).
+//
+// Resizing NEVER goes through bt_party_init on the existing members: that memsets the whole BtParty
+// and would throw away `known` (every command the player has met) and `items` (the hidden finds) —
+// which is what the old `bt_party_init(&c->party, 2)` on Ottilie's door did.
+static inline void ch_party_resize(Chapter *c, int n) {
+    if (n < 1) n = 1;
+    if (n > BT_PARTY) n = BT_PARTY;
+    if (c->party.count == n) return;
+    if (c->party.count < 1) { bt_party_init(&c->party, n); return; }
+    BtParty fresh;
+    bt_party_init(&fresh, BT_PARTY);                   // the COMBAT.md starting values, to copy from
+    for (int i = c->party.count; i < n; i++) c->party.a[i] = fresh.a[i];   // a new member joins whole
+    c->party.count = n;
+}
+
 // Apply a PLAY row to the world: map, spawn, time of day, party size, lantern, night sight, goal.
 // Only what the row actually names is touched, so a row that changes nothing but the light leaves
 // the player standing exactly where they were.
@@ -250,20 +271,31 @@ static inline void ch_apply_step(Chapter *c, VoxField *v) {
         vx_set_party_lamp(v, 4.5f, 0.9f, s->lamp);
         vx_set_night_sight(v, s->night_sight ? 0.10f : 0.0f);
     }
+    if (s->party > 0) ch_party_resize(c, s->party);    // who is in the FIGHT, not just on the map
     if (s->goal) snprintf(c->goal, sizeof(c->goal), "%s", s->goal);
 }
 
 // Move to the next step, running through any SET rows, and apply whatever we land on.
 static inline void ch_advance(Chapter *c, VoxField *v) {
     if (c->step >= CH_STEP_COUNT - 1) return;
+    int from = c->step;
     c->step++;
     while (c->step < CH_STEP_COUNT && CH_STEPS[c->step].kind == CHS_SET) {
-        for (int i = 0; i < CH_NEED && CH_STEPS[c->step].need[i] >= 0; i++)
+        for (int i = 0; i < CH_NEED && CH_STEPS[c->step].need[i] >= 0; i++) {
             ch_set(c, CH_STEPS[c->step].need[i]);
+            if (CH_STEPS[c->step].need[i] == F_DISTEL) ch_party_resize(c, 3);
+        }
         c->step++;
     }
     if (c->step >= CH_STEP_COUNT) c->step = CH_STEP_COUNT - 1;
     ch_apply_step(c, v);
+    {
+        static const char *K[] = { "PLAY", "CLIP", "SET", "END" };
+        const ChStep *n = &CH_STEPS[c->step];
+        SDL_Log("chapter: step %d %s %s -> %d (party %d, goal \"%s\")", from + 1, K[n->kind],
+                n->kind == CHS_CLIP ? n->arg : (n->map ? n->map : "(same map)"), c->step + 1,
+                c->party.count, c->goal);
+    }
 }
 
 // Jump straight to a step (the Dev panel). Every flag an earlier step gated on is set on the way,
@@ -274,8 +306,10 @@ static inline void ch_jump(Chapter *c, VoxField *v, int step) {
     for (int k = 0; k < step; k++)
         for (int i = 0; i < CH_NEED && CH_STEPS[k].need[i] >= 0; i++) ch_set(c, CH_STEPS[k].need[i]);
     c->step = step;
-    if (ch_has(c, F_DISTEL)) c->party.count = 3;
-    else if (ch_has(c, F_OTTILIE_DOOR)) c->party.count = 2;
+    // A step with no `party` column of its own inherits from the flags the jump just set.
+    if (ch_has(c, F_DISTEL)) ch_party_resize(c, 3);
+    else if (ch_has(c, F_OTTILIE_DOOR)) ch_party_resize(c, 2);
+    else ch_party_resize(c, 1);
     ch_apply_step(c, v);
 }
 
@@ -284,7 +318,7 @@ static inline bool ch_on_text(Chapter *c, const char *text_id) {
     for (int i = 0; i < CH_BIND_COUNT; i++)
         if (!strcmp(CH_BINDS[i].text_id, text_id) && !ch_has(c, CH_BINDS[i].flag)) {
             ch_set(c, CH_BINDS[i].flag);
-            if (CH_BINDS[i].flag == F_OTTILIE_DOOR && c->party.count < 2) bt_party_init(&c->party, 2);
+            if (CH_BINDS[i].flag == F_OTTILIE_DOOR && c->party.count < 2) ch_party_resize(c, 2);
             return true;
         }
     return false;

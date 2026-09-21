@@ -84,8 +84,33 @@ int bt_tick(Battle *b, int w, int h, float dt, bool ui_blocked, BtEvent *ev);
 // caller may return to the field.
 bool bt_done(Battle *b);
 
+// ── what --battle-ui-test drives the real screen with (star_logic.cpp) ─────────────────────────
+// Read-only views of the last drawn frame, so the test taps where the menu actually is.
+int bt_ui_phase(Battle *b);                  // 0 INPUT, 1 RESOLVE, 2 ENEMY, 3 OVER
+// The command ids, so a caller can size an array and name what it tapped. battle.cpp's private
+// BtCmd enum is these numbers; bt_cmd_name() is the only place the words live.
+#define BT_CMD_FIRST 1
+#define BT_CMD_MAX   6
+int bt_ui_rows(Battle *b, int *rows);        // the visible commands; returns how many
+int bt_ui_has_effort(Battle *b);
+int bt_ui_enemy_count(Battle *b);
+int bt_ui_selected(Battle *b);
+int bt_ui_effort(Battle *b);
+int bt_ui_target(Battle *b);
+int bt_ui_round(Battle *b);
+int bt_ui_cur(Battle *b);                    // whose input the screen is taking
+int bt_ui_affordable(Battle *b, int row);    // can this row be committed right now?
+const char *bt_cmd_name(int cmd);
+// kind: 0 = command row, 1 = effort notch (idx 1..5), 2 = enemy. ImGui coordinates.
+bool bt_ui_point(Battle *b, int kind, int idx, float *x, float *y);
+
+// How many times the soft-lock watchdog has fired in this fight. Must be 0; --battle-ui-test
+// asserts it, and the Dev panel shows it.
+int bt_stuck_count(Battle *b);
+
 // Dev: skip the fight and win it outright. The owner's "skip fights" toggle.
 void bt_force_win(Battle *b);
+void bt_force_lose(Battle *b);   // Dev/test: end it as a loss
 
 // Dev panel rows for the battle system; returns true if it asked for something (out = a command).
 bool bt_dev_ui(Battle *b, char *out, int cap);
