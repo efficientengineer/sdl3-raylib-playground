@@ -183,6 +183,17 @@ herder puts it to sleep while it is held open — neither could alone. Leaves th
 guard beasts don't go rogue; what happened to this one (the answer is up the mountain; not needed yet).
 Draft choice: the beast sleeps and is carried home (orchestrator leans this) vs. has to be put down.
 
+**Owner:** "I think Falke and Ottilie could meet a 3rd party member from the herders on the quest, and
+they join together to stop it." Orchestrator's sketch (owner not yet confirmed): the beast's own young
+handler, who raised it and lost it, run ahead of the family to fix it; met in the dark on the pasture
+(Falke nearly swings, Ottilie realises); doesn't want it killed → the job becomes stop-it-not-slay-it;
+battle role = pace control with light magic (drowsy/slow, calm/attack down, sees in the dark and calls
+the tells — takes over Ottilie's "Left!"), sleep finishes the boss once Falke's parry holds it open;
+small, large-eyed, blunt, literal, first time among humans; nocturnal: half asleep by day (carried on
+Falke's back — sprite gag), sharpest at night; Ottilie adopts them on the spot (her chosen family
+starts). Whether/why they stay after the beast goes home is left open. Asked: boy/girl/hard to tell;
+young and prickly (orchestrator's lean) or older and wry. Token names for the people and the person.
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
