@@ -5,8 +5,8 @@ it** — `{{ROAD_CREATURE}}`, `{{THIEF_CREATURE}}`, `{{AMBUSH_CREATURE}}`, `{{ST
 `{{RUIN_CREATURE}}`, `{{CAVE_CREATURE}}` and `{{SHRINE_CREATURE}}` are out of chapter one. One
 survivor: `{{GRAIN_CREATURE}}`, because the player needs one harmless thing to hit inside Halm.
 
-Five things to fight, and four of them are one idea each: **three field creatures, the machines, and
-the boss.** Every proper name is a token (`NAMES.md`); values below are the designer's placeholders
+Five things to fight, and all but the boss are one idea each: **three field creatures, the machines
+(three of them, named not numbered), and the boss.** Every proper name is a token (`NAMES.md`); values below are the designer's placeholders
 until the writer sets them.
 
 Every creature has **one tell** and the parry rules in `COMBAT.md` apply to all of them without
@@ -74,7 +74,8 @@ blinded character cannot see tells at all, so parrying becomes a guess.
 **Tell.** The light **dims for a beat before it flares.** In the dark that dip is the only warning,
 and without {{HERDER}} it comes a beat too late to react to reliably; with her it is called early and
 the fight is fair. **This is the creature that makes night sight a mechanic rather than a line.**
-**Group.** Two to four, spread out, each in its own patch of dark.
+**Group.** Two or three, spread out, each in its own patch of dark. One of them is the set piece in
+`chapter01.md` P7 segment 3 — the one the player walks toward believing it is a person.
 **Drops.** Nothing you can hold. Killing one leaves a dark patch of grass, which is how a player
 learns to tell the pasture's lights from the real lantern ahead.
 **Its job.** To make the dark hostile, to make the party's own lantern ambiguous, and to make Distel
@@ -102,25 +103,34 @@ examining them — without ever making the player stop doing it.
 Not creatures. Wood, iron, rope and counterweights, built by a man whose knee ended his hunting, each
 one teaching exactly one thing, in this order. They are the whole of the game's combat teaching.
 
-| # | The machine | It teaches | Window | Beaten by |
-|---|---|---|---|---|
-| 1 | **the post** — a split post on a spring that leans away when struck | *hit a thing that is moving* | none | three clean hits |
-| 2 | **the barrel** — a barrel that runs down a slack rope across the yard | *a straight line cannot turn; step aside* | wide, 0.8 s | one sidestep, then hit it as it passes |
-| 3 | **the arm that holds** — a sprung jaw that closes on the wrist | *you will be held, and getting free costs turns* | 0.6 s | parry it, or spend two rounds getting out |
-| 4 | **the swing** — a counterweighted arm on a pivot | **wait, turn the swing aside, strike the opening** | 0.45 s | the parry, and only the parry |
+**There are three, and they are named, never numbered.** *(Revised 2026-09-21: the barrel on a rope
+is cut. Its lesson was "a straight line cannot turn", which the grain-yard creatures teach in play an
+hour later, and its real job was to introduce the word* tell *in a sentence — and no sentence
+introduces anything in this chapter any more. Cutting it takes two minutes and a tutorial out of P1.)*
 
-**Machine 4 in full, and it is the effort system's tutorial** (`COMBAT.md` §2, §5). Every attack that
-is not into an opening **winds the counterweight** — the arm comes back faster and harder — and the
-counter it deals **drains the attacker's stamina**. So a player swinging at effort 5, which is what
-{{HERO}} does and what every new player does, is spending 24 a turn to make the machine worse, and
-inside a session they are at zero and **cannot afford to swing at all.** The only thing left they can
-afford is a **Guard, which costs no effort ever.** That is the answer, and the machine walks them
-into it. The tell is a **click**, the counterweight dropping, about a second before the arm comes,
-and **it always comes from the left.** Parry on the click and the machine stands wide open for one
-round, and now spend.
+| The machine | It teaches | Window | Beaten by |
+|---|---|---|---|
+| **the post** — a split post on a spring that leans away when struck | *hit a thing that is moving* | none | three clean hits |
+| **the arm that holds** — a sprung jaw that closes on the wrist | *things telegraph, and waiting can beat swinging* | 0.6 s | parry it, or spend two rounds getting out |
+| **the swing** — a counterweighted arm on a pivot | **wait, turn the swing aside, strike the opening** | 0.45 s | the parry, and only the parry |
 
-Falke has beaten machines 1 to 3 for a year. He has never beaten 4 and does not know why, because he
-is trying harder each time, which is exactly the wrong thing.
+**The swing in full, and it is the effort system's tutorial** (`COMBAT.md` §2, §5, and §4a for how it
+teaches without anybody speaking). Every attack that is not into an opening **winds the
+counterweight** — the arm comes back faster and harder — and the counter it deals **drains the
+attacker's stamina**. So a player swinging at effort 5, which is what {{HERO}} does and what every
+new player does, is spending 24 a turn to make the machine worse, and inside a session they are at
+zero and **cannot afford to swing at all.** Attack and Hard swing grey out with their costs showing;
+**Guard, which costs no effort ever, stays lit.** That is the answer, and the machine walks them into
+it without one word of coaching from anybody.
+
+**The tell is big and it is a performance**: the **counterweight drops a hand's width**, the arm
+**winds back** with a ratchet sound, and about a second later it comes — **always from the same
+side**, every single time. After three failures in a session it plays about a fifth slower; after
+five, the Guard entry pulses once as it plays. Both reset on a parry, and neither is ever spoken
+aloud. Parry it and the machine stands wide open for one round, and now spend.
+
+Falke has beaten the post and the arm for a year. He has never beaten the swing and does not know
+why, because he is trying harder each time, which is exactly the wrong thing.
 
 **Failure is fast and free.** Flat on your back, up in two seconds, no menu.
 

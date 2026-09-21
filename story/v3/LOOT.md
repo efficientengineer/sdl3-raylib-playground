@@ -4,8 +4,14 @@ Rewritten 2026-09-21 for the hunt on the high pasture. The west road's items are
 
 **One hidden item per map, off the main path, missable on purpose — except the first**, which is the
 teaching find and is meant to be got by anyone who pokes around at all. Every effect is a **rule
-change or a multiplier**, never "+3 attack", and still worth having at level forty. Every name is a
+change or a multiplier**, never "+3 attack", and still worth having at level fifty. Every name is a
 token in `NAMES.md`.
+
+**None of them is mandatory, and that is the point.** The chapter's ten led-through interactions
+(`chapter01.md`, *The mandatory ten*) carry everything the story needs; the items carry everything
+the story does *not* need, which is what makes finding one feel like yours. The teaching find is the
+chapter's contract — *look around and you will be paid* — and it is the only one the game puts a
+glint on.
 
 | Ch | Map | Item | Exactly how it is reached | What it does | Why it lasts |
 |---|---|---|---|---|---|

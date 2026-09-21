@@ -27,13 +27,17 @@ sleeping-animal prop.
 
 ### Changes to maps that exist
 
-**`hart_yard`** — the chapter opens here and spends 22 minutes in it.
-- **Four machines** standing in a line, each an interactable object with its own trigger: the post,
-  the barrel (needs a rope run across the yard — decoration voxels, not structure), the arm that
-  holds, the swing. The swing needs a **counterweight that visibly climbs a post** as a progress
-  read-out.
+**`hart_yard`** — the chapter opens here and spends 20 minutes in it.
+- **Three machines** standing in a line, each an interactable object with its own trigger: the post,
+  the arm that holds, the swing. *(The barrel on a rope is cut — see §2a.)* The swing needs a
+  **counterweight that visibly drops as its tell and climbs the post as a progress read-out**, with a
+  mark that stays at the session's best.
+- **Hart's workshop as a place you walk into**, not a façade: the errand's part is on his bench at
+  the back, past the vice and the half-built things and the hook with nothing on it. This is the only
+  way the chapter says he is an engineer.
 - **The wall between the houses**, walkable-on by an NPC, with Ottilie sitting on it (she is not a
-  follower in P1/P4; she is a stationary NPC who talks).
+  follower in P1/P4; she is a stationary NPC who talks, and **she is not a hint dispenser** — her
+  lines never change with the player's failure count).
 - **The ladder to the workshop roof**, both roofs walkable, and a **three-cell gap** between workshop
   roof and house roof so the running jump clears it and a standing jump does not. `{{LOOT_YARD}}`
   under the eaves. This is the only place in the chapter where a jump is *taught*.
@@ -50,8 +54,12 @@ sleeping-animal prop.
 - **The bell-run shortcuts**: a water trough beside the grain-yard wall at jump height, the wall
   itself walkable along its top, two lane roofs with a two-cell drop into the alley behind the guild
   hall, and the well kerb to a low shed. All three must be **provably faster** than the street.
-- **Ottilie's door**, on the fast route.
-- Five townspeople with two line states each (before and after the sword).
+- **Ottilie's door**, on the fast route — and **Ottilie's house seen into** from the lane home at
+  dusk: one chair at the table, two coats on the hook. A dressed interior visible through an open
+  door, not an enterable map.
+- **A stranger in the road on the errand route**, renewing a carter's lamp charm — the chapter's one
+  sight of ordinary magic, and a trigger the player cannot walk around.
+- **Three** townspeople with two line states each (before and after the sword), down from five.
 
 ---
 
@@ -76,8 +84,29 @@ not built?
 | 12 | **A party-member passive that shifts prompt timing** | Distel's night sight, and `{{LOOT_PASTURE}}` | Yes, but C5's payoff is then only a line. |
 | 13 | **Turn-based combat proper** (`COMBAT.md` §1-§9) | the real version of all of the above | **Yes** — deliberately. The fallback exists so combat is not on the critical path. |
 
-**Suggested order to build in:** 4, 1, 5, 9, 10, 7, 6, 11, 3, 2, 8, 12, then 13.
-Items 4, 9 and 10 are small and unblock the writer's field lines immediately.
+### 2a. Added by the draft-three revision (2026-09-21)
+
+The owner's note — *too much text; Ottilie must not coach* — moves work off the writer and onto the
+engine. **The teaching that used to be dialogue is now animation, sound and menu state.** These are
+new rows, in the same format, and three of them are now on the critical path.
+
+| # | Feature | Needed by | Playable without it? |
+|---|---|---|---|
+| 14 | **The swing's tell as a real animation with a sound** — counterweight visibly drops a hand's width, arm winds back, ratchet audio, always the same side, ~1 s before the strike | `COMBAT.md` §4a carrier 1. **This is the whole hint system now.** | **No.** With Ottilie's hints struck, a swing with no readable tell leaves the chapter's one lesson untaught. Highest new priority. |
+| 15 | **A counterweight that climbs the post, and a mark that stays at the session's best** | §4a carrier 2, and day two's progress read-out | **No** for day two, which is fourteen minutes of "am I getting better?" with no numbers and no dialogue to answer it. |
+| 16 | **Greyed-out commands with their cost shown, and one always-lit Guard** — and in the fallback, a charge glyph that greys when the bar cannot pay and a guard glyph that never does | §4a carriers 3 and 4; `COMBAT.md` §11 | **No.** This is the game's loudest permitted hint. Cheap: it is menu state over the stamina value (row 3). |
+| 17 | **Non-verbal difficulty escalation** — after 3 failures in a session the tell plays ~20% slower; after 5 the Guard entry pulses once as it plays; both reset on a parry; yard only | §4a carrier 5 | Yes, but then a player who cannot read the tell has nothing at all, and the chapter has no way to help them without someone speaking. Small: two counters and a timescale. |
+| 18 | **An idea-arrival system for the command list** — a command is *absent* until its idea arrives, not greyed (Attack only → Guard appears → the effort slider appears), one short prompt each | `COMBAT.md` §7a "Teaching order" | Yes, but the alternative is tutorial boxes, which is exactly what the owner cut. |
+| 19 | **Mandatory-interaction gating** — a trigger that *must* fire before the block advances: an object that must be picked up (`bench_part`), a trigger fired on entering rather than on interacting (`guild_hall_door`, `lamp_charm`), a scene held until an examine has happened (`body` before C6), and text fired by taking an object (`job_sheet` on taking the sheet down) | the mandatory ten (`chapter01.md`) | **No.** The cold read's main finding — the setup was all in the optional layer — is repaired by this row and nothing else. It is four small variants of a trigger the engine already has. |
+| 20 | **A goal line of ≤6 words, one at a time, settable per trigger, changeable mid-block** | every block; and specifically the bell-run clock starting at the yard gate, not at the end of C4 | Already row 4; restated because the six-word cap and the mid-block change are new constraints. |
+| 21 | **A timer that is armed by a scene and started by a player action** (the bell audible but not counting until the player leaves the yard) | C4 → P5, "the sword gets a breath" | Yes, but the sword — the object the whole first act is about — then gets one exclamation and a clock. |
+| 22 | **A pair of dark set pieces**: a single distant light source on the pasture that looks exactly like the party's lamp and fires its text when the player has *stepped toward it*, and a trail of prints that ends | P7's two mandatory set pieces | **No** for the chapter's wonder, which the cold read says currently arrives at minute fifty. |
+
+**Suggested order to build in, revised:** 4/20, 19, 1, 14, 16, 5, 9, 10, 7, 15, 22, 6, 11, 17, 18, 3,
+2, 8/21, 12, then 13. Rows 19 and 16 are the cheapest big wins in the list.
+
+**What got cheaper.** One machine fewer (three, not four: the barrel is cut), two townspeople fewer,
+one room interact fewer, and two of day two's four between-session lines gone.
 
 ---
 
@@ -90,13 +119,23 @@ Listed for the art side, not scheduled here.
 - **Three creatures**: burr (hill), lantern (a light, so mostly a shader), fleece (a sheep from
   behind — cheap, it reuses the sleeping-animal prop).
 - **The sleeping animal prop**, used maybe twenty times on the pasture. High value per unit of work.
-- **Four machines** in Hart's yard, and a counterweight that moves.
+- **Three machines** in Hart's yard, and a counterweight that moves — **its drop is the chapter's
+  hint system**, so it is the highest-value animation in chapter one, not set dressing.
+- **The lamp-charm pair** in Halm's road (a carter, a woman warming a wick) and a **dressed interior
+  behind Ottilie's open door** (one chair, two coats).
 - **Hart** — the redesign already flagged in `BRAINSTORM.md` (engineer, knee brace, apron).
 - **Four hidden items** as pickup sprites.
 
 ---
 
-## 4. Open questions for the owner (five, each with my recommendation)
+## 4. The five questions — ANSWERED (orchestrator accepted all five recommendations, 2026-09-21)
+
+All five stand as written below and are now design, not proposals: **no fail state on the bell run**;
+**day two stays at fourteen minutes in four sessions**; **the pasture is genuinely dark with the fold
+faintly visible from anywhere**; **effort is taught in the fallback as the hold-to-charge press**;
+**no inventory UI in chapter one**. One amendment from the draft-three pass: question 2's fallback —
+"if it has to shrink, cut session 1" — is unchanged, but nothing was in fact cut from day two, which
+is the only block the revision left at its full length.
 
 1. **Does the bell run have a real fail state?**
    *Recommendation: no.* If the rings run out, the clerk is closing the shutter and signs him anyway
@@ -127,4 +166,10 @@ The writer owns `story/scenes/`, `field/text.md`, `characters.md`, `NAMES.md`, `
 and their file names (`0110_the_yard`, `0130_the_counter`, `0140_supper`, `0150_the_sword`,
 `0160_the_herder`, `0180_what_was_on_it`). Their three creature names and concepts (burr, lantern,
 fleece) are the ones designed in `BESTIARY.md`; their two in-field boss exchanges are in the spine.
-Field-line ids the design needs are listed in `ch01_room/designer_to_writer.md` §2.
+Field-line ids the design needs are listed in `ch01_room/designer_to_writer.md` §2, and the
+draft-three **mandatory / optional / deleted** split is §5 of the same file. In the draft-three pass
+the writer and I agreed, in this order: the job sheet fires on taking the sheet; Ottilie carries no
+hints at all; `high_pasture.lantern` and `tracks_stop` become unmissable set pieces; a new
+`halm.lamp_charm` carries both the ordinary-magic sight and the first mention of the
+{{HERDER_PEOPLE_PL}}; three machines named rather than four numbered; roughly eighty field ids down
+to fifty-odd, of which ten are mandatory.

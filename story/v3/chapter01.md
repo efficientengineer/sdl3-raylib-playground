@@ -9,7 +9,23 @@ Party: {{HERO}} alone for days one and two; **{{HEALER}}** joins on the bell run
 joins at C5. Combat rules: `COMBAT.md` (and its no-combat fallback, which is how this plays today).
 Creatures: `BESTIARY.md`. Hidden items: `LOOT.md`.
 
-**Six clips, seventy-three minutes of play.** The chapter is one lesson — *you cannot win by
+**Checked against the writer's draft three, 2026-09-21.** Every id in *The mandatory ten* exists in
+`story/field/text.md`; the three machines are named not numbered in every scene; nobody coaches
+anywhere (0150's beat says it outright — *"Nobody tells him to do it and nobody says afterwards what
+he did"*); nine appears only as the ring of holes; the flock is not counted on the sheet and the job
+pays five coin; the sword gets its held beat before the bell; and the animals are warm, unhurt and
+gathered in every line that touches them. **No scene contradicts play.**
+
+**Revision pass, 2026-09-21** (owner's notes on draft 2, and `story/notes/cold-read-ch01-draft2.md`).
+Three things changed and they run through every block below. **(a) No character coaches the player.**
+Ottilie is no longer the hint system — she is on the wall enjoying it. The swing's own tell, the
+stamina drain and a lit Guard entry teach the parry (`COMBAT.md` §4a). **(b) Ten mandatory
+interactions** carry everything the chapter's setup depends on; the path goes through them
+(§ *The mandatory ten*, below). Everything else is optional and has been cut hard. **(c) Less text
+everywhere**: goal lines of six words or fewer, no system pop-ups, no line that describes what the
+player just did.
+
+**Six clips, sixty-seven minutes of play.** The chapter is one lesson — *you cannot win by
 attacking; you wait, you turn the swing aside, and then you strike* — taught by a machine in a yard,
 paid for with a sword, and cashed in on a hillside in the dark.
 
@@ -17,106 +33,150 @@ paid for with a sword, and cashed in on a hillside in the dark.
 
 ## Goals, in order
 
-The on-screen goal line at every stage, in plain words. Rule 2: the player can always say what they
-are doing and why.
+The on-screen goal line at every stage. **Six words or fewer, always** — the player can say what they
+are doing without the game using a sentence to tell them. One line on screen at a time, never two.
 
 | Stage | Goal line |
 |---|---|
-| P1 | Beat the last machine in {{MENTOR}}'s yard. |
-| P2 | Take the repaired part to the guild hall. Buy bread for three. |
+| P1 | Beat the swing. |
+| P2 | Deliver the part. Buy bread. |
 | after C2 | Get home before supper. |
 | P3 | Eat, and go to bed. |
 | night | Be at the machines before light. |
-| P4 | Beat the last machine. |
-| C4 → P5 | The board closes on the last ring of the bell. **Get to the guild hall.** |
-| after signing | Take the job: find out what is taking the animals off the high pasture. |
-| P6 | Get up to the high pasture before full dark. |
+| P4 | Beat the swing. |
+| after C4, in the yard | *(unchanged — the bell is not counting yet)* |
+| on leaving the yard | Get to the guild hall. |
+| after signing | Find what is taking the animals. |
+| P6 | Get up to the pasture. |
 | P7 | Follow the sleeping animals. |
 | after the tracks stop | Find the guard beast. |
-| P8 phase 1 | Hold it open so {{HERDER}} can calm it. |
-| P8 phase 2 | Stop it. It is going for {{HERDER}}. |
+| P8 phase 1 | Hold it open for {{HERDER}}. |
+| P8 phase 2 | Stop it. It wants {{HERDER}}. |
+
+---
+
+## The mandatory ten
+
+The cold read's main finding was that **the chapter's setup lived in the optional layer and its
+exposition in the mandatory one** — backwards. The repair is in play, not in more text. These ten
+interactions are **led through**: the route passes them, the goal line points at them, or they are
+the block's objective. Each is short (one or two boxes). **Nothing else in the chapter is mandatory**,
+and everything else has been trimmed or deleted (the list is in `ch01_room/designer_to_writer.md` §5).
+
+| # | Id | Where it is unmissable | What it carries, without saying it |
+|---|---|---|---|
+| 1 | `hart_yard.machine_swing` | the block's objective | one sentence: hitting it winds the weight. Nothing about the click. |
+| 2 | `hart_yard.bench_part` | the errand's object is on {{MENTOR}}'s bench | you walk through his workshop, among his machines. He is an engineer because you were in it. |
+| 3 | `halm.lamp_charm` | on the lane out of the yard, in the road | ordinary magic, done by a stranger as a chore — and the carter's saying, which is the first the player hears of the {{HERDER_PEOPLE_PL}}. |
+| 4 | `halm.guild_hall_door` | fires on entering, and you must enter to deliver | the word *guild*. |
+| 5 | `halm.ottilie_house` | the lane home at dusk passes her open door | one chair at the table, two coats on the hook. Nobody comments, then or ever. |
+| 6 | `halm.job_sheet` + `_2` | **signing is reading**: taking the sheet fires it | the whole job. The one place it is ever written down. |
+| 7 | `halm.ottilie_door` + `_2` | her door is *on* the fast route in P5 | she is **asked**. She does not simply appear on the pasture. |
+| 8 | `high_pasture.lantern` | fires on the first one sighted | the chapter's wonder, at minute forty rather than fifty. |
+| 9 | `high_pasture.tracks_stop` | the set piece the trail leads to; C5 fires here | the best sentence in the chapter, and the shape of the boss. |
+| 10 | `high_pasture.body` + `_2` | C6 does not run until the player has looked | the ring of nine holes, found by the player, not reported to them. |
+
+**Two of these are set pieces, not boxes** — see P7: the false lantern and the tracks that stop are
+built as places, and the text is the small part of them.
 
 ---
 
 # DAY ONE
 
-## PLAY P1 — {{MENTOR}}'s yard, midday (8 min)
+## PLAY P1 — {{MENTOR}}'s yard, midday (6 min)
 *Map: `hart_yard`. Party: {{HERO}}. Light: day.*
 
 **The chapter opens on the stick in your hand**, not on a picture. Falke is already in the yard with
 a practice blade and Hart is already watching and Ottilie is already on the wall.
 
-**Map.** One small enclosure, no exits open yet. Four machines stand in a line across the yard from
-the gate: **the post**, **the barrel**, **the arm that holds**, **the swing**. Hart's workshop is at
-the near end with a ladder against it. The wall between the two houses runs down the left and Ottilie
-is sitting on it with her legs over.
+**Map.** One small enclosure, no exits open yet. **Three** machines stand in a line across the yard
+from the gate: **the post**, **the arm that holds**, **the swing**. They are named, never numbered
+(`COMBAT.md` §7; the barrel-on-a-rope is cut — its whole job was to say the word *tell* out loud).
+Hart's workshop is at the near end with a ladder against it. The wall between the two houses runs
+down the left and Ottilie is sitting on it with her legs over.
 
 **Minute to minute.**
-1. *Machine 1, the post* (1 min). The game's first input: move, face, hit. Three clean hits and it
-   falls over. An examine line on the post says what it is for, so the word for what these things do
-   enters the game from an object rather than from a person.
-2. *Machine 2, the barrel* (1.5 min). A barrel comes down a rope across the yard. Standing there is
-   a knock-down. Step aside and hit it as it passes. **This is where the game says the word "tell"
-   for the first time** — the rope creaks before the barrel comes — and the examine line spells out
-   the whole rule in plain words: the thing warns you, then it comes.
-3. *Machine 3, the arm that holds* (1.5 min). A jaw closes on the wrist. Getting out costs you two
-   goes; parrying it on the tell costs you nothing. The first time the player chooses to wait
-   instead of swing, and the first time waiting is obviously better.
-4. *Machine 4, the swing* (4 min, and you do not win). A counterweighted arm. **Every attack that is
-   not into an opening winds it and it comes back harder, and its counter drains your stamina**
-   (`COMBAT.md` §7). The player feels both inside three attempts without being told. The tell is a
-   click and the arm always comes from the left. The window is 0.45 s. The player will lose four to
-   six times — flat on your back, up in two seconds, no menu, no penalty, Ottilie laughing.
-   **The session ends with {{HERO}} out of stamina**, which is the picture C1 is written over.
+1. *The post* (1 min). The game's first input: move, face, hit. **Attack is the only command that
+   exists** (`COMBAT.md` §7a). Three clean hits and it falls over.
+2. *The arm that holds* (1.5 min). It telegraphs, then a jaw closes on the wrist. **Guard appears in
+   the list the first time it telegraphs at you** — the word arriving is the entire tutorial. Getting
+   out costs two goes; guarding on the telegraph costs nothing. The first time waiting is obviously
+   better, and the player found that out by being caught.
+3. *The swing* (3.5 min, and you do not win). A counterweighted arm. The weight **drops a hand's
+   width**, the arm **winds back** with a ratchet sound, and then it comes — always from the same
+   side, every time, unmissably. The window is 0.45 s. **Every attack that is not into an opening
+   winds the weight another notch and its counter drains you** (`COMBAT.md` §7), so by the end of the
+   session Attack and Hard swing are **greyed** and Guard is the one lit entry in the list. Nobody
+   says a word about any of it. The player loses five or six times — flat on your back, up in two
+   seconds, no menu, no penalty. **The session ends with {{HERO}} out of stamina**, which is the
+   picture C1 is written over, and it ends *without the win*.
 
-**What the player learns.** That there is a tell; that the machines each teach one thing; that
-effort has a price; and that this last machine is not hard, it is *different*, and they do not yet
-know how.
+**What the player learns.** That things telegraph; that waiting sometimes beats swinging; that effort
+has a price; and that the swing is not hard, it is *different*, and they do not yet know how. They go
+to bed not knowing. That is the design.
 
 **Encounters.** None. The machines are the encounters.
-**The one hazard.** Machine 4's winding, which is the player's own impatience made visible twice
+**The one hazard.** The swing's winding, which is the player's own impatience made visible twice
 over: the counterweight climbs a notch every time they attack, and their own stamina bar falls.
 **The optional find.** The ladder against the workshop is climbable from minute one and the roof is
 walkable. **{{LOOT_YARD}}** is under the eaves across a three-cell gap (`LOOT.md`) — takeable now by
 an adventurous player, but most will take it on the night of day one.
-**{{HEALER}} as the hint system.** Her calls from the wall get more explicit with each failure:
-a direction, then a direction and where to look, then what the sound means, and on day two the whole
-answer. She has been saying it since he was twelve and he has never listened, which is why the
-realisation on day two is earned and not given.
+**{{HEALER}} is NOT the hint system.** *(Struck 2026-09-21, owner: "I don't like that Ottilie tells
+Falke what to do, it's not her domain. She just thinks it's funny he's getting whomped.")* She never
+calls a direction, never names the sound, never gets more explicit. She is on the wall enjoying the
+show: she winces at a big hit, she counts the falls, she is eating something. **Her reactions are a
+feedback layer, not instruction** — the one that matters is that she goes quiet for exactly one beat
+*after* he turns it aside on day two, which is applause, and cannot be a tip because it comes after.
+**The hint system is the machine** (`COMBAT.md` §4a): the tell, the winding weight, the drain that
+leaves Guard the only lit command, and — only after repeated failure — the tell playing a fifth
+slower and the Guard entry pulsing once. No words. {{MENTOR}} says *"Again."*
 **What failing costs.** Nothing at all, ever, in this yard. That is a design rule, not a setting.
-**Feel.** Funny. You are losing to furniture and a woman on a wall is enjoying it.
+**Feel.** Funny. You are losing to furniture and a woman on a wall is enjoying it, and she is no help
+whatsoever.
 
 ### CLIP C1 — "You're not ready" *(1 min, panels)* — `0110_the_yard`
-**Purpose.** After the player has personally failed machine 4 several times, the game states the
+**Purpose.** After the player has personally failed the swing several times, the game states the
 problem: he cannot see why it beats him, and Hart can. Hart says he is not ready — kindly, and about
 the machine, not about the boy. Ottilie comes off the wall and Mends the wrist **quickly, easily and
 without stopping teasing him** — the player's first sight of magic, and what it shows is that it is
 ordinary, small, reliable, and that she is good at it. No cost worth showing; she is not limited.
 Nothing about the job, the board, the sword or the herders. One beat.
-*Back into:* the yard, goal line *Take the repaired part to the guild hall.*
+*Back into:* the yard, goal line *Deliver the part. Buy bread.*
 
 ---
 
-## PLAY P2 — Halm by day, the errand (12 min)
+## PLAY P2 — Halm by day, the errand (10 min)
 *Map: `halm`. Party: {{HERO}}. Light: day.*
 
-Hart's errand is given as two field lines while the player still has the stick: a repaired part to
-the guild hall, and bread for three, because Ottilie is coming to supper. **This is the first walk,
-and its real job is to teach that the town is a place with things in it.**
+Hart's errand is **one short box**, and then **the player fetches the part themselves**: it is on his
+bench, at the back of his workshop, past the vice and the half-built things and the hook with nothing
+on it. `hart_yard.bench_part`, **mandatory**, because the errand cannot start until you have the
+part. *This is how the chapter says Hart is the town's engineer* — the player walks through the
+evidence. No line says it, then or later. **This is the first walk, and its real job is to teach that
+the town is a place with things in it.**
 
 **Map, in segments.**
-1. *Hart's lane to the square.* Houses, the well, people. Five townspeople with a line each.
+1. *Hart's lane to the square.* Houses, the well, people. **Three** townspeople, each with a line now
+   and a different one after he has the sword (cut from five; the pair of states matters more than
+   the count). **In the road, unavoidable:** a carter on the kerb having the charm on his lamp
+   renewed by somebody doing it the way you'd re-sole a boot — `halm.lamp_charm`, **mandatory**.
+   Magic is ordinary and small and it is a **chore**, and the carter's saying about the
+   {{HERDER_PEOPLE_PL}} comes out of him while he waits. That is the only time they are mentioned
+   before Distel is standing in front of you, and it costs one trigger.
 2. *The square.* The baker (bread for three — an actual transaction, the player's first). The bell
    tower, examinable, so the bell that rings tomorrow is a thing the player has stood under. The job
    board is visible across the square and **empty**: it is not dawn.
 3. *The grain yard.* The short way through to the guild hall is the gap in its far wall. The door is
    propped, three {{GRAIN_CREATURE_PL}} are inside, and the long way round the outside is open to
    anybody who does not want to. **The first real fights of the game**, and the first parry landed on
-   something alive.
-4. *The guild hall.* The counter, the clerk, the part delivered.
+   something alive — and **the first fight in which the effort press exists at all**, because it
+   appears the first time the player has an opening to spend into (`COMBAT.md` §7a).
+4. *The guild hall.* `halm.guild_hall_door` fires **on entering**, and you must enter to deliver the
+   part: it is where the word *guild* comes into the game. Then the counter, the clerk, the part.
 
 **What the player learns.** That the town is walkable and full of examines; that fighting is normal
-and happens on the way somewhere; that hidden things exist (the find, below).
+and happens on the way somewhere; that magic exists and is nothing much; that hidden things exist
+(the find, below).
 
 **Encounters.** {{GRAIN_CREATURE_PL}}, three, in the grain yard only, one behind another. One
 behaviour: rolls in a straight line and cannot turn. Tell: stands up on its rim. Drops grain and the
@@ -126,40 +186,58 @@ player's first coin. That is the whole encounter design of Halm, on purpose — 
 two steps inside the grain-yard door, in plain sight, glinting, one step off the route out
 (`LOOT.md`). The game does not point at it. This is the chapter's contract with the player: *look
 around and you will be paid.* Everything else in the game is hidden properly.
-**Length.** 12 min with the examines, 6 if the player runs it.
+**Length.** 10 min with the examines, 5 if the player runs it.
 **Feel.** An ordinary afternoon in a town that is about to matter.
 
 ### CLIP C2 — the counter *(1 min, talk)* — `0130_the_counter`
-**Purpose.** The clerk states the rules, plainly, because the player has walked in holding
-somebody else's parcel and asked about the empty board. Job sheets go up at **dawn**. The board
-closes on the **last ring of the evening bell**. And, when Falke asks whether he can take one:
-**no sword, no signature** — an apprentice cannot sign until his teacher says he is ready, and the
-sword is the sign. One beat: the rules. Not the job; there is no job yet.
+**Purpose.** **One rule, said once: no sword, no signature.** *(Shortened after the cold read: the
+clip used to recite three rules and it was two minutes of dead time at minute twenty.)* Open on Falke
+asking when he can take a job and let the rest come out of him arguing with it. The **dawn** rule and
+the **closing bell** are not needed here — the player meets the empty board in play with
+`halm.board_closed` on it, and meets the closing bell as the timer in P5, which is a better teacher
+than a clerk. Not the job; there is no job yet.
 *Back into:* free walk in Halm, goal line *Get home before supper.* The board can be walked up to and
 read: empty, with an examine line saying why.
 
 ---
 
-## PLAY P3 — home, supper, night (4 min)
+## PLAY P3 — home, supper, night (3 min)
 *Map: `halm` → `hart_yard`. Party: {{HERO}}. Light: day → dusk → night.*
 
 The walk home at dusk, with the town's lamps coming on — the first time the player sees the light
-change, which is preparation for a chapter that ends in the dark. Then Hart's kitchen: the player
-walks in, sits, and **supper is a short field scene** of three or four exchanges with one examine in
-the middle of it (Hart's workshop book on the bench, every attempt at every machine written down and
-dated, including today's). Then his own room: two interacts — the gap on the wall where a sword
-would hang, the window — and bed.
+change, which is preparation for a chapter that ends in the dark.
+
+**The lane home goes past Ottilie's house, and this is the sixth mandatory interaction**
+(`halm.ottilie_house`). Her door is open on a warm evening and she is not in it, because she is
+already at Hart's table. What the player sees is **one chair at the table and two coats on the hook**
+— coats nobody has taken down in years. Nothing is said about it, by anyone, in this chapter.
+*Falke has always known her family died; he grew up next door.* **Nobody explains it to him and
+nobody explains it to the player** — the player is the one who did not know, and the house tells
+them, and then the supper he walks into immediately afterwards is the answer to it without ever
+naming it. *(This replaces the draft-2 version where the fact was spoken at supper — owner: "why
+wouldn't Falke know her family died? That's a big oversight.")*
+
+Then Hart's kitchen: the player walks in, sits, and **supper is two boxes** with one examine beside
+it (Hart's workshop book on the bench, every attempt at every machine written down and dated,
+including today's). Then his own room: **one** interact — the gap on the wall where a sword would
+hang — and bed.
 
 **The optional find, properly.** While Hart is inside at supper, the ladder and the roof and the
 three-cell jump to the eaves are unobserved and the game is quiet. **{{LOOT_YARD}}** wants to be
 taken here.
 **Encounters.** None. Rule 9: this is the rest.
-**Length.** 4 min.
+**Length.** 3 min.
 
-### CLIP C3 — supper *(1 min, talk)* — `0140_supper`
+### CLIP C3 — supper *(0.8 min, talk)* — `0140_supper`
 **Purpose.** The last beat of the meal only. Hart says he is not ready for the guild, and means it
-as care. One plain fact about Ottilie's own life lands — she came from the dark house next door, she
-chose this table. One beat. No speeches, and she does not explain herself.
+as care. **Nobody states anything about Ottilie's family** — the player walked past the house ten
+minutes ago and is sitting at the table she chose instead; that is the whole statement and it is made
+by the level, not by a line. If a line survives at all it is hers, flat and fast, and it does not
+explain. One beat, no speeches.
+**The one sanctioned sentence about the system** lives here and nowhere else: {{MENTOR}}'s *"You hit
+everything as hard as you can."* It is an observation about the boy, it names no input, it offers no
+answer, and he refuses to explain it — which is why it is allowed when nothing else is. It is also
+the last thing anyone says about the machine until the player has beaten it.
 *Back into:* his room, then sleep. Goal line *Be at the machines before light.*
 
 ---
@@ -175,10 +253,10 @@ in fourteen minutes and can see themselves getting better.
 
 | Session | Light | What is actually different | Fails |
 |---|---|---|---|
-| **1. Before light** | grey dawn, lamp on the workshop | Machine 4 as it was. The player does what they did yesterday, harder. The counterweight is at the top of the post inside a minute. | 2-3 |
-| **2. Morning** | sun up | **Hart changes the machine**: he comes out, pulls a pin, and the arm now swings slower with a longer click — the game giving the player an easier version of the same window rather than an easier problem. Beat this one. | 2 |
-| **3. Afternoon** | high sun, Ottilie arrives on the wall | The pin goes back. Full speed. But the player has now parried it once at slow speed and knows the shape. Ottilie's call is the whole answer this time: don't swing at it, stand there and watch the arm come. | 2-3 |
-| **4. Evening** | low gold | **The win.** One parry on the click, one strike into the opening, and the arm hangs dead. The counterweight never leaves the bottom of the post. | 0-1 |
+| **1. Before light** | grey dawn, lamp on the workshop | The swing as it was. The player does what they did yesterday, harder. The counterweight is at the top of the post inside a minute, and the command list is one lit entry in a row of grey ones. | 2-3 |
+| **2. Morning** | sun up | **Hart changes the machine, and says nothing.** He comes out, pulls a pin, and the arm now winds back slower and longer — *the same tell, more of it*. An easier version of the same window, never an easier problem. **This is where most players get it**, and they get it by watching a machine, alone, with a man behind them who has said one word. Beat this one. | 2 |
+| **3. Afternoon** | high sun, Ottilie arrives on the wall | The pin goes back. Full speed. The player has parried it once slow and knows the shape. **Ottilie gives nothing** — she arrives, gets comfortable, and enjoys it. | 2-3 |
+| **4. Evening** | low gold | **The win.** One guard as the weight drops, one strike into the opening, and the arm hangs dead. The counterweight never leaves the bottom of the post. | 0-1 |
 
 **How progress is shown.** Three ways, all visual, no numbers: the **counterweight's height on the
 post** at the end of each session (a mark on the post stays where your best attempt left it); the
@@ -186,20 +264,31 @@ post** at the end of each session (a mark on the post stays where your best atte
 day's attempts down in his own hand, session by session. A player who looks at the book after each
 session watches the day accumulate.
 
-**Ottilie arrives for session 3** for the usual show. She goes quiet for exactly one beat when he
-beats it, and then ruins it.
+**Between sessions there are two field lines, not four** (`hart_yard.day2_b`, `hart_yard.day2_d`),
+and **neither of them coaches**. The day is marked by the light and the mark on the post.
+
+**Ottilie arrives for session 3** for the usual show and is no use at all: she counts, she rates the
+falls, she eats. She goes quiet for exactly one beat when he beats it — **after**, so it can never be
+a hint — and then ruins it. *(The draft-2 escalating-hint script through her is struck: owner,
+2026-09-21. `COMBAT.md` §4a is the hint system now.)*
 
 **Encounters.** The machine. **The hazard.** The winding, again, and by now the player knows it is
 them. **Optional.** {{LOOT_YARD}}, if it is still up there. **Failing costs nothing**, all day.
 **Length.** 14 min. **Feel.** A montage the player is inside of.
 
-### CLIP C4 — the sword *(1.5 min, panels)* — `0150_the_sword`
-**Purpose.** The player has just beaten the machine themselves. Hart gives him the sword he made,
-and the player must understand — because the clerk said it yesterday and the game says it again here
-— that **this means he may sign.** And underneath the last box, the **evening bell starts**, and does
-not stop: the board has been open all day while he was in this yard. One beat, and the second half
-of it is the alarm.
-*Back into:* control, instantly, no fade, bell ringing, a ring counter on screen.
+### CLIP C4 — the sword *(1.2 min, panels)* — `0150_the_sword`
+**Purpose.** The player has just beaten the machine themselves. Hart gives him the sword he made, and
+because of one rule stated once yesterday the player already knows what that means: **he may sign.**
+Nobody re-explains it and **nobody narrates the parry he just did** (struck after the cold read: "He
+turned it aside and then he hit it" and "there's a click first" are both the game describing what the
+player watched). The bell starts underneath the last box.
+**THE SWORD GETS A BREATH.** The bell is **audible but not counting**. Control returns in the yard,
+no fade, the sword on his back, the old goal line still up — **and nothing is pressing.** The player
+can stand in that yard as long as they like and look at it. **The ring counter appears, and the timer
+starts, only when the player walks out of the gate**, and the goal line changes on that step to
+*Get to the guild hall.* The game's whole first act is about this object; it gets thirty seconds
+before it gets a clock.
+*Back into:* the yard, quiet, sword in hand. Then the run, on the player's own step.
 
 ---
 
@@ -209,8 +298,9 @@ of it is the alarm.
 **A timed dash across town, and the first time the player is asked to move well.**
 
 **The timer is the bell itself** — a set number of rings, shown as a small counter, each ring a
-sound the player has been hearing all chapter. **The direct route down the lane and round the square
-does not make it.** The shortcuts do, and all of them are jumps the player has already been taught
+sound the player has been hearing all chapter. **It starts when the player leaves the yard, not when
+C4 ends** (see C4): the pressure is real, and it is never sprung on somebody mid-sentence.
+**The direct route down the lane and round the square does not make it.** The shortcuts do, and all of them are jumps the player has already been taught
 in Hart's yard by the ladder and the roof:
 
 - **over the grain-yard wall** — a running jump off the water trough onto the wall, along it, and
@@ -218,16 +308,20 @@ in Hart's yard by the ladder and the roof:
 - **the roofs off the lane** — two roofs and a two-cell drop into the alley behind the guild hall;
 - **the well kerb to the low shed** — the small one, for players who missed the other two.
 
-**Asking her along.** Ottilie's door is *on* the fast route, not off it. Two field lines at the door
-while the bell is still ringing and she joins as a follower on the spot — the engine's follower trail
-— and the run finishes with two people jumping the grain-yard wall. **She is asked, she does not
-follow.**
+**Asking her along — mandatory (7).** Ottilie's door is *on* the fast route, not off it, and the run
+goes through it: `halm.ottilie_door` / `_2`, two boxes while the bell is still ringing, and she joins
+as a follower on the spot — the engine's follower trail — and the run finishes with two people
+jumping the grain-yard wall. **She is asked, she does not follow.** She must never simply appear on
+the pasture.
 
-**The board.** Four job sheets, three struck through. The fourth is the shepherd's: animals go
-missing off the high pasture at night and turn up miles away, asleep and unwakeable, and the tracks
-stop in open ground. It pays badly and it sounds like a tall tale, which is why it is the one still
-there. **Reading it is an examine, not a cutscene** — `halm.job_sheet` / `_2`, the only place in the
-chapter the job is ever written down. Signing is `halm.clerk_signing`.
+**The board — mandatory (6).** Three job sheets, two struck through. The one left is the shepherd's:
+**eleven** animals off the high pasture at night, turning up miles away asleep and unwakeable, the
+tracks stopping in open ground. It pays **five coin** and it sounds like a tall tale, which is why it
+is the one still there. **Reading it is not optional and it is not a cutscene**: `halm.job_sheet` /
+`_2` fires **on taking the sheet down**, because taking it to the counter is how you sign it — *the
+act of signing IS the act of reading.* Two short boxes, the only place in the chapter the job is ever
+written down. Signing is `halm.clerk_signing`.
+*(Numbers: nine belongs to the ring of holes and to nothing else in this chapter.)*
 **If the rings run out**, `halm.clerk_signing_late` runs instead: the clerk pretends the shutter is
 not already down and signs him anyway. **The run is pressure, never a restart** — nothing in chapter
 one sends the player backwards.
@@ -286,19 +380,32 @@ is a consequence of that one idea and nothing else has been added.
 1. *Inside the wall.* Wide open dark grass. The lantern shows about four cells. Somewhere in it,
    **the first sleeping animal** — the player finds it by walking into it.
 2. *The trail of sleepers.* Three more, spaced far enough apart that finding the next one is the
-   activity. Each one's examine says a little more: warm, unhurt, will not wake, and each is further
-   from the fold than the last. **The trail IS the navigation**: no marker, no arrow, just sleeping
-   animals in the dark leading the same way.
-3. *The knots of sleepers.* Where the sleeping animals lie thickest, and therefore where the
+   activity. **Warm, unhurt, bedded down** — never harmed, never scattered, laid in the grass like
+   something put them there on purpose, which is exactly what happened and is what Distel will say
+   out loud much later. Each examine is **one sentence**; the game never interprets a sleeper for the
+   player (cut after the cold read: three sleepers in a row all ended with the game explaining
+   itself). **The trail IS the navigation**: no marker, no arrow.
+3. *Where the false lantern is — SET PIECE, mandatory (8).* Not an examine the player may walk past:
+   the trail's third sleeper lies in the open, and **the only other light on the map is out there**,
+   at the edge of sight, the same warm colour as the party's own lamp. The player heads for it —
+   everyone does; it looks like a person — and `high_pasture.lantern` fires **when they have taken
+   the step**, which is what makes the line land. Then it flares. **This is the chapter's wonder and
+   it arrives at minute forty, not fifty.**
+4. *The knots of sleepers.* Where the sleeping animals lie thickest, and therefore where the
    {{PASTURE_CREATURE_PL}} are standing among them. The player learns to look at a group before
    walking into it, and can read the direction the beast went from where the knots are.
-4. *Where the tracks stop.* Open ground. The tracks are there and then they are not, and the grass
-   past them is not flattened. The chapter's best examine point. It is also where {{HERDER}} is
-   standing, looking at the same thing.
+5. *Where the tracks stop — SET PIECE, mandatory (9).* The trail of sleepers runs out and the trail
+   of **prints** takes over, pressed deep in mud, and the lantern circle follows them across open
+   ground **until there are no more.** The grass past them is not flattened. The walk itself is the
+   discovery; the player is already stopped and looking down when `high_pasture.tracks_stop` fires,
+   and it is the one line in the chapter meant to be quoted. **C5 fires here**, because {{HERDER}} is
+   standing at the far edge of the lamp looking at the same thing.
 
 **What the player learns.** Everything the job sheet said, by finding it: the animals are taken, they
-sleep, they cannot be woken, and whatever does it does not walk away afterwards. The player can
-assemble the shape of the boss before anyone says a word about it.
+are **unhurt and put down carefully**, they cannot be woken, and whatever does it does not walk away
+afterwards. The player can assemble the shape of the boss before anyone says a word about it — and
+the "taken" on the sheet and the "kept safe" of Distel's explanation are **both** supported by what
+the player has been walking past for ten minutes. Nothing in play shows a harmed animal, ever.
 
 **Encounters.** Two kinds, both about seeing:
 - {{NIGHT_CREATURE_PL}}, two to four, each a pale light in the dark that **looks exactly like
@@ -318,7 +425,7 @@ them sees it and has to make the jump in the dark.
 **What failing costs.** Wake at the shepherd's fold, keep everything.
 **Length.** 12 min. **Feel.** Two people out of their depth, and then three.
 
-### CLIP C5 — the herder *(1.5 min, panels)* — `0160_the_herder`
+### CLIP C5 — the herder *(1.2 min, panels)* — `0160_the_herder`
 **Purpose.** The third party member exists. At the place where the tracks stop, in the dark, someone
 small is already standing. Falke nearly swings; Ottilie stops him. They are tracking the same thing,
 it is theirs, they raised it, and they do not want it killed. That is the one beat, and it changes
@@ -334,8 +441,7 @@ this; the player sees the field change. Goal line *Find the guard beast.*
 
 Rules in full in `COMBAT.md` §9 and `BESTIARY.md`.
 
-**Phase one — hold it open** *(cannot be lost, 2.5 min).* Goal line: *Hold it open so {{HERDER}} can
-calm it.* The mane lifts — an enormous slow tell — {{HERO}} parries (**Guard costs no effort**), it
+**Phase one — hold it open** *(cannot be lost, 2.5 min).* Goal line: *Hold it open for {{HERDER}}.* The mane lifts — an enormous slow tell — {{HERO}} parries (**Guard costs no effort**), it
 is OPEN, and {{HERDER}} spends **Settle at effort 5** into the opening, 24 stamina a go, which she
 can afford about three times. **Attacking does nothing and the game says so each time.** So the phase
 is restraint: cheap parries, everything poured into her, and her bar visibly not coming back. The
@@ -350,8 +456,7 @@ bar rather than out of a box. Three cycles and it goes quiet.
 Then the mane lifts again, and it looks at her, and it does not know her.
 
 > **In-field exchange `high_pasture.boss_turn`** *(2 boxes)* — it goes for her. Fires on the round it
-> changes target, not before. The goal line changes on the last box: *Stop it. It is going for
-> {{HERDER}}.*
+> changes target, not before. The goal line changes on the last box: *Stop it. It wants {{HERDER}}.*
 
 **Phase two — a real fight** *(3.5 min).* Same tell, **faster, tighter window.** Damage counts; this
 is the release, and everything held back in phase one gets spent. After round three it stops
@@ -362,39 +467,53 @@ something without ever having been a failure. Open it and finish it. Losing rest
 **It is killed with a parry and the strike after it — the exact input the player learned on a machine
 in a yard yesterday afternoon.** That is the chapter.
 
-### CLIP C6 — what was on it *(2 min, panels)* — `0180_what_was_on_it`
-**The player finds it first, in play.** `high_pasture.body` / `_2` is an examine on the body after
-the fight: **a ring of nine small healed holes behind the left ear.** The player walks up and looks,
-and only then does the clip run — so the chapter's last discovery is made with the stick in hand.
+### CLIP C6 — what was on it *(1.6 min, panels)* — `0180_what_was_on_it`
+**The player finds it first, in play — mandatory (10).** `high_pasture.body` / `_2` is an examine on
+the body after the fight: **a ring of nine small healed holes behind the left ear.** The body is the
+only thing on a dark map and the party will not leave until it has been looked at; **the clip does
+not run until it has been.** The chapter's last discovery is made with the stick in hand.
 **Purpose of the clip.** The three of them react to what the player already found. It is not
-explained. The sheep wake. {{SHEPHERD}} pays: the first coin {{HERO}} earns as a hunter. Three
-people who have no answer decide to go and find one. One beat: *paid on paper, not solved.*
+explained, and nobody describes the holes a second time. The flock wakes — **unhurt, which the player
+has known since the first sleeper.** {{SHEPHERD}} pays: the first coin {{HERO}} earns as a hunter.
+Three people who have no answer decide to go and find one. One beat: *paid on paper, not solved.*
 
 ---
 
 ## Pacing — play against clips
 
-| Block | Kind | Minutes play | Minutes clip |
-|---|---|---|---|
-| P1 {{MENTOR}}'s yard, midday | play | 8 | — |
-| C1 "You're not ready" | clip | — | 1.0 |
-| P2 Halm, the errand | play | 12 | — |
-| C2 the counter | clip | — | 1.0 |
-| P3 home, supper, night | play | 4 | — |
-| C3 supper | clip | — | 1.0 |
-| P4 the yard, all day | play | 14 | — |
-| C4 the sword | clip | — | 1.5 |
-| P5 the bell run | play | 6 | — |
-| P6 the hill path | play | 10 | — |
-| C5 the herder | clip | — | 1.5 |
-| P7 the high pasture | play | 12 | — |
-| P8 the boss | play | 6 | — |
-| C6 what was on it | clip | — | 2.0 |
-| **Total** | | **72** | **8.0** |
+**Re-timed 2026-09-21** after the cuts. Every clip got shorter and P1, P2 and P3 lost play time to
+trimming rather than to content: the barrel machine is gone, the errand lost two townspeople and a
+recitation, the night lost an interact. Nothing was cut from P4 onward — the second half of the
+chapter is the part the whole thing is for.
 
-**Ratio 9:1.** The longest stretch without a clip is **P5 → P6, 16 minutes** (the bell run and the
-climb), which is on purpose: it is the chapter's momentum and nothing may be inserted into it. The
-longest clip is the last one. No two clips are adjacent anywhere in the chapter.
+| Block | Kind | Minutes play | Minutes clip | Change |
+|---|---|---|---|---|
+| P1 {{MENTOR}}'s yard, midday | play | 6 | — | −2 (three machines, not four) |
+| C1 "You're not ready" | clip | — | 0.8 | −0.2 |
+| P2 Halm, the errand | play | 10 | — | −2 (three townspeople; tighter examines) |
+| C2 the counter | clip | — | 0.7 | −0.3 (one rule, not three) |
+| P3 home, supper, night | play | 3 | — | −1 (supper two boxes; one room interact) |
+| C3 supper | clip | — | 0.8 | −0.2 |
+| P4 the yard, all day | play | 14 | — | — |
+| C4 the sword | clip | — | 1.2 | −0.3, and it gains a silent beat in play |
+| P5 the bell run | play | 6 | — | — |
+| P6 the hill path | play | 10 | — | — |
+| C5 the herder | clip | — | 1.2 | −0.3 |
+| P7 the high pasture | play | 12 | — | — |
+| P8 the boss | play | 6 | — | — |
+| C6 what was on it | clip | — | 1.6 | −0.4 |
+| **Total** | | **67** | **6.3** | **73 minutes** |
+
+**Ratio 10.6:1**, up from 9:1 — the direction the owner asked for. **Total scene text is down about a
+third** and the mandatory share of it is ten short interactions. The longest stretch without a clip is
+**P5 → P6, 16 minutes** (the bell run and the climb), which is on purpose: it is the chapter's
+momentum and nothing may be inserted into it. The longest clip is still the last one. No two clips
+are adjacent anywhere in the chapter.
+
+**The no-teaching rule, stated once for the whole chapter.** No goal line is longer than six words;
+no system is explained in a box; no character coaches; and no line of dialogue or field text
+describes something the player has just watched. Anything that breaks one of those is cut, not
+rewritten.
 
 **Tension and release** (rule 9): P1 is funny, P2-P3 is the rest and the laugh, P4 is effort, C4-P5
 is the spike, P6 is the first real danger, P7 is dread, P8 is the payoff. The rest is early because

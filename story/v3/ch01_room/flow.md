@@ -15,24 +15,34 @@ an NPC line in the field, or a short two-line exchange that plays while you keep
 ## The whole chapter in one column
 
 ```
-  PLAY  P1  Hart's yard, midday      machines 1-3, then machine 4 beats you      8 min
-  CLIP  C1  the yard, after the loss  "not ready" + the patch-up  0110_the_yard   1 min
-  PLAY  P2  Halm by day               the errand: bread, the guild hall          12 min
+  PLAY  P1  Hart's yard, midday      the post, the arm, then the swing beats you  6 min
+  CLIP  C1  the yard, after the loss  "not ready" + the patch-up  0110_the_yard   0.8 min
+  PLAY  P2  Halm by day               the errand: the bench, the lamp-charm, the guild hall  10 min
               └ teaching find in the grain yard
-  CLIP  C2  the guild hall counter    the rules: dawn, last ring, no sword no signature   1 min
-  PLAY  P3  Halm at dusk → supper     walk home; supper is a short field scene   4 min
-  CLIP  C3  supper at Hart's          he isn't ready; the day ends               1 min
-  PLAY  P4  the yard, day two         the grind: four sessions, visible progress, then the parry  14 min
-  CLIP  C4  the yard, the sword       Hart gives the sword = you may sign; the bell is ringing   1.5 min
-  PLAY  P5  the bell run              timed dash across Halm; the board; asking her   6 min
+  CLIP  C2  the guild hall counter    ONE rule: no sword, no signature            0.7 min
+  PLAY  P3  Halm at dusk → supper     past her house; supper is two boxes          3 min
+  CLIP  C3  supper at Hart's          he isn't ready; the day ends                0.8 min
+  PLAY  P4  the yard, day two         four sessions, visible progress, then the parry  14 min
+  CLIP  C4  the yard, the sword       the sword = you may sign; the bell starts   1.2 min
+              └ then a silent beat in the yard; the clock starts at the gate
+  PLAY  P5  the bell run              timed dash; the sheet; asking her            6 min
   PLAY  P6  the hill path, dusk       first real encounters; leaving town         10 min
-  CLIP  C5  the pasture edge, night   meeting the herder                          1.5 min
-  PLAY  P7  the high pasture, night   tracking; darkness; the tracks that stop    12 min
+  CLIP  C5  the pasture edge, night   meeting the herder                          1.2 min
+  PLAY  P7  the high pasture, night   the false lantern; the tracks that stop     12 min
   BOSS  P8  the guard beast           two phases                                  6 min
-  CLIP  C6  after                     the wrong thing on the beast; the three go on   2 min
+  CLIP  C6  after                     the wrong thing on the beast; the three go on  1.6 min
 ```
 
-**73 minutes of play, 8 minutes of clip.** Ratio 9:1. Full table in `chapter01.md`.
+**67 minutes of play, 6.3 minutes of clip.** Ratio 10.6:1, re-timed 2026-09-21 after the cuts.
+Full table in `chapter01.md`.
+
+**The three rules of this revision** (owner's notes on draft 2, binding):
+1. **Nobody coaches.** Ottilie is not the hint system and never was in her own right — she is on the
+   wall enjoying it. The parry is taught by the machine (`COMBAT.md` §4a).
+2. **Ten interactions are mandatory** (`chapter01.md`, *The mandatory ten*) and everything else is
+   optional and short. The setup lives in the mandatory layer now; it used to live in the optional one.
+3. **Fewer words everywhere.** Goal lines of six words or fewer; no system boxes; no line that
+   narrates what the player just did.
 
 ---
 
@@ -42,10 +52,10 @@ These were scenes in the old draft. They are now play.
 
 | Old scene | Now |
 |---|---|
-| `0102_the_errand` (Hart sends him to town) | **Field lines in the yard.** Hart says the errand in two boxes while the player still has the stick; the goal line changes to "Take the part to the guild hall." |
-| `0104_the_table` (supper) | **A short field scene at the table** — the player walks in, sits, and the exchange is three in-field lines plus one examine (Hart's workshop book on the bench). C3 is only the last beat of it. |
-| `0105_the_night` (alone at night) | **Play.** One screen: Falke's room, one interact on the sword-shaped gap on the wall, one on the window, then bed. Thirty seconds, no boxes. |
-| `0110_the_board` (the job sheet) | **An examine, not a scene.** The board is a field object with four job sheets on it, three struck through. Reading the last one is an examine box. The clerk's two lines are NPC lines. |
+| `0102_the_errand` (Hart sends him to town) | **One box, then play.** Hart says it in one box; the part is then **fetched by the player off his bench** (`hart_yard.bench_part`, mandatory), so the errand starts by walking through his workshop. Goal line: *Deliver the part. Buy bread.* |
+| `0104_the_table` (supper) | **A short field scene at the table** — the player walks in, sits, **two** in-field boxes plus one examine (Hart's workshop book). C3 is only the last beat of it. Nothing at this table states Ottilie's history; her house did that, on the walk home. |
+| `0105_the_night` (alone at night) | **Play.** One screen: Falke's room, **one** interact on the sword-shaped gap on the wall, then bed. Thirty seconds, no boxes. |
+| `0110_the_board` (the job sheet) | **A mandatory examine, not a scene, and not optional.** Three sheets, two struck through; **taking the last one down fires `halm.job_sheet` / `_2`** in two short boxes, because taking it to the counter is how you sign it. The clerk's line is an NPC line. |
 | `0130_asking_her` (asking Ottilie along) | **An in-field exchange at her door,** two boxes, while the bell is still ringing. She joins as a follower on the spot. |
 | `0120_what_the_road_is` | **Gone with the road.** (No sunk cost.) |
 

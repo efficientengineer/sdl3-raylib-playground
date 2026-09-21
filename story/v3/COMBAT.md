@@ -100,6 +100,44 @@ parry that bought it refunded a third of what it cost. Every fight in the game i
 The tell belongs to a target, and whoever guards is who parries it, so three party members can parry
 three tells in a round.
 
+## 4a. How the parry is taught — with no words at all
+
+**Binding (owner, 2026-09-21):** *"I don't like that Ottilie tells Falke what to do, it's not her
+domain. She just thinks it's funny he's getting whomped."* **No character coaches the player, ever,
+in this chapter.** The old design ran an escalating hint script through her from the wall; it is
+struck out of every file. The realisation is the player's own or it is worth nothing.
+
+Five things carry it, in this order, and none of them is a sentence:
+
+1. **The tell is a performance, not a cue.** The swing's counterweight **visibly drops** a hand's
+   width, the arm **winds back** with a sound like a ratchet, and only then does it come. It is large,
+   it is slow, it happens every single time, and it always comes from the same side. A player who
+   never works out what to do with it has still seen it fifty times.
+2. **Attacking makes it worse, on screen.** Every attack that is not into an opening winds the
+   counterweight another notch up the post and it comes back harder. The post is a graph of the
+   player's own impatience and it is standing in the middle of the yard.
+3. **The stamina drain closes the door.** Its counter drains the attacker. Within a session the
+   player cannot afford Attack, cannot afford Hard swing, and **Guard is the only command left that
+   costs nothing.** The game does not suggest Guard. It removes everything else.
+4. **The menu says it in light.** Anything unaffordable is **greyed with its cost shown**; Guard is
+   never greyed and is **visibly lit**. At the bottom of a bad session the command list is one bright
+   entry in a row of grey ones. That is the loudest the game is ever allowed to get.
+5. **Non-verbal escalation, only after repeated failure.** After three failures in a session the tell
+   **slows by about a fifth** — the same tell, more of it. After five, the **Guard entry pulses once**
+   as the tell plays. Nothing is said, nothing is unlocked, and the difficulty of the input does not
+   change; the player is given more time to notice, not a different problem. Both escalations reset
+   the moment a parry lands, and neither ever fires outside {{MENTOR}}'s yard.
+
+**{{MENTOR}} says one word.** *"Again."* He is not withholding the answer to be wise; he cannot hand
+over a thing that is learned in the hands. **{{HEALER}} is not a hint system.** She is on the wall
+enjoying it: she winces at a big hit, she counts falls, she goes quiet for exactly one beat the first
+time he turns it aside — feedback the player reads as applause, never as instruction. Her going quiet
+happens **after** the parry, so it can never be a tip.
+
+**The no-combat fallback (§10) teaches it identically**: the same drop-and-wind animation, the same
+sound, the same stamina bar on the HUD emptying until the only press that does anything is the cheap
+one, the same lit-versus-grey prompt.
+
 ## 5. The three of them
 
 Each skill has a **minimum effort**; below it the skill is greyed on the list with its minimum shown.
@@ -111,11 +149,11 @@ Each skill has a **minimum effort**; below it the skill is greyed on the list wi
 | **Hard swing** | 4 | damage ×1.6 of the effort's magnitude, but you **cannot guard next round** |
 | Guard / parry | — | §4 |
 
-**His flaw is the system's tutorial.** Falke swings at effort 5 every single turn. Machine four
+**His flaw is the system's tutorial.** Falke swings at effort 5 every single turn. The swing
 counters full-effort attacks into its guard and drains him doing it, so by the end of a session he
 is **too tired to swing at all** — and the only thing he can still afford is a **cheap guard**.
 Which is the answer. The player learns both halves of the game in one beat: the parry is cheap, the
-opening is what you spend into.
+opening is what you spend into. **Nobody tells them.** See §4a.
 
 **{{HEALER}} — the party's healer, and good at it.** She is an apprentice in title only: the town
 healer has not given her full standing, which is a matter of experience away from home and not of
@@ -158,18 +196,42 @@ the party in the order, which is what makes effort-scaled duration worth buying.
 
 ## 7. The machines as enemies
 
-Hart's four machines fight by these rules with everything else switched off (`BESTIARY.md`). They
-have no HP worth the name; they are beaten by parrying and striking the opening. **Machine four
-cannot be beaten any other way**: every attack that is not into an opening **winds its
+Hart's **three** machines fight by these rules with everything else switched off (`BESTIARY.md`).
+They have no HP worth the name; they are beaten by parrying and striking the opening. They are
+**the post**, **the arm that holds**, and **the swing**, and they are named, never numbered.
+(A fourth, a barrel on a rope, was cut: its only job was to introduce the word *tell* in a sentence,
+and no sentence introduces anything in this chapter any more.)
+
+**The swing cannot be beaten any other way**: every attack that is not into an opening **winds its
 counterweight**, and it comes back faster and harder, and the counter drains the attacker's stamina.
 The harder the player tries, the worse it gets. The machine is a graph of the player's own
 impatience, and it is drawn on the post as a mark that climbs.
 
+## 7a. Teaching order — at most one short prompt per new idea
+
+**Rule: the game explains nothing it can instead withhold until the player does it.** Goal lines are
+**six words or fewer**. There are no system pop-ups, no multi-box explanations, and no line anywhere
+that describes something the player has just watched happen.
+
+| # | New idea | How it arrives | The one prompt allowed |
+|---|---|---|---|
+| 1 | move, face, hit | **Only Attack exists.** The command list is one entry. | the button glyph, no words |
+| 2 | things have tells | the arm that holds telegraphs, closes, and costs you two goes | none |
+| 3 | Guard | **Guard appears in the list** the first time something telegraphs at you | *"Guard"* — the word, appearing |
+| 4 | Guard on a tell is a parry | the player does it and the enemy is visibly OPEN | none; the stagger is the prompt |
+| 5 | effort | the **slider appears under Attack** the first time the player has an opening to spend into | the notches, and the cost shown against the bar |
+| 6 | minimum effort | a skill greyed **with its minimum shown** | the grey itself |
+| 7 | stamina regenerates | the bar refills while walking, where the player can see it | none |
+
+Nothing on this list is ever re-explained, and an idea that has not arrived yet is **absent from the
+UI**, not greyed. That is the difference between the list growing and the list being a menu the
+player must read.
+
 ## 8. Losing, and running
 
 - **In {{MENTOR}}'s yard, losing is free and instant.** No menu, no reload; flat on your back, up in
-  two seconds, Ottilie saying something from the wall. The player is meant to lose a lot and find it
-  funny.
+  two seconds, Ottilie laughing from the wall — at him, about nothing useful. The player is meant to
+  lose a lot and find it funny.
 - **Everywhere else in chapter one, losing is gentle.** The party wakes at the last safe place — the
   yard, the last house on the hill path, the shepherd's fold — with everything they had. Nothing is
   lost but the walk back.
@@ -208,7 +270,7 @@ An encounter is a creature sprite standing on the field. Walk into it, or press 
 radius, and:
 
 1. It plays its **tell** — the same animation and sound the battle version will use.
-2. A **window** opens, about 0.6 s on the pasture, 0.45 s for machine four. **Tap inside the window**
+2. A **window** opens, about 0.6 s on the pasture, 0.45 s for the swing. **Tap inside the window**
    = parry: the creature staggers and is OPEN.
 3. **Effort is a hold.** The follow-up press into the opening is **hold-to-charge**: a short bar
    fills in four visible notches while the button is down and empties your stamina meter as it goes.
@@ -220,9 +282,13 @@ radius, and:
 One to three cycles a creature. Stamina is a bar on the HUD that **refills as you walk**, so the
 regeneration rule is learned by walking between encounters. Fallbacks for the rest:
 
-- **The machines** are the same interaction at four window lengths. Machine four's is shortest, and
+- **The machines** are the same interaction at three window lengths. The swing's is shortest, and
   pressing outside it winds the weight *and* drains you — so the player is literally too tired to
-  swing by the end of a session, which is the story beat, played.
+  swing by the end of a session, which is the story beat, played. In the fallback the two prompts
+  are a **charge glyph** (the swing press) and a **guard glyph** (the cheap press), and the charge
+  glyph **greys out when the bar cannot pay for it** while the guard glyph stays lit. §4a's
+  escalation applies here unchanged: after three failures the wind-up plays slower, after five the
+  guard glyph pulses once as it plays, both reset on a parry.
 - **{{HEALER}}'s Mend** is an automatic field event after a losing exchange: she patches you up
   quickly and it costs her a little of a bar that fills straight back as you walk. It is routine for
   her, and the field should make it look routine.
@@ -243,7 +309,13 @@ prompt's timing. All five are small beside a battle system, and all five are reu
   character, showing the stamina cost and the resulting magnitude before you commit.
 - **A stamina bar** under every portrait, and — once {{HERDER}} is in the party — under every enemy.
 - **A tell indicator** on the enemy that is telegraphing, unmistakable at a glance and audible.
-- A skill below its minimum effort is **greyed with its minimum shown**, never hidden.
+- A skill below its minimum effort is **greyed with its minimum shown**, never hidden. So is a
+  command the character cannot currently pay for. **Guard is never greyed** — it is the one entry
+  that is always lit, and on a tired character it is the only one, which is §4a's fourth carrier and
+  the closest thing to a hint the chapter contains.
+- An idea that has not been introduced yet is **absent** from the list, not greyed (§7a). The list
+  grows: one entry, then two, then the slider under them.
+- **A goal line**, six words or fewer, settable per trigger, and never two lines at once.
 
 ## 12. Later, not chapter one
 
@@ -265,6 +337,12 @@ equipment that changes the effort curve rather than adding numbers; a skill whos
    down, no ceiling.** The world's "light work only" rule applies to everybody equally.
 3. **{{HERDER}}'s failure in phase one is hers to be hurt by.** The calming does not fail because she
    is careless; it fails after she has spent nearly everything she has, on screen.
-4. **Nobody says "stamina", "effort" or "magnitude" in dialogue.** Ottilie's calls from the wall say
-   plain things — *you're swinging too hard*, *you've got nothing left* — and that is the whole
-   vocabulary the story needs.
+4. **Nobody says "stamina", "effort" or "magnitude" in dialogue** — and now nobody says the
+   *content* of them either. **Struck (owner, 2026-09-21):** Ottilie's calls from the wall,
+   including *you're swinging too hard* and *you've got nothing left*. She does not coach, hint,
+   call a direction or name the sound. She is enjoying the show: she winces, she counts falls, she
+   goes quiet for one beat **after** he turns it aside. {{MENTOR}} says *"Again."* The parry is
+   taught by §4a and by nothing else, and no line of dialogue anywhere in chapter one may describe
+   what the player has just seen or done.
+5. **The machines are named, never numbered** (§7): the post, the arm that holds, the swing. There
+   are three.

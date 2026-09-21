@@ -153,3 +153,67 @@ Two sentences at most each, per `check --all`.
    No small pool, no ceiling, no sitting down, no "wasn't strong enough" line. The yard patch-up is
    quick and routine and she teases him through it. Design updated in `COMBAT.md` §5.
 4. The herder's name: I need one word the player can say. Wik is a placeholder.
+
+---
+
+## 5. DRAFT THREE — mandatory, optional, deleted (2026-09-21)
+
+Written for the owner's notes on draft 2 and the cold read. Sent to you by message before this file
+was updated, so you could start; this is the record.
+
+### 5.1 The hint system is not a person any more
+
+**Owner, binding:** *"I don't like that Ottilie tells Falke what to do, it's not her domain. She just
+thinks it's funny he's getting whomped."* Everything that made her a hint system is struck from my
+files. What teaches the parry is in `COMBAT.md` §4a: the swing's tell is a **performance** (the
+weight drops a hand's width, the arm winds back with a ratchet, it always comes from the same side);
+its counter **drains stamina** until Attack and Hard swing are greyed with their costs showing and
+**Guard is the only lit entry in the list**; and after repeated failure the tell plays about a fifth
+slower and the Guard entry pulses once — **no words, and both reset on a parry.** {{MENTOR}} says
+*"Again."* and nothing else.
+
+**What she may still do,** because it is fun and it is hers: wince at a big hit, count falls, rate
+the landings, eat something, and go quiet for exactly one beat **after** he turns it aside on day
+two. That last one is applause and it cannot be a tip, because it comes after. She never calls a
+direction, names the sound, or says *you're swinging too hard* / *you've got nothing left* — both of
+those lines are struck from `COMBAT.md` too.
+
+### 5.2 The mandatory ten
+
+Full table in `chapter01.md`, *The mandatory ten*. In one line each: `hart_yard.machine_swing`
+(one sentence, no click), `hart_yard.bench_part` (walk through the workshop to fetch the errand's
+object — that is how Hart is an engineer), `halm.lamp_charm` (+`_2`: ordinary magic as a chore, and
+the carters' saying, which is the only mention of the {{HERDER_PEOPLE_PL}} before Distel),
+`halm.guild_hall_door` (fires on entering; the word *guild*), `halm.ottilie_house` (one chair, two
+coats, on the lane home at dusk; nobody comments, ever), `halm.job_sheet` + `_2` (fires on taking the
+sheet down — signing IS reading), `halm.ottilie_door` + `_2` (her door is on the fast route; she is
+**asked**), `high_pasture.lantern` (a set piece: the only other light on the map, and it fires when
+the player has taken the step toward it), `high_pasture.tracks_stop` (a set piece: the prints run out
+under the lamp; C5 fires here), `high_pasture.body` + `_2` (C6 does not run until the player has
+looked).
+
+### 5.3 What I asked to be deleted
+
+`hart_yard.machine_1/2/3/4` and `hart_yard.practice_posts` (there are **three** machines now and they
+are named, never numbered: the post, the arm that holds, the swing — the barrel is cut, its only job
+was to say the word *tell* out loud), `hart_yard.wall`, `hart_yard.errand_1/_2` (one box plus
+`bench_part`), `hart_yard.room_window`, `hart_yard.supper_3`, `hart_yard.day2_a` and `day2_c`,
+`halm.board_sheets`, `halm.carter_saying` (merged into `lamp_charm_2`), `halm.npc_2` + `_after`,
+`halm.npc_5` + `_after` (five townspeople down to three, each keeping its before/after-sword pair —
+narrower, not cheaper), `halm.clerk_after`, `halm.rival_door_2`, `high_pasture.ottilie_ready`,
+`west_road.culvert` and `west_road.west_end` (west_road is not a chapter-one map).
+
+Everything not in §5.2 or §5.3 is **optional and should be short**: one sentence where it used to be
+two, and never a closing sentence that interprets the first one for the player. The cold read named
+four of those specifically (`sleeper_3`, `sleeper_4`, `machine_4`'s click line, `day2_c`) and they
+are the pattern, not the exceptions.
+
+### 5.4 Three staging facts from the play side
+
+1. **The sword gets a breath.** The bell-run clock does **not** start at the end of C4. Control
+   returns in the yard with the sword and the bell audible but **not counting**; the counter appears
+   and the goal line changes only when the player walks out of the gate. Write the quiet beat.
+2. **Taken vs kept safe.** In play every animal is found warm, unhurt and bedded down on purpose, and
+   the flock wakes after the fight. Nothing the player sees contradicts Distel's explanation.
+3. **Numbers.** Nine is the ring of holes and nothing else. Flock eleven, job pays five coin, no
+   "forty-one", no "that's four". My files are clean of both.
