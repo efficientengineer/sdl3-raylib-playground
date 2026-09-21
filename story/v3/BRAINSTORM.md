@@ -149,6 +149,17 @@ part ends at the sword (he may scoff at faeries); the father need not appear; th
 did", the confession scene and the road briefing all fall away. Kept only because they still earn it:
 the dummies and the parry, Ottilie on the wall and being asked, the sword as the sign that lets him sign.
 
+**Magic and peoples (owner, 2026-09-21):** "Magic can be mostly ordinary, but people are not going
+around casting fireballs. Mostly just light work. I don't know why yet." (WHY is an open thread — not
+needed for chapter one.) "I don't literally want faeries, they were just an example. We should use our
+own beings, like PS4 has Motavians and Dezolisians." So: PEOPLES, neighbours with towns and trades, not
+spirits; the hunt ends in a first meeting. Orchestrator noted: light-only magic is why a town needs an
+engineer, and makes "wasn't strong enough" plain for Ottilie. Three shapes offered (owner not yet
+answered): A night herders (small, large-eyed, nocturnal, sleep is their light magic; the animals were
+gathered with their night herd; the "monster" is their herd beast; two peoples sharing one hill
+unknowingly) — orchestrator's pick; B tall folk of the wood; C burrow people (traders, a door in the
+pasture; good recurring shopkeepers). All names as tokens.
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
