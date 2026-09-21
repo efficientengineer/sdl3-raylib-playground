@@ -140,6 +140,15 @@ Halm stopped keeping. Questions put to the owner: is magic ordinary or half-forg
 first faerie friend, trickster or threat (orchestrator leans half-forgotten, trickster; evil stays
 human). The jar, the Stair, the woman under the step and the moved moon are shelved ideas, not canon.
 
+**No sunk cost (owner, 2026-09-21):** "Don't hold onto Rabe, Hart making the quest posting, etc just
+because we already worked the idea. Forcing it in is more harmful than useful." Applies to EVERYTHING in
+this file, including the owner's own earlier ideas: an element survives only if the new chapter wants
+it. Hunt stripped accordingly: a shepherd posts it; it is the last job sheet because it sounds like a
+tall tale and pays badly; Falke takes it because it says monster and he finally has a sword; Hart's
+part ends at the sword (he may scoff at faeries); the father need not appear; the sealed post, "You
+did", the confession scene and the road briefing all fall away. Kept only because they still earn it:
+the dummies and the parry, Ottilie on the wall and being asked, the sword as the sign that lets him sign.
+
 ## Open (owner hasn't answered)
 
 - Which interlude(s): The Wrong Water ({{THIEF}}), The Early Field (new fifth member), The Ferry ({{SCHOLAR}})? Fifth member in or out?
