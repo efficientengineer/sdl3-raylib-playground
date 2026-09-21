@@ -11,8 +11,28 @@ humans edit them by hand.
   `story/out/<map>.tmap.png`, drawing a flat colour for any tile whose atlas cell is still empty. That
   is how a map is judged on the Mac before any art exists.
 
+## `## height` — authored elevation (NEW, parser pending)
+
+`hill_path` and `high_pasture` carry an optional `## height` section. It is a **grid exactly like
+`## ground`**: `size:` rows of `size:` characters, one per walk cell, giving that cell's surface
+height in **VOXELS** (half a walk cell, the unit `VOXFIELD_NOTES.md` builds in).
+
+```
+## height            # optional; W chars x H rows, base36 per cell: 0-9 = 0..9, a-z = 10..35
+```
+
+- A character is read base36, so `0`..`9` then `a`..`z`, range **0..35 voxels** (0..17.5 cells).
+- **`.` means "unauthored"**: that cell keeps the deterministic terrain height the builder already
+  generates. A map with no `## height` section behaves exactly as it does today.
+- An authored cell is **authoritative**: no procedural height, and it is **exempt from the
+  neighbour-clamp pass** — the two-voxel clamp is what a cliff has to be allowed to break.
+- Stamps and trigger rectangles are still flattened, to the height of their own top-left cell.
+- Walk connectivity is unchanged (`<= 1` voxel is a walk edge, more is a ledge), which is what the
+  two maps are authored against: every path climbs at most one voxel a cell, and every cliff, the
+  two-cell drop on `hill_path` and the jump-only shelf on `high_pasture` are deliberate ledges.
+
 ## todo
 
 Maps an exit is allowed to point at before they are written. Delete a name once its `.tmap` exists.
 
-- `west_road`
+- (none — every exit target has a `.tmap`)

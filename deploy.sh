@@ -27,10 +27,9 @@ for f in story/portraits/*.png; do
     cp "$f" "$ASSETS/cutscenes/portrait_$(basename "$f")"                 # the name cutscene_data.h uses
 done
 
-# Field (TILES.md): the tile field reads tmaps, walkers, one tileset folder and the palette. The
-# parked 3D streams (screens, views, maps, props, tiles, buildings, edges) are not bundled; the old
-# field says so in the log and falls back to its built-in map.
-for d in tmaps walkers; do
+# Field (VOXFIELD_NOTES.md): the voxel field reads tmaps, walkers, sprites, one tileset folder and
+# the palette. That is the whole list; the old 3D, painted-view and tile fields are gone.
+for d in tmaps walkers sprites; do
     [ -d "story/field/$d" ] || continue
     mkdir -p "$ASSETS/field/$d"
     for f in story/field/"$d"/*; do

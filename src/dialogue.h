@@ -1,5 +1,5 @@
 // dialogue.h — one dialogue box, shared by the cutscene player (star_logic.cpp) and the field's
-// message box (tilefield.cpp). Header-only and static: two translation units, no link order.
+// message box (voxfield.cpp). Header-only and static: two translation units, no link order.
 //
 // What it owns:
 //   * PAGINATION. A line longer than the box is split into pages at word boundaries, preferring a

@@ -18,7 +18,7 @@ HASH="$(basename "$(dirname "$CXX_DIR")")"
 OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
 # Every translation unit of libgame_logic.so. CMakeLists.txt's game_logic target must match.
-GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/field.cpp $SCRIPT_DIR/src/tilefield.cpp $SCRIPT_DIR/src/voxfield.cpp"
+GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/voxfield.cpp $SCRIPT_DIR/src/battle.cpp"
 
 IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
 SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"
@@ -71,14 +71,8 @@ SHIP_CUT="$(mktemp)"; SHIP_FIELD="$(mktemp)"
 trap 'rm -f "$SHIP_CUT" "$SHIP_FIELD"' EXIT
 BEFORE_KB="$("$ADB" -s "$DEVICE" shell "run-as $PKG du -sk files" | awk '{print $1}' | tr -d '\r')"
 
-# The parked streams (the old 3D field: FIELD.md's screens, views, maps, props, tiles, buildings,
-# edges) are not pushed any more — nothing the tile field draws reads them, and they were 11 MB.
-# `--with-parked` puts them back for a session on the old field; without them its Dev button finds no
-# map and says so in the log rather than crashing.
-WITH_PARKED=0
-for a in "$@"; do [ "$a" = "--with-parked" ] && WITH_PARKED=1; done
-FIELD_KINDS="tmaps walkers"
-[ "$WITH_PARKED" = 1 ] && FIELD_KINDS="tmaps walkers maps screens views props tiles buildings edges"
+# What the voxel field reads, and nothing else. The old 3D, painted-view and tile fields are gone.
+FIELD_KINDS="tmaps walkers sprites"
 
 # Panel images and speaker portraits: push only the ones the device doesn't already have at the same size.
 "$ADB" -s "$DEVICE" shell "run-as $PKG mkdir -p files/cutscenes"
@@ -116,9 +110,9 @@ for d in $FIELD_KINDS; do
     HAVE_F="$("$ADB" -s "$DEVICE" shell "run-as $PKG sh -c 'cd files/field/$d && stat -c \"%n %s\" * 2>/dev/null'" | tr -d '\r')"
     for f in "$SCRIPT_DIR"/story/field/"$d"/*; do
         [ -f "$f" ] || continue
-        # authoring scripts stay off the phone; screens carry .screen and .triggers text files
+        # authoring scripts stay off the phone
         case "$f" in *_debug.png) continue;; esac          # the ingest's own check image, not art
-        case "$f" in *.png|*.map|*.tmap|*.screen|*.triggers|*.json) ;; *) continue;; esac
+        case "$f" in *.png|*.tmap|*.json) ;; *) continue;; esac
         n="$(basename "$f")"
         echo "$d/$n" >> "$SHIP_FIELD"
         sz="$(stat -f %z "$f")"
@@ -196,17 +190,6 @@ if [ -d "$SCRIPT_DIR/story/palette" ]; then
         echo "  palette $n"
         "$ADB" -s "$DEVICE" push "$f" "/data/local/tmp/$n" >/dev/null
         "$ADB" -s "$DEVICE" shell "run-as $PKG cp /data/local/tmp/$n files/palette/$n && rm /data/local/tmp/$n"
-    done
-fi
-
-# --pull-views: bring the in-game "Capture view" output back into the repo for the painter.
-if [ "$1" = "--pull-views" ]; then
-    mkdir -p "$SCRIPT_DIR/story/field/views"
-    NAMES="$("$ADB" -s "$DEVICE" shell "run-as $PKG ls files/field/views 2>/dev/null" | tr -d '\r')"
-    for n in $NAMES; do
-        case "$n" in *_depth.png) continue;; esac     # depth stays on the phone: reference, not art
-        "$ADB" -s "$DEVICE" shell "run-as $PKG cat files/field/views/$n" > "$SCRIPT_DIR/story/field/views/$n"
-        echo "  pulled views/$n"
     done
 fi
 

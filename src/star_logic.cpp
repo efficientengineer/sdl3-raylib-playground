@@ -20,14 +20,26 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "stb_image.h"
-#include "stb_image_write.h"   // the dialogue capture; the implementation lives in third_party_impl.c
+// The capture path's PNG writer. It lives here, the one TU every capture (dialogue, chapter,
+// voxfield) links against.
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 #include "game_api.h"
 #include "cutscene_data.h"
-#include "field.h"
-#include "tilefield.h"
 #include "voxfield.h"
 #include "dialogue.h"
+#include "battle.h"
+#include "chapter01.h"
+
+// The game plays CHAPTERS now — `## intro` is gone from story/playlist.md and CS_INTRO with it.
+// New Game starts at CS_CHAPTERS[0]. The cutscene player reads one chapter's scene list at a time;
+// CS_CUR is that list, so the player itself did not have to learn what a chapter is.
+#ifndef CS_HAS_CHAPTERS
+#error "src/cutscene_data.h is stale: run ./story_prompt.py export (it must define CS_HAS_CHAPTERS)"
+#endif
+static const CsScene *CS_CUR = CS_CHAPTERS[0].scenes;
+static const int CS_CUR_COUNT = CS_CHAPTERS[0].count;
 
 #define PREF_ORG "com.playground"
 #define PREF_APP "questglory"   // host.cpp uses the same pref path for reload.flag and the .so
@@ -451,14 +463,10 @@ struct Star {
     int line_page;                // which page of this line is on screen (long lines paginate)
     float line_t;                 // seconds since this line started
     float fade;                   // 1 = black, 0 = clear
-    int fade_to_scene;            // scene to cut to once faded out (-1 = none, CS_INTRO_COUNT = the field)
+    int fade_to_scene;            // scene to cut to once faded out (-1 = none, CS_CUR_COUNT = the field)
     bool to_field;                // this scene was started from the field, so it returns there when it ends
     bool from_field;              // set for the one fade that carries us from the field into that scene
-    Field *field;                 // the parked 2.5D/painted world, still reachable from the Dev panel
-    TileField *tf;                // the tile field (TILES.md): parked, one Dev button away
     VoxField *vx;                 // the voxel + sprite field (VOXFIELD_NOTES.md): what SCR_FIELD is
-    bool old_field;               // Dev: "Old 3D field" sends SCR_FIELD back to field.cpp
-    bool tile_field;              // Dev: "Old tile field" sends SCR_FIELD back to tilefield.cpp
     bool panel_on[MAX_PANELS];
     float panel_t[MAX_PANELS];
     int panel_z[MAX_PANELS], z_next;
@@ -476,8 +484,7 @@ struct Star {
     bool port_motion;             // Dev: the pop, the shake, the jolt and the sink. On by default.
     float dpi_scale;
     float title_t;
-    char cap_spec[320];           // FIELD_CAPTURE=<map>:<zone>:<scale>:<out.png>, desktop capture path
-    int cap_tiles;                // 1 = TILE_CAPTURE=<map>:<scale>:<out.png> instead: the tile field
+    char cap_spec[320];           // VOX_CAPTURE=<map>:<w>:<h>:<out.png>, desktop capture path
     int cap_vox;                  // 1 = VOX_CAPTURE=<map>:<w>:<h>:<out.png>: the voxel field
                                   // 2 = VOX_SELFTEST, 3 = VOX_WALKTEST (the movement bot)
     int cap_state;                // 0 idle, 1 asked, 2 done -> quit
@@ -486,6 +493,12 @@ struct Star {
     int dlg_as_narr, dlg_no_port, dlg_small;  // capture-only: as a Narrator / no portrait / a short box
     int dlg_textless;             // capture-only: the same line drawn with its text emptied (a reaction beat)
                                    // (the short box is how the paginator and the ▼▼ marker are shown working)
+    // ── chapter one ──────────────────────────────────────────────────────────────────────────
+    Chapter ch;                   // the story's whole memory: step, flags, party, the bell
+    Battle *bat;                  // the battle screen, created lazily on the first fight
+    int in_battle;                // 1 while SCR_FIELD is showing a battle instead of the world
+    char fight_enc[32];           // which encounter is being fought, so its flag can be set on the win
+    int self_test;                // 1 = --chapter-selftest is driving; no window input is read
 };
 
 static void star_free_textures(Star *st) {
@@ -592,7 +605,7 @@ static void reveal_panel(Star *st, const CsScene *sc, int n, bool instant) {   /
 
 // Enter `line` of `scene`. `instant` rebuilds the page without animation (used after a hot reload).
 static void star_goto(Star *st, int scene, int line, bool instant) {
-    const CsScene *sc = &CS_INTRO[scene];
+    const CsScene *sc = &CS_CUR[scene];
     if (st->tex_scene != scene) {
         star_free_textures(st);                 // only ever one scene's art is resident: 8 panels + portraits
         for (int i = 0; i < sc->panel_count && i < MAX_PANELS; i++) st->tex[i] = tex_load(sc->panels[i].file);
@@ -628,7 +641,7 @@ static void star_goto(Star *st, int scene, int line, bool instant) {
 }
 
 static void star_advance(Star *st) {
-    const CsScene *sc = &CS_INTRO[st->scene];
+    const CsScene *sc = &CS_CUR[st->scene];
     if (st->line + 1 < sc->line_count) { star_goto(st, st->scene, st->line + 1, false); return; }
     st->fade_to_scene = st->scene + 1;                                     // fade out, then next scene or the end
 }
@@ -697,7 +710,7 @@ static void draw_box(ImDrawList *dl, ImVec2 a, ImVec2 b, float u) {        // th
 static void draw_scene(Star *st, int w, int h, float dt) {
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
     ImFont *font = ImGui::GetFont();
-    const CsScene *sc = &CS_INTRO[st->scene];
+    const CsScene *sc = &CS_CUR[st->scene];
     const CsLine *ln = &sc->lines[st->line];
     bool narr = line_is_narrator(ln) || st->dlg_as_narr;   // dlg_* are set only by DIALOG_CAPTURE
     const char *ltext = st->dlg_textless ? "" : ln->text;  // a textless line: name and portrait, no words
@@ -894,7 +907,7 @@ static void draw_title(Star *st, int w, int h, float dt) {
         dl->AddRectFilled(ImVec2(x, y), ImVec2(x + 3, y + 3), with_alpha(IM_COL32(200, 210, 255, 255), tw));
     }
     float m = (float)(w < h ? w : h);
-    const char *title = "THE FAIR COPY", *sub = "Chapter 1  -  Clear the Entrance";
+    const char *title = "THE FAIR COPY", *sub = "Chapter 1  -  The Last Job Sheet";
     float ts = m * 0.115f, ss = m * 0.042f;
     ImVec2 tsz = font->CalcTextSizeA(ts, FLT_MAX, 0, title), ssz = font->CalcTextSizeA(ss, FLT_MAX, 0, sub);
     float y = h * 0.28f;
@@ -908,7 +921,11 @@ static void draw_title(Star *st, int w, int h, float dt) {
     }
     if (ImGui::IsMouseClicked(0) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && st->title_t > 0.5f && st->fade_to_scene < 0) {
         au_play(V_BELL, note_freq(81), 1.2f, 0.3f);
-        st->fade_to_scene = 0;
+        // New Game. The chapter starts at CH_STEPS[0], which is a PLAY block in the yard — the
+        // chapter opens on the stick in your hand, not on a scene — so we fade to the FIELD and
+        // let ch_apply_step put the party on the right map, in the right light, with the goal up.
+        ch_new_game(&st->ch);
+        st->fade_to_scene = CS_CUR_COUNT;
     }
 }
 
@@ -926,62 +943,129 @@ static void draw_end(Star *st, int w, int h, float dt) {
 }
 
 // ───────────────────────── The world ─────────────────────────
-// Title -> intro -> field. The field owns its own renderer, controls and dialogue box (field.cpp);
+// Title -> intro -> field. The field owns its own renderer, controls and dialogue box (voxfield.cpp);
 // the only things it hands back are "play this talk scene" and "the player walked into an encounter
 // zone", because those belong to the game, not the map.
 
 static int scene_by_id(const char *id) {
-    for (int i = 0; i < CS_INTRO_COUNT; i++) if (!strcmp(CS_INTRO[i].id, id)) return i;
+    for (int i = 0; i < CS_CUR_COUNT; i++) if (!strcmp(CS_CUR[i].id, id)) return i;
     return -1;
 }
 
 static void enter_field(Star *st) {
-    if (st->old_field) { if (!st->field) st->field = field_create(); }
-    else if (st->tile_field) { if (!st->tf) st->tf = tf_create(); }
-    else if (!st->vx) st->vx = vx_create();
+    if (!st->vx) st->vx = vx_create();
     star_free_textures(st);                       // the page art goes; the field has its own
     st->screen = SCR_FIELD;
     st->to_field = false;
     st->from_field = false;
     mus_start(CS_WONDER);
+    // Coming back from a clip: that clip WAS the current step, so the chapter moves on now. This is
+    // the one place a CLIP step is retired, which is why a clip can be re-entered safely if the
+    // player reloads mid-scene.
+    if (st->ch.started && st->ch.step < CH_STEP_COUNT && CH_STEPS[st->ch.step].kind == CHS_CLIP) {
+        ch_advance(&st->ch, st->vx);
+        if (CH_STEPS[st->ch.step].kind == CHS_END) { st->screen = SCR_END; st->title_t = 0; }
+    } else {
+        ch_apply_step(&st->ch, st->vx);           // re-assert light, party, lantern, goal line
+    }
 }
 
 // A field asked for a cutscene. If it is not in the playlist yet, say so in the field's own box
 // rather than fading to a blank scene.
-static void field_scene(Star *st, const char *id, TileField *tf) {
+static void field_scene(Star *st, const char *id) {
     int idx = scene_by_id(id);
-    if (idx >= 0 && CS_INTRO[idx].line_count > 0) { st->fade_to_scene = idx; st->from_field = true; return; }
+    if (idx >= 0 && CS_CUR[idx].line_count > 0) { st->fade_to_scene = idx; st->from_field = true; return; }
     char msg[160];
     snprintf(msg, sizeof(msg), "(scene \"%s\" is not in the playlist yet)", id);
-    if (tf) tf_message(tf, msg);
-    else if (st->vx && !st->old_field && !st->tile_field) vx_message(st->vx, msg);
-    else if (st->field) field_message(st->field, msg);
+    if (st->vx) vx_message(st->vx, msg);
 }
 
 static void draw_field(Star *st, int w, int h, float dt) {
-    if (st->old_field) {                                  // the parked 2.5D field, on a Dev button
-        if (!st->field) st->field = field_create();
-        FieldEvent ev;
-        field_tick(st->field, w, h, dt, dev.open, &ev);
-        if (ev.kind == FE_SCENE) field_scene(st, ev.arg, nullptr);
-        else if (ev.kind == FE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
-        char warn[192];
-        if (field_take_warning(st->field, warn, sizeof(warn))) dev_send(warn);
-        return;
-    }
-    if (st->tile_field) {                                 // the parked tile field, on a Dev button
-        if (!st->tf) st->tf = tf_create();
-        TfEvent ev;
-        tf_tick(st->tf, w, h, dt, dev.open, &ev);
-        if (ev.kind == TFE_SCENE) field_scene(st, ev.arg, st->tf);
-        else if (ev.kind == TFE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
-        return;
-    }
     if (!st->vx) st->vx = vx_create();
+
+    // ── a battle has the screen ───────────────────────────────────────────────────────────────
+    // The world is not ticked while a battle runs: the party is frozen where it stood, and the
+    // battle draws over everything. Winning or losing hands control straight back to that spot.
+    if (st->in_battle) {
+        BtEvent bev;
+        int out = bt_tick(st->bat, w, h, dt, dev.open, &bev);
+        if (bev.kind == BTE_TEXT) vx_say_id(st->vx, bev.arg);
+        else if (bev.kind == BTE_GOAL) snprintf(st->ch.goal, sizeof(st->ch.goal), "%s", bev.arg);
+        if (out != BT_RUNNING && bt_done(st->bat)) {
+            st->in_battle = 0;
+            vx_freeze(st->vx, 0);
+            ch_on_battle(&st->ch, st->fight_enc, out == BT_WIN);
+            // A won fight is consumed so walking back over the cell does not restart it. A lost
+            // one is left armed: in the yard that IS the instant retry.
+            if (out == BT_WIN) vx_disable_trigger(st->vx, st->fight_enc);
+        }
+        return;
+    }
+
     VxEvent ev;
     vx_tick(st->vx, w, h, dt, dev.open, &ev);
-    if (ev.kind == VXE_SCENE) field_scene(st, ev.arg, nullptr);
-    else if (ev.kind == VXE_ZONE) { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); }
+    ch_tick(&st->ch, dt);
+
+    switch (ev.kind) {
+    case VXE_SCENE:  field_scene(st, ev.arg); break;
+    case VXE_ZONE:   { char m[128]; snprintf(m, sizeof(m), "encounter %s", ev.arg); dev_send(m); } break;
+    case VXE_TEXT:   ch_on_text(&st->ch, ev.arg); break;          // a mandatory examine, observed
+    case VXE_PICKUP: ch_on_pickup(&st->ch, ev.arg); break;
+    case VXE_GOAL:   snprintf(st->ch.goal, sizeof(st->ch.goal), "%s", ev.arg); break;
+    case VXE_MAP:    ch_on_map(&st->ch, ev.arg); break;
+    case VXE_FIGHT:
+        if (!st->ch.skip_fights) {
+            if (!st->bat) st->bat = bt_create();
+            if (bt_start(st->bat, ev.arg, &st->ch.party, vx_current_map(st->vx))) {
+                snprintf(st->fight_enc, sizeof(st->fight_enc), "%s", ev.arg);
+                st->in_battle = 1;
+                vx_freeze(st->vx, 1);
+            }
+        } else {                                   // Dev "skip fights": count it as a clean win
+            ch_on_battle(&st->ch, ev.arg, true);
+            vx_disable_trigger(st->vx, ev.arg);
+        }
+        break;
+    default: break;
+    }
+
+    // ── the chapter script ────────────────────────────────────────────────────────────────────
+    // One rule: when the current step's required interactions have all happened, move on. A CLIP
+    // step plays its scene and comes back here; an END step shows the card.
+    if (st->ch.started && !vx_busy(st->vx) && ch_step_complete(&st->ch)) {
+        const ChStep *s = &CH_STEPS[st->ch.step];
+        if (s->kind == CHS_PLAY) {
+            ch_advance(&st->ch, st->vx);
+            const ChStep *n = &CH_STEPS[st->ch.step];
+            if (n->kind == CHS_CLIP) field_scene(st, n->arg);
+            else if (n->kind == CHS_END) { st->screen = SCR_END; st->title_t = 0; }
+        }
+    }
+}
+
+// The goal line: six words at most, at the top of the screen, one at a time. STYLE.md rule 2 — the
+// player should never have to be told twice what they are doing. Beside it, when the bell is
+// running, the rings left: a counter, not a threat, because the run cannot be failed.
+static void draw_goal(Star *st, int w, int h) {
+    if (st->in_battle || !st->ch.started || !st->ch.goal[0]) return;
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    ImFont *font = ImGui::GetFont();
+    float m = (float)(w < h ? w : h), s = m * 0.042f;
+    ImVec2 z = font->CalcTextSizeA(s, FLT_MAX, 0, st->ch.goal);
+    float x = (w - z.x) * 0.5f, y = h * 0.035f;
+    dl->AddRectFilled(ImVec2(x - s * 0.7f, y - s * 0.28f), ImVec2(x + z.x + s * 0.7f, y + z.y + s * 0.28f),
+                      IM_COL32(0, 0, 0, 120), s * 0.3f);
+    dl->AddText(font, s, ImVec2(x + 2, y + 2), IM_COL32(0, 0, 0, 200), st->ch.goal);
+    dl->AddText(font, s, ImVec2(x, y), IM_COL32(240, 225, 160, 255), st->ch.goal);
+    if (st->ch.bell_started) {
+        char bell[32];
+        int left = CH_BELL_RINGS - st->ch.rings;
+        snprintf(bell, sizeof(bell), "%d", left < 0 ? 0 : left);
+        ImVec2 bz = font->CalcTextSizeA(s, FLT_MAX, 0, bell);
+        dl->AddText(font, s, ImVec2(x + z.x + s * 1.6f, y),
+                    left > 0 ? IM_COL32(200, 210, 240, 255) : IM_COL32(200, 120, 110, 255), bell);
+        (void)bz;
+    }
 }
 
 // Small dev overlay: a corner button opening the phone <-> dev message log plus scene test controls.
@@ -1047,15 +1131,67 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     if (ImGui::Button("Next scene") && st->screen == SCR_INTRO) { st->fade_to_scene = st->scene + 1; dev.open = false; }
     ImGui::SameLine();
     if (ImGui::Button("Title")) { st->screen = SCR_TITLE; st->title_t = 0; dev.open = false; }
+
+    // ── chapter one ───────────────────────────────────────────────────────────────────────────
+    // Where the story thinks it is, and a way to put it anywhere. Jumping to a step sets every flag
+    // the steps before it gated on, so the world is consistent with having played them.
+    ImGui::SeparatorText("Chapter one");
+    {
+        const ChStep *s = &CH_STEPS[st->ch.step < 0 ? 0 : st->ch.step];
+        static const char *KIND[] = { "PLAY", "CLIP", "SET", "END" };
+        ImGui::Text("step %d/%d  %s  %s   goal: %s", st->ch.step + 1, CH_STEP_COUNT, KIND[s->kind],
+                    s->kind == CHS_CLIP ? s->arg : (s->map ? s->map : "(same map)"),
+                    st->ch.goal[0] ? st->ch.goal : "-");
+        ImGui::Text("mandatory ten: %d/%d   party %d   %s",
+                    CH_MANDATORY - ch_mandatory_missing(&st->ch), CH_MANDATORY,
+                    st->ch.party.count, st->ch.bell_started ? "bell running" : "bell idle");
+        if (ImGui::Button("New game")) { ch_new_game(&st->ch); enter_field(st); dev.open = false; }
+        ImGui::SameLine();
+        if (ImGui::Button("< step") && st->ch.step > 0) { ch_jump(&st->ch, st->vx, st->ch.step - 1); dev.open = false; }
+        ImGui::SameLine();
+        if (ImGui::Button("step >")) {
+            ch_jump(&st->ch, st->vx, st->ch.step + 1);
+            if (CH_STEPS[st->ch.step].kind == CHS_CLIP) field_scene(st, CH_STEPS[st->ch.step].arg);
+            dev.open = false;
+        }
+        ImGui::SameLine();
+        bool skip = st->ch.skip_fights != 0;
+        if (ImGui::Checkbox("Skip fights", &skip)) st->ch.skip_fights = skip ? 1 : 0;
+        // Every step, so any block can be reached in one tap.
+        if (ImGui::BeginCombo("Jump to step", "...")) {
+            for (int i = 0; i < CH_STEP_COUNT; i++) {
+                char lbl[96];
+                const ChStep *t = &CH_STEPS[i];
+                snprintf(lbl, sizeof(lbl), "%2d  %s  %s", i + 1, KIND[t->kind],
+                         t->kind == CHS_CLIP ? t->arg : (t->goal ? t->goal : (t->map ? t->map : "-")));
+                if (ImGui::Selectable(lbl, i == st->ch.step)) {
+                    ch_jump(&st->ch, st->vx, i);
+                    if (t->kind == CHS_CLIP) field_scene(st, t->arg);
+                    else if (st->screen != SCR_FIELD) enter_field(st);
+                    dev.open = false;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        // The flags, so a gate that will not open can be seen and forced.
+        if (ImGui::TreeNode("Flags")) {
+            for (int i = 0; i < CH_FLAG_COUNT; i++) {
+                bool on = ch_has(&st->ch, i);
+                ImGui::PushID(i);
+                if (ImGui::Checkbox("##f", &on)) {
+                    if (on) ch_set(&st->ch, i); else st->ch.flags &= ~(1ull << i);
+                }
+                ImGui::PopID();
+                ImGui::SameLine();
+                ImGui::TextColored(i < CH_MANDATORY ? ImVec4(0.95f, 0.85f, 0.45f, 1) : ImVec4(0.7f, 0.75f, 0.85f, 1),
+                                   "%s%s", CH_FLAG_NAME[i], i < CH_MANDATORY ? "  (mandatory)" : "");
+            }
+            ImGui::TreePop();
+        }
+        if (st->bat) { char cmd[128]; if (bt_dev_ui(st->bat, cmd, sizeof(cmd))) dev_send(cmd); }
+    }
     ImGui::SameLine();
     if (ImGui::Button("Field")) { st->fade_to_scene = -1; st->fade = 0.0f; enter_field(st); dev.open = false; }
-    ImGui::SameLine();
-    if (ImGui::Button(st->old_field ? "Tile field" : "Old 3D field")) {   // the parked field.cpp world
-        st->old_field = !st->old_field;
-        st->fade_to_scene = -1; st->fade = 0.0f;
-        enter_field(st);
-        dev.open = false;
-    }
     static const char *mood_names[CS_MOOD_COUNT] = {"wonder", "dread", "tense", "confront", "sorrow", "hope"};
     ImGui::SameLine();
     ImGui::TextDisabled("  mood:");
@@ -1071,13 +1207,7 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGui::Separator();
     if (st->screen == SCR_FIELD) {
         char line[224];
-        bool ofld = st->old_field, tfld = st->tile_field;
-        if (ImGui::Checkbox("Old 3D field", &ofld)) { st->old_field = ofld; if (ofld) st->tile_field = false; }
-        ImGui::SameLine();
-        if (ImGui::Checkbox("Old tile field", &tfld)) { st->tile_field = tfld; if (tfld) st->old_field = false; }
-        if (!st->old_field && !st->tile_field && st->vx) { if (vx_dev_ui(st->vx, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
-        else if (!st->old_field && st->tile_field && st->tf) { if (tf_dev_ui(st->tf, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
-        else if (st->old_field && st->field) { if (field_dev_ui(st->field, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
+        if (st->vx) { if (vx_dev_ui(st->vx, line, sizeof(line))) dev_send(line); ImGui::Separator(); }
     }
     float input_h = ImGui::GetFrameHeightWithSpacing() + 4 * k;
     ImGui::BeginChild("##msgs", ImVec2(0, -input_h));
@@ -1096,6 +1226,77 @@ static void draw_dev(Star *st, int w, int h, float dt, float dpi) {
     ImGui::PopStyleColor();
 }
 
+// ───────────────────────── the chapter self-test ─────────────────────────
+// CHAPTER_SELFTEST=1 (capture.sh --chapter-selftest). Plays the whole chapter through the SAME
+// entry points the game uses — ch_on_text, ch_on_pickup, ch_on_battle, ch_advance — with no window,
+// no input and no world, and asserts it reaches the end card with all ten mandatory flags set.
+//
+// What this does NOT prove: that a player can physically walk to each trigger. That is
+// `--vox-walktest`'s job (it path-walks the real movement code to every exit, door and NPC on every
+// map). The two together are the coverage; neither is the other.
+static const char *ch_text_for_flag(int flag) {
+    for (int i = 0; i < CH_BIND_COUNT; i++) if (CH_BINDS[i].flag == flag) return CH_BINDS[i].text_id;
+    return nullptr;
+}
+static const char *ch_item_for_flag(int flag) {
+    for (int i = 0; i < CH_ITEM_BIND_COUNT; i++) if (CH_ITEM_BINDS[i].flag == flag) return CH_ITEM_BINDS[i].text_id;
+    return nullptr;
+}
+
+static int chapter_selftest() {
+    Chapter c;
+    ch_new_game(&c);
+    int fails = 0, clips = 0, battles = 0;
+    SDL_Log("CHAPTER %d steps, %d flags (%d mandatory)", CH_STEP_COUNT, CH_FLAG_COUNT, CH_MANDATORY);
+    for (int guard = 0; guard < CH_STEP_COUNT * 4; guard++) {
+        const ChStep *s = &CH_STEPS[c.step];
+        if (s->kind == CHS_END) break;
+        if (s->kind == CHS_CLIP) {
+            // A clip must name a scene that actually exists in cutscene_data.h, or the chapter
+            // stalls on the phone with "(scene ... is not in the playlist yet)".
+            int idx = -1;
+            for (int i = 0; i < CS_CUR_COUNT; i++) if (!strcmp(CS_CUR[i].id, s->arg)) idx = i;
+            if (idx < 0) { SDL_Log("FAIL step %d: CLIP '%s' is not in cutscene_data.h", c.step + 1, s->arg); fails++; }
+            else if (CS_CUR[idx].line_count <= 0) { SDL_Log("FAIL step %d: CLIP '%s' has no lines", c.step + 1, s->arg); fails++; }
+            else { SDL_Log("  step %2d  CLIP  %-22s %d lines, %d panels", c.step + 1, s->arg,
+                           CS_CUR[idx].line_count, CS_CUR[idx].panel_count); clips++; }
+            ch_advance(&c, nullptr);
+            continue;
+        }
+        // A PLAY step: do each thing the step is waiting for, the way the world would report it.
+        SDL_Log("  step %2d  PLAY  %-22s goal: %s", c.step + 1, s->map ? s->map : "(same)",
+                s->goal ? s->goal : "(unchanged)");
+        for (int i = 0; i < CH_NEED && s->need[i] >= 0; i++) {
+            int f = s->need[i];
+            if (ch_has(&c, f)) continue;
+            const char *tid = ch_text_for_flag(f), *iid = ch_item_for_flag(f);
+            if (tid) { ch_on_text(&c, tid); SDL_Log("          examine  %s", tid); }
+            else if (iid) { ch_on_pickup(&c, iid); SDL_Log("          pick up  %s", iid); }
+            else if (f == F_SWING_TRIED) { ch_on_battle(&c, "swing", false); battles++; SDL_Log("          fight    swing (lost: P1 is not won)"); }
+            else if (f == F_SWING_BEATEN) { ch_on_battle(&c, "swing", true); battles++; SDL_Log("          fight    swing (won: the parry lands)"); }
+            else if (f == F_BOSS_DEAD) { ch_on_battle(&c, "klee", true); battles++; SDL_Log("          fight    klee (boss)"); }
+            else if (f == F_AT_PASTURE) { ch_on_map(&c, "high_pasture"); SDL_Log("          walk to  high_pasture"); }
+            else if (f == F_LEFT_YARD) { c.bell_armed = 1; ch_on_map(&c, "halm"); SDL_Log("          leave the yard: the bell starts"); }
+            else { ch_set(&c, f); SDL_Log("          (no binding for flag '%s' — forced)", CH_FLAG_NAME[f]); fails++; }
+            if (!ch_has(&c, f)) { SDL_Log("FAIL step %d: '%s' did not set", c.step + 1, CH_FLAG_NAME[f]); fails++; ch_set(&c, f); }
+        }
+        if (!ch_step_complete(&c)) { SDL_Log("FAIL step %d did not complete", c.step + 1); fails++; break; }
+        ch_advance(&c, nullptr);
+    }
+    if (CH_STEPS[c.step].kind != CHS_END) { SDL_Log("FAIL: never reached the end card (stopped at step %d)", c.step + 1); fails++; }
+    int missing = ch_mandatory_missing(&c);
+    if (missing) {
+        SDL_Log("FAIL: %d of the mandatory ten never fired:", missing);
+        for (int i = 0; i < CH_MANDATORY; i++) if (!ch_has(&c, i)) SDL_Log("        %s", CH_FLAG_NAME[i]);
+        fails += missing;
+    }
+    // The bell must be a soft outcome: running out of rings is the clerk's late line, never a stop.
+    if (c.bell_started && !ch_has(&c, F_SIGNED)) { SDL_Log("FAIL: the bell run ended unsigned"); fails++; }
+    SDL_Log("CHAPTER SELFTEST %s  (%d clips, %d battles, mandatory %d/%d, %d failure(s))",
+            fails ? "FAILED" : "ok", clips, battles, CH_MANDATORY - missing, CH_MANDATORY, fails);
+    return fails;
+}
+
 // ───────────────────────── GameAPI ─────────────────────────
 
 static void *game_create(float dpi_scale) {
@@ -1111,21 +1312,29 @@ static void *game_create(float dpi_scale) {
     // variant (and its fallback) before any scene file has been tagged. Desktop capture path only.
     const char *espec = SDL_getenv("DIALOG_EXPR");
     if (espec) snprintf(g_expr_force, sizeof(g_expr_force), "%s", espec);
-    const char *spec = SDL_getenv("FIELD_CAPTURE");
-    if (spec) snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec);
-    spec = SDL_getenv("TILE_CAPTURE");                 // <map>:<scale>:<out.png>, the whole map in one PNG
-    if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_tiles = 1; }
-    spec = SDL_getenv("VOX_CAPTURE");                  // <map>:<w>:<h>:<out.png>, one voxel-field frame
-    if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 1; st->cap_tiles = 0; }
+    const char *spec = SDL_getenv("VOX_CAPTURE");      // <map>:<w>:<h>:<out.png>, one voxel-field frame
+    if (spec) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 1; }
     spec = SDL_getenv("VOX_SELFTEST");                 // load every map once and fail loudly
     if (spec && spec[0] == '1') st->cap_vox = 2;
     spec = SDL_getenv("VOX_WALKTEST");                 // <map>|all: drive the movement bot, then quit
     if (spec && spec[0]) { snprintf(st->cap_spec, sizeof(st->cap_spec), "%s", spec); st->cap_vox = 3; }
+    // CHAPTER_SELFTEST=1 — the chapter is played through and the battles are tested, then quit.
+    // BATTLE_SELFTEST=1 — the battles only. Either way no window input is read and the app exits.
+    spec = SDL_getenv("CHAPTER_SELFTEST");
+    if (spec && spec[0] == '1') st->self_test = 1;
+    spec = SDL_getenv("BATTLE_SELFTEST");
+    if (spec && spec[0] == '1') st->self_test = 2;
     st->dpi_scale = dpi_scale;
     st->screen = SCR_TITLE;
     st->fade_to_scene = -1;
     st->tex_scene = -1;
     st->fade = 1.0f;                                   // open from black
+    // STAR_NEWGAME=1 — skip the title and open straight on chapter one, step 1, in the yard. This
+    // is what the owner's Desktop shortcut uses: one double-click and you are playing. enter_field
+    // cannot run yet (there is no VoxField until the first tick), so this only arms the chapter and
+    // lets the fade resolver take us to the field.
+    spec = SDL_getenv("STAR_NEWGAME");
+    if (spec && spec[0] == '1') { ch_new_game(&st->ch); st->fade_to_scene = CS_CUR_COUNT; }
     memset(&dev, 0, sizeof(dev));
     memset(&mus, 0, sizeof(mus));
     memset(&g_set, 0, sizeof(g_set));
@@ -1138,8 +1347,6 @@ static void *game_create(float dpi_scale) {
 static void game_destroy(void *state) {
     Star *st = (Star *)state;
     star_free_textures(st);
-    if (st->field) { field_destroy(st->field); st->field = nullptr; }
-    if (st->tf) { tf_destroy(st->tf); st->tf = nullptr; }
     if (st->vx) { vx_destroy(st->vx); st->vx = nullptr; }
     if (au_stream) { SDL_DestroyAudioStream(au_stream); au_stream = nullptr; }
     free(st);
@@ -1152,11 +1359,11 @@ static int game_wants_quit(void *state) { return ((Star *)state)->cap_state == 2
 // judged on the exact line you were looking at, and the field keeps the map, the spot on the navmesh
 // and whatever camera the owner was tuning. Everything else is rebuilt from those few numbers.
 struct ReloadBlob {
-    uint32_t magic; int32_t screen, scene, line, line_page, to_field, has_field; FieldSave field;
-    int32_t has_tf, old_field; TfSave tf;
-    int32_t has_vx, tile_field; VxSave vx;
+    uint32_t magic; int32_t screen, scene, line, line_page, to_field;
+    int32_t has_vx; VxSave vx;
+    Chapter ch;                    // the story's memory: step, flags, party, the bell
 };
-#define RELOAD_MAGIC 0x44525453u   // 'STRD' — bumped for free movement: VxSave now carries a float position
+#define RELOAD_MAGIC 0x44525456u   // bumped: the old 3D field and the tile field left ReloadBlob
 
 static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     Star *st = (Star *)state;
@@ -1165,11 +1372,8 @@ static size_t game_serialize(void *state, void *buf, size_t buf_size) {
     b.magic = RELOAD_MAGIC;
     b.screen = st->screen; b.scene = st->scene; b.line = st->line; b.line_page = st->line_page;
     b.to_field = st->to_field ? 1 : 0;
-    if (st->field) { b.has_field = 1; field_save(st->field, &b.field); }
-    if (st->tf) { b.has_tf = 1; tf_save(st->tf, &b.tf); }
     if (st->vx) { b.has_vx = 1; vx_save(st->vx, &b.vx); }
-    b.old_field = st->old_field ? 1 : 0;
-    b.tile_field = st->tile_field ? 1 : 0;
+    b.ch = st->ch;                                     // POD; the whole chapter survives the reload
     if (buf && buf_size >= sizeof(b)) memcpy(buf, &b, sizeof(b));
     return sizeof(b);
 }
@@ -1181,29 +1385,26 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     memcpy(&b, buf, sizeof(b));
     if (b.magic != RELOAD_MAGIC) return;               // blob from the old game or an older layout: title
     st->fade = 0.0f;
-    st->old_field = b.old_field != 0;
-    st->tile_field = b.tile_field != 0;
+    // The chapter comes back exactly as it was, then is validated: a step index from a build with a
+    // different CH_STEPS is clamped rather than trusted, which is the same rule the save file uses.
+    st->ch = b.ch;
+    if (st->ch.step < 0 || st->ch.step >= CH_STEP_COUNT) st->ch.step = 0;
+    if (st->ch.party.count < 1 || st->ch.party.count > BT_PARTY) st->ch.party.count = 1;
+    st->in_battle = 0;                                 // a reload never lands you mid-battle
+    st->fight_enc[0] = 0;
     bool want_field = (b.screen == SCR_FIELD) || b.to_field;
-    if (b.has_vx && want_field && !st->old_field && !st->tile_field) {
+    if (b.has_vx && want_field) {
         if (!st->vx) st->vx = vx_create();
         vx_restore(st->vx, &b.vx);                     // map and position survive the reload
     }
-    if (b.has_tf && want_field && st->tile_field) {                      // tf_restore validates every field it reads
-        if (!st->tf) st->tf = tf_create();
-        tf_restore(st->tf, &b.tf);
-    }
-    if (b.has_field && want_field && st->old_field) {
-        if (!st->field) st->field = field_create();
-        field_restore(st->field, &b.field);
-    }
-    if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_INTRO_COUNT && CS_INTRO[b.scene].line_count > 0) {
-        int line = b.line < 0 ? 0 : b.line >= CS_INTRO[b.scene].line_count ? CS_INTRO[b.scene].line_count - 1 : b.line;
+    if (b.screen == SCR_INTRO && b.scene >= 0 && b.scene < CS_CUR_COUNT && CS_CUR[b.scene].line_count > 0) {
+        int line = b.line < 0 ? 0 : b.line >= CS_CUR[b.scene].line_count ? CS_CUR[b.scene].line_count - 1 : b.line;
         star_goto(st, b.scene, line, true);
         // Keep the PAGE too, so a long line being edited comes back on the page you were reading.
         // star_goto validated the line; the page is clamped when the box next paginates, which is the
         // only place that knows how many pages the new text has.
         st->line_page = b.line_page < 0 ? 0 : b.line_page;
-        st->to_field = (b.to_field && (st->tf || st->field));
+        st->to_field = (b.to_field && st->vx != nullptr);
     } else if (b.screen == SCR_END) {
         st->screen = SCR_END;
     } else if (b.screen == SCR_FIELD) {
@@ -1230,11 +1431,11 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
         st->dlg_small = (flag[0] == 's');
         st->dlg_textless = (flag[0] == 't');
         int scene = -1;
-        for (int i = 0; i < CS_INTRO_COUNT; i++) if (!strcmp(CS_INTRO[i].id, id)) { scene = i; break; }
-        if (scene < 0) { scene = atoi(id); if (scene < 0 || scene >= CS_INTRO_COUNT) scene = 0; }
-        if (line < 0 || line >= CS_INTRO[scene].line_count) line = 0;
+        for (int i = 0; i < CS_CUR_COUNT; i++) if (!strcmp(CS_CUR[i].id, id)) { scene = i; break; }
+        if (scene < 0) { scene = atoi(id); if (scene < 0 || scene >= CS_CUR_COUNT) scene = 0; }
+        if (line < 0 || line >= CS_CUR[scene].line_count) line = 0;
         if (st->dlg_frames == 0) { star_goto(st, scene, line, true); SDL_Log("dialog capture: scene %d (%s) line %d page %d",
-                                                                            scene, CS_INTRO[scene].id, line, page); }
+                                                                            scene, CS_CUR[scene].id, line, page); }
         st->screen = SCR_INTRO;
         st->fade = 0.0f; st->fade_to_scene = -1;
         st->line = line; st->line_page = page; st->line_t = 99.0f;      // typing finished, marker steady
@@ -1245,7 +1446,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             else if (st->dlg_small) snprintf(suffix, sizeof(suffix), "_smallbox");
             if (st->dlg_textless) snprintf(suffix + strlen(suffix), sizeof(suffix) - strlen(suffix), "_textless");
             if (g_expr_force[0]) snprintf(suffix + strlen(suffix), sizeof(suffix) - strlen(suffix), "_%s", g_expr_force);
-            snprintf(out, sizeof(out), "build_desktop/dialog_%s_l%d_p%d%s.png", CS_INTRO[scene].id, line, page, suffix);
+            snprintf(out, sizeof(out), "build_desktop/dialog_%s_l%d_p%d%s.png", CS_CUR[scene].id, line, page, suffix);
             unsigned char *px = (unsigned char *)malloc((size_t)w * h * 4);
             unsigned char *row = (unsigned char *)malloc((size_t)w * 4);
             if (px && row) {
@@ -1263,7 +1464,19 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             st->cap_state = 2;
         }
     }
-    if (st->cap_vox == 2 && st->cap_state < 2) {
+    if (st->self_test && st->cap_state < 2) {
+        // Mode 1 (CHAPTER_SELFTEST) proves both, chapter first because it needs nothing. Mode 2
+        // (BATTLE_SELFTEST) is the battles alone, and must log its OWN marker — capture.sh greps
+        // for "SELFCHECK battle" and would otherwise never see a verdict.
+        if (st->self_test == 2) {
+            int bad = bt_selftest();
+            SDL_Log("SELFCHECK battle %s", bad ? "FAILED" : "ok");
+        } else {
+            int bad = chapter_selftest() + bt_selftest();
+            SDL_Log("SELFCHECK chapter %s", bad ? "FAILED" : "ok");
+        }
+        st->cap_state = 2;
+    } else if (st->cap_vox == 2 && st->cap_state < 2) {
         if (!st->vx) st->vx = vx_create();
         st->screen = SCR_FIELD;
         vx_selftest(st->vx);   // capture.sh --vox-selftest greps the SELFCHECK lines for the verdict
@@ -1285,33 +1498,6 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             vx_capture_to(st->vx, m, cw, chh, out);
             st->cap_state = 1;
         } else if (vx_capture_done(st->vx)) st->cap_state = 2;
-    } else if (st->cap_spec[0] && st->cap_tiles && st->cap_state < 2) {
-        if (!st->tf) st->tf = tf_create();
-        st->screen = SCR_FIELD;
-        st->fade = 0.0f;
-        st->fade_to_scene = -1;
-        if (st->cap_state == 0) {
-            char m[64] = "halm", out[256] = "capture.png";
-            int sc = 1;
-            sscanf(st->cap_spec, "%63[^:]:%d:%255s", m, &sc, out);
-            const char *nw = SDL_getenv("TILE_CAPTURE_NO_WALKERS");
-            const char *wh = SDL_getenv("TILE_CAPTURE_WHOLE");
-            tf_capture_to(st->tf, m, sc, out, !(nw && nw[0] == '1'), wh && wh[0] == '1');
-            st->cap_state = 1;
-        } else if (tf_capture_done(st->tf)) st->cap_state = 2;
-    } else if (st->cap_spec[0] && st->cap_state < 2) {
-        if (!st->field) st->field = field_create();
-        st->old_field = true;
-        st->screen = SCR_FIELD;
-        st->fade = 0.0f;
-        st->fade_to_scene = -1;
-        if (st->cap_state == 0) {
-            char m[64] = "halm", z[64] = "base", out[256] = "capture.png";
-            int sc = 2;
-            sscanf(st->cap_spec, "%63[^:]:%63[^:]:%d:%255s", m, z, &sc, out);
-            field_capture_to(st->field, m, z, sc, out);
-            st->cap_state = 1;
-        } else if (field_capture_done(st->field)) st->cap_state = 2;
     }
 
     // map.flag is the field's remote control, and from the title it means "go there": a fresh start
@@ -1326,7 +1512,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             snprintf(path, sizeof(path), "%smap.flag", pref ? pref : "");
             size_t sz = 0;
             void *d = SDL_LoadFile(path, &sz);
-            if (d) { SDL_free(d); if (sz) { SDL_Log("tilefield: map.flag from the title — entering the field"); enter_field(st); } }
+            if (d) { SDL_free(d); if (sz) { SDL_Log("field: map.flag from the title — entering the field"); enter_field(st); } }
         }
     }
 
@@ -1334,7 +1520,7 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     case SCR_TITLE: draw_title(st, w, h, dt); break;
     case SCR_INTRO: draw_scene(st, w, h, dt); break;
     case SCR_END:   draw_end(st, w, h, dt); break;
-    case SCR_FIELD: draw_field(st, w, h, dt); break;
+    case SCR_FIELD: draw_field(st, w, h, dt); draw_goal(st, w, h); break;
     }
 
     // Fades between scenes: to black, cut, back up. Music keeps playing across the cut.
@@ -1349,8 +1535,8 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
             } else {
                 bool came = st->from_field;
                 st->from_field = false;
-                while (next < CS_INTRO_COUNT && CS_INTRO[next].line_count <= 0) next++;   // nothing to tap
-                if (next < CS_INTRO_COUNT) { star_goto(st, next, 0, false); st->to_field = came; }
+                while (next < CS_CUR_COUNT && CS_CUR[next].line_count <= 0) next++;   // nothing to tap
+                if (next < CS_CUR_COUNT) { star_goto(st, next, 0, false); st->to_field = came; }
                 else enter_field(st);                                 // the intro is over: out into Halm
             }
         }

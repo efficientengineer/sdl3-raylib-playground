@@ -32,12 +32,15 @@
 #define VOX_S    0.5f            // one voxel, in world units
 #define VX_VW    (VX_MAXW * VX_VPC)   // 192 voxels east
 #define VX_VD    (VX_MAXD * VX_VPC)   // 192 voxels south
-#define VX_VY    48                   // voxels up (24 walk cells)
+#define VX_VY    64                   // voxels up (32 walk cells) — a `## height` map may climb
 #define VX_CHV   32              // chunk footprint, in voxels (= 16 walk cells, as before)
 #define VX_CHX   (VX_VW / VX_CHV)
 #define VX_CHZ   (VX_VD / VX_CHV)
 #define VX_CHUNKS (VX_CHX * VX_CHZ)
 #define VX_TRIGS 128
+// The tallest a `## height` cell may be, in VOXELS above the map base, so base + h + 1 fits VX_VY.
+#define VX_HMAX  (VX_VY - 6)
+#define VX_EVQ   16              // events a tick may produce; drained one a tick, never dropped
 #define VX_NPCS  48
 #define VX_ART   16
 #define VX_LIGHTS 16
@@ -85,7 +88,7 @@ static const int DX[4] = { 0, -1, 1, 0 }, DZ[4] = { 1, 0, 0, -1 };
 static const char *FACE_NAME[4] = { "S", "W", "E", "N" };
 static int facing_of(const char *s) { return s[0] == 'W' ? 1 : s[0] == 'E' ? 2 : s[0] == 'N' ? 3 : 0; }
 
-static const char *VX_MAPS[] = { "halm", "hart_yard", "west_road" };
+static const char *VX_MAPS[] = { "halm", "hart_yard", "west_road", "hill_path", "high_pasture" };
 int vx_map_count() { return (int)(sizeof(VX_MAPS) / sizeof(VX_MAPS[0])); }
 const char *vx_map_name_at(int i) { return (i >= 0 && i < vx_map_count()) ? VX_MAPS[i] : "halm"; }
 
@@ -268,9 +271,15 @@ static float shape_height_at(unsigned char s, float fu, float fw) {
 
 // ───────────────────────── data ─────────────────────────
 
-enum { TG_MESSAGE = 0, TG_EXIT, TG_DOOR, TG_ZONE, TG_TRAP, TG_SCENE };
+enum { TG_MESSAGE = 0, TG_EXIT, TG_DOOR, TG_ZONE, TG_TRAP, TG_SCENE,
+       TG_FIGHT, TG_PICKUP, TG_GOAL, TG_SPRITE };
+#define TGM(k) (1u << (k))
 
-struct VxTrig { short x, z, w, d; int kind; char arg[96], map[32]; short ax, az, af; bool inside; };
+// `arg2` is the second argument a `pickup` carries (its field-text id). `off` is set by
+// vx_disable_trigger (the chapter consumed it) and cleared by a map load; `taken` is a pickup
+// that has been taken; `night` is the `nightsight` flag — hidden until vx_set_night_sight is on.
+struct VxTrig { short x, z, w, d; int kind; char arg[96], arg2[64], map[32]; short ax, az, af;
+                bool inside; unsigned char off, taken, night; short sprart; };
 struct VxNpc {
     short hx, hz, tx, tz, px, pz;
     float t, wait, y, py_;
@@ -296,6 +305,20 @@ struct VxCrumb { float x, z, y, s; unsigned char air; };
 struct VxLight { float x, z, y, r, level; int flicker; };
 
 // One tiles.md entry, only what the voxel builder needs: how big a stamp is and what it is.
+// A FIELD SPRITE (VOXFIELD_NOTES.md "Field sprites"): story/field/sprites/<id>.png, an indexed PNG
+// on the master palette, index 0 transparent, anchored BOTTOM-CENTRE, 64 px to the map cell. The
+// optional sidecar <id>.json gives frames/frame/sheet/footprint/fps/loop; `frame` is READ, never
+// derived by dividing. `tex` == 0 means the art is not on disk yet and a placeholder is drawn.
+#define VX_SPRART 32
+struct VxSprArt {
+    char id[32];
+    GLuint tex;
+    int w, h;                       // the sheet, in pixels
+    int fw, fh;                     // one frame, in pixels (from the json, or the whole sheet)
+    int frames, fps, pingpong;
+    float cw, ch;                   // the billboard, in map cells (footprint, or frame / 64)
+};
+
 struct VxDef { char name[24]; short index, w, h; unsigned char solid[8]; unsigned char kind; };
 enum { DK_TILE = 0, DK_TERRAIN, DK_DECAL };
 struct VxPlace { short def, x, z; };
@@ -338,6 +361,11 @@ struct VoxField {
     VxNpc npcs[VX_NPCS]; int npc_count;
     VxLight lights[VX_LIGHTS]; int light_count;
     int spawn_x, spawn_z, spawn_f;
+    // The authored terrain height (the `## height` section). hset marks the cells the map spoke for;
+    // everywhere else the procedural noise still runs, exactly as before. hmap is in WALK CELLS above
+    // the map base; base_v is the base itself, in voxels (meta `base:`, default H_FLAT).
+    unsigned char hmap[VX_MAXD][VX_MAXW], hset[VX_MAXD][VX_MAXW];
+    int base_v, has_height;
 
     // palette
     unsigned char pal[256][3];
@@ -404,6 +432,7 @@ struct VoxField {
 
     // art
     VxArt art[VX_ART]; int art_count;
+    VxSprArt sprart[VX_SPRART]; int sprart_count;
     GLuint atlas; int atlas_w, atlas_h, atlas_cell;
     GLuint decal_tex[24]; int decal_w[24], decal_h[24]; char decal_id[24][24]; int decal_count;
     // scattered detail billboards, built once per map
@@ -441,6 +470,16 @@ struct VoxField {
     // ui / flow
     char msg[512], msg_who[64];
     float msg_t; int msg_page; bool msg_typing, msg_more, tapped;
+    // ── what the chapter script drives (voxfield.h, "what the chapter script drives") ──
+    // The event QUEUE. vx_tick reports one event a tick and the chapter gates on every one of them,
+    // so a tick that produced two (a pickup's text and the pickup itself) must not throw one away.
+    VxEvent evq[VX_EVQ]; int evq_n;
+    float ns_add;                     // night sight: added to the effective ambient, 0 = off
+    int frozen;                       // vx_freeze: input ignored, the party stops walking
+    // The ONE dynamic point light (the lantern that follows the leader). Not baked into the mesh —
+    // it is a uniform in the world shader and a term in vx_light_at_foot, looked up in the `lamp`
+    // colormap row exactly as the .tmap's static lamps are.
+    int dlamp_on; float dlamp_r, dlamp_level, dlamp_x, dlamp_y, dlamp_z;
     int exam_trig, exam_npc;
     char to_map[32]; int to_x, to_z, to_f, fade, fade_dir;
     float anim_t, map_poll;
@@ -885,7 +924,7 @@ static void vx_parse_tmap(VoxField *v, char *text) {
         if (line[0] == '#' && line[1] == '#') {
             char *s = vx_trim(line + 2);
             sec = !strcmp(s, "meta") ? 0 : !strcmp(s, "legend") ? 1 : !strcmp(s, "ground") ? 2
-                : !strcmp(s, "objects") ? 3 : !strcmp(s, "triggers") ? 4 : -1;
+                : !strcmp(s, "objects") ? 3 : !strcmp(s, "triggers") ? 4 : !strcmp(s, "height") ? 5 : -1;
             row = 0;
             continue;
         }
@@ -918,6 +957,9 @@ static void vx_parse_tmap(VoxField *v, char *text) {
                     l->level = lv < 0 ? 0 : lv > 1 ? 1 : lv;
                     l->flicker = !strcmp(fl, "flicker");
                 }
+            } else if (!strcmp(key, "base")) {
+                int b = atoi(val);
+                v->base_v = b < 1 ? 1 : b > VX_VY - 4 ? VX_VY - 4 : b;
             } else if (!strcmp(key, "spawn")) {
                 char f[8] = "S";
                 sscanf(val, "%d %d %7s", &v->spawn_x, &v->spawn_z, f);
@@ -956,6 +998,31 @@ static void vx_parse_tmap(VoxField *v, char *text) {
                 }
             }
             row++;
+        } else if (sec == 5) {
+            // `## height` — the same grid shape as `## ground`, one character a cell:
+            //   '0'-'9' then 'a'-'z' = base 36: 0..35 VOXELS (half a walk cell each) above the map
+            //                          base, which is `base:` in `## meta`, 4 voxels by default.
+            //   '.' or ' '           = unauthored: today's procedural terrain height for that cell.
+            //   '~'                  = a bend: the mean of its authored orthogonal neighbours.
+            // A map with NO `## height` section behaves exactly as it always did — that is the
+            // compatibility rule that matters, since halm, hart_yard and west_road have no grid.
+            // A cell the map speaks for is AUTHORITATIVE: the noise does not touch it, the two-voxel
+            // smoothing pass does not touch it, and the reach verifier will not flatten it.
+            if (row >= v->md) { row++; continue; }
+            for (int x = 0; x < v->mw; x++) {
+                char c = line[x];
+                if (!c) break;
+                int h = -1;
+                if (c >= '0' && c <= '9') h = c - '0';
+                else if (c >= 'a' && c <= 'z') h = 10 + (c - 'a');
+                else if (c == '~') { v->hset[row][x] = 2; v->has_height = 1; continue; }
+                else continue;                                  // '.', ' ' and anything else: procedural
+                if (h > VX_HMAX) h = VX_HMAX;
+                v->hmap[row][x] = (unsigned char)h;
+                v->hset[row][x] = 1;
+                v->has_height = 1;
+            }
+            row++;
         } else if (sec == 4) {
             char work[256];
             snprintf(work, sizeof(work), "%s", line);
@@ -978,13 +1045,48 @@ static void vx_parse_tmap(VoxField *v, char *text) {
             }
             if (!strcmp(k, "light")) continue;
             if (v->trig_count >= VX_TRIGS) continue;
+            // `nightsight` is a bare trailing word on any trigger line: the trigger is hidden and
+            // non-interactive until the party has night sight (vx_set_night_sight). It is stripped
+            // here so every kind below still counts its own arguments the way it always did.
+            int night = 0;
+            while (n > 5 && (!strcmp(w[n - 1], "nightsight") || !strcmp(w[n - 1], "nightsight:") ||
+                             (!strcmp(w[n - 1], "yes") && n > 6 && !strcmp(w[n - 2], "nightsight:")))) {
+                if (!strcmp(w[n - 1], "yes")) n--;
+                n--; night = 1;
+            }
             VxTrig *g = &v->trigs[v->trig_count];
             memset(g, 0, sizeof(*g));
+            g->sprart = -1;
+            g->night = (unsigned char)night;
             g->x = (short)gx; g->z = (short)gz; g->w = (short)gw; g->d = (short)gd;
             if (!strcmp(k, "message")) { g->kind = TG_MESSAGE; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
             else if (!strcmp(k, "zone")) { g->kind = TG_ZONE; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
             else if (!strcmp(k, "trap")) { g->kind = TG_TRAP; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
             else if (!strcmp(k, "scene")) { g->kind = TG_SCENE; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
+            // ── chapter one ──
+            // `fight <encounter_id>`  fires VXE_FIGHT on walk-in, like `zone`, and draws the
+            //                         encounter's field sprite standing on the trigger.
+            else if (!strcmp(k, "fight")) { g->kind = TG_FIGHT; snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : ""); }
+            // `goal <Words_with_underscores>`  fires VXE_GOAL on walk-in, underscores become spaces.
+            else if (!strcmp(k, "goal")) {
+                g->kind = TG_GOAL;
+                snprintf(g->arg, sizeof(g->arg), "%s", n > 5 ? w[5] : "");
+                for (char *c = g->arg; *c; c++) if (*c == '_') *c = ' ';
+            }
+            // `pickup <item_id> <text_id>`  an INTERACT, like `message`: the `!` prompt, a button
+            //                               press, the text in the field box, VXE_PICKUP, once only.
+            else if (!strcmp(k, "pickup")) {
+                if (n < 7) continue;
+                g->kind = TG_PICKUP;
+                snprintf(g->arg, sizeof(g->arg), "%s", w[5]);
+                snprintf(g->arg2, sizeof(g->arg2), "%s", w[6]);
+            }
+            // `sprite <sprite_id>`  a field sprite billboard standing on the cell, nothing else.
+            else if (!strcmp(k, "sprite")) {
+                if (n < 6) continue;
+                g->kind = TG_SPRITE;
+                snprintf(g->arg, sizeof(g->arg), "%s", w[5]);
+            }
             else if (!strcmp(k, "exit") || !strcmp(k, "door")) {
                 if (n < 9) continue;
                 g->kind = !strcmp(k, "exit") ? TG_EXIT : TG_DOOR;
@@ -1371,18 +1473,64 @@ static void vx_build_world(VoxField *v) {
             if (nx >= 0 && nz >= 0 && nx < v->mw && nz < v->md && !flat[nz][nx]) flat[nz][nx] = 2;
         }
     }
-    const int H_FLAT = 4;                       // solid voxels under a flat cell
+    const int H_FLAT = v->base_v;               // solid voxels under a flat cell (meta `base:`)
     static unsigned char hh[VX_MAXD][VX_MAXW];
     for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        // A cell the `## height` section spoke for is AUTHORITATIVE. It is not rolled by the noise,
+        // it is not forced flat for an object, and the smoothing pass below leaves it alone: a
+        // switchback is meant to climb and a two-cell drop is meant to be a drop.
+        if (v->hset[z][x] == 1) {
+            int h = H_FLAT + (int)v->hmap[z][x];        // the map's chars are VOXELS above the base
+            hh[z][x] = (unsigned char)(h < 1 ? 1 : h > VX_VY - 5 ? VX_VY - 5 : h);
+            continue;
+        }
         if (flat[z][x]) { hh[z][x] = H_FLAT; continue; }
         float n = vx_vnoise(x / 9.0f, z / 9.0f, 7717u) * 0.72f + vx_vnoise(x / 4.0f, z / 4.0f, 313u) * 0.28f;
         int h = H_FLAT + (int)(n * 5.2f);
         hh[z][x] = (unsigned char)(h < H_FLAT ? H_FLAT : h > H_FLAT + 4 ? H_FLAT + 4 : h);
     }
+    // '~' in `## height`: the mean of the authored cells around it, so a bend between two shelves
+    // meets both. It is resolved after the grid so it can see its neighbours' final heights.
+    for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+        if (v->hset[z][x] != 2) continue;
+        int sum = 0, cnt = 0;
+        for (int d = 0; d < 4; d++) {
+            int nx = x + DX[d], nz = z + DZ[d];
+            if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md || v->hset[nz][nx] != 1) continue;
+            sum += hh[nz][nx]; cnt++;
+        }
+        if (cnt) { hh[z][x] = (unsigned char)((sum + cnt / 2) / cnt); v->hset[z][x] = 1; }
+        else v->hset[z][x] = 0;
+    }
+    // A stamp and a trigger rectangle each sit on ONE height — their top-left cell's — so a cart
+    // never straddles a step and a trigger's floor is flat under the whole rectangle. Authored or
+    // procedural, the rule is the same; it is only visible on a map with a height grid, because
+    // everywhere else those cells were already forced flat above.
+    if (v->has_height) {
+        for (int i = 0; i < v->place_count; i++) {
+            VxPlace *p = &v->places[i];
+            VxDef *d = &v->defs[p->def];
+            unsigned char h0 = hh[p->z][p->x];
+            for (int r = 0; r < d->h; r++) for (int c = 0; c < d->w; c++) {
+                int mx = p->x + c, mz = p->z + r;
+                if (mx < v->mw && mz < v->md) { hh[mz][mx] = h0; v->hset[mz][mx] = 1; }
+            }
+        }
+        for (int i = 0; i < v->trig_count; i++) {
+            VxTrig *g = &v->trigs[i];
+            if (g->x < 0 || g->z < 0 || g->x >= v->mw || g->z >= v->md) continue;
+            unsigned char h0 = hh[g->z][g->x];
+            for (int r = 0; r < g->d; r++) for (int c = 0; c < g->w; c++) {
+                int mx = g->x + c, mz = g->z + r;
+                if (mx < v->mw && mz < v->md) { hh[mz][mx] = h0; v->hset[mz][mx] = 1; }
+            }
+        }
+    }
     // No neighbour may differ by more than two voxels — one voxel is a free smooth step, two is a hop.
     for (int pass = 0; pass < 10; pass++) {
         bool changed = false;
         for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
+            if (v->hset[z][x]) continue;                  // authored: the map's word is final
             int h = hh[z][x];
             for (int d = 0; d < 4; d++) {
                 int nx = x + DX[d], nz = z + DZ[d];
@@ -1638,6 +1786,13 @@ static void flood(VoxField *v, unsigned char *out, int sx, int sz, bool vox) {
                 int def = v->ground[nz][nx];
                 const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
                 ok = !v->tsolid[nz][nx] && terr_block(nm) != B_WATER && npc_home_at(v, nx, nz) < 0;
+                // On a map with an authored `## height`, a ledge is part of the map, not a bug in
+                // the noise: the tile reference has to see it too, or the verifier would call the
+                // shelf above "unreachable" and flatten the hill the author drew.
+                if (ok && v->has_height) {
+                    int a2 = v->hgt[z][x], b2 = v->hgt[nz][nx];
+                    if ((a2 > b2 ? a2 - b2 : b2 - a2) > 2) ok = false;
+                }
             }
             if (!ok) continue;
             out[nz * VX_MAXW + nx] = 1;
@@ -1658,6 +1813,18 @@ static int vx_verify_reach(VoxField *v) {
         for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++)
             if (tile_r[z * VX_MAXW + x] && !vox_r[z * VX_MAXW + x]) missing++;
         if (!missing) return 0;
+        // A map with an authored `## height` is the author's shape, and flattening it would be the
+        // tool second-guessing them: a shelf you can only reach by jumping down onto it is the
+        // point of the high pasture, and the tile map — which has no idea there is a hill — would
+        // call it unreachable every time. So on such a map this pass only REPORTS, and the real
+        // test of "can the story still be played" is vx_build_nav's target check (navreach), which
+        // walks to every exit, door, message and NPC and fails loudly if one is cut off.
+        if (v->has_height) {
+            SDL_Log("voxfield: %s has an authored height field — %d cell%s the flat tile map could "
+                    "reach are behind a ledge here (by design; navreach is the real check)",
+                    v->map_name, missing, missing == 1 ? "" : "s");
+            return 0;
+        }
         // Flatten every unreachable cell and its neighbours back to the flat level and rebuild them.
         for (int z = 0; z < v->md; z++) for (int x = 0; x < v->mw; x++) {
             if (!tile_r[z * VX_MAXW + x] || vox_r[z * VX_MAXW + x]) continue;
@@ -1665,6 +1832,7 @@ static int vx_verify_reach(VoxField *v) {
                 int nx = x + dx, nz = z + dz;
                 if (nx < 0 || nz < 0 || nx >= v->mw || nz >= v->md) continue;
                 if (v->place_at[nz][nx]) continue;
+                if (v->hset[nz][nx]) continue;             // never flatten what the map authored
                 int def = v->ground[nz][nx];
                 const char *nm = (def >= 0 && def < v->def_count) ? v->defs[def].name : "grass";
                 unsigned char top = terr_block(nm);
@@ -2405,6 +2573,11 @@ static const char *VX_FS_HEAD =
     // The benchmark's knobs. All three are uniform branches — one value for the whole draw, so the
     // wavefront never diverges — and all three sit at the shipping look unless a benchmark moved them.
     "uniform float u_qpattern, u_qpcf, u_qwater;\n"
+    // The one DYNAMIC point light (vx_set_party_lamp): xyz = world position, w = radius in world
+    // units; u_dlev is its level, 0 with the lamp out. A uniform branch — one value for the whole
+    // draw, so no wavefront ever diverges on it.
+    "uniform vec4 u_dlamp;\n"
+    "uniform float u_dlev;\n"
     "out vec4 o;\n"
     // Four rotated-poisson taps, UNROLLED (this repo has been bitten by a driver miscompiling a
     // GLSL loop), each one hardware-PCF'd, so the edge is soft without being mush.
@@ -2543,6 +2716,11 @@ static const char *VX_FS_BODY =
     "  float idx = texelFetch(u_lut, ivec2(step6 + (use_top ? 0 : 6), ty), 0).r * 255.0;\n"
     "  float ao = 1.0 - (1.0 - v_ao) * u_ao;\n"
     "  float lamp = v_light.y;\n"
+    "  if (u_dlev > 0.0005) {\n"
+    "    float dd = distance(v_world, u_dlamp.xyz) / max(u_dlamp.w, 0.001);\n"
+    "    float ff = clamp(1.0 - dd, 0.0, 1.0);\n"
+    "    lamp = min(1.0, lamp + u_dlev * ff * ff);\n"
+    "  }\n"
     // The cast shadow is a LIGHT LEVEL, not a multiply toward black: it pulls the colormap lookup
     // down the table, so shade stays a cool palette colour (PALETTE.md / D19).
     "  float ndl = clamp(dot(v_nrm, u_sundir), 0.0, 1.0);\n"
@@ -2602,6 +2780,19 @@ static const char *VX_SPR_FS =
     "    float a = (1.0 - smoothstep(0.55, 1.0, d)) * v_par.z;\n"
     "    if (a < 0.02) discard;\n"
     "    o = vec4(0.0, 0.0, 0.0, a); return; }\n"
+    "  if (kind == 3) {\n"                        // a PLACEHOLDER field sprite: one flat palette band
+    "    float idx = v_par.x * 255.0;\n"
+    "    float lamp = v_par.y;\n"
+    "    float lv = max(clamp(u_amb, 0.0, 1.0), lamp);\n"
+    "    float warm = clamp((lamp - u_amb) * 1.8, 0.0, 1.0);\n"
+    "    float f = (1.0 - lv) * (u_levels - 1.0);\n"
+    "    float r0 = floor(f), fr = f - r0, r1 = min(r0 + 1.0, u_levels - 1.0);\n"
+    "    vec3 cA = mix(look(idx, u_rowa + r0), look(idx, u_rowa + r1), fr);\n"
+    "    vec3 c3 = warm > 0.002 ? mix(cA, mix(look(idx, u_rowb + r0), look(idx, u_rowb + r1), fr), warm) : cA;\n"
+    "    float e = min(min(v_uv.x, 1.0 - v_uv.x), min(v_uv.y, 1.0 - v_uv.y));\n"
+    "    if (e < 0.06) c3 *= 0.45;\n"
+    "    float fg3 = u_fog * smoothstep(u_fognear, u_fogfar, v_viewz);\n"
+    "    o = vec4(mix(c3, u_sky, clamp(fg3, 0.0, 0.92)), 1.0); return; }\n"
     "  if (kind == 2) {\n"                        // an additive lamp glow
     "    float d = length(v_uv - 0.5) * 2.0;\n"
     "    float a = pow(clamp(1.0 - d, 0.0, 1.0), 2.2) * v_par.z;\n"
@@ -2981,6 +3172,86 @@ static int vx_art_get(VoxField *v, const char *id) {
     return v->art_count++;
 }
 
+// ───────────────────────── field sprites ─────────────────────────
+// story/field/sprites/<id>.png — the contract in VOXFIELD_NOTES.md, "Field sprites". Indexed on the
+// master palette, index 0 transparent, anchored BOTTOM-CENTRE, 64 px to the map cell, an upright
+// camera-facing billboard. NOT a walker sheet: there are no direction rows. A still by default; the
+// optional sidecar <id>.json is the only thing that may say otherwise, and its `frame` is READ.
+//
+// Loading is by file-exists and is CACHED PER ID INCLUDING THE MISS, so a missing PNG costs one
+// failed read a map load and then draws a placeholder — the chapter is playable before any art
+// exists, and picks the real art up the next time the map loads after the file appears.
+static int vx_sprart_get(VoxField *v, const char *id) {
+    if (!id || !id[0]) return -1;
+    for (int i = 0; i < v->sprart_count; i++) if (!strcmp(v->sprart[i].id, id)) return i;
+    if (v->sprart_count >= VX_SPRART) return -1;
+    int k = v->sprart_count++;
+    VxSprArt *a = &v->sprart[k];
+    memset(a, 0, sizeof(*a));
+    snprintf(a->id, sizeof(a->id), "%s", id);
+    a->frames = 1; a->fps = 3; a->cw = 1.0f; a->ch = 1.5f;
+
+    char rel[192];
+    snprintf(rel, sizeof(rel), "field/sprites/%s.png", id);
+    size_t sz = 0;
+    void *data = vx_read(rel, &sz);
+    if (data) {
+        int w = 0, h = 0, c = 0;
+        unsigned char *px = stbi_load_from_memory((const unsigned char *)data, (int)sz, &w, &h, &c, 4);
+        SDL_free(data);
+        if (px) {
+            char label[64];
+            snprintf(label, sizeof(label), "sprite %s", id);
+            a->tex = vx_tex_indexed(v, label, px, w, h);
+            a->w = w; a->h = h; a->fw = w; a->fh = h;
+            stbi_image_free(px);
+        }
+    }
+    // the sidecar, if there is one
+    char jrel[192];
+    snprintf(jrel, sizeof(jrel), "field/sprites/%s.json", id);
+    size_t jsz = 0;
+    char *js = (char *)vx_read(jrel, &jsz);
+    if (js) {
+        const char *k2;
+        int n = 0;
+        if ((k2 = strstr(js, "\"frames\"")) && sscanf(k2 + 8, " : %d", &n) == 1 && n > 0) a->frames = n;
+        if ((k2 = strstr(js, "\"fps\"")) && sscanf(k2 + 5, " : %d", &n) == 1 && n > 0) a->fps = n;
+        if ((k2 = strstr(js, "\"loop\"")) && strstr(k2, "pingpong") && strstr(k2, "pingpong") < k2 + 24) a->pingpong = 1;
+        int fw = 0, fh = 0;
+        if ((k2 = strstr(js, "\"frame\"")) && strchr(k2, '[')) sscanf(strchr(k2, '[') + 1, "%d , %d", &fw, &fh);
+        if (fw > 0 && fh > 0) { a->fw = fw; a->fh = fh; }          // READ, never divided
+        float cw = 0, ch = 0;
+        if ((k2 = strstr(js, "\"footprint\"")) && strchr(k2, '[')) sscanf(strchr(k2, '[') + 1, "%f , %f", &cw, &ch);
+        if (cw > 0 && ch > 0) { a->cw = cw; a->ch = ch; }
+        SDL_free(js);
+    }
+    if (a->tex) {
+        if (a->fw <= 0 || a->fw > a->w) a->fw = a->w;
+        if (a->fh <= 0 || a->fh > a->h) a->fh = a->h;
+        if (a->frames < 1) a->frames = 1;
+        int percol = a->fw > 0 ? a->w / a->fw : 1;
+        if (percol < 1) percol = 1;
+        if (a->frames > percol * (a->fh > 0 ? a->h / a->fh : 1)) a->frames = percol;
+        // 64 px to the map cell, unless the sidecar gave an explicit footprint
+        if (a->cw == 1.0f && a->ch == 1.5f) { a->cw = a->fw / 64.0f; a->ch = a->fh / 64.0f; }
+        SDL_Log("voxfield: field sprite \"%s\" %dx%d, frame %dx%d, %d frame%s, %.2fx%.2f cells",
+                id, a->w, a->h, a->fw, a->fh, a->frames, a->frames == 1 ? "" : "s", a->cw, a->ch);
+    } else {
+        SDL_Log("voxfield: no story/field/sprites/%s.png — drawing a placeholder", id);
+    }
+    return k;
+}
+
+// Every trigger that stands something on the map resolves its art once, at load. A `fight` draws its
+// encounter's sprite where the encounter is; a `sprite` line draws whatever it names.
+static void vx_bind_sprites(VoxField *v) {
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        g->sprart = (g->kind == TG_FIGHT || g->kind == TG_SPRITE) ? (short)vx_sprart_get(v, g->arg) : (short)-1;
+    }
+}
+
 static void vx_load_atlas(VoxField *v) {
     if (v->atlas) return;
     char rel[160];
@@ -3114,6 +3385,10 @@ bool vx_load_map(VoxField *v, const char *name) {
     memset(v->walk, 0, sizeof(v->walk));
     memset(v->hgt, 0, sizeof(v->hgt));
     for (int z = 0; z < VX_MAXD; z++) for (int x = 0; x < VX_MAXW; x++) v->ground[z][x] = -1;
+    memset(v->hmap, 0, sizeof(v->hmap));
+    memset(v->hset, 0, sizeof(v->hset));
+    v->has_height = 0; v->base_v = 4;
+    v->evq_n = 0;
     v->mw = 24; v->md = 16;
     v->spawn_x = 4; v->spawn_z = 4; v->spawn_f = 0;
     v->amb = 1.0f; v->light_table = 0;
@@ -3129,6 +3404,7 @@ bool vx_load_map(VoxField *v, const char *name) {
     v->nav_dirty = true; v->nav_verts = 0;
     vx_load_atlas(v);
     vx_load_decals(v);
+    vx_bind_sprites(v);                    // every fight/sprite trigger's field sprite
     vx_scatter_detail(v);
     vx_mesh_all(v);
     vx_sun_defaults(v);
@@ -3197,7 +3473,11 @@ static int npc_near(VoxField *v, float x, float z, float r) {
     return best;
 }
 
-static void vx_say(VoxField *v, const char *who, const char *id) {
+static void vx_fire(VoxField *v, int kind, const char *arg, const char *arg2);
+
+// `report` is false only when the chapter itself asked for the line (vx_say_id): the field reports
+// what the PLAYER did, and echoing the chapter's own line back at it would gate on nothing.
+static void vx_say2(VoxField *v, const char *who, const char *id, bool report) {
     const char *text = nullptr, *name = nullptr;
     for (int i = 0; i < FIELD_TEXT_COUNT; i++)
         if (!strcmp(FIELD_TEXT[i].id, id)) { text = FIELD_TEXT[i].text; name = FIELD_TEXT[i].name; break; }
@@ -3206,24 +3486,43 @@ static void vx_say(VoxField *v, const char *who, const char *id) {
     const char *speaker = (name && name[0]) ? name : who;
     snprintf(v->msg_who, sizeof(v->msg_who), "%s", speaker ? speaker : "");
     v->msg_t = 0; v->msg_page = 0; v->msg_typing = true;
+    // Every story text id the field shows is reported. This is how a mandatory examine is observed;
+    // it goes through the QUEUE, so a pickup that shows a line and takes an item reports both.
+    if (report) vx_fire(v, VXE_TEXT, id, "");
 }
+
+static void vx_say(VoxField *v, const char *who, const char *id) { vx_say2(v, who, id, true); }
 
 void vx_message(VoxField *v, const char *text) {
     snprintf(v->msg, sizeof(v->msg), "%s", text ? text : "");
     v->msg_who[0] = 0; v->msg_t = 0; v->msg_page = 0; v->msg_typing = true;
 }
 
-static void fire(VxEvent *ev, int kind, const char *arg) {
-    if (ev->kind != VXE_NONE) return;
-    ev->kind = kind;
-    snprintf(ev->arg, sizeof(ev->arg), "%s", arg);
+// The event queue. vx_tick hands the game ONE event a tick and pops it here; nothing is dropped
+// unless a single tick somehow produces more than VX_EVQ of them, which is logged.
+static void vx_fire(VoxField *v, int kind, const char *arg, const char *arg2) {
+    if (v->evq_n >= VX_EVQ) { SDL_Log("voxfield: event queue full — dropped kind %d (%s)", kind, arg ? arg : ""); return; }
+    VxEvent *e = &v->evq[v->evq_n++];
+    e->kind = kind;
+    snprintf(e->arg, sizeof(e->arg), "%s", arg ? arg : "");
+    snprintf(e->arg2, sizeof(e->arg2), "%s", arg2 ? arg2 : "");
 }
 
-static int trig_at(VoxField *v, int x, int z, int ka, int kb) {
+// A trigger the player can see and act on right now: not consumed by the chapter, not already
+// taken, and — if it carries `nightsight` — only while night sight is on.
+static bool trig_live(VoxField *v, const VxTrig *g) {
+    if (g->off || g->taken) return false;
+    if (g->night && v->ns_add <= 0.0f) return false;
+    return true;
+}
+
+static int trig_at(VoxField *v, int x, int z, unsigned mask) {
     for (int i = 0; i < v->trig_count; i++) {
         VxTrig *g = &v->trigs[i];
         if (x < g->x || z < g->z || x >= g->x + g->w || z >= g->z + g->d) continue;
-        if (g->kind == ka || g->kind == kb) return i;
+        if (!(mask & TGM(g->kind))) continue;
+        if (!trig_live(v, g)) continue;
+        return i;
     }
     return -1;
 }
@@ -3339,7 +3638,7 @@ static bool vx_trig_at_edge(VoxField *v, const VxTrig *g) {
     return g->x <= 0 || g->z <= 0 || g->x + g->w >= v->mw || g->z + g->d >= v->md;
 }
 
-static void on_enter_cell(VoxField *v, VxEvent *ev, bool grounded) {
+static void on_enter_cell(VoxField *v, bool grounded) {
     v->steps++;
     int x = v->act[0].tx, z = v->act[0].tz;
     for (int i = 0; i < v->trig_count; i++) {
@@ -3348,12 +3647,15 @@ static void on_enter_cell(VoxField *v, VxEvent *ev, bool grounded) {
         bool was = g->inside;
         g->inside = in;
         if (!in || was) continue;
+        if (!trig_live(v, g)) { g->inside = false; continue; }
         if (!grounded && !(g->kind == TG_EXIT && vx_trig_at_edge(v, g))) { g->inside = false; continue; }
         if (g->kind == TG_EXIT) { start_map_change(v, g->map, g->ax, g->az, g->af); return; }
         if (g->kind == TG_DOOR && v->act[0].facing == 3) { start_map_change(v, g->map, g->ax, g->az, g->af); return; }
-        if (g->kind == TG_ZONE) fire(ev, VXE_ZONE, g->arg);
+        if (g->kind == TG_ZONE) vx_fire(v, VXE_ZONE, g->arg, "");
         if (g->kind == TG_TRAP) vx_say(v, nullptr, g->arg);
-        if (g->kind == TG_SCENE) fire(ev, VXE_SCENE, g->arg);
+        if (g->kind == TG_SCENE) vx_fire(v, VXE_SCENE, g->arg, "");
+        if (g->kind == TG_FIGHT) vx_fire(v, VXE_FIGHT, g->arg, "");
+        if (g->kind == TG_GOAL) vx_fire(v, VXE_GOAL, g->arg, "");
     }
 }
 
@@ -3453,7 +3755,7 @@ static void npc_step(VoxField *v, float dt) {
                     int n = (int)(rad / (VOX_S * 0.5f)) + 1;
                     for (int s = 1; s <= n && ok; s++)
                         ok = vx_nav_at(v, np->x + (tx - np->x) * s / n, np->z + (tz - np->z) * s / n);
-                    if (ok && trig_at(v, gcx, gcz, TG_EXIT, TG_DOOR) < 0) { np->gx = tx; np->gz = tz; }
+                    if (ok && trig_at(v, gcx, gcz, TGM(TG_EXIT) | TGM(TG_DOOR)) < 0) { np->gx = tx; np->gz = tz; }
                 }
             }
             np->phase = 0;
@@ -3622,11 +3924,11 @@ static void vx_respawn_at_takeoff(VoxField *v, const char *why) {
     v->fade = FADE_FRAMES; v->fade_dir = -1;              // a quick fade back in, no damage
 }
 
-static void vx_leader_move(VoxField *v, int w, int h, float dt, VxEvent *ev) {
+static void vx_leader_move(VoxField *v, int w, int h, float dt) {
     VxActor *a = &v->act[0];
     if (dt > 0.1f) dt = 0.1f;                            // a hitch must not become a teleport
 
-    bool frozen = v->msg[0] || v->fade_dir > 0;
+    bool frozen = v->msg[0] || v->fade_dir > 0 || v->frozen;   // vx_freeze: a scripted beat
     if (frozen) { v->move_in_x = v->move_in_z = 0; v->move_mag = 0; v->want_jump = 0; v->jump_buf = 0; }
     else vx_move_input(v, w, h);
 
@@ -3721,7 +4023,7 @@ static void vx_leader_move(VoxField *v, int w, int h, float dt, VxEvent *ev) {
     if (cz >= v->md) cz = v->md - 1;
     if (cx != a->tx || cz != a->tz) {
         a->tx = (short)cx; a->tz = (short)cz;
-        on_enter_cell(v, ev, v->airborne == 0);
+        on_enter_cell(v, v->airborne == 0);
     }
 }
 
@@ -3755,8 +4057,8 @@ static void vx_followers(VoxField *v, float dt) {
     }
 }
 
-static void vx_walk(VoxField *v, int w, int h, float dt, VxEvent *ev) {
-    vx_leader_move(v, w, h, dt, ev);
+static void vx_walk(VoxField *v, int w, int h, float dt) {
+    vx_leader_move(v, w, h, dt);
     vx_followers(v, dt);
 }
 
@@ -3777,9 +4079,22 @@ static void spr_push(VoxField *v, const VxSpr *s) {
     if (v->spr_count < VX_SPRITES) v->spr[v->spr_count++] = *s;
 }
 
+// The ONE dynamic point light, on top of whatever the .tmap baked. Same falloff as vx_lamp_at, so
+// the moving lantern and a static one in a wall bracket read as the same kind of light.
+static float vx_dyn_lamp_at(VoxField *v, float x, float y, float z) {
+    if (!v->dlamp_on || v->dlamp_level <= 0.0f) return 0.0f;
+    float dx = x - v->dlamp_x, dy = y - v->dlamp_y, dz = z - v->dlamp_z;
+    float d = sqrtf(dx * dx + dy * dy + dz * dz);
+    float r = v->dlamp_r > 0.001f ? v->dlamp_r : 0.001f;
+    float f = 1.0f - d / r;
+    return f > 0 ? v->dlamp_level * f * f : 0.0f;
+}
+
 static void vx_light_at_foot(VoxField *v, float x, float y, float z, float *lit, float *warm) {
     float lamp = 0;
     vx_lamp_at(v, x, y + 0.8f, z, &lamp);
+    lamp += vx_dyn_lamp_at(v, x, y + 0.8f, z);
+    if (lamp > 1) lamp = 1;
     *lit = 0.92f;                      // a body is lit by the sky, not by the face it stands on
     *warm = lamp;
 }
@@ -3867,6 +4182,72 @@ static void vx_collect_sprites(VoxField *v) {
         s.u0 = 0; s.v0 = 0; s.u1 = 1; s.v1 = 1;
         s.tex = v->decal_tex[d]; s.kind = 0; s.alpha = 1; s.tilt = 1;
         vx_light_at_foot(v, s.x, s.y, s.z, &s.lit, &s.warm);
+        spr_push(v, &s);
+    }
+    // Field sprites: everything a `fight` or a `sprite` trigger stands on the map. The art is drawn
+    // bottom-centre on the trigger rectangle's centre cell, upright and camera-facing.
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (g->sprart < 0 || !trig_live(v, g)) continue;
+        VxSprArt *a = &v->sprart[g->sprart];
+        float fx = g->x + g->w * 0.5f, fz = g->z + g->d * 0.5f;
+        int hx = g->x + g->w / 2, hz = g->z + g->d / 2;
+        if (hx >= v->mw) hx = v->mw - 1;
+        if (hz >= v->md) hz = v->md - 1;
+        float gy = vx_gy(v, hx < 0 ? 0 : hx, hz < 0 ? 0 : hz);
+        float lit = 0, warm = 0;
+        vx_light_at_foot(v, fx, gy, fz, &lit, &warm);
+        if (a->tex) {
+            int frame = 0;
+            if (a->frames > 1) {
+                int t = (int)(v->anim_t * (float)(a->fps > 0 ? a->fps : 3));
+                if (a->pingpong && a->frames > 1) {
+                    int span = a->frames * 2 - 2;
+                    int q = ((t % span) + span) % span;
+                    frame = q < a->frames ? q : span - q;
+                } else frame = ((t % a->frames) + a->frames) % a->frames;
+            }
+            int percol = a->fw > 0 ? a->w / a->fw : 1;
+            if (percol < 1) percol = 1;
+            int cxi = frame % percol, czi = frame / percol;
+            VxSpr sp;
+            memset(&sp, 0, sizeof(sp));
+            sp.x = fx; sp.z = fz; sp.y = gy;
+            sp.w = a->cw; sp.h = a->ch;
+            sp.u0 = (float)(cxi * a->fw) / (float)a->w;
+            sp.u1 = (float)((cxi + 1) * a->fw) / (float)a->w;
+            sp.v0 = (float)(czi * a->fh) / (float)a->h;
+            sp.v1 = (float)((czi + 1) * a->fh) / (float)a->h;
+            sp.tex = a->tex; sp.kind = 0; sp.alpha = 1; sp.tilt = 1;
+            sp.lit = lit; sp.warm = warm;
+            spr_push(v, &sp);
+        } else {
+            // No art yet: a flat palette-ramp silhouette of the right footprint, five stacked bands
+            // tapering to the top so it reads as a thing standing there and never as finished art.
+            int r = vx_ramp_by_name(v, "neutral warm (plaster, cloth)");
+            if (r < 0) r = 0;
+            static const float TAPER[5] = { 1.00f, 0.94f, 0.84f, 0.68f, 0.46f };
+            for (int b = 0; b < 5; b++) {
+                int step = r < v->ramp_count && v->ramp_len[r] > 0
+                         ? v->ramp_idx[r][(b * v->ramp_len[r]) / 5] : 1;
+                VxSpr sp;
+                memset(&sp, 0, sizeof(sp));
+                sp.x = fx; sp.z = fz; sp.y = gy + a->ch * (b / 5.0f);
+                sp.w = a->cw * TAPER[b]; sp.h = a->ch / 5.0f;
+                sp.kind = 3; sp.alpha = 1; sp.tilt = 1;
+                sp.lit = (float)step / 255.0f;               // kind 3 reads lit as a palette INDEX
+                sp.warm = warm;
+                spr_push(v, &sp);
+            }
+        }
+    }
+    // The moving lantern's own glow, so the pool is visible and not merely felt.
+    if (v->dlamp_on && v->dlamp_level > 0.0f && v->amb + v->ns_add < 0.92f) {
+        VxSpr s;
+        memset(&s, 0, sizeof(s));
+        s.x = v->dlamp_x; s.z = v->dlamp_z; s.y = v->dlamp_y - 0.9f;
+        s.w = s.h = v->dlamp_r * 0.9f;
+        s.kind = 2; s.alpha = v->dlamp_level * (1.0f - (v->amb + v->ns_add)) * 0.85f; s.tilt = 1;
         spr_push(v, &s);
     }
     // Lamps at night: a soft additive glow the bloom picks up. Off in full daylight, where it is noise.
@@ -3984,7 +4365,14 @@ static void vx_camera(VoxField *v, int w, int h, float *proj) {
 static void vx_set_common(VoxField *v, GLuint prog, float sky[3]) {
     int rowa = v->cmap_row0[v->light_table < v->cmap_tables ? v->light_table : 0];
     int rowb = v->cmap_lamp_row0;
-    glUniform1f(vx_uni(prog, "u_amb"), v->amb);
+    // Night sight (vx_set_night_sight) lifts the EFFECTIVE ambient, so it reaches the world, the
+    // sprites and the lamp mix in one place rather than being applied three times slightly wrong.
+    float amb = v->amb + v->ns_add;
+    if (amb > 1) amb = 1;
+    if (amb < 0) amb = 0;
+    glUniform1f(vx_uni(prog, "u_amb"), amb);
+    glUniform4f(vx_uni(prog, "u_dlamp"), v->dlamp_x, v->dlamp_y, v->dlamp_z, v->dlamp_r);
+    glUniform1f(vx_uni(prog, "u_dlev"), v->dlamp_on ? v->dlamp_level : 0.0f);
     glUniform1f(vx_uni(prog, "u_levels"), (float)v->cmap_levels);
     glUniform1f(vx_uni(prog, "u_cmaph"), (float)v->cmap_h);
     glUniform1f(vx_uni(prog, "u_rowa"), (float)rowa);
@@ -4435,6 +4823,8 @@ static void vx_render(VoxField *v, int w, int h) {
             draws++;
         }
     }
+    // Placeholder field sprites: opaque, untextured, same state as the batches above.
+    { int from = 0, n = vx_emit_sprites(v, sv, sv_cap, 3, 0, 0, &from); if (n) { vx_draw_sprite_batch(v, sv, n); draws++; } }
     // The sky now, into the pixels the world did not cover, and before anything blended. The sprite
     // scope is closed around it so the sky gets a GPU timer query of its own — a query cannot nest.
     vxp_end(VXP_SPRITES);
@@ -4961,7 +5351,7 @@ static double vx_tex_mb(VoxField *v, int rw, int rh) {
 }
 
 void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) {
-    ev->kind = VXE_NONE; ev->arg[0] = 0;
+    ev->kind = VXE_NONE; ev->arg[0] = 0; ev->arg2[0] = 0;
     if (!v->gl_ready) vx_gl_init(v);
     vxp_init();
     // The GPU timer queries are only armed when somebody is reading them. See vxp_want_gpu.
@@ -4989,11 +5379,18 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
                 v->trigs[i].inside = (v->act[0].tx >= v->trigs[i].x && v->act[0].tz >= v->trigs[i].z &&
                                       v->act[0].tx < v->trigs[i].x + v->trigs[i].w && v->act[0].tz < v->trigs[i].z + v->trigs[i].d);
             v->fade_dir = -1;
+            vx_fire(v, VXE_MAP, v->map_name, "");      // an exit or a door completed
         } else if (v->fade_dir < 0 && v->fade <= 0) { v->fade = 0; v->fade_dir = 0; }
     }
 
+    // The one dynamic light rides the leader. Cheap, and it has to happen before the world draw
+    // reads the uniform or the pool would lag the body by a frame.
+    if (v->dlamp_on) {
+        v->dlamp_x = v->act[0].x; v->dlamp_z = v->act[0].z; v->dlamp_y = v->act[0].y + 1.0f;
+    }
+
     vxp_begin(VXP_MOVE);
-    vx_walk(v, w, h, dt, ev);
+    vx_walk(v, w, h, dt);
     npc_step(v, dt);
     vxp_end(VXP_MOVE);
 
@@ -5014,8 +5411,10 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
         if (v->exam_npc < 0) {
             // the cell 0.9 ahead, then the one under the feet
             int fx = (int)floorf(a->x + fxd * 0.9f), fz = (int)floorf(a->z + fzd * 0.9f);
-            v->exam_trig = trig_at(v, fx, fz, TG_MESSAGE, TG_DOOR);
-            if (v->exam_trig < 0) v->exam_trig = trig_at(v, a->tx, a->tz, TG_MESSAGE, TG_MESSAGE);
+            const unsigned AHEAD = TGM(TG_MESSAGE) | TGM(TG_DOOR) | TGM(TG_PICKUP);
+            const unsigned UNDER = TGM(TG_MESSAGE) | TGM(TG_PICKUP);
+            v->exam_trig = trig_at(v, fx, fz, AHEAD);
+            if (v->exam_trig < 0) v->exam_trig = trig_at(v, a->tx, a->tz, UNDER);
         }
     }
     if (v->tapped && !v->fade_dir) {
@@ -5031,8 +5430,24 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
         } else if (v->exam_trig >= 0) {
             VxTrig *g = &v->trigs[v->exam_trig];
             if (g->kind == TG_DOOR) start_map_change(v, g->map, g->ax, g->az, g->af);
+            else if (g->kind == TG_PICKUP) {
+                // The box opens FIRST and unconditionally — it is the player's feedback, and it must
+                // not depend on the event surviving. Then the item is reported, and the trigger is
+                // spent: a pickup is takeable exactly once.
+                g->taken = 1;
+                vx_say(v, nullptr, g->arg2);
+                vx_fire(v, VXE_PICKUP, g->arg, g->arg2);
+            }
             else vx_say(v, nullptr, g->arg);
         }
+    }
+
+    // One event a tick, oldest first. The queue is what makes this lossless: a pickup reports its
+    // text on one tick and the item on the next, and the chapter sees both.
+    if (v->evq_n > 0) {
+        *ev = v->evq[0];
+        for (int i = 1; i < v->evq_n; i++) v->evq[i - 1] = v->evq[i];
+        v->evq_n--;
     }
 
     vxp_end(VXP_TICK);
@@ -5177,6 +5592,15 @@ void vx_capture_to(VoxField *v, const char *map, int w, int h, const char *out_p
         char tb[16] = "day"; float lv = 1.0f;
         if (sscanf(e, "%15[^:]:%f", tb, &lv) >= 1) { v->light_table = vx_table_by_name(v, tb); v->amb = lv < 0 ? 0 : lv > 1 ? 1 : lv; }
     }
+    // Two measuring switches for the capture path, so the shots the chapter's look is judged on can
+    // be taken before src/chapter01.h exists. VOX_LAMP="radius,level" is vx_set_party_lamp;
+    // VOX_NIGHTSIGHT is vx_set_night_sight. Neither is a setting anybody is meant to find.
+    if ((e = SDL_getenv("VOX_LAMP")) && e[0]) {
+        float r = 6.0f, lv = 0.9f;
+        sscanf(e, "%f , %f", &r, &lv);
+        vx_set_party_lamp(v, r, lv, 1);
+    }
+    if ((e = SDL_getenv("VOX_NIGHTSIGHT")) && e[0]) vx_set_night_sight(v, (float)atof(e));
     if ((e = SDL_getenv("VOX_CUT")) && e[0]) v->cutaway = atoi(e) ? 1 : 0;
     if ((e = SDL_getenv("VOX_FOG")) && e[0]) v->fog = (float)atof(e);
     if ((e = SDL_getenv("VOX_TILT")) && e[0]) v->tilt = (float)atof(e);
@@ -5235,6 +5659,25 @@ bool vx_dev_ui(VoxField *v, char *out, int cap) {
     ImGui::Text("walkable %s | jump-only %d vox in %d region(s) | nav %.1f ms",
                 v->nav_bad ? "UNREACHABLE TARGETS" : "ok", v->nav_jump_vox,
                 v->nav_regions > 1 ? v->nav_regions - 1 : 0, v->nav_ms);
+    // Field sprites: which ids this map stands on the ground, and which of them are still
+    // placeholders. This is the "id label in Dev mode" — in the panel, not painted into the world,
+    // where a 3D text label would cost a font atlas and a pass of its own for a debugging aid.
+    if (v->sprart_count) {
+        char line[512];
+        int n = 0;
+        line[0] = 0;
+        for (int i = 0; i < v->sprart_count; i++)
+            n += snprintf(line + n, sizeof(line) - (size_t)n, "%s%s%s", n ? "  " : "",
+                          v->sprart[i].id, v->sprart[i].tex ? "" : "*");
+        ImGui::Text("sprites: %s   (* = placeholder, no story/field/sprites/<id>.png yet)", line);
+    }
+    { float ns = v->ns_add;
+      ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+      if (ImGui::SliderFloat("night sight", &ns, 0.0f, 0.6f, "%.2f")) vx_set_night_sight(v, ns);
+      ImGui::SameLine();
+      bool lamp = v->dlamp_on != 0;
+      if (ImGui::Checkbox("party lamp", &lamp)) vx_set_party_lamp(v, v->dlamp_r > 0 ? v->dlamp_r : 6.0f,
+                                                                  v->dlamp_level > 0 ? v->dlamp_level : 0.9f, lamp); }
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
     ImGui::SliderFloat("walk", &v->sp_walk, 1.0f, 12.0f, "%.1f");
     ImGui::SameLine();
@@ -5437,10 +5880,9 @@ static uint32_t bot_rand(VxBotRng *r) { r->s = r->s * 1664525u + 1013904223u; re
 static float bot_f(VxBotRng *r) { return (float)(bot_rand(r) & 0xFFFFFF) / (float)0xFFFFFF; }
 
 static void vx_bot_frame(VoxField *v, float dt, float mx, float mz, bool run, bool jump) {
-    VxEvent ev; ev.kind = VXE_NONE; ev.arg[0] = 0;
     v->bot_on = 1; v->bot_mx = mx; v->bot_mz = mz; v->bot_run = run ? 1 : 0;
     v->want_jump = jump ? 1 : 0;
-    vx_leader_move(v, 1920, 1080, dt, &ev);
+    vx_leader_move(v, 1920, 1080, dt);
     vx_followers(v, dt);
     npc_step(v, dt);
     // a map change would pull the world out from under the test; the bot never takes one
@@ -5523,9 +5965,30 @@ static int vx_walktest_map(VoxField *v, const char *map, char *summary, int cap)
         float moved = sqrtf((a->x - last_x) * (a->x - last_x) + (a->z - last_z) * (a->z - last_z));
         last_x = a->x; last_z = a->z;
         // "stuck" only counts when the way the body is being pushed is actually open a cell ahead
-        float ax = a->x + held_x * 1.0f, az = a->z + held_z * 1.0f;
-        if (moved < 0.002f && vx_nav_at(v, ax, az)) stuck_t += dt; else stuck_t = 0;
-        if (stuck_t > 3.0f) { stuck_hits++; stuck_t = 0; }
+        // AT THE BODY'S OWN HEIGHT. vx_nav_at alone is a plan test: on a map with an authored
+        // height field the cell in front of you can be perfectly walkable and still be the face of
+        // a four-voxel step, and standing still against a hillside is the correct behaviour, not a
+        // stuck body. (hill_path reported three of these before the feet were taken into account.)
+        // The probe walks OUT FROM THE BODY, and every sample has to be open at the body's own
+        // height. Two things were wrong with a single sample a cell ahead: it is a plan test, so a
+        // hillside four voxels tall read as open ground; and it skips the voxel the body is
+        // actually pressed against, so a body correctly stopped by a step it cannot climb was
+        // reported stuck because the ledge BEYOND that step happened to be level with it.
+        float ax = a->x + held_x, az = a->z + held_z;
+        bool open_ahead = true;
+        for (int k = 1; k <= 4 && open_ahead; k++) {
+            float t = (v->agent_r + 0.10f) + (1.0f - v->agent_r - 0.10f) * (k / 4.0f);
+            float sx = a->x + held_x * t, sz = a->z + held_z * t;
+            if (!vx_nav_at(v, sx, sz) ||
+                vx_ground_block(v, (int)floorf(sx / VOX_S), (int)floorf(sz / VOX_S), a->y)) open_ahead = false;
+        }
+        (void)ax; (void)az;
+        if (moved < 0.002f && open_ahead) stuck_t += dt; else stuck_t = 0;
+        if (stuck_t > 3.0f) {
+            stuck_hits++; stuck_t = 0;
+            SDL_Log("WALKTEST %s: stuck at %.2f,%.2f y=%.2f pushing %.2f,%.2f with the way open",
+                    v->map_name, a->x, a->z, a->y, held_x, held_z);
+        }
     }
     fails += (out_of_region > 0) + (nan_hits > 0) + (stuck_hits > 0);
 
@@ -5698,4 +6161,79 @@ void vx_restore(VoxField *v, const VxSave *s) {
         v->act[i].y = v->act[i].y0 = vx_nav_y(v, x, z);
         v->act[i].facing = s->facing[i] & 3;
     }
+}
+
+// ───────────────────────── what the chapter script drives ─────────────────────────
+// voxfield.h names these and says what they mean. The field knows nothing about flags, goals or
+// steps: it is told what the world looks like now, and it reports what the player did.
+
+const char *vx_current_map(VoxField *v) { return v ? v->map_name : ""; }
+
+void vx_goto(VoxField *v, const char *map, int x, int z, const char *facing) {
+    if (!v) return;
+    if (map && map[0] && strcmp(map, v->map_name)) vx_load_map(v, map);
+    // A negative cell means "wherever this map says it starts" — the chapter script's PLAY rows
+    // use -1,-1 for every step that does not care, and only name a cell when the story needs a
+    // particular doorway. Without this the party is placed at -1,-1 and snapped off the navmesh.
+    if (x < 0 || z < 0) { x = v->spawn_x; z = v->spawn_z; if (!facing) facing = "S"; }
+    vx_place_party(v, x, z, facing_of(facing ? facing : "S"));
+    // Standing inside a trigger after a teleport must not fire it: the party did not walk in.
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        g->inside = (v->act[0].tx >= g->x && v->act[0].tz >= g->z &&
+                     v->act[0].tx < g->x + g->w && v->act[0].tz < g->z + g->d);
+    }
+    v->msg[0] = 0; v->msg_who[0] = 0;
+    v->fade = 0; v->fade_dir = 0;
+}
+
+void vx_set_light(VoxField *v, const char *table, float level) {
+    if (!v) return;
+    v->light_table = vx_table_by_name(v, table && table[0] ? table : "day");
+    v->amb = level < 0 ? 0 : level > 1 ? 1 : level;
+    vx_sun_defaults(v);                 // the table's own sun, and shadow_dirty
+    if (v->gl_ready && v->built) vx_render_shadow(v);
+    SDL_Log("voxfield: light %s %.2f", table ? table : "day", v->amb);
+}
+
+void vx_set_party_lamp(VoxField *v, float radius, float level, int on) {
+    if (!v) return;
+    v->dlamp_on = on ? 1 : 0;
+    v->dlamp_r = radius > 0.5f ? radius : 0.5f;
+    v->dlamp_level = level < 0 ? 0 : level > 1 ? 1 : level;
+    v->dlamp_x = v->act[0].x; v->dlamp_z = v->act[0].z; v->dlamp_y = v->act[0].y + 1.0f;
+}
+
+void vx_set_night_sight(VoxField *v, float add) {
+    if (!v) return;
+    v->ns_add = add < 0 ? 0 : add > 1 ? 1 : add;
+}
+
+void vx_set_party(VoxField *v, int count) {
+    if (!v) return;
+    v->party = count < 1 ? 1 : count > VX_PARTY ? VX_PARTY : count;
+}
+
+void vx_disable_trigger(VoxField *v, const char *arg_id) {
+    if (!v || !arg_id || !arg_id[0]) return;
+    int n = 0;
+    for (int i = 0; i < v->trig_count; i++) {
+        VxTrig *g = &v->trigs[i];
+        if (strcmp(g->arg, arg_id) && strcmp(g->arg2, arg_id)) continue;
+        g->off = 1; n++;
+    }
+    if (!n) SDL_Log("voxfield: vx_disable_trigger(\"%s\") matched nothing on %s", arg_id, v->map_name);
+}
+
+void vx_say_id(VoxField *v, const char *id) {
+    if (!v || !id || !id[0]) return;
+    vx_say2(v, nullptr, id, false);     // the chapter's own line: not reported back at it
+}
+
+bool vx_busy(VoxField *v) { return v && (v->msg[0] != 0 || v->fade_dir != 0); }
+
+void vx_freeze(VoxField *v, int on) {
+    if (!v) return;
+    v->frozen = on ? 1 : 0;
+    if (v->frozen) { v->move_in_x = v->move_in_z = 0; v->move_mag = 0; v->want_jump = 0; v->jump_buf = 0; }
 }

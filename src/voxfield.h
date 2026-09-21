@@ -18,9 +18,20 @@ enum VxEventKind {
     VXE_NONE = 0,
     VXE_SCENE,                       // ev.arg is a cutscene id; the game plays it and comes back
     VXE_ZONE,                        // ev.arg is an encounter table name
+    // ── chapter one (src/chapter01.h) ──────────────────────────────────────────────────────────
+    // The field reports what the player did; the chapter script decides what it means. The field
+    // itself knows nothing about flags, goals or steps.
+    VXE_TEXT,                        // ev.arg is the field-text id just shown (message/npc/trap).
+                                     // This is how a mandatory examine is observed: the chapter
+                                     // gates on it, the field just draws the box as it always did.
+    VXE_FIGHT,                       // ev.arg is an encounter id (post, arm, swing, lid, burr,
+                                     // lantern, fleece, klee). The game runs the fallback fight.
+    VXE_PICKUP,                      // ev.arg is an item id, ev.arg2 the field-text id to show
+    VXE_GOAL,                        // ev.arg is a goal line, underscores already spaces
+    VXE_MAP,                         // ev.arg is the map just loaded (an exit was taken)
 };
 
-struct VxEvent { int kind; char arg[64]; };
+struct VxEvent { int kind; char arg[64], arg2[64]; };
 
 #define VX_PARTY 4
 
@@ -71,3 +82,49 @@ void vx_restore(VoxField *v, const VxSave *s);
 
 int vx_map_count();
 const char *vx_map_name_at(int i);
+
+// ───────────────────────── what the chapter script drives ─────────────────────────
+// src/chapter01.h owns the story; the field owns the world. These are the only knobs between them.
+// None of them knows what a flag or a step is.
+
+// Which map the party is standing on right now.
+const char *vx_current_map(VoxField *v);
+
+// Load `map` and put the party on `x,z` facing `facing` ("S"/"W"/"E"/"N"). Used by a chapter step
+// to place the player, not by the player walking through an exit. A NEGATIVE x or z means "use the
+// map's own `spawn:` line", which is what a chapter step that does not care about the exact doorway
+// passes. Standing inside a trigger after this never fires it: the party did not walk in.
+void vx_goto(VoxField *v, const char *map, int x, int z, const char *facing);
+
+// Time of day for this step (PALETTE.md's colormap tables: day, dusk, night, lamp, ...). Re-points
+// the colormap row, moves the sun to that table's defaults and re-renders the shadow map. Cheap
+// enough to call on a step change; NOT a per-frame call.
+void vx_set_light(VoxField *v, const char *table, float level);
+
+// A lamp that follows the party leader — the lantern on the high pasture. Looked up in the `lamp`
+// colormap table, so it stays warm inside a blue night. radius in cells; level 0..1; on = 0 puts it
+// out. Unlike the .tmap's static `lamp:` lines this one is NOT baked into the mesh.
+void vx_set_party_lamp(VoxField *v, float radius, float level, int on);
+
+// Distel's night sight: lifts the ambient a step and makes things flagged night-sight-only visible
+// (the lens shelf). add is added to the map's own ambient; 0 turns it off.
+void vx_set_night_sight(VoxField *v, float add);
+
+// How many of the party are following (1..VX_PARTY).
+void vx_set_party(VoxField *v, int count);
+
+// Stop a trigger firing again once the chapter has consumed it (a mandatory examine, a pickup that
+// has been taken). Matches on the trigger's arg id. Cleared by loading a map, so the chapter
+// re-applies what it needs after a step change.
+void vx_disable_trigger(VoxField *v, const char *arg_id);
+
+// Show a story/field/text.md id in the field's own box, from the game side.
+void vx_say_id(VoxField *v, const char *id);
+
+// True while the field is busy with something the chapter must not interrupt: a message box is
+// open, or a map change is fading.
+bool vx_busy(VoxField *v);
+
+// Freeze the player where they stand (a scripted beat, a battle starting). Input is ignored and the
+// party stops walking; the world keeps rendering.
+void vx_freeze(VoxField *v, int on);

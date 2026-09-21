@@ -46,8 +46,8 @@ if(ANDROID)
     target_compile_definitions(imgui_shared PUBLIC IMGUI_IMPL_OPENGL_ES3)
 
     # Game logic: hot-reloadable
-    # The game. src/game_logic.cpp is the previous RPG, kept for reference and no longer built.
-    add_library(game_logic SHARED src/star_logic.cpp src/field.cpp src/tilefield.cpp src/voxfield.cpp)
+    # The game.
+    add_library(game_logic SHARED src/star_logic.cpp src/voxfield.cpp src/battle.cpp)
     target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(game_logic PRIVATE imgui_shared)
@@ -65,8 +65,8 @@ else()
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(imgui_shared PUBLIC SDL3::SDL3-static "-framework OpenGL")
 
-    # The game. src/game_logic.cpp is the previous RPG, kept for reference and no longer built.
-    add_library(game_logic SHARED src/star_logic.cpp src/field.cpp src/tilefield.cpp src/voxfield.cpp)
+    # The game.
+    add_library(game_logic SHARED src/star_logic.cpp src/voxfield.cpp src/battle.cpp)
     target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(game_logic PRIVATE imgui_shared)
@@ -78,9 +78,11 @@ else()
     target_include_directories(quest_glory PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 
-    add_executable(scene_demo src/scene_demo.cpp ${IMGUI_SOURCES})
-    target_link_libraries(scene_demo PRIVATE SDL3::SDL3-static
-        "-framework OpenGL")
-    target_include_directories(scene_demo PRIVATE src ${THIRD_PARTY}
+    # BATTLE agent's own tool: --selftest and the battle-screen capture. Not part of the game.
+    add_executable(battle_tool src/battle.cpp)
+    target_compile_definitions(battle_tool PRIVATE BATTLE_TOOL_MAIN)
+    target_link_libraries(battle_tool PRIVATE imgui_shared)
+    target_include_directories(battle_tool PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+
 endif()

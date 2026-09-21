@@ -9,6 +9,9 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 # startup whatever settings.ini says, and the forced state is never written back to the file.
 # The Settings window shows "muted by STAR_MUTE" and the owner can still untick it for the session.
 export STAR_MUTE=1
+# Double-clicking the Desktop shortcut should put you in the game, not on a title screen: this
+# starts a NEW GAME at chapter one, step 1 (the yard). Unset it to get the title back.
+export STAR_NEWGAME=${STAR_NEWGAME:-1}
 LOG="$ROOT/build_desktop/run_desktop.log"
 mkdir -p "$ROOT/build_desktop"
 {

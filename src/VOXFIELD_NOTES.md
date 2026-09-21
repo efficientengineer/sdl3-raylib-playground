@@ -123,6 +123,137 @@ roof courses, water, thatch, crop rows, leaves, bark, dressed stone, plaster.
   anything for a map to work.
 - **Triggers, spawn, NPCs and `lamp:` meta carry over unchanged**, as does `light: <table> <level>`.
 
+### `## height` — terrain the map authors (chapter one)
+
+Terrain height used to be entirely procedural (`vx_vnoise` in `vx_build_world`), which is fine for a
+town square and no use at all for a hillside. A `.tmap` may now draw one.
+
+```
+## meta
+base: 4                     # optional: the map's floor, in VOXELS. 4 is the old H_FLAT default.
+## height
+ccccccdeghkkkkkjhgfccccc    # one char a cell, the same grid shape as `## ground`
+occcccceghikkkkkggdooooo
+...
+```
+
+- A character is that cell's surface height in **VOXELS above the map base**, in **base 36**:
+  `0`-`9` = 0..9, `a`-`z` = 10..35. A voxel is half a walk cell, so `c` is three walk cells up.
+- `.` or a space is **unauthored**: that cell keeps today's procedural height. **A map with no
+  `## height` section at all behaves exactly as it always did** — that is the compatibility rule that
+  matters, and halm, hart_yard and west_road have no grid.
+- `~` is a **bend**: the mean of its authored orthogonal neighbours. Nothing uses it yet; it exists so
+  a map can meet two shelves without picking a side.
+- An authored cell is **authoritative**. The noise does not touch it, it is **exempt from the
+  two-voxel neighbour clamp** (that exemption is the point — a cliff has to be allowed to break the
+  clamp, and hill_path's hidden find is a deliberate 4-voxel drop the clamp would have smoothed
+  away), and `vx_verify_reach` will **not flatten it**.
+- **Stamps and trigger rectangles flatten to their top-left cell's height**, so a cart never straddles
+  a step and a trigger's floor is level under the whole rectangle.
+- **Walk connectivity is unchanged.** `vx_can_step` still says one voxel of rise is a free step and
+  two is a hop; more is a ledge. Walking off a ledge is a fall, never a wall — which is exactly what
+  "a two-cell drop is a drop" means.
+- **`vx_verify_reach` only reports on a map with a height grid.** Its reference flood is the flat tile
+  map, which has no idea there is a hill, so on hill_path it would call the shelf above every
+  switchback unreachable and flatten the lot. On such a map it logs the count and returns 0; the real
+  test that the story can still be played is **`vx_build_nav`'s target check (`navreach`)**, which
+  walks to every exit, door, message and NPC. high_pasture's `navreach=FAIL` is the loot shelf, which
+  is *deliberately* jump-only.
+- `VX_VY` went from 48 to **64 voxels** so a map can climb. `VX_HMAX` is the parser's ceiling.
+
+### New trigger kinds
+
+Trigger lines are `x z w d <kind> [args]`, as before.
+
+| kind | args | fires | how |
+|---|---|---|---|
+| `fight` | `<encounter_id>` | `VXE_FIGHT` (`arg` = id) | **walk-in**, like `zone`. Also draws the encounter's field sprite on the trigger. |
+| `pickup` | `<item_id> <text_id>` | `VXE_PICKUP` (`arg` = item, `arg2` = text) | **interact**: the `!` prompt and a button press, like `message`. Shows `<text_id>` in the field box first, then reports. **Takeable once.** |
+| `goal` | `<Words_with_underscores>` | `VXE_GOAL` (`arg` = the line, underscores now spaces) | **walk-in** |
+| `sprite` | `<sprite_id>` | nothing | draws a field sprite on the cell and no more |
+
+**`nightsight`** is a bare trailing word on **any** trigger line:
+
+```
+12 8 1 1 pickup lens halm.lens_shelf nightsight
+```
+
+The trigger is hidden and non-interactive — and its sprite is not drawn — until
+`vx_set_night_sight(v, >0)`. (`nightsight:` and `nightsight: yes` are accepted too; the bare word is
+canonical.) It is stripped before the kind counts its arguments, so nothing else had to change.
+
+### Events, and why there is a queue
+
+`struct VxEvent { int kind; char arg[64], arg2[64]; }`. `fire()` used to keep only the FIRST event a
+tick produced and throw the rest away. A pickup produces two — the text it showed and the item it
+gave — and the chapter gates on both, so losing one breaks the chapter. Events now go on a
+**fixed-size ring in `VoxField` (`VX_EVQ` = 16), drained one a tick**, no allocation, and a full
+queue is logged rather than silently dropped.
+
+- **`VXE_TEXT`** fires for **every** story text id the field shows — a `message`, an `npc` line, a
+  `trap`. That is how a mandatory examine is observed: the field just draws the box as it always did.
+  `vx_say_id` (the chapter asking for a line) does **not** fire it; the field reports what the PLAYER
+  did, and echoing the chapter's own line back at it would gate on nothing.
+- **`VXE_MAP`** fires when an exit or a door **completes** a map change, `arg` = the map just loaded.
+  `vx_goto` does not fire it: the chapter put the party there and already knows.
+- A pickup's **box opens first and unconditionally**, before anything is reported, so the player's
+  feedback never depends on an event surviving.
+
+### Field sprites — `story/field/sprites/<id>.png`
+
+- An **indexed PNG on the master palette**, index 0 transparent, anchored **bottom-centre**, an
+  upright camera-facing billboard, **64 px to the map cell**. A single still by default. **Not a
+  walker sheet**: there are no direction rows.
+- Optional sidecar `story/field/sprites/<id>.json`:
+  `{ "frames": N, "frame": [w,h], "sheet": [w,h], "footprint": [w,h], "fps": 3, "loop": "pingpong"|"loop" }`.
+  **`frame` is READ, never derived by dividing.** `footprint` is the billboard in map cells; without
+  it the size is the frame at 64 px to the cell.
+- Loading is **by file-exists and cached per id including the miss**, so a missing PNG costs one
+  failed read a map load. When the PNG is not there the game draws a **placeholder**: five stacked,
+  tapering, flat palette-ramp bands of the right footprint, which reads as "a thing stands here and
+  it is not art yet" from across the map. The real art is picked up automatically the next time the
+  map loads after the file appears. The Dev panel lists every sprite id the map uses and marks the
+  placeholders with `*` — that is the id label, in the panel rather than painted into the world,
+  where a 3D label would cost a font atlas and a pass of its own for a debugging aid.
+- Chapter one's ids: `lid, burr, false_lantern, fleece, klee, sleeping_animal, machine_post,
+  machine_arm, machine_swing`.
+
+### What the chapter script drives (`src/chapter01.h`)
+
+`voxfield.h`'s bottom block. The field owns the world; the chapter owns the story; neither knows what
+the other's nouns are.
+
+| call | what it does |
+|---|---|
+| `vx_current_map` | the map the party is standing on |
+| `vx_goto(map, x, z, facing)` | load and place. Triggers the party is standing in are marked already-entered, so a teleport never fires one. |
+| `vx_set_light(table, level)` | re-points the colormap row, re-runs `vx_sun_defaults` for that table and **re-renders the shadow map**. A step-change call, not a per-frame one. |
+| `vx_set_party_lamp(radius, level, on)` | the lantern that follows the leader — see below |
+| `vx_set_night_sight(add)` | adds to the **effective ambient** (one place: `vx_set_common`), and makes `nightsight` triggers live |
+| `vx_set_party(count)` | how many are following |
+| `vx_disable_trigger(arg_id)` | matches on `arg` **or** `arg2`; cleared by a map load |
+| `vx_say_id(id)` | a `story/field/text.md` id in the field's own box, without reporting it back |
+| `vx_busy()` | a box is open, or a map change is fading |
+| `vx_freeze(on)` | input ignored and the party stops walking; the world keeps rendering |
+
+**The dynamic party lamp** is the only real rendering work here. The `.tmap`'s static `lamp:` lines
+are **baked per-vertex into `VxVert.warm` at mesh time**, so a moving light cannot use that path at
+all. Instead there is **exactly one** dynamic point light, as shader uniforms:
+
+- `uniform vec4 u_dlamp` (world xyz, radius) and `uniform float u_dlev` in the world fragment shader,
+  added to the warm term right where the baked `v_light.y` is read. It is a **uniform branch** — one
+  value for the whole draw — so no wavefront diverges on it and the discard-free shader split is
+  untouched.
+- On the CPU, `vx_dyn_lamp_at` adds the same falloff inside `vx_light_at_foot`, so sprites light with
+  it too. It is deliberately **not** in `vx_lamp_at`, which is what the mesh bake calls.
+- It is looked up in the **`lamp` colormap row (`cmap_lamp_row0`)** exactly as the baked lamps are, so
+  the lantern pool stays warm inside a blue night.
+- It rides the leader, updated once a tick before the world draw reads the uniform.
+
+Two capture-only switches, so the look can be judged before `chapter01` exists:
+`VOX_LAMP="radius,level"` is `vx_set_party_lamp`, `VOX_NIGHTSIGHT=<add>` is `vx_set_night_sight`.
+Neither is a setting anybody is meant to find.
+
 ## The house generator (no wave function collapse)
 
 A short list of rules in a fixed order, seeded per building, all of it in voxels — which is the whole
@@ -725,3 +856,22 @@ non-zero. All three pass.
 11. **`map.flag` is now polled in one place only** — `vx_tick`, before the default load, with the first
    tick polling immediately — so a flagged map loads once. star_logic's title poll only opens the
    field; it does not consume the flag. (Fixed this round.)
+12. **`hill_path`'s nav has 13 jump-only regions and 339 jump-only voxels.** That is the authored
+   hillside doing its job (a switchback shelf you can drop off but not climb back up), and
+   `navreach` is `ok` — every exit, door, message and NPC is walk-reachable from spawn. It is listed
+   here so nobody reads the region count as a regression.
+13. **`high_pasture` reports `navreach=FAIL`.** One target — the loot shelf, 188 nav voxels across a
+   three-cell gap — is deliberately reachable only by a running jump. `vx_selftest` does not fail on
+   `navreach`, only on `reach_missing`, so this is a note and not a broken map. If a real target ever
+   goes unreachable there it will look identical; check the logged region sizes.
+14. **The walktest's "stuck" probe now walks out from the body**, four samples from `agent_r` to one
+   cell, each tested at the body's own height. The old single plan-space sample a cell ahead read a
+   four-voxel hillside as open ground and reported three false stucks on `hill_path`. Flat maps are
+   unaffected (halm, hart_yard and west_road still report `stuck=0`).
+15. **`~` in `## height` is parsed and nothing authors it.** It resolves to the mean of its authored
+   orthogonal neighbours and is then treated as an ordinary authored cell; it does not build a
+   sloped surface the way a `## objects` ramp stamp does.
+16. **Field sprites are stills unless a sidecar says otherwise, and nothing animates yet** — no
+   `story/field/sprites/` directory exists at all, so every one of chapter one's nine ids currently
+   draws the placeholder. The frame-picking and ping-pong code is written but has never run against
+   a real sheet.

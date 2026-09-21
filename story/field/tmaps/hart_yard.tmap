@@ -78,24 +78,36 @@ l gate_post
 ........................
 .xwwwwwwwwwwwwwwwwwwwwx.
 .N....................N.
-.N.R+++H++..........Z+N.
-.N.+++++++..........++N.
-.N.+++++++............N.
-.N.++++......r........N.
+.N.R+++...H++.......Z+N.
+.N.++++...+++.......++N.
+.N.++++...+++.........N.
+.N.++++...............N.
+.N....e...............N.
 .N....................N.
-.N...............i....N.
-.N..u..........i...i..N.
+.N..u.......i.i.i.....N.
 .N....................N.
-.N...T+.............i.N.
+.N...T+...............N.
+.N...++.....wwwwww....N.
 .N...++...............N.
-.N...++............i..N.
-.N...............i....N.
+.N....................N.
 .N.o....j.............N.
 .N....................N.
 .N....................N.
 .xwwwwwwwl...lwwwwwwwwx.
 ........................
 ## triggers
-14 7 8 9 message hart_yard.practice_posts
 8 8 1 1 npc hart S hart_yard.hart
+4 7 3 1 message hart_yard.workshop_door
+6 7 1 2 message hart_yard.bench_part
+6 7 1 2 pickup bench_part hart_yard.bench_part
+10 6 3 1 message hart_yard.ladder
+10 6 3 1 pickup loot_yard hart_yard.ladder
+12 9 1 2 message hart_yard.machine_post
+12 10 1 1 fight post
+14 9 1 2 message hart_yard.machine_arm
+14 10 1 1 fight arm
+16 9 1 2 message hart_yard.machine_swing
+16 10 1 1 fight swing
+14 11 1 1 npc ottilie S hart_yard.ottilie_idle
+10 18 3 1 zone yard_gate
 10 19 3 1 exit halm 31 2 S

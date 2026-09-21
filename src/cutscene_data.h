@@ -5,7 +5,10 @@ enum CsMood { CS_WONDER, CS_DREAD, CS_TENSE, CS_CONFRONT, CS_SORROW, CS_HOPE, CS
 enum CsKind { CS_PANELS, CS_NARRATION, CS_TALK };   // panels = manga page, narration = text over black, talk = dialogue box over black or a dimmed backdrop
 enum CsSide { CS_LEFT, CS_RIGHT };                   // which end of the dialogue box a portrait sits at
 struct CsRect { float x, y, w, h; };                 // percent of the stage
-struct CsPanel { const char *file; int page; CsRect land, port; };   // a new page clears the screen
+struct CsPanel { const char *file; int page; CsRect land, port;   // a new page clears the screen
+                 const char *desc; };   // the panel's one-line description, drawn small inside the
+// placeholder box when file does not exist yet, so pacing can be judged before the art is generated.
+#define CS_HAS_PANEL_DESC 1
 struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood;  // reveal 0 = none
                 const char *portrait; CsSide side;    // portrait file, or nullptr when the speaker has none
                 const char *expr; };                  // "" when untagged; else one of the ten ids below.
@@ -17,6 +20,32 @@ struct CsLine { const char *speaker; const char *text; int reveal; CsMood mood; 
 struct CsScene { const char *id; const char *title; bool narration;   // narration == (kind == CS_NARRATION)
                  CsKind kind; const char *backdrop;   // backdrop: talk scenes only, may be nullptr
                  const CsPanel *panels; int panel_count; const CsLine *lines; int line_count; };
+
+static const CsPanel CS_0110_the_yard_PANELS[] = {
+    { "0110_the_yard_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "the hill yard at midday, three wood-and-iron training machines in a row in cut grass, a workbench under the eaves, a low stone wall at the left with Ottilie sitting on it, Falke and Hart below" },
+    { "0110_the_yard_p2_portrait_inset.png", 0, {49.0f, 37.6f, 17.0f, 27.2f}, {69.0f, 24.0f, 30.0f, 24.0f}, "Ottilie close up on the stone wall, an apple in one hand and a roll of bandage in her lap, enjoying herself" },
+    { "0110_the_yard_p3_impact.png", 0, {20.0f, 32.4f, 52.0f, 41.6f}, {17.0f, 52.0f, 80.0f, 32.0f}, "a heavy counterweighted wooden arm sweeping across the frame into Falke's forearm, his practice stick flying out of frame, cut grass and chaff kicked up" },
+    { "0110_the_yard_p4_low_angle_menace.png", 0, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "the swing seen from the grass, a pivoting iron-weighted arm settling back above a scarred wooden post, rope and pulley overhead" },
+    { "0110_the_yard_p5_high_angle_down.png", 1, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "Falke flat on his back in the cut grass seen from straight above, his practice stick an arm's length away, the machines' shadows lying across him" },
+    { "0110_the_yard_p6_object_insert.png", 1, {49.0f, 37.6f, 17.0f, 27.2f}, {69.0f, 24.0f, 30.0f, 24.0f}, "two long gloved hands cupped just above a bare young forearm, a small warm light held between the palms and the skin, the wrist below already darkening" },
+    { "0110_the_yard_p7_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "Hart head to boots at his workbench from a low angle, a hinged leather and iron brace on his left knee, a scorched leather apron, wire spectacles pushed up on his forehead" },
+};
+static const CsLine CS_0110_the_yard_LINES[] = {
+    { "Ottilie", "He's at the swing again. Best wall in Halm, this.", 1, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Ottilie", "Feet over his head. That's the best one all week.", 3, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "I hit it a dozen times!", 4, CS_WONDER, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "It hit you once.", 2, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "How is anyone supposed to beat that thing?", 5, CS_WONDER, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "Maybe hit it again?", 5, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "My wrist's fine.", 5, CS_WONDER, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "Put it down, then. I can't patch a wrist you're holding on to.", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Ottilie", "There. Closed.", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "That's it? That's all of it?", 6, CS_WONDER, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "You fought a training dummy, not a bear.", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Hart", "Again. From the gate.", 7, CS_WONDER, "portrait_hart.png", CS_LEFT, "" },
+    { "Falke", "Hart  -  say it straight. Am I ready or am I not?", 7, CS_WONDER, "portrait_bron.png", CS_RIGHT, "" },
+    { "Hart", "Not quite ready yet.", 7, CS_SORROW, "portrait_hart.png", CS_LEFT, "" },
+};
 
 static const CsLine CS_0130_the_counter_LINES[] = {
     { "Clerk", "The repaired part goes on the counter. Is there anything else?", 0, CS_WONDER, "portrait_guildclerk.png", CS_LEFT, "" },
@@ -52,8 +81,101 @@ static const CsLine CS_0140_supper_LINES[] = {
     { "Falke", "I'll still be out there when you come and laugh at me!", 0, CS_HOPE, "portrait_bron.png", CS_LEFT, "" },
 };
 
-static const CsScene CS_INTRO[] = {
+static const CsPanel CS_0150_the_sword_PANELS[] = {
+    { "0150_the_sword_p1_establishing_wide.png", 0, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "the hill yard in low evening light, the three training machines throwing long shadows across cut grass, Falke small and bent over in front of the swing, Ottilie sitting on the stone wall at the left" },
+    { "0150_the_sword_p2_portrait_inset.png", 0, {49.0f, 37.6f, 17.0f, 27.2f}, {69.0f, 24.0f, 30.0f, 24.0f}, "Ottilie close up on the wall in the last of the light, comfortable, watching a show she has watched for years" },
+    { "0150_the_sword_p3_over_shoulder.png", 0, {20.0f, 32.4f, 52.0f, 41.6f}, {17.0f, 52.0f, 80.0f, 32.0f}, "the dark back of Falke's head and shoulder at the left edge, the scarred machine beyond him, its iron counterweight dropping on its rope" },
+    { "0150_the_sword_p4_eyes_slit.png", 0, {20.0f, 50.0f, 60.0f, 24.0f}, {4.0f, 40.0f, 92.0f, 18.4f}, "Falke's eyes and brow filling the panel edge to edge, low evening light across them" },
+    { "0150_the_sword_p5_impact.png", 1, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "the wooden practice stick meeting the swinging arm side on and turning it away, the arm going wide of Falke, his other shoulder already driving in at the post" },
+    { "0150_the_sword_p6_profile_flat.png", 1, {49.0f, 37.6f, 17.0f, 27.2f}, {69.0f, 24.0f, 30.0f, 24.0f}, "Ottilie in profile on the stone wall, sitting up straight for the first time all day, the town below her in the dusk" },
+    { "0150_the_sword_p7_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "Hart head to boots in the middle of the yard from a low angle, a plain straight sword in a scabbard held out level in both hands, his knee brace and scorched apron catching the last light" },
+    { "0150_the_sword_p8_object_insert.png", 1, {82.0f, 46.8f, 17.0f, 27.2f}, {69.0f, 57.6f, 30.0f, 24.0f}, "a plain straight sword in a worn scabbard lying across Falke's two open palms, the leather of the grip rubbed dark in the middle" },
+};
+static const CsLine CS_0150_the_sword_LINES[] = {
+    { "Ottilie", "You've been out here since before it was light. I've eaten two meals up here.", 1, CS_TENSE, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "Don't tell me how many times. Please don't tell me.", 2, CS_TENSE, "portrait_bron.png", CS_RIGHT, "" },
+    { "Falke", "My arms are gone. I can't swing at it again.", 3, CS_TENSE, "portrait_bron.png", CS_RIGHT, "" },
+    { "Falke", "All right. Come on, then.", 4, CS_TENSE, "portrait_bron.png", CS_RIGHT, "" },
+    { "Falke", "Come on!", 5, CS_CONFRONT, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "I had a very good thing ready to say and now I'm not saying it.", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "Say it!", 6, CS_WONDER, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "No. You'd have it framed.", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Hart", "Put the stick down. Both hands.", 7, CS_HOPE, "portrait_hart.png", CS_LEFT, "" },
+    { "Hart", "Made it the winter before last. It's been on its hook since.", 7, CS_HOPE, "portrait_hart.png", CS_LEFT, "" },
+    { "Ottilie", "It suits you.", 8, CS_SORROW, "portrait_lyra.png", CS_LEFT, "" },
+    { "Hart", "Take it to the clerk. He'll write your name in the book.", 8, CS_SORROW, "portrait_hart.png", CS_LEFT, "" },
+    { "Falke", "I can sign. Tonight, I can sign.", 8, CS_SORROW, "portrait_bron.png", CS_RIGHT, "" },
+    { "Ottilie", "Falke. That's the evening bell.", 8, CS_TENSE, "portrait_lyra.png", CS_LEFT, "" },
+};
+
+static const CsPanel CS_0160_the_herder_PANELS[] = {
+    { "0160_the_herder_p1_establishing_tall.png", 0, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "a black hillside at night under heavy stars, a broken stone wall running up it, pale sheep lying asleep in the grass in ones and twos, one small lamp burning low on the ground" },
+    { "0160_the_herder_p2_high_angle_down.png", 0, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "seen from above, a sleeping ewe in flattened grass with Distel, very small and hooded, crouched over her, a long pale crook laid down alongside, the lamp beside them" },
+    { "0160_the_herder_p3_eyes_slit.png", 0, {20.0f, 50.0f, 60.0f, 24.0f}, {4.0f, 40.0f, 92.0f, 18.4f}, "Falke's eyes and brow filling the panel edge to edge, lamp light coming up at them from below" },
+    { "0160_the_herder_p4_two_shot.png", 0, {20.0f, 32.4f, 52.0f, 41.6f}, {17.0f, 52.0f, 80.0f, 32.0f}, "Falke on the left with a plain sword up and out, Ottilie stepping across in front of him with one arm barred against his chest, Distel small and crouched on the right beyond them" },
+    { "0160_the_herder_p5_full_body_reveal.png", 1, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "Distel standing at last from a low angle, a head shorter than a grown woman, felt overdress and woven belt, bare feet in black grass, the long crook held upright, the lamp behind her" },
+    { "0160_the_herder_p6_portrait_inset.png", 1, {82.0f, 46.8f, 17.0f, 27.2f}, {69.0f, 57.6f, 30.0f, 24.0f}, "Distel in close up, huge round black eyes with a wide pale ring at the outer edge, two thin braids hanging in front of the ears, lamp light on one cheek" },
+    { "0160_the_herder_p7_over_shoulder.png", 1, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "Distel's small hooded shoulder at the right edge, Falke and Ottilie beyond her standing together in the grass, the sword now pointing at the ground" },
+};
+static const CsLine CS_0160_the_herder_LINES[] = {
+    { "Ottilie", "I've been up here in daylight a hundred times. It isn't the same hill.", 1, CS_DREAD, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "Get away from her! Get back!", 2, CS_TENSE, "portrait_bron.png", CS_RIGHT, "" },
+    { "Distel", "Don't shout. You'll wake her. She's had a bad night.", 3, CS_TENSE, nullptr, CS_LEFT, "" },
+    { "Ottilie", "She's a girl. Falke, she's a girl  -  put the sword down.", 4, CS_TENSE, "portrait_lyra.png", CS_LEFT, "" },
+    { "Falke", "What are you?", 5, CS_TENSE, "portrait_bron.png", CS_RIGHT, "" },
+    { "Distel", "Mohn. You'd say night herder.", 5, CS_TENSE, nullptr, CS_LEFT, "" },
+    { "Ottilie", "I've heard of your people all my life. No one here has ever seen one.", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Distel", "Now you have. Move your foot. You're standing on my lead.", 6, CS_WONDER, nullptr, CS_LEFT, "" },
+    { "Distel", "Klee put them down. My drover  -  I raised him from a pup.", 6, CS_WONDER, nullptr, CS_LEFT, "" },
+    { "Ottilie", "What is a drover?", 6, CS_WONDER, "portrait_lyra.png", CS_LEFT, "" },
+    { "Distel", "He beds a flock down where he thinks it's safe. He ran in the spring and stopped knowing me.", 6, CS_WONDER, nullptr, CS_LEFT, "" },
+    { "Falke", "He's the monster on my job sheet. I signed for him.", 7, CS_CONFRONT, "portrait_bron.png", CS_RIGHT, "" },
+    { "Distel", "Then hold him still and I'll calm him. Quietly  -  she's sleeping.", 7, CS_CONFRONT, nullptr, CS_LEFT, "" },
+    { "Falke", "That's a sheep!", 7, CS_CONFRONT, "portrait_bron.png", CS_RIGHT, "" },
+    { "Distel", "She has a name.", 7, CS_SORROW, nullptr, CS_LEFT, "" },
+};
+
+static const CsPanel CS_0180_what_was_on_it_PANELS[] = {
+    { "0180_what_was_on_it_p1_high_angle_down.png", 0, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "seen from above, a long shaggy animal lying dead in flattened grass with Distel, Falke and Ottilie round it, a lamp on the ground, sheep asleep in a wide ring beyond" },
+    { "0180_what_was_on_it_p2_object_insert.png", 0, {49.0f, 37.6f, 17.0f, 27.2f}, {69.0f, 24.0f, 30.0f, 24.0f}, "lamp light on thick matted fur parted by two gloved fingers behind a heavy ear, a ring of small round holes in the bare skin beneath, healed shut, each one the same size as the last" },
+    { "0180_what_was_on_it_p3_full_body_reveal.png", 0, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "Distel standing over the dead animal from a low angle, crook in one hand, the long body at her bare feet, grey first light coming up behind the broken wall" },
+    { "0180_what_was_on_it_p4_portrait_inset.png", 1, {6.0f, 40.0f, 17.0f, 27.2f}, {6.0f, 40.0f, 30.0f, 24.0f}, "Distel in close up in the grey light, braids stuck to one cheek, the huge ringed eyes fixed on something far off up the hill" },
+    { "0180_what_was_on_it_p5_establishing_tall.png", 1, {73.0f, 3.0f, 22.0f, 70.4f}, {61.0f, 10.0f, 36.0f, 57.6f}, "the hillside at first light, dozens of sheep standing up all at once out of the grass and beginning to walk downhill together, the broken wall running down beside them" },
+    { "0180_what_was_on_it_p6_two_shot.png", 1, {4.0f, 5.0f, 52.0f, 41.6f}, {3.0f, 2.0f, 80.0f, 32.0f}, "Garbe on the left in an oiled canvas coat with a rope over one shoulder, Falke on the right with the sword slung and his hand out, the walking sheep streaming past behind them" },
+    { "0180_what_was_on_it_p7_object_insert.png", 1, {49.0f, 37.6f, 17.0f, 27.2f}, {69.0f, 24.0f, 30.0f, 24.0f}, "five small worn coins lying in a young open palm, grass seed and dried blood on the fingers, morning light across them" },
+};
+static const CsLine CS_0180_what_was_on_it_LINES[] = {
+    { "Distel", "He's dead. You killed him, and he'd have killed me. Both of those are true.", 1, CS_SORROW, nullptr, CS_LEFT, "" },
+    { "Falke", "I'm sorry. I didn't want to.", 1, CS_SORROW, "portrait_bron.png", CS_RIGHT, "" },
+    { "Distel", "I know. Bring the lamp closer. Behind his ear.", 1, CS_SORROW, nullptr, CS_LEFT, "" },
+    { "Ottilie", "Nine of them, all the same size, healed shut years ago.", 2, CS_DREAD, "portrait_lyra.png", CS_LEFT, "" },
+    { "Distel", "I've known him since he was a pup. I have never seen those.", 3, CS_DREAD, nullptr, CS_LEFT, "" },
+    { "Distel", "A drover does not forget his handler. Not ever.", 4, CS_DREAD, nullptr, CS_LEFT, "" },
+    { "Falke", "He forgot you.", 4, CS_DREAD, "portrait_bron.png", CS_RIGHT, "" },
+    { "Distel", "So it was done to him. If it was done to mine, it was done to others.", 4, CS_DREAD, nullptr, CS_LEFT, "" },
+    { "Garbe", "Garbe, and that's my flock walking home on its own legs.", 5, CS_DREAD, nullptr, CS_RIGHT, "" },
+    { "Garbe", "Five coin, the way the job sheet said. I'll take the sheet off the board tonight.", 6, CS_DREAD, nullptr, CS_RIGHT, "" },
+    { "Ottilie", "Put it somewhere you won't sit on it.", 7, CS_HOPE, "portrait_lyra.png", CS_LEFT, "" },
+    { "Distel", "I'm going up to find out what was done to him. I don't need either of you.", 7, CS_HOPE, nullptr, CS_LEFT, "" },
+    { "Ottilie", "We're coming. Walk in the middle, you're asleep on your feet.", 7, CS_HOPE, "portrait_lyra.png", CS_LEFT, "" },
+    { "Distel", "I'm going to cry soon. Keep walking.", 7, CS_SORROW, nullptr, CS_LEFT, "" },
+    { "Falke", "Then we walk. Which way is up your mountain?", 7, CS_SORROW, "portrait_bron.png", CS_RIGHT, "" },
+};
+
+static const CsScene CS_CHAPTER01[] = {
+    { "0110_the_yard", "The Yard", false, CS_PANELS, nullptr, CS_0110_the_yard_PANELS, 7, CS_0110_the_yard_LINES, 14 },
     { "0130_the_counter", "The Counter", false, CS_TALK, nullptr, nullptr, 0, CS_0130_the_counter_LINES, 14 },
     { "0140_supper", "Supper", false, CS_TALK, nullptr, nullptr, 0, CS_0140_supper_LINES, 14 },
+    { "0150_the_sword", "The Sword", false, CS_PANELS, nullptr, CS_0150_the_sword_PANELS, 8, CS_0150_the_sword_LINES, 14 },
+    { "0160_the_herder", "The Herder", false, CS_PANELS, nullptr, CS_0160_the_herder_PANELS, 7, CS_0160_the_herder_LINES, 15 },
+    { "0180_what_was_on_it", "What Was On Him", false, CS_PANELS, nullptr, CS_0180_what_was_on_it_PANELS, 7, CS_0180_what_was_on_it_LINES, 15 },
 };
-static const int CS_INTRO_COUNT = sizeof(CS_INTRO) / sizeof(CS_INTRO[0]);
+static const int CS_CHAPTER01_COUNT = sizeof(CS_CHAPTER01) / sizeof(CS_CHAPTER01[0]);
+
+struct CsChapter { const char *id; int number; const CsScene *scenes; int count; };
+#define CS_HAS_CHAPTERS 1
+static const CsChapter CS_CHAPTERS[] = {
+    { "chapter01", 1, CS_CHAPTER01, CS_CHAPTER01_COUNT },
+};
+static const int CS_CHAPTER_COUNT = sizeof(CS_CHAPTERS) / sizeof(CS_CHAPTERS[0]);
+// New Game starts at CS_CHAPTERS[0].
