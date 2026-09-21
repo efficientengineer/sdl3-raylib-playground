@@ -175,6 +175,14 @@ valley deal with them, sayings) but have never come to Halm — no yearly market
 Halm's first meeting with them: a first for Falke and the town, not for the world. Open question the
 chapter leaves: why here, why now.
 
+**Owner:** "Maybe the guard beast has gone rogue?" Orchestrator's reading (owner not yet confirmed): the
+beast still does its job with nobody in charge — gathers any animals it finds each night, puts them to
+sleep, moves them on (explains every clue). The night herders are near Halm because they followed their
+runaway beast down; light magic and small bodies can't stop it. The fight: Falke's parry opens it, a
+herder puts it to sleep while it is held open — neither could alone. Leaves the better open question:
+guard beasts don't go rogue; what happened to this one (the answer is up the mountain; not needed yet).
+Draft choice: the beast sleeps and is carried home (orchestrator leans this) vs. has to be put down.
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
