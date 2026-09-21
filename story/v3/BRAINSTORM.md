@@ -206,6 +206,12 @@ find out and Falke goes too. The sheep wake, the shepherd pays (first coin as a 
 paper, not solved. Optional: something visibly wrong found on the beast, meaning undecided (would go in
 THREADS.md).
 
+## WRITE IT, round 2 (owner, 2026-09-21): "Go ahead with suggestions. I think we need two agents though, one with a writing and story emphasis and one with a gameplay emphasis, and they should work together. Writer is obvious, but the gameplay agent needs to work on what the player actually gets to do in between scenes."
+
+Accepted thereby: read "save it" as Falke saving the herder; two-phase boss; something visibly wrong on
+the beast (meaning undecided → THREADS); the herder young and prickly; whether they stay is answered by
+"find the cause". Shared workspace for the two agents: `story/v3/ch01_room/`.
+
 ## Later pool (liked, not placed)
 
 - The burrow people (owner likes them): stocky traders and tinkerers under the ground, doors in the
