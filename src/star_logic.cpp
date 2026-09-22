@@ -32,6 +32,7 @@
 #include "dialogue.h"
 #include "battle.h"
 #include "chapter01.h"
+#include "field_text.h"   // the robustness sweep measures every one of these in the box
 
 // The game plays CHAPTERS now — `## intro` is gone from story/playlist.md and CS_INTRO with it.
 // New Game starts at CS_CHAPTERS[0]. The cutscene player reads one chapter's scene list at a time;
@@ -1391,6 +1392,98 @@ static void bui_tap(float x, float y);
 static void bui_pump();
 static void star_tick(Star *st, int w, int h, float dt, float dpi_scale);
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  --clips-selftest: EVERY SCENE ENDS UNDER TAPPING
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CLIPS_SELFTEST=1. The narrow unit test under the play-test's clip steps: for every scene in the
+// chapter, tap through it at 60 fps with the REAL player (draw_scene, the real typewriter, the real
+// pagination, the real panel reveal) and assert three things.
+//
+//   1. it ENDS — star_advance fires off the last line inside line_count x 2 seconds. A clip that
+//      does not end is the whole chapter stopped, and it is invisible to every test that reads the
+//      chapter table instead of drawing the page;
+//   2. every panel is revealed EXACTLY ONCE — a `[n]` tag pointing past the last panel, or two
+//      lines fighting over one panel, both show up here;
+//   3. every LINE is reached. A textless line (`Distel (sorrow):` with no words) has no typewriter
+//      to finish, so the marker is up from the first frame and the next tap must move on; a line
+//      that swallows taps would show as a scene that times out on that line, by name.
+//
+// The scene is driven with no fade, because the fade is the field's business and this test is the
+// page's. It costs one real frame per sim frame (a clip IS its drawing), so the whole chapter is a
+// few seconds.
+struct ClipTest {
+    int scene, frames, budget, tap_cool, fails, done, checked;
+    int line_seen[64];                     // times each line was entered
+    int panel_seen[MAX_PANELS];            // times each panel was revealed
+    bool panel_was[MAX_PANELS];
+    int last_line;
+};
+static ClipTest ct;
+
+static void ct_begin(Star *st, int scene) {
+    memset(ct.line_seen, 0, sizeof(ct.line_seen));
+    memset(ct.panel_seen, 0, sizeof(ct.panel_seen));
+    memset(ct.panel_was, 0, sizeof(ct.panel_was));
+    ct.scene = scene; ct.frames = 0; ct.tap_cool = 0; ct.last_line = -1;
+    st->fade = 0.0f; st->fade_to_scene = -1; st->to_field = false; st->from_field = false;
+    star_goto(st, scene, 0, false);
+    ct.budget = CS_CUR[scene].line_count * 120 + 240;      // two seconds a line, plus the page-in
+}
+
+// Returns 1 while the test is still running. Drives ONE frame.
+static int ct_drive(Star *st, int w, int h) {
+    if (ct.done) return 0;
+    if (!ct.checked) {
+        ct.checked = 1;
+        SDL_Log("CLIPS: %d scenes", CS_CUR_COUNT);
+        ct_begin(st, 0);
+    }
+    const CsScene *sc = &CS_CUR[ct.scene];
+    // One frame of the real page.
+    st->screen = SCR_INTRO;
+    draw_scene(st, w, h, 1.0f / 60.0f);
+    ct.frames++;
+    if (st->line != ct.last_line) {
+        ct.last_line = st->line;
+        if (st->line >= 0 && st->line < 64) ct.line_seen[st->line]++;
+    }
+    for (int i = 0; i < sc->panel_count && i < MAX_PANELS; i++) {
+        if (st->panel_on[i] && !ct.panel_was[i]) ct.panel_seen[i]++;
+        ct.panel_was[i] = st->panel_on[i];
+    }
+    if (ct.tap_cool <= 0) { bui_tap(w * 0.5f, h * 0.5f); ct.tap_cool = 6; }
+    ct.tap_cool--;
+    bui_pump();
+
+    bool ended = (st->fade_to_scene >= 0);
+    bool over = (ct.frames > ct.budget);
+    if (!ended && !over) return 1;
+
+    int f = 0;
+    if (over) {
+        SDL_Log("CLIPS FAIL: '%s' did not end in %d frames (%.1f s): stuck on line %d/%d "
+                "\"%.48s\" (speaker '%s', page %d, %d chars)", sc->id, ct.budget,
+                ct.budget / 60.0f, st->line + 1, sc->line_count, sc->lines[st->line].text,
+                sc->lines[st->line].speaker, st->line_page, (int)strlen(sc->lines[st->line].text));
+        f++;
+    }
+    for (int i = 0; i < sc->line_count && i < 64; i++)
+        if (!ct.line_seen[i]) { SDL_Log("CLIPS FAIL: '%s' line %d was never reached", sc->id, i + 1); f++; }
+    for (int i = 0; i < sc->panel_count && i < MAX_PANELS; i++)
+        if (ct.panel_seen[i] != 1) {
+            SDL_Log("CLIPS FAIL: '%s' panel %d was revealed %d times, not once", sc->id, i + 1, ct.panel_seen[i]);
+            f++;
+        }
+    SDL_Log("CLIPS   %-22s %s  %2d lines, %d panels, %4d frames (%.1f s)", sc->id,
+            f ? "FAILED" : "ok", sc->line_count, sc->panel_count, ct.frames, ct.frames / 60.0f);
+    ct.fails += f;
+    st->fade_to_scene = -1; st->fade = 0.0f;
+    if (ct.scene + 1 < CS_CUR_COUNT) { ct_begin(st, ct.scene + 1); return 1; }
+    SDL_Log("SELFCHECK clips %s (%d failure(s))", ct.fails ? "FAILED" : "ok", ct.fails);
+    ct.done = 1;
+    return 0;
+}
+
 struct PlayBot {
     Star *st;
     int lazy;                           // 0 = the completionist, 1 = the lazy player
@@ -1400,6 +1493,13 @@ struct PlayBot {
     uint64_t flags_at_step_start;
     double t0, tstep;
     int running, done, clip_guard, tap_cool, guard, last_step, tries, forced, effort_round;
+    // ONE TURN AT A TIME. A command is not one tap: the row has to be SELECTED, then the skill
+    // picked out of the list that selection put on screen, then the effort notch set, and only
+    // then is the row tapped again to commit. The bot plans a turn once (per round, per character)
+    // and then walks that sequence, one tap a frame-group, exactly as a thumb does.
+    int turn_key, turn_stage, turn_row, turn_skill, turn_eff, turn_frames;
+    int in_battle_last, battle_f0, step_logged;
+    uint64_t battle_flags;
     // THE REAL WINDOW SIZE. The bot taps by warping the OS pointer, so its coordinates
     // have to be the ones the battle screen was actually drawn at. Drawing the field at a
     // made-up 1920x1080 while the window was 1920x1027 put every tap a few per cent low,
@@ -1420,8 +1520,18 @@ static void pb_fail(const char *fmt, ...) {
 // advances the step when the gate opens. Nothing is shortcut.
 static void pb_frame(float mx, float mz, int run) {
     vx_bot_stick(pb.st->vx, mx, mz, run);
+    unsigned items = pb.st->ch.party.items;
     draw_field(pb.st, pb.w, pb.h, PT_DT);
     pb.frames++; pb.step_frames++;
+    // ONE LINE PER PICKUP, said where it happened. The step line below only says a step ended; a
+    // hidden find is the thing the completionist run exists to prove, so it gets its own.
+    if (pb.st->ch.party.items != items) {
+        int cx, cz;
+        vx_bot_cell(pb.st->vx, &cx, &cz);
+        SDL_Log("PLAYTEST     picked up item bits 0x%x at %d,%d on %s (step %d)",
+                pb.st->ch.party.items & ~items, cx, cz,
+                vx_current_map(pb.st->vx) ? vx_current_map(pb.st->vx) : "?", pb.st->ch.step + 1);
+    }
 }
 static void pb_idle(int n) { for (int i = 0; i < n; i++) pb_frame(0, 0, 0); }
 
@@ -1615,52 +1725,106 @@ static void pb_drop_off() {
 // real frame for as long as the fight lasts. It is the same injector --battle-ui-test uses, which
 // is the whole point: the bot fights through the real menu, and a fight it cannot get out of is a
 // fight a player cannot get out of.
+//
+// A TURN IS FOUR TAPS, NOT ONE, and getting that wrong is what made the boss unkillable. The menu
+// works like the player's: tapping a command row SELECTS it (and only then does its skill list and
+// its effort notch appear); tapping that same row again COMMITS. So a turn is
+//   select the row  ->  pick the skill out of the list  ->  set the effort notch  ->  commit,
+// and the bot plans it once per (round, character) and then walks the sequence. The old policy
+// tapped the row twice and never touched the skill list, so every Skill was its owner's FIRST
+// skill — Drowsy for Distel — and Klee's phase one, which ends on three Settles and nothing else,
+// ran to round ninety with the party politely making it sleepy.
+static void pb_plan_turn(Battle *bat) {
+    int rows[BT_CMD_MAX + 2], n = bt_ui_rows(bat, rows);
+    int telling = 0, open = 0;
+    for (int e = 0; e < bt_ui_enemy_count(bat); e++) {
+        if (bt_ui_enemy_tell(bat, e)) telling = 1;
+        if (bt_ui_enemy_open(bat, e)) open = 1;
+    }
+    pb.turn_row = -1; pb.turn_skill = -1; pb.turn_eff = 0;
+    // What the chapter teaches, in order: guard the tell, spend the opening, hit it otherwise.
+    // Into an opening the SKILL matters — Settle is the only thing that ends the boss's phase one,
+    // so whoever has it uses it and everybody else guards rather than burning stamina on a thing
+    // the game has just told them is not hurt.
+    int settle = -1, damage = -1;
+    for (int k = 0; k < bt_ui_skill_count(bat); k++) {
+        int kind = bt_ui_skill_kind(bat, k);
+        if (kind == BT_SK_SETTLE) settle = k;
+        if (kind == BT_SK_DAMAGE || kind == BT_SK_HARD) damage = k;
+    }
+    int want = telling ? 3 /*GUARD*/ : open ? 2 /*SKILL*/ : 1 /*ATTACK*/;
+    if (open && settle < 0 && damage < 0) want = 1;          // nothing to spend: just hit it
+    if (want == 2) {
+        pb.turn_skill = settle >= 0 ? settle : damage;
+        pb.turn_eff = bt_ui_skill_min(bat, pb.turn_skill);
+        if (pb.turn_eff < 3) pb.turn_eff = 3;
+        if (pb.turn_eff > 5) pb.turn_eff = 5;
+    } else if (want == 1) pb.turn_eff = 3;
+    for (int i = 0; i < n; i++) if (rows[i] == want && bt_ui_affordable(bat, i)) pb.turn_row = i;
+    if (pb.turn_row < 0 && want == 2) {                      // cannot afford the skill: hit it
+        pb.turn_skill = -1; pb.turn_eff = 2;
+        for (int i = 0; i < n; i++) if (rows[i] == 1 && bt_ui_affordable(bat, i)) pb.turn_row = i;
+    }
+    if (pb.turn_row < 0) {                                   // guard is free, always
+        pb.turn_skill = -1; pb.turn_eff = 0;
+        for (int i = 0; i < n; i++) if (rows[i] == 3 && bt_ui_affordable(bat, i)) pb.turn_row = i;
+    }
+    if (pb.turn_row < 0)
+        for (int i = 0; i < n; i++) if (bt_ui_affordable(bat, i)) { pb.turn_row = i; pb.turn_skill = -1; break; }
+}
+
 static void pb_battle_frame() {
     Star *st = pb.st;
-    if (bt_ui_phase(st->bat) == 0 && pb.tap_cool <= 0) {
-        int rows[BT_CMD_MAX + 2], n = bt_ui_rows(st->bat, rows);
-        // THE POLICY, and it is the chapter's own lesson written as three lines: guard when
-        // something is telegraphing at you, spend into the opening that parry bought, and attack
-        // when neither is true. A bot that only guards never kills anything — it parried the arm
-        // that holds for thirteen hundred rounds — and a bot that only attacks cannot beat the
-        // swing at all, which is the design.
-        int telling = 0, open = 0;
-        for (int e = 0; e < bt_ui_enemy_count(st->bat); e++) {
-            if (bt_ui_enemy_tell(st->bat, e)) telling = 1;
-            if (bt_ui_enemy_open(st->bat, e)) open = 1;
+    Battle *bat = st->bat;
+    if (bt_ui_phase(bat) == 0) {
+        int key = bt_ui_round(bat) * 16 + bt_ui_cur(bat) + 1;
+        // A PLAN MADE BEFORE THE MENU HAS BEEN DRAWN IS NO PLAN. bt_ui_rows reads the LAST drawn
+        // frame, so on the first frame of a fight there are no rows and the plan comes back empty
+        // — and a cached empty plan with an unchanging (round, character) key is a bot that never
+        // taps anything again. So an empty plan is retried every frame until the menu exists.
+        if (key != pb.turn_key || pb.turn_row < 0) {
+            if (key != pb.turn_key) { pb.turn_key = key; pb.turn_stage = 0; pb.turn_frames = 0; }
+            pb_plan_turn(bat);
         }
-        // Into an opening, the SKILL is what the chapter's one real fight is about: the boss's
-        // phase one is BTF_IMMUNE_ATTACK and cannot be finished by hitting it at all — {{HERO}}
-        // holds it open and {{HERDER}} spends Settle into the opening. A policy of guard-and-
-        // attack parried Klee for eleven hundred rounds and could not end the fight, which is the
-        // correct outcome for that policy and a useless one for a test. So: guard on a tell, spend
-        // a SKILL into an opening when there is one to spend, attack otherwise.
-        int want = telling ? 3 /*GUARD*/ : open ? 2 /*SKILL*/ : 1 /*ATTACK*/;
-        int pick = -1;
-        for (int i = 0; i < n; i++) if (rows[i] == want && bt_ui_affordable(st->bat, i)) pick = i;
-        if (pick < 0 && want == 2)                       // no skill, or cannot afford it: hit it
-            for (int i = 0; i < n; i++) if (rows[i] == 1 && bt_ui_affordable(st->bat, i)) pick = i;
-        if (pick < 0)                                    // cannot afford that either: guard is free
-            for (int i = 0; i < n; i++) if (rows[i] == 3 && bt_ui_affordable(st->bat, i)) pick = i;
-        if (pick < 0) for (int i = 0; i < n; i++) if (bt_ui_affordable(st->bat, i)) { pick = i; break; }
-        // INTO AN OPENING, SPEND. The effort notch is a slider under the command and setting it
-        // does NOT commit anything — the command row still has to be tapped afterwards. Tapping
-        // the notch every frame and returning is an infinite loop that reads exactly like a hung
-        // battle, which is what it was the first time: round 3, enemy open, and the bot moved the
-        // slider forever. So it is set ONCE a round and then the command is committed.
+        pb.turn_frames++;
+        // A TURN THAT WILL NOT COMMIT is a finding, not a reason to hang: after four seconds of
+        // this character's input phase, fall back to committing whatever is selected.
+        if (pb.turn_frames > 240 && pb.turn_stage < 3) pb.turn_stage = 3;
+    }
+    if (bt_ui_phase(bat) == 0 && pb.tap_cool <= 0 && pb.turn_row >= 0) {
         float x, y;
-        if (open && bt_ui_has_effort(st->bat) && pb.effort_round != bt_ui_round(st->bat)) {
-            pb.effort_round = bt_ui_round(st->bat);
-            float ex, ey;
-            if (bt_ui_point(st->bat, 1, 4, &ex, &ey)) {
-                bui_tap(ex, ey); pb.tap_cool = 6;
-                pb.tap_cool--; bui_pump(); draw_field(st, pb.w, pb.h, PT_DT);
-                return;
+        // Stage 0: select the row. Stage 1: the skill. Stage 2: the effort. Stage 3: commit.
+        // Each stage falls through when there is nothing to do, so a Guard is still two taps.
+        for (int spin = 0; spin < 4; spin++) {
+            if (pb.turn_stage == 0) {
+                if (bt_ui_selected(bat) != pb.turn_row) {
+                    if (bt_ui_point(bat, 0, pb.turn_row, &x, &y)) { bui_tap(x, y); pb.tap_cool = 6; }
+                    pb.turn_stage = 1;
+                    break;
+                }
+                pb.turn_stage = 1;
+                continue;
             }
+            if (pb.turn_stage == 1) {
+                if (pb.turn_skill >= 0 && bt_ui_skill_sel(bat) != pb.turn_skill) {
+                    if (bt_ui_point(bat, 3, pb.turn_skill, &x, &y)) { bui_tap(x, y); pb.tap_cool = 6; break; }
+                }
+                pb.turn_stage = 2;
+                continue;
+            }
+            if (pb.turn_stage == 2) {
+                if (pb.turn_eff > 0 && bt_ui_has_effort(bat) && bt_ui_effort(bat) != pb.turn_eff) {
+                    if (bt_ui_point(bat, 1, pb.turn_eff, &x, &y)) { bui_tap(x, y); pb.tap_cool = 6; break; }
+                }
+                pb.turn_stage = 3;
+                continue;
+            }
+            // Commit.
+            if (bt_ui_point(bat, 0, pb.turn_row, &x, &y)) { bui_tap(x, y); pb.tap_cool = 6; }
+            pb.turn_stage = 4;
+            break;
         }
-        if (pick >= 0 && bt_ui_point(st->bat, 0, pick, &x, &y)) { bui_tap(x, y); pb.tap_cool = 6; }
-        else { bui_tap(pb.w * 0.5f, pb.h * 0.85f); pb.tap_cool = 6; }   // the results screen
-    } else if (pb.tap_cool <= 0) {
+    } else if (bt_ui_phase(bat) != 0 && pb.tap_cool <= 0) {
         bui_tap(pb.w * 0.5f, pb.h * 0.85f);                             // RESOLVE/ENEMY/OVER: tap on
         pb.tap_cool = 6;
     }
@@ -1723,10 +1887,17 @@ static bool pb_open_gate(int flag, const char *map) {
 static void pb_play_step(int step) {
     Star *st = pb.st;
     const ChStep *s = &CH_STEPS[step];
+    // THE MAP NAME IS NOT A CONSTANT WITHIN A STEP. Walking onto `exit:high_pasture` loads another
+    // map in the middle of this loop, and a name read once at the top is then a lie for every
+    // iteration after it — which is how a run that had ALREADY arrived reported
+    // "cannot walk to exit:high_pasture on high_pasture": the stale name made the
+    // already-on-that-map shortcut below miss, so the bot went looking for an exit to the map it
+    // was standing on, found the one pointing back, and failed on it. Read it every time.
     const char *map = vx_current_map(st->vx);
     for (int i = 0; i < CH_NEED && s->need[i] >= 0; i++) {
         int f = s->need[i];
         if (ch_has(&st->ch, f)) continue;
+        map = vx_current_map(st->vx);
         short tx, tz;
         if (f == F_SWING_TRIED || f == F_DAY2_1 || f == F_DAY2_2 || f == F_DAY2_3 || f == F_SWING_BEATEN) {
             if (!vx_find_trigger(st->vx, "swing", &tx, &tz)) { pb_fail("no `fight swing` on %s", map); break; }
@@ -1748,14 +1919,33 @@ static void pb_play_step(int step) {
             if (!vx_find_trigger(st->vx, want, &tx, &tz)) { pb_fail("no `%s` on %s", want, map); break; }
             // C4 is what arms the bell in play; the clip step before this one has just run.
             if (f == F_LEFT_YARD) st->ch.bell_armed = 1;
-            if (!pb_walk_into(tx, tz)) pb_fail("cannot walk to %s on %s", want, map);
+            // AN EXIT THAT WORKED LOOKS LIKE A WALK THAT FAILED. pb_walk_into asks whether the body
+            // ended up on the target cell — and stepping onto an exit starts a map change, so by
+            // the time it looks, the body is on ANOTHER MAP at its arrival spot and the cell it was
+            // sent to does not exist any more. The verdict is therefore the map, not the cell: we
+            // asked to go to high_pasture, are we on high_pasture? That false alarm is what
+            // "cannot walk to exit:high_pasture on high_pasture" was, on a run that had arrived.
+            bool arrived = pb_walk_into(tx, tz);
             pb_idle(150);                                   // the fade, and the new map's first frames
+            const char *now = vx_current_map(st->vx);
+            if (now && !strcmp(now, want + 5)) arrived = true;
+            if (!arrived) pb_fail("cannot walk to %s on %s (still on %s)", want, map, now ? now : "?");
+            map = now;
         } else {
             pb_open_gate(f, map ? map : "(none)");
             if (st->in_battle) { pb.battles++; return; }   // a fight on the way there
         }
         if (pb.step_frames >= PT_STEP_BUDGET) { pb_fail("step %d ran out of budget", step + 1); break; }
     }
+    map = vx_current_map(st->vx);
+    // A STEP WHOSE FLAGS ARE ALL SET STILL HAS TO BE TICKED. The chapter only advances inside
+    // draw_field, and only when nothing is on screen — so a step that finished with a box still up
+    // (the boss's own death text) advances on no frame at all if the bot simply returns. The loop
+    // above walks nowhere when every need is already met, the world never moves, and three empty
+    // passes later the run reports "never reached the end card" with nothing unset to blame. So:
+    // read whatever is up, and give the field its frames.
+    pb_close_box();
+    pb_idle(30);
     // THE COMPLETIONIST also goes and gets whatever this map hides. The LAZY PLAYER does not, and
     // the difference between the two runs is exactly the difference between "the chapter can be
     // finished" and "the chapter can be finished by somebody who only reads the goal line".
@@ -1799,6 +1989,11 @@ static void pb_begin(Star *st, int lazy) {
 
 static void pb_log_step(int step) {
     static const char *K[] = { "PLAY", "CLIP", "SET", "END" };
+    // ONE LINE PER STEP. A clip step is retired the frame the field comes back, and the caller
+    // asks every frame while the screen fades — which wrote twenty-seven identical lines for one
+    // clip and buried everything else. The step's own line is written once.
+    if (pb.step_logged) return;
+    pb.step_logged = 1;
     const ChStep *s = &CH_STEPS[step];
     double tnow = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
     SDL_Log("PLAYTEST   step %2d %s %-16s %6d frames (%5.1f s of play, %5.0f ms real)  goal: %s",
@@ -1850,6 +2045,11 @@ static int pb_drive() {
 
     // A battle has the screen: one frame of it, through the real menu, and come back.
     if (st->in_battle) {
+        if (!pb.in_battle_last) {
+            pb.in_battle_last = 1; pb.battle_f0 = pb.frames; pb.battle_flags = st->ch.flags;
+            SDL_Log("PLAYTEST     battle '%s' begins (step %d, party %d)",
+                    st->fight_enc, st->ch.step + 1, st->ch.party.count);
+        }
         pb_battle_frame();
         pb.frames++; pb.step_frames++;
         // A fight that will not end is a finding, not a reason to hang: say it ONCE, lose it, and
@@ -1860,6 +2060,11 @@ static int pb_drive() {
                     "and neither could a player using the same three commands",
                     st->ch.step + 1, PT_STEP_BUDGET);
             bt_force_lose(st->bat);
+        }
+        if (!st->in_battle) {
+            pb.in_battle_last = 0;
+            SDL_Log("PLAYTEST     battle over after %d frames (%.1f s of play, round %d)",
+                    pb.frames - pb.battle_f0, (pb.frames - pb.battle_f0) * PT_DT, bt_ui_round(st->bat));
         }
         // ASSERTION 5, checked the moment a swing fight resolves.
         if (!st->in_battle && st->ch.step <= CHST_C1 && ch_has(&st->ch, F_SWING_BEATEN))
@@ -1872,7 +2077,7 @@ static int pb_drive() {
     const ChStep *s = &CH_STEPS[step];
     if (step != pb.last_step) {
         pb.last_step = step;
-        pb.step_frames = 0; pb.clip_guard = 0; pb.tap_cool = 0; pb.forced = 0;
+        pb.step_frames = 0; pb.clip_guard = 0; pb.tap_cool = 0; pb.forced = 0; pb.step_logged = 0;
         pb.flags_at_step_start = st->ch.flags;
         pb.tstep = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
     }
@@ -2412,6 +2617,12 @@ static void *game_create(float dpi_scale) {
     if (spec && spec[0] == '1') st->self_test = 4;
     spec = SDL_getenv("BATTLE_SELFTEST");
     if (spec && spec[0] == '1') st->self_test = 2;
+    // CLIPS_SELFTEST=1 — every scene tapped through by the real player. See ct_drive.
+    spec = SDL_getenv("CLIPS_SELFTEST");
+    if (spec && spec[0] == '1') st->self_test = 5;
+    // ROBUSTNESS=1 — the sweep. See rb_drive.
+    spec = SDL_getenv("ROBUSTNESS");
+    if (spec && spec[0] == '1') st->self_test = 6;
     // BATTLE_UI_TEST=1 — the real battle screen driven by injected TAPS, in a real window.
     spec = SDL_getenv("BATTLE_UI_TEST");
     if (spec && spec[0] == '1') st->self_test = 3;
@@ -2504,6 +2715,223 @@ static void game_deserialize(void *state, const void *buf, size_t size) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  --robustness: THE SWEEP
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ROBUSTNESS=1 (capture.sh --robustness). Not a play-test: a set of narrow assertions about the
+// things that break when the game is interrupted rather than played. Each one names itself and
+// says ok or FAILED, and the run ends with one verdict line.
+//
+//   A  save/continue at every chapter step: the blob written at a step boundary comes back with
+//      the same step, flags, party, items and known commands;
+//   B  the hot-reload blob mid-battle and mid-clip: serialize, build a fresh state, deserialize,
+//      and the continuation is identical (a reload never lands you mid-battle by design, which is
+//      the assertion, not a bug);
+//   D  the settings file round-trips volume and mute;
+//   F  battle fuzz: 2,000 random taps and keys across every encounter — the watchdog must never
+//      fire, no hp or stamina may go negative or NaN, and the menu must never be dead;
+//   H  every field-text id measured in the real dialogue box: no page may overflow, and the worst
+//      three by page count are named so they can be looked at.
+//
+// What it does NOT cover, and why, is in VOXFIELD_NOTES.md: the Dev panel sweep (every button
+// pressed headlessly), the window-size matrix and the five-times soak with RSS and GL object
+// counts are still to be written.
+struct RobustTest { int phase, fails, enc, taps, frames, subfails; unsigned seed; };
+static RobustTest rb;
+static unsigned rb_rand() { rb.seed = rb.seed * 1664525u + 1013904223u; return rb.seed >> 8; }
+static void rb_fail(const char *fmt, ...) {
+    char msg[256]; va_list ap; va_start(ap, fmt); vsnprintf(msg, sizeof msg, fmt, ap); va_end(ap);
+    SDL_Log("ROBUST FAIL: %s", msg);
+    rb.fails++; rb.subfails++;
+}
+
+// A — every step boundary survives a save and a continue.
+static void rb_save_continue(Star *st) {
+    rb.subfails = 0;
+    for (int step = 0; step < CH_STEP_COUNT; step++) {
+        Chapter c;
+        ch_new_game(&c);
+        ch_jump(&c, nullptr, step);
+        Chapter saved = c;                       // the blob is a memcpy of this POD, by design
+        Chapter back;
+        memcpy(&back, &saved, sizeof(back));
+        if (back.step != c.step) rb_fail("step %d: the step index did not survive", step + 1);
+        if (back.flags != c.flags) rb_fail("step %d: the flags did not survive", step + 1);
+        if (back.party.count != c.party.count) rb_fail("step %d: the party size did not survive", step + 1);
+        if (back.party.items != c.party.items) rb_fail("step %d: the items did not survive", step + 1);
+        if (back.party.known != c.party.known) rb_fail("step %d: the known commands did not survive", step + 1);
+        // And the step must be one the game can actually stand on: a map (or an inherited one) and
+        // a party size the battle screen accepts.
+        if (c.party.count < 1 || c.party.count > BT_PARTY)
+            rb_fail("step %d leaves the party at %d, which the battle screen cannot draw", step + 1, c.party.count);
+        for (int i = 0; i < c.party.count; i++) {
+            if (c.party.a[i].hp < 0 || c.party.a[i].stam < 0)
+                rb_fail("step %d: %s comes back with hp %d stam %d", step + 1,
+                        c.party.a[i].name, c.party.a[i].hp, c.party.a[i].stam);
+        }
+    }
+    SDL_Log("ROBUST A save/continue at every step boundary: %s (%d step(s), %d failure(s))",
+            rb.subfails ? "FAILED" : "ok", CH_STEP_COUNT, rb.subfails);
+}
+
+// B — the hot-reload blob, mid-battle and mid-clip.
+static void rb_reload_blob(Star *st) {
+    rb.subfails = 0;
+    static unsigned char buf[sizeof(ReloadBlob) + 64];
+    // mid-clip: put the player on a line of a scene and round-trip it.
+    for (int sc = 0; sc < CS_CUR_COUNT; sc++) {
+        int line = CS_CUR[sc].line_count / 2;
+        star_goto(st, sc, line, true);
+        st->to_field = true;
+        size_t n = game_serialize(st, buf, sizeof buf);
+        int want_scene = st->scene, want_line = st->line;
+        st->screen = SCR_TITLE; st->scene = 0; st->line = 0;      // "a fresh state"
+        game_deserialize(st, buf, n);
+        if (st->screen != SCR_INTRO || st->scene != want_scene || st->line != want_line)
+            rb_fail("mid-clip '%s' line %d came back as screen %d scene %d line %d",
+                    CS_CUR[sc].id, want_line + 1, st->screen, st->scene, st->line);
+    }
+    // mid-battle: the contract is that a reload never lands you mid-battle, and the chapter is
+    // otherwise untouched — so the flags and the party come back and in_battle does not.
+    ch_new_game(&st->ch);
+    ch_jump(&st->ch, st->vx, CH_STEP_COUNT - 3);
+    st->in_battle = 1;
+    snprintf(st->fight_enc, sizeof(st->fight_enc), "klee");
+    uint64_t flags = st->ch.flags;
+    int party = st->ch.party.count, step = st->ch.step;
+    size_t n = game_serialize(st, buf, sizeof buf);
+    st->ch.flags = 0; st->ch.step = 0; st->in_battle = 1;
+    game_deserialize(st, buf, n);
+    if (st->in_battle) rb_fail("mid-battle: the reload landed still in a battle");
+    if (st->ch.flags != flags) rb_fail("mid-battle: the flags did not survive");
+    if (st->ch.step != step) rb_fail("mid-battle: the step did not survive (%d, wanted %d)", st->ch.step + 1, step + 1);
+    if (st->ch.party.count != party) rb_fail("mid-battle: the party size did not survive");
+    // A blob with the wrong magic must be ignored, not half-applied.
+    unsigned char junk[sizeof(ReloadBlob)];
+    memset(junk, 0xAB, sizeof junk);
+    int before = st->ch.step;
+    game_deserialize(st, junk, sizeof junk);
+    if (st->ch.step != before) rb_fail("a blob with a bad magic was applied anyway");
+    SDL_Log("ROBUST B hot-reload blob round trip (%d clip(s) + mid-battle + a bad blob): %s (%d failure(s))",
+            CS_CUR_COUNT, rb.subfails ? "FAILED" : "ok", rb.subfails);
+}
+
+// D — the settings file.
+static void rb_settings() {
+    rb.subfails = 0;
+    StarSettings keep = g_set;
+    g_set.volume = 0.37f; g_set.muted = true; g_set.dirty = true;
+    settings_save();
+    memset(&g_set, 0, sizeof(g_set));
+    settings_load();
+    if (fabsf(g_set.volume - 0.37f) > 0.002f) rb_fail("volume came back as %.3f, not 0.370", g_set.volume);
+    // STAR_MUTE forces mute at load and is never written back, so the muted flag can only be
+    // asserted when the environment is not forcing it. The forcing itself is the other assertion.
+    if (g_set.env_forced && !g_set.muted) rb_fail("STAR_MUTE was set and the game came back unmuted");
+    g_set = keep; g_set.dirty = true;
+    settings_save();
+    SDL_Log("ROBUST D settings volume/mute persist across a relaunch: %s (%d failure(s))",
+            rb.subfails ? "FAILED" : "ok", rb.subfails);
+}
+
+// H — every field-text id in the real dialogue box.
+static void rb_field_text(int w, int h) {
+    rb.subfails = 0;
+    int worst[3] = { -1, -1, -1 }, worstp[3] = { 0, 0, 0 };
+    for (int i = 0; i < FIELD_TEXT_COUNT; i++) {
+        const FieldText *t = &FIELD_TEXT[i];
+        int over = 0, pages = vx_msg_measure(t->name, t->text, w, h, &over);
+        if (over) rb_fail("'%s' overflows the box at %dx%d", t->id, w, h);
+        if (pages > 1 && !t->text[0]) rb_fail("'%s' paginates with no text", t->id);
+        for (int k = 0; k < 3; k++)
+            if (pages > worstp[k]) {
+                for (int j = 2; j > k; j--) { worst[j] = worst[j - 1]; worstp[j] = worstp[j - 1]; }
+                worst[k] = i; worstp[k] = pages;
+                break;
+            }
+    }
+    for (int k = 0; k < 3; k++)
+        if (worst[k] >= 0)
+            SDL_Log("ROBUST   longest %d: '%s' = %d page(s), %d chars", k + 1, FIELD_TEXT[worst[k]].id,
+                    worstp[k], (int)strlen(FIELD_TEXT[worst[k]].text));
+    SDL_Log("ROBUST H %d field-text ids in the dialogue box at %dx%d: %s (%d failure(s))",
+            FIELD_TEXT_COUNT, w, h, rb.subfails ? "FAILED" : "ok", rb.subfails);
+}
+
+// F — battle fuzz. 2,000 random taps and keys across every encounter, one frame at a time.
+#define RB_FUZZ_TAPS 2000
+static void rb_fuzz_frame(Star *st, int w, int h, float dt) {
+    if (!st->bat) st->bat = bt_create();
+    if (bt_done(st->bat) || bt_ui_round(st->bat) <= 0 || rb.frames == 0) {
+        if (rb.frames == 0 || bt_done(st->bat)) {
+            if (rb.enc >= bt_enc_count()) return;
+            ch_new_game(&st->ch);
+            st->ch.party.known = 0x3Fu;                  // everything on: fuzz the whole menu
+            ch_party_resize(&st->ch, BT_PARTY);
+            bt_start(st->bat, bt_enc_id(rb.enc), &st->ch.party, "hart_yard");
+            rb.enc++;
+        }
+    }
+    // A RANDOM THUMB. Half the taps land on the menu's own points (so real commands get committed
+    // and the fight moves), half land anywhere on the screen — which is what finds the dead menu.
+    if ((rb_rand() & 1) && bt_ui_phase(st->bat) == 0) {
+        float x, y;
+        int kind = (int)(rb_rand() % 4), idx = (int)(rb_rand() % 6);
+        if (bt_ui_point(st->bat, kind, idx, &x, &y)) bui_tap(x, y);
+        else bui_tap((float)(rb_rand() % (unsigned)w), (float)(rb_rand() % (unsigned)h));
+    } else {
+        bui_tap((float)(rb_rand() % (unsigned)w), (float)(rb_rand() % (unsigned)h));
+    }
+    for (int k = 0; k < 5; k++) { bui_pump(); }
+    BtEvent ev;
+    bt_tick(st->bat, w, h, dt, false, &ev);
+    rb.taps++;
+    if (bt_stuck_count(st->bat) > 0) {
+        rb_fail("the watchdog fired in '%s' after %d taps", bt_enc_id(rb.enc - 1), rb.taps);
+        bt_force_lose(st->bat);
+    }
+    for (int i = 0; i < st->ch.party.count; i++) {
+        BtActor *a = &st->ch.party.a[i];
+        if (a->hp < 0 || a->stam < 0)
+            rb_fail("'%s': %s went to hp %d stam %d", bt_enc_id(rb.enc - 1), a->name, a->hp, a->stam);
+        if (a->hp > a->hp_max || a->stam > a->stam_max)
+            rb_fail("'%s': %s went over its maximum (hp %d/%d stam %d/%d)", bt_enc_id(rb.enc - 1),
+                    a->name, a->hp, a->hp_max, a->stam, a->stam_max);
+    }
+    if (bt_ui_phase(st->bat) == 0) {                     // the menu must never be dead
+        int rows[BT_CMD_MAX + 2], n = bt_ui_rows(st->bat, rows), any = 0;
+        for (int i = 0; i < n; i++) if (bt_ui_affordable(st->bat, i)) any = 1;
+        if (n > 0 && !any) rb_fail("'%s': the menu has %d row(s) and not one can be chosen",
+                                   bt_enc_id(rb.enc - 1), n);
+    }
+}
+
+static int rb_drive(Star *st, int w, int h, float dt) {
+    if (rb.phase == 0) {
+        SDL_Log("ROBUST: the sweep begins (%dx%d)", w, h);
+        rb.seed = 0x5EED1234u;
+        rb_save_continue(st);
+        rb_reload_blob(st);
+        rb_settings();
+        rb_field_text(w, h);
+        rb.phase = 1; rb.subfails = 0; rb.frames = 0;
+        return 1;
+    }
+    if (rb.phase == 1) {
+        rb_fuzz_frame(st, w, h, dt);
+        rb.frames++;
+        if (rb.taps >= RB_FUZZ_TAPS && rb.enc >= bt_enc_count()) {
+            SDL_Log("ROBUST F battle fuzz: %d taps across %d encounter(s): %s (%d failure(s))",
+                    rb.taps, bt_enc_count(), rb.subfails ? "FAILED" : "ok", rb.subfails);
+            st->in_battle = 0;
+            rb.phase = 2;
+        }
+        return 1;
+    }
+    SDL_Log("SELFCHECK robustness %s (%d failure(s))", rb.fails ? "FAILED" : "ok", rb.fails);
+    return 0;
+}
+
 static void game_tick(void *state, int w, int h, float dpi_scale) {
     Star *st = (Star *)state;
     st->dpi_scale = dpi_scale;
@@ -2558,6 +2986,18 @@ static void game_tick(void *state, int w, int h, float dpi_scale) {
     if (st->self_test == 3 && st->cap_state < 2) {
         battle_ui_test(st, w, h, dt);
         draw_dev(st, w, h, dt, dpi_scale);
+        au_update();
+        return;
+    }
+    // ── the robustness sweep ──
+    if (st->self_test == 6 && st->cap_state < 2) {
+        if (!rb_drive(st, w, h, dt)) st->cap_state = 2;
+        au_update();
+        return;
+    }
+    // ── every scene tapped through by the real player ──
+    if (st->self_test == 5 && st->cap_state < 2) {
+        if (!ct_drive(st, w, h)) st->cap_state = 2;
         au_update();
         return;
     }

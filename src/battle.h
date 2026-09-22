@@ -106,8 +106,34 @@ int bt_ui_round(Battle *b);
 int bt_ui_cur(Battle *b);                    // whose input the screen is taking
 int bt_ui_affordable(Battle *b, int row);    // can this row be committed right now?
 const char *bt_cmd_name(int cmd);
-// kind: 0 = command row, 1 = effort notch (idx 1..5), 2 = enemy. ImGui coordinates.
+// ── THE SKILL LIST, for a test that has to play rather than cheat ──────────────────────────────
+// The skill list is only on screen while the Skill row is the SELECTED one, and a skill is chosen
+// by tapping its name beside the menu — so a bot that only taps command rows can never cast
+// anything but its owner's first skill. That is why the boss's phase one ran for ninety rounds:
+// phase one is ended by three Settles and Settle is Distel's THIRD skill, so the bot was casting
+// Drowsy at a thing that was already open and the fight could not be finished by any amount of
+// patience. These five say what the list holds and where to tap it.
+int bt_ui_skill_count(Battle *b);            // skills of whoever the screen is taking input from
+const char *bt_ui_skill_name(Battle *b, int k);
+int bt_ui_skill_min(Battle *b, int k);       // minimum effort notch this skill needs
+int bt_ui_skill_kind(Battle *b, int k);      // BT_SK_* below
+int bt_ui_skill_sel(Battle *b);              // which one is currently highlighted
+// The skill kinds a caller may reason about. battle.cpp's private BtSkillKind is these numbers.
+#define BT_SK_DAMAGE 0
+#define BT_SK_HEAL   1
+#define BT_SK_CURE   2
+#define BT_SK_SHIELD 3
+#define BT_SK_SLOW   4
+#define BT_SK_WEAKEN 5
+#define BT_SK_SETTLE 6
+#define BT_SK_HARD   7
+// kind: 0 = command row, 1 = effort notch (idx 1..5), 2 = enemy, 3 = skill row. ImGui coordinates.
 bool bt_ui_point(Battle *b, int kind, int idx, float *x, float *y);
+
+// Every encounter the game can start, so a fuzz test can hit all of them without a hard-coded
+// list going stale the next time one is added.
+int bt_enc_count();
+const char *bt_enc_id(int i);
 
 // How many times the soft-lock watchdog has fired in this fight. Must be 0; --battle-ui-test
 // asserts it, and the Dev panel shows it.

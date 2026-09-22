@@ -227,8 +227,21 @@ int main(int argc, char *argv[]) {
     // Landscape only: the cutscene pages are composed for a wide screen. Without this hint SDL
     // overrides the manifest (the window is resizable) and the app follows the phone's auto-rotate.
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
-    SDL_Window *win = SDL_CreateWindow("fungame", 800, 600,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN);
+    // STAR_WINSIZE=WxH (Mac only, tests): a WINDOWED window of exactly that size instead of the
+    // fullscreen one, so the robustness sweep can put the HUD, the battle menu and the dialogue box
+    // through 2400x1080, 1280x720 and a portrait shape without anyone resizing anything by hand.
+    // Unset, nothing changes: the desktop game is still fullscreen and the phone never sees this.
+    int win_w = 800, win_h = 600;
+    SDL_WindowFlags win_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN;
+    if (const char *ws = SDL_getenv("STAR_WINSIZE")) {
+        int a = 0, b = 0;
+        if (sscanf(ws, "%dx%d", &a, &b) == 2 && a >= 320 && b >= 240) {
+            win_w = a; win_h = b;
+            win_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
+            SDL_Log("STAR_WINSIZE: windowed %dx%d", win_w, win_h);
+        }
+    }
+    SDL_Window *win = SDL_CreateWindow("fungame", win_w, win_h, win_flags);
     SDL_GLContext gl_ctx = SDL_GL_CreateContext(win);
     SDL_GL_SetSwapInterval(1);
 

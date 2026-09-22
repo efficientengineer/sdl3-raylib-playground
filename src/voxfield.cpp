@@ -80,6 +80,13 @@
 // How far up or down the interact button can reach, in world units. Two voxels: you can examine
 // something a step above or below you and nothing on a roof. See the exam cone in vx_tick.
 #define VX_EXAM_REACH (VOX_S * 2.0f + 0.001f)
+#define VX_EXAM_Q     6          // triggers one cell may deliver from a single press
+// How bright the party's lantern is allowed to make a surface, as a light level into the `lamp`
+// colormap row. The row's top is paper white; a pool that reaches it reads as a torch in a cave
+// rather than a lantern in a field. Tuned by eye on high_pasture at night (owner: warm straw, not
+// neon). The world shader needs it as GLSL text, hence the pair.
+#define VX_LAMP_CAP   0.62f
+#define VX_LAMP_CAP_S "0.62"
 #define VX_FACE_HYST  55.0f      // degrees off the current facing's axis before it flips
 #define VX_TRAIL      512        // breadcrumbs the followers walk
 #define VX_TRAIL_DS   0.06f      // cells between breadcrumbs
@@ -488,6 +495,14 @@ struct VoxField {
     // colormap row exactly as the .tmap's static lamps are.
     int dlamp_on; float dlamp_r, dlamp_level, dlamp_x, dlamp_y, dlamp_z;
     int exam_trig, exam_npc;
+    // MORE THAN ONE TRIGGER ON A CELL. A `.tmap` cell may carry a message AND a pickup AND a door
+    // (hart_yard 6,7 is a message and a pickup: the bench, and the part on it). The examine used to
+    // take the FIRST one the trigger list happened to hold and the others could never be reached at
+    // all, which is why `hart_yard.bench_part` read its line forever and the part was never taken.
+    // So an examine resolves the whole cell into this queue, in a defined order — every message,
+    // then the pickup, then the door — and each box closing acts on the next. See trig_collect.
+    int exam_q[VX_EXAM_Q], exam_qn, exam_cx, exam_cz;
+    unsigned exam_mask;
     char to_map[32]; int to_x, to_z, to_f, fade, fade_dir;
     float anim_t, map_poll;
     int dbg_solid, dbg_trig, dbg_coord, noclip;
@@ -2800,10 +2815,17 @@ static const char *VX_FS_BODY =
     "  float idx = texelFetch(u_lut, ivec2(step6 + (use_top ? 0 : 6), ty), 0).r * 255.0;\n"
     "  float ao = 1.0 - (1.0 - v_ao) * u_ao;\n"
     "  float lamp = v_light.y;\n"
+    // THE LANTERN'S CAP, and it is a look decision (owner: warm straw, not neon). Two numbers:
+    // the falloff is a SMOOTHSTEP, not a square — a square puts nearly all of the light in the
+    // first cell and the pool reads as a hard bright disc about two cells across — and the level is
+    // capped below the top of the `lamp` colormap row, because the top of that row is the paper
+    // white the table ends on and a pool that reaches it is a headlight. 0.62 keeps the brightest
+    // straw inside the warm part of the ramp.
     "  if (u_dlev > 0.0005) {\n"
     "    float dd = distance(v_world, u_dlamp.xyz) / max(u_dlamp.w, 0.001);\n"
     "    float ff = clamp(1.0 - dd, 0.0, 1.0);\n"
-    "    lamp = min(1.0, lamp + u_dlev * ff * ff);\n"
+    "    ff = ff * ff * (3.0 - 2.0 * ff);\n"
+    "    lamp = min(" VX_LAMP_CAP_S ", lamp + u_dlev * ff);\n"
     "  }\n"
     // The cast shadow is a LIGHT LEVEL, not a multiply toward black: it pulls the colormap lookup
     // down the table, so shade stays a cool palette colour (PALETTE.md / D19).
@@ -3616,6 +3638,60 @@ static int trig_at(VoxField *v, int x, int z, unsigned mask) {
     return -1;
 }
 
+// EVERY live trigger on a cell, in the order one press delivers them. The order is the contract:
+//   1. every MESSAGE — what the place says, before anything changes;
+//   2. the PICKUP — its own box, then the item, so taking something always reads as a consequence
+//      of having looked at it;
+//   3. the DOOR last, because it takes the screen and nothing after it would ever be seen.
+// Returns how many were written. Anything not in `mask` is skipped, so the cell ahead and the cell
+// underfoot keep the different rules they always had.
+static int trig_collect(VoxField *v, int x, int z, unsigned mask, int *out, int cap) {
+    static const int ORDER[3] = { TG_MESSAGE, TG_PICKUP, TG_DOOR };
+    int n = 0;
+    for (int k = 0; k < 3 && n < cap; k++) {
+        for (int i = 0; i < v->trig_count && n < cap; i++) {
+            VxTrig *g = &v->trigs[i];
+            if (g->kind != ORDER[k]) continue;
+            if (x < g->x || z < g->z || x >= g->x + g->w || z >= g->z + g->d) continue;
+            if (!(mask & TGM(g->kind))) continue;
+            if (!trig_live(v, g)) continue;
+            out[n++] = i;
+        }
+    }
+    return n;
+}
+
+static void start_map_change(VoxField *v, const char *map, int x, int z, int f);
+
+// Act on ONE trigger, exactly as a press on it always did.
+static void trig_act(VoxField *v, int ti) {
+    VxTrig *g = &v->trigs[ti];
+    if (g->kind == TG_DOOR) start_map_change(v, g->map, g->ax, g->az, g->af);
+    else if (g->kind == TG_PICKUP) {
+        // The box opens FIRST and unconditionally — it is the player's feedback, and it must not
+        // depend on the event surviving. Then the item is reported, and the trigger is spent: a
+        // pickup is takeable exactly once.
+        g->taken = 1;
+        vx_say(v, nullptr, g->arg2);
+        vx_fire(v, VXE_PICKUP, g->arg, g->arg2);
+    }
+    else vx_say(v, nullptr, g->arg);
+}
+
+// Take the next trigger off the cell's queue and act on it. A door empties the queue, because the
+// map is about to change and anything still in it belongs to a place we have left.
+static void trig_drain(VoxField *v) {
+    while (v->exam_qn > 0) {
+        int ti = v->exam_q[0];
+        for (int i = 1; i < v->exam_qn; i++) v->exam_q[i - 1] = v->exam_q[i];
+        v->exam_qn--;
+        if (!trig_live(v, &v->trigs[ti])) continue;          // consumed since the press
+        if (v->trigs[ti].kind == TG_DOOR) v->exam_qn = 0;
+        trig_act(v, ti);
+        return;
+    }
+}
+
 static void start_map_change(VoxField *v, const char *map, int x, int z, int f) {
     snprintf(v->to_map, sizeof(v->to_map), "%s", map);
     v->to_x = x; v->to_z = z; v->to_f = f;
@@ -4186,7 +4262,10 @@ static float vx_dyn_lamp_at(VoxField *v, float x, float y, float z) {
     float d = sqrtf(dx * dx + dy * dy + dz * dz);
     float r = v->dlamp_r > 0.001f ? v->dlamp_r : 0.001f;
     float f = 1.0f - d / r;
-    return f > 0 ? v->dlamp_level * f * f : 0.0f;
+    if (f <= 0) return 0.0f;
+    f = f * f * (3.0f - 2.0f * f);                    // the same smoothstep the shader uses
+    float lit = v->dlamp_level * f;
+    return lit > VX_LAMP_CAP ? VX_LAMP_CAP : lit;
 }
 
 static void vx_light_at_foot(VoxField *v, float x, float y, float z, float *lit, float *warm) {
@@ -5112,6 +5191,27 @@ static void draw_touch_ui(VoxField *v, int w, int h) {
     }
 }
 
+// THE SAME GEOMETRY AS THE BOX, with nothing drawn: how many pages this text needs at this window
+// size, and whether any one of them is taller than the space it has. The robustness sweep runs every
+// id in story/field/text.md through it, so a line that would spill off the bottom of the box on the
+// phone is a test failure and not a screenshot somebody happens to take. Kept beside draw_msg_box
+// deliberately: if one changes, so must the other.
+int vx_msg_measure(const char *who, const char *text, int w, int h, int *overflow) {
+    if (overflow) *overflow = 0;
+    if (!text || !text[0]) return 0;
+    ImFont *font = ImGui::GetFont();
+    float ts = h * 0.052f;
+    float x0 = w * 0.06f, x1 = w * 0.94f, y1 = h * 0.96f, y0 = y1 - h * 0.24f;
+    DlgRect cr = dlg_content(x0, y0, x1, y1, ts);
+    float name_h = (who && who[0]) ? ts * DLG_LINE_H : 0.0f;
+    float tw = cr.x1 - cr.x0, avail = (cr.y1 - cr.y0) - name_h;
+    DlgPages pg;
+    dlg_paginate(font, ts, tw, dlg_max_lines(avail, ts), text, &pg);
+    for (int i = 0; i < pg.count; i++)
+        if (dlg_text_height(font, ts, tw, pg.beg[i], pg.end[i]) > avail + 0.5f && overflow) *overflow = 1;
+    return pg.count;
+}
+
 static void draw_msg_box(VoxField *v, int w, int h) {
     if (!v->msg[0]) return;
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
@@ -5518,10 +5618,20 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
             // first platforming lesson into the first time it was authored. A trigger on a SOLID
             // cell (a wall, a well, a house front) keeps that cell's ground height, so examining
             // those from beside them still works exactly as it did.
-            if (fx >= 0 && fz >= 0 && fx < v->mw && fz < v->md && fabsf(vx_gy(v, fx, fz) - a->y) > VX_EXAM_REACH)
-                v->exam_trig = -1;
-            else v->exam_trig = trig_at(v, fx, fz, AHEAD);
-            if (v->exam_trig < 0) v->exam_trig = trig_at(v, a->tx, a->tz, UNDER);
+            // THE WHOLE CELL, not the first trigger on it. The cell ahead wins if it has anything
+            // at all; otherwise the one underfoot. `exam_cell` is where a press would look; the
+            // prompt shows the first trigger of that cell in delivery order, which is the one the
+            // press acts on, and the rest follow as each box is dismissed.
+            bool reach = !(fx >= 0 && fz >= 0 && fx < v->mw && fz < v->md &&
+                           fabsf(vx_gy(v, fx, fz) - a->y) > VX_EXAM_REACH);
+            int q[VX_EXAM_Q], n = 0;
+            if (reach) n = trig_collect(v, fx, fz, AHEAD, q, VX_EXAM_Q);
+            if (n) { v->exam_cx = fx; v->exam_cz = fz; v->exam_mask = AHEAD; }
+            else {
+                n = trig_collect(v, a->tx, a->tz, UNDER, q, VX_EXAM_Q);
+                v->exam_cx = a->tx; v->exam_cz = a->tz; v->exam_mask = UNDER;
+            }
+            v->exam_trig = n ? q[0] : -1;
         }
     }
     if (v->tapped && !v->fade_dir) {
@@ -5536,27 +5646,25 @@ void vx_tick(VoxField *v, int w, int h, float dt, bool ui_blocked, VxEvent *ev) 
             // So with no renderer a press CLOSES the box, whole. The consequence is stated in
             // VOXFIELD_NOTES.md: the play-test does not exercise the typewriter or pagination.
             // --capture.sh --dialog and the robustness sweep are what cover those.
-            if (v->headless) { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; }
+            bool closed = false;
+            if (v->headless) { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; closed = true; }
             else if (v->msg_typing) v->msg_t = 99.0f;
             else if (v->msg_more) { v->msg_page++; v->msg_t = 0; }
-            else { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; }
+            else { v->msg[0] = 0; v->msg_who[0] = 0; v->msg_page = 0; closed = true; }
+            // THE REST OF THE CELL. Closing a box is what delivers the next thing the cell holds —
+            // the bench's line, and then the part that is lying on it.
+            if (closed) trig_drain(v);
         } else if (v->exam_npc >= 0) {
             VxNpc *np = &v->npcs[v->exam_npc];
             np->facing = vx_face_pick(-1, v->act[0].x - np->x, v->act[0].z - np->z);   // turn to the player
             np->gx = np->x; np->gz = np->z; np->wait = 2.5f;                           // and stop walking
             vx_say(v, nullptr, np->text);
         } else if (v->exam_trig >= 0) {
-            VxTrig *g = &v->trigs[v->exam_trig];
-            if (g->kind == TG_DOOR) start_map_change(v, g->map, g->ax, g->az, g->af);
-            else if (g->kind == TG_PICKUP) {
-                // The box opens FIRST and unconditionally — it is the player's feedback, and it must
-                // not depend on the event surviving. Then the item is reported, and the trigger is
-                // spent: a pickup is takeable exactly once.
-                g->taken = 1;
-                vx_say(v, nullptr, g->arg2);
-                vx_fire(v, VXE_PICKUP, g->arg, g->arg2);
-            }
-            else vx_say(v, nullptr, g->arg);
+            // A PRESS RESOLVES THE WHOLE CELL ONCE, into a queue that then survives the boxes it
+            // opens. Rebuilding it every tick instead would re-deliver the message the player has
+            // just dismissed, for ever.
+            v->exam_qn = trig_collect(v, v->exam_cx, v->exam_cz, v->exam_mask, v->exam_q, VX_EXAM_Q);
+            trig_drain(v);
         }
     }
 

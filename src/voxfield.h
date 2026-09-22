@@ -78,6 +78,10 @@ int vx_selftest(VoxField *v);
 int vx_walktest(VoxField *v, const char *one_map);
 
 // ───────────────────────── the play-test bot's hands ─────────────────────────
+// The dialogue box's own measurement with nothing drawn: pages needed, and whether any page would
+// spill. `overflow` may be null. Needs an ImGui frame to be open (it reads the live font).
+int vx_msg_measure(const char *who, const char *text, int w, int h, int *overflow);
+
 // src/star_logic.cpp's --chapter-playtest drives the REAL game through these: a stick and two
 // buttons, which land on exactly the variables the touch stick and the Act and Jump buttons land
 // on, plus the A* the bot needs to steer. Everything else — triggers firing, boxes opening, events

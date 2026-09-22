@@ -1560,6 +1560,18 @@ int bt_ui_affordable(Battle *b, int idx) {
     return (c == BTC_GUARD || bt_cheapest_affordable(b, b->cur, c) > 0) ? 1 : 0;
 }
 const char *bt_cmd_name(int cmd) { return (cmd > 0 && cmd < BTC_COUNT) ? BT_CMD_NAME[cmd] : "?"; }
+// The skill list of whoever the screen is taking input from. See battle.h for why this exists.
+static_assert(BTK_DAMAGE == BT_SK_DAMAGE && BTK_SETTLE == BT_SK_SETTLE && BTK_HARD == BT_SK_HARD,
+              "battle.h's BT_SK_* must match BtSkillKind");
+int bt_ui_skill_count(Battle *b) { return b ? bt_skill_count(b->party->a[b->cur].id) : 0; }
+static const BtSkillDef *bt_ui_skill(Battle *b, int k) {
+    if (!b || k < 0 || k >= bt_skill_count(b->party->a[b->cur].id)) return nullptr;
+    return bt_skill_at(b->party->a[b->cur].id, k);
+}
+const char *bt_ui_skill_name(Battle *b, int k) { const BtSkillDef *s = bt_ui_skill(b, k); return s ? s->name : ""; }
+int bt_ui_skill_min(Battle *b, int k)          { const BtSkillDef *s = bt_ui_skill(b, k); return s ? s->min : 0; }
+int bt_ui_skill_kind(Battle *b, int k)         { const BtSkillDef *s = bt_ui_skill(b, k); return s ? s->kind : -1; }
+int bt_ui_skill_sel(Battle *b)                 { return b ? b->ui_skill : 0; }
 bool bt_ui_point(Battle *b, int kind, int idx, float *x, float *y) {
 #if BT_DRAW
     if (!b || b->ui_rowh <= 0.0f) return false;
@@ -1584,6 +1596,14 @@ bool bt_ui_point(Battle *b, int kind, int idx, float *x, float *y) {
         *y = (h * 0.34f) * U;
         return true;
     }
+    // The skill list, which is only on screen while the Skill row is selected — the same rect the
+    // InvisibleButton above uses, centred.
+    if (kind == 3) {
+        if (idx < 0 || idx >= bt_skill_count(b->party->a[b->cur].id)) return false;
+        *x = (b->ui_mx0 + b->ui_mw + b->ui_S * 0.8f) * U + b->ui_mw * U * 0.5f;
+        *y = (b->ui_my0 + idx * b->ui_S * 1.2f - b->ui_S * 0.1f) * U + b->ui_S * 1.05f * U * 0.5f;
+        return true;
+    }
 #else
     (void)b; (void)kind; (void)idx; (void)x; (void)y;
 #endif
@@ -1591,6 +1611,8 @@ bool bt_ui_point(Battle *b, int kind, int idx, float *x, float *y) {
 }
 
 // How many times the watchdog has fired this fight. --battle-ui-test asserts it is zero.
+int bt_enc_count() { return BT_ENCOUNTER_COUNT; }
+const char *bt_enc_id(int i) { return (i >= 0 && i < BT_ENCOUNTER_COUNT) ? BT_ENCOUNTERS[i].id : ""; }
 int bt_stuck_count(Battle *b) { return b ? b->stuck_fires : 0; }
 
 bool bt_done(Battle *b) {

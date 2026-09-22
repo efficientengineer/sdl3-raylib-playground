@@ -34,6 +34,12 @@ fi
 #   ./capture.sh --vox halm --hd2d 0              -> the post pass off, for a side-by-side
 #   ./capture.sh --vox halm --pitch 40 --fov 32 --viewh 9 --face N --size 1920x1080 --name spawn
 #   ./capture.sh --vox halm --nav 1               -> the navmesh overlay drawn into the shot
+#   ./capture.sh --vox high_pasture --light night:0.16 --lantern
+#                                                 -> the PARTY LANTERN lit as well as the map's own
+#                                                    `lamp:` lines: the warm pool that follows the
+#                                                    leader, which is what a night map actually
+#                                                    looks like in play. --lantern r,level to tune
+#                                                    (default 6,0.85).
 # The movement bot: the real movement code driven against walls, path-walked to every exit, door and
 # NPC, and jumped 200 times, on one map or all three. Non-zero exit means a real failure.
 if [ "$1" = "--vox-walktest" ]; then
@@ -66,7 +72,45 @@ if [ "$1" = "--chapter-playtest" ]; then
     cd "$ROOT"
     OUT=$(CHAPTER_PLAYTEST=1 "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "PLAYTEST|SELFCHECK chapter-playtest")
     echo "$OUT"
+    # TWO CONDITIONS, because the summary is a count and a FAIL line is a fact. A failure found in a
+    # phase whose counter was not the one summed printed "PLAYTEST FAIL: ..." and still exited 0,
+    # which is a red test nobody notices. Any FAIL line at all is now a non-zero exit.
     echo "$OUT" | grep -q "SELFCHECK chapter-playtest ok" || { echo "ERROR: --chapter-playtest FAILED" >&2; exit 1; }
+    if echo "$OUT" | grep -q "PLAYTEST FAIL"; then
+        echo "ERROR: --chapter-playtest printed a FAIL line" >&2
+        exit 1
+    fi
+    exit 0
+fi
+
+# The clips self-test: every scene in the chapter tapped through by the REAL player at 60 fps —
+# it must END, every panel must be revealed exactly once, and every line must be reached (textless
+# lines included). This is the unit test under the play-test's CLIP steps; run it after editing a
+# scene file. See src/star_logic.cpp, ct_drive.
+if [ "$1" = "--clips-selftest" ]; then
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    OUT=$(CLIPS_SELFTEST=1 "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "CLIPS|SELFCHECK clips")
+    echo "$OUT"
+    echo "$OUT" | grep -q "SELFCHECK clips ok" || { echo "ERROR: --clips-selftest FAILED" >&2; exit 1; }
+    exit 0
+fi
+
+# The robustness sweep: save/continue at every chapter step, the hot-reload blob mid-clip and
+# mid-battle, the settings file, 2,000+ random taps across every encounter, and every field-text id
+# measured in the real dialogue box. Optionally at a given window size:
+#   ./capture.sh --robustness                 (fullscreen, the default)
+#   ./capture.sh --robustness 1280x720        (a windowed size; also 2400x1080, 1080x1920, ...)
+if [ "$1" = "--robustness" ]; then
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
+    cmake --build "$ROOT/build_desktop" --target quest_glory game_logic -j"$(sysctl -n hw.ncpu)" | tail -1
+    cd "$ROOT"
+    OUT=$(STAR_WINSIZE="${2:-}" ROBUSTNESS=1 "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "ROBUST|SELFCHECK robustness")
+    echo "$OUT"
+    echo "$OUT" | grep -q "SELFCHECK robustness ok" || { echo "ERROR: --robustness FAILED" >&2; exit 1; }
     exit 0
 fi
 
@@ -116,7 +160,7 @@ fi
 if [ "$1" = "--vox" ]; then
     MAP=${2:-halm}
     shift 2 || true
-    AT=""; ORTHO=""; HD2D=""; LIGHT=""; PITCH=""; FOV=""; VIEWH=""; FACE=""; SIZE="1920x1080"; NAME=""; SUFFIX=""; CUT=""; FOG=""; TILT=""; NAV=""; RADIUS=""
+    AT=""; ORTHO=""; HD2D=""; LIGHT=""; PITCH=""; FOV=""; VIEWH=""; FACE=""; SIZE="1920x1080"; NAME=""; SUFFIX=""; CUT=""; FOG=""; TILT=""; NAV=""; RADIUS=""; LAMP=""
     while [ $# -gt 0 ]; do
         case "$1" in
             --at) AT="$2"; SUFFIX="${SUFFIX}_at${2//,/-}"; shift ;;
@@ -134,6 +178,11 @@ if [ "$1" = "--vox" ]; then
             --tilt) TILT="$2"; shift ;;
             --nav) NAV="$2"; [ "$2" = "1" ] && SUFFIX="${SUFFIX}_nav"; shift ;;
             --radius) RADIUS="$2"; shift ;;
+            --lantern)
+                # The party lantern, on. An optional "r,level" follows; anything starting with a
+                # dash is the next flag, not this one's argument.
+                case "$2" in ""|-*) LAMP="6,0.85" ;; *) LAMP="$2"; shift ;; esac
+                SUFFIX="${SUFFIX}_lantern" ;;
         esac
         shift
     done
@@ -146,7 +195,7 @@ if [ "$1" = "--vox" ]; then
     cd "$ROOT"
     VOX_AT="$AT" VOX_ORTHO="$ORTHO" VOX_HD2D="$HD2D" VOX_LIGHT="$LIGHT" VOX_PITCH="$PITCH" \
     VOX_FOV="$FOV" VOX_VIEWH="$VIEWH" VOX_FACE="$FACE" VOX_CUT="$CUT" VOX_FOG="$FOG" VOX_TILT="$TILT" \
-    VOX_NAV="$NAV" VOX_RADIUS="$RADIUS" \
+    VOX_NAV="$NAV" VOX_RADIUS="$RADIUS" VOX_LAMP="$LAMP" \
         VOX_CAPTURE="$MAP:$W:$H:$OUT" "$ROOT/build_desktop/quest_glory" 2>&1 | grep -E "SELFCHECK|OVERDRAW|voxfield: (capture|walker|[0-9]+ cells)" || true
     if [ -f "$OUT" ]; then
         echo "wrote $OUT"

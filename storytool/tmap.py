@@ -45,7 +45,7 @@ TRIGGER_KINDS = {"exit": 4, "door": 4, "message": 1, "npc": 3, "zone": 1, "trap"
 # itself, so it never needs a `sprite` line beside it.
 FIGHT_IDS = {"post", "arm", "swing",          # hart_yard, the three training machines
              "lid",                            # halm, the grain yard
-             "burr",                           # the hill path
+             "burr", "burr3",                  # the hill path (one burr; three burrs)
              "lantern", "fleece", "klee"}      # the high pasture, and its boss
 
 

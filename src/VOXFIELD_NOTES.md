@@ -838,7 +838,7 @@ run while three of the chapter's gates had **no map trigger anywhere** that coul
 |---|---|---|---|
 | `--chapter-logic-selftest` (was `--chapter-selftest`) | `ch_on_text` / `ch_on_pickup` / `ch_on_battle` directly | the step table is well-formed, every clip exists in `cutscene_data.h`, the gates chain to the end card, `ch_steps_selfcheck` agrees with `ChStepId` | **anything at all about the world.** It types the answers in itself. A flag with no trigger, a trigger on no map, a trigger that fires in the wrong step — all invisible here |
 | `--vox-walktest` | `vx_leader_move` directly, no `vx_tick` | the body: it never leaves the eroded region, never NaNs, never sticks with the way open; A* reaches every exit, door and NPC; 200 jumps land or respawn cleanly | anything about the chapter. It does not know what a flag is |
-| `--chapter-playtest` | **the real game**, through `vx_tick`, a stick and two buttons | that a player can finish the chapter: every gate opened by walking to a reachable trigger and pressing the button, fights won through the real menu, clips tapped through the real renderer | the typewriter and pagination (see below), the Dev panel, save/load, resize |
+| `--chapter-playtest` | **the real game**, through `vx_tick`, a stick and two buttons | that a player can finish the chapter: every gate opened by walking to a reachable trigger and pressing the button, fights won through the real menu, clips tapped through the real renderer | the typewriter and pagination (see below), the Dev panel, resize. Save/load, the reload blob and the battle menu under random input are `--robustness` |
 
 ### What the play-test is
 
@@ -873,18 +873,93 @@ interactions.
    whole thing is a state machine driven from `game_tick` rather than a function that runs to
    completion.
 
-### Where it currently stops (2026-09-21)
+### Where it stops (2026-09-21, second round: it does not — both runs finish)
 
-The completionist reaches **step 21 of 26 with 9 of the mandatory 10**, through four map changes,
-eight battles including the boss, and 28 jumps, in 144 s of real time for 6.5 minutes of play. Open:
+Both runs reach the end card with **10 of the mandatory 10**, in **2 min 14 s of real time** for
+5.7 minutes of play each. The four things that stopped the first round, and what each one was:
 
-- **C5 `0160_the_herder` never ends** under the bot's tapping. Clips C1-C4 end in ~27 frames each; C5
-  does not. Not diagnosed.
-- **The lazy player stalls on `hart_yard.bench_part`** while the completionist gets it. Both the
-  `message` and the `pickup` sit on the same box, and `trig_at` returns the first match, so the
-  pickup can never fire — the same overlapping-trigger class as the guild-hall counter was.
-- `pb_play_step` caches `vx_current_map` at the top, so after a map change it reports one spurious
-  "cannot walk to exit:high_pasture on high_pasture".
+- **The boss could not be killed, and it was the bot's hands, not the fight.** The menu works like
+  the player's: tapping a command row SELECTS it and puts its skill list and effort notch on screen,
+  and tapping the same row again COMMITS. The old policy tapped a row twice and never touched the
+  skill list, so every Skill cast its owner's FIRST skill — Drowsy, for Distel. Klee's phase one ends
+  on **three Settles and nothing else**, so the party made a thing that was already open sleepy for
+  ninety rounds. A turn is now planned once per (round, character) and walked as
+  *select row → pick skill → set effort → commit*; the boss dies in 16 rounds. `bt_ui_skill_count`,
+  `bt_ui_skill_kind`, `bt_ui_skill_min`, `bt_ui_skill_sel` and `bt_ui_point(kind 3)` are the API that
+  made it possible to do this by tapping rather than by cheating.
+- **`0160_the_herder` was never the problem.** The new `--clips-selftest` taps every scene in the
+  chapter through the real player and all six end; what the old log showed was the clip's fade-in
+  being logged once a frame, and then the boss fight underneath it. The step line is now written
+  **once per step**, with its own line per battle and per pickup.
+- **A step whose flags were all set was never ticked.** The chapter only advances inside `draw_field`
+  and only when nothing is on screen, so a step that finished with the boss's own death text still up
+  advanced on no frame at all — the bot's need loop walks nowhere when every need is met. It now
+  reads whatever is up and gives the field its frames before deciding it is stuck.
+- **An exit that worked looked like a walk that failed.** `pb_walk_into` asks whether the body ended
+  up on the target cell, and stepping onto an exit starts a map change, so by the time it looks the
+  body is on another map. The verdict is now the map, not the cell. `pb_play_step` also re-reads
+  `vx_current_map` every iteration instead of caching it at the top.
+
+And one engine bug the lazy run found, fixed in `voxfield.cpp` rather than in the map:
+
+- **A cell may carry several triggers, and they now fire in a defined order.** `hart_yard` 6,7 is a
+  `message` and a `pickup` on one box. `trig_at` returned the first match, so the pickup could never
+  be reached at all. An examine now resolves the WHOLE cell into a queue — every message, then the
+  pickup, then the door — and each box closing delivers the next (`trig_collect`, `trig_act`,
+  `trig_drain`). The queue is built once per press and survives the boxes it opens; rebuilding it
+  per tick would re-deliver the line the player has just dismissed, for ever.
+
+`./capture.sh --chapter-playtest` now exits non-zero on **any** `PLAYTEST FAIL` line, not only on the
+summary count.
+
+## The other tests
+
+| test | what it is |
+|---|---|
+| `--clips-selftest` | every scene in the chapter tapped through by the real player at 60 fps. It must END within `lines x 2 s`, every panel must be revealed exactly once, and every line must be reached — textless lines included. The unit test under the play-test's CLIP steps; run it after editing a scene file. `ct_drive` in `star_logic.cpp` |
+| `--robustness [WxH]` | the sweep below. `WxH` is a windowed size (`STAR_WINSIZE`, host.cpp, desktop only) |
+
+### The robustness sweep (`--robustness`)
+
+Not a play-test: narrow assertions about what breaks when the game is interrupted rather than played.
+Each names itself and says ok or FAILED; the run ends with one `SELFCHECK robustness` line.
+
+- **A — save/continue at every chapter step.** Every one of the 26 steps: the POD the save and the
+  reload blob are both a memcpy of comes back with the same step, flags, party size, items and known
+  commands, and with a party the battle screen can draw and no negative hp or stamina.
+- **B — the hot-reload blob.** Mid-clip, for every scene: serialize at a line, build a fresh state,
+  deserialize, and the screen/scene/line are identical. Mid-battle: the contract is that a reload
+  **never** lands you in a battle, and that is the assertion — the flags, step and party come back
+  and `in_battle` does not. A blob with a bad magic must be ignored, not half-applied.
+- **D — settings.** Volume and mute round-trip through `settings.ini`. `STAR_MUTE` forces mute at
+  load and is never written back, which is asserted rather than worked around.
+- **F — battle fuzz.** 2,000+ random taps and keys across **every** encounter in `BT_ENCOUNTERS`
+  (`bt_enc_count`/`bt_enc_id`, so the list cannot go stale). The watchdog must never fire, no hp or
+  stamina may go negative or over its maximum, and a menu with rows in it must always have at least
+  one row that can be chosen.
+- **H — every field-text id in the real dialogue box.** `vx_msg_measure` is `draw_msg_box`'s own
+  geometry with nothing drawn: no page may overflow its space, and the three longest are named.
+  All 66 ids fit; the worst are `halm.gate_watch_after`, `halm.lamp_charm_2` and
+  `halm.shepherd_market_2`, at two pages each.
+
+Run at 2400x1080, 1920x1080, 1280x720 and a portrait request: all pass, nothing crashes. **Note the
+Mac clamps the window to the display**, so 2400x1080 and 1080x1920 both arrive as roughly 1920x1027
+and the portrait *shape* is not actually exercised on this machine — the sweep reports the size it
+really measured, so the log never claims otherwise.
+
+**Still to write** (the deferred part D, honestly outstanding): the Dev panel sweep — every button
+pressed once headlessly — and the five-times soak of the lazy run with RSS and GL object counts
+(textures, buffers) asserted flat after the first loop.
+
+### The party lantern
+
+`./capture.sh --vox <map> --light night:0.16 --lantern [r,level]` draws the party's own light as well
+as the map's `lamp:` lines, which is what a night map actually looks like in play. Tuned by eye on
+`high_pasture`: the falloff is a **smoothstep**, not a square (a square puts nearly all the light in
+the first cell and the pool reads as a hard bright disc), and the level is **capped at
+`VX_LAMP_CAP` = 0.62** below the top of the `lamp` colormap row, because that row ends on paper white
+and a pool that reaches it is a headlight rather than a lantern. The constant is in `voxfield.cpp`
+twice on purpose — once as a float for `vx_dyn_lamp_at`, once as GLSL text for the world shader.
 
 ## Known issues, in the order they matter
 
