@@ -26,7 +26,7 @@ if [ "$1" = "--dialog" ]; then
     exit 0
 fi
 
-# The voxel field (VOXFIELD_NOTES.md):
+# The voxel field (src/notes/world.md, movement.md, rendering.md):
 #   ./capture.sh --vox halm                       -> build_desktop/vox_halm.png, 1920x1080
 #   ./capture.sh --vox halm --at 21,21            -> the party stood on that cell
 #   ./capture.sh --vox halm --ortho 1             -> orthographic instead of the low perspective
@@ -64,7 +64,7 @@ fi
 # battle menu, the real renderer for the clips. It never touches the chapter's memory: every flag
 # that ends up set got there because the bot walked onto a trigger and pressed a button. Two runs,
 # the completionist and the lazy player, plus three static checks (the hidden finds, the bell run's
-# arithmetic, and whether the hill is a hill). See src/VOXFIELD_NOTES.md, "The three tests".
+# arithmetic, and whether the hill is a hill). See src/notes/testing.md, "The three tests".
 if [ "$1" = "--chapter-playtest" ]; then
     ROOT="$(cd "$(dirname "$0")" && pwd)"
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null
@@ -86,7 +86,7 @@ fi
 # The clips self-test: every scene in the chapter tapped through by the REAL player at 60 fps —
 # it must END, every panel must be revealed exactly once, and every line must be reached (textless
 # lines included). This is the unit test under the play-test's CLIP steps; run it after editing a
-# scene file. See src/star_logic.cpp, ct_drive.
+# scene file. See src/star_test.cpp, ct_drive.
 if [ "$1" = "--clips-selftest" ]; then
     ROOT="$(cd "$(dirname "$0")" && pwd)"
     cmake -B "$ROOT/build_desktop" -S "$ROOT" -DCMAKE_BUILD_TYPE=Debug > /dev/null

@@ -5,7 +5,7 @@
 A Phantasy Star IV style JRPG on SDL3 + OpenGL, built **one chapter at a time**. You walk around a
 **voxel world with billboard sprites** (`src/voxfield.cpp`), talk in dialogue boxes, watch manga-page
 cutscenes, and fight **turn-based battles whose twist is an effort slider** — every action is spent
-at effort 1-5 against a stamina bar (`story/v3/COMBAT.md`, `src/battle.cpp`). Chapter one is
+at effort 1-5 against a stamina bar (`story/v3/COMBAT.md`, `src/battle_rules.cpp`). Chapter one is
 *The High Pasture*. Terrain and buildings need **no drawn art** — the engine generates them from
 `.tmap` text maps — so the only art is what moves or reads as a character, and it comes from ChatGPT
 through **the art tray** (`story/packages/`). **The phone is the target**; the Mac is where it is
@@ -29,13 +29,17 @@ tested. C11 own code, C++ deps allowed.
 
 ## The game
 
-`src/star_logic.cpp` builds as `libgame_logic.so` and is hot-reloadable — see *Hot reload* below.
+The game builds as `libgame_logic.so` and is hot-reloadable — see *Hot reload* below.
+**`src/ENGINE.md` is the map of `src/`**: every file's responsibility, its entry points, the test
+that covers it, and the include graph. Read it before opening a source file.
 
 - **`src/voxfield.cpp` is the world.** Terrain, water and buildings are voxels the engine generates
   at load from the `.tmap` text maps: palette ramps, procedural shader detail and rule-built houses.
   **None of that needs generated art**, which is the whole point of the design. Half-size voxels,
-  shadow map, free analog movement and jumping. `src/VOXFIELD_NOTES.md` is the engine's own contract.
-- **`src/battle.cpp`** is the turn-based combat; `src/dialogue.h` the field dialogue box.
+  shadow map, free analog movement and jumping. `src/notes/world.md`, `movement.md` and
+  `rendering.md` are the engine's own contract.
+- **`src/battle_rules.cpp`** is the turn-based combat (with `battle_ui/script/test.cpp`, and
+  `src/notes/battle.md` for which file owns which rule); `src/dialogue.h` the field dialogue box.
 - **Cutscenes** are manga pages with typewriter dialogue and adaptive music, drawn from the generated
   `src/cutscene_data.h`. A panel with no art yet draws a placeholder box with its description in it,
   so a chapter plays end to end while its sheets are being generated.
@@ -54,7 +58,8 @@ Four documents, and they beat anything written anywhere else:
 | `WORLD.md` | the voxel field: what needs art and what does not, the `.tmap` format, map design rules, asset sizes |
 | `PALETTE.md` | 256 indexed colours, the colormap light tables, conversion (D19) |
 | `story/STYLE.md` | the locked art style and composition rules for cutscene panels |
-| `src/VOXFIELD_NOTES.md` | the engine side of the world |
+| `src/ENGINE.md` | the map of `src/`: file, responsibility, entry points, test |
+| `src/notes/*.md` | the engine's long-form record (world, movement, rendering, battle, chapter, testing) |
 
 `story/DECISIONS.md` is the append-only log of every scope and story call, with how to reverse it.
 
@@ -136,7 +141,7 @@ tools/script/golden.py record|diff   # the tool's own contract: every command's 
 ./run_desktop.sh                    # play it on the Mac, muted, reading story/ directly
 ./capture.sh --vox <map>            # one rendered frame to build_desktop/, no phone
 ./capture.sh --vox-selftest | --vox-walktest [map] | --chapter-selftest | --battle-selftest
-./perf.sh [map] | --desktop | --watch   # the A/B benchmark (src/VOXFIELD_NOTES.md, "Performance")
+./perf.sh [map] | --desktop | --watch   # the A/B benchmark (src/notes/rendering.md, "Performance")
 ./deploy.sh                         # android APK -> phone (only when the owner asks)
 ./fast_reload.sh                    # hot reload libgame_logic.so (~0.7s; only when the owner asks)
 ./compile_shaders.sh                # GLSL 450 -> SPIR-V -> glsl330, glsl300es, msl, hlsl
@@ -219,10 +224,10 @@ section you need (each has a banner comment), never top to bottom.
 | rename anything | `story/v3/NAMES.md` (one row), then `./story_prompt.py names` | `story/v3/NAMES.md` |
 | add or edit a map | `story/field/tmaps/<map>.tmap`, then `tmap check` + `tmap preview` | `WORLD.md` §3-4 |
 | change the chapter's order, flags or goals | `src/chapter01.h` (one row of `CH_STEPS`) | `story/v3/chapter01.md` |
-| add an enemy | `story/v3/BESTIARY.md`, a `fight` trigger in a `.tmap`, `src/battle.cpp` ⚠ | `story/v3/COMBAT.md` |
-| fix a battle bug | `src/battle.cpp` ⚠ / `src/battle.h`; `./capture.sh --battle-selftest` | `story/v3/COMBAT.md` |
-| change a combat number | `story/v3/COMBAT.md` **first** (it is the source), then `src/battle.cpp` ⚠ | `story/v3/COMBAT.md` |
-| fix a world/movement/render bug | `src/voxfield.cpp` ⚠; `./capture.sh --vox-selftest`, `--vox-walktest` | `src/VOXFIELD_NOTES.md` |
+| add an enemy | `story/v3/BESTIARY.md`, a `fight` trigger in a `.tmap`, a row in `src/battle_rules.cpp` ⚠ | `story/v3/COMBAT.md`, `src/notes/battle.md` |
+| fix a battle bug | `src/battle_rules.cpp` (logic) or `battle_ui.cpp` (screen) ⚠; `./capture.sh --battle-selftest`, `--battle-ui-test` | `src/notes/battle.md` |
+| change a combat number | `story/v3/COMBAT.md` **first** (it is the source), then `src/battle_rules.cpp` §1 ⚠ | `story/v3/COMBAT.md` |
+| fix a world/movement/render bug | the `src/vox_*.cpp` file `src/ENGINE.md` names ⚠; `./capture.sh --vox-selftest`, `--vox-walktest` | `src/notes/world.md`, `movement.md`, `rendering.md` |
 | change a palette table or light | `story/palette/**` via `./story_prompt.py palette build \| colormap` — never by hand | `PALETTE.md` |
 | generate art | `./story_prompt.py packages` → the folder → `returned.png` → `ingest` | `story/packages/README.md` |
 | add a billboard sprite | `story/field/sprites.md`, then `packages` + `ingest` | `WORLD.md` §2 |
@@ -230,12 +235,17 @@ section you need (each has a banner comment), never top to bottom.
 | change the tool | the module named in `storytool/README.md`'s table | `storytool/README.md` |
 | play it on the Mac | `./run_desktop.sh` (muted), `./capture.sh --vox halm` | `capture.sh` header |
 | run every test | `./story_prompt.py check --all`; `./capture.sh --vox-selftest`, `--vox-walktest all`, `--chapter-selftest`, `--battle-selftest`; `tools/script/golden.py record\|diff` | this file |
-| profile | `./perf.sh [map]`, Dev panel → Perf HUD | `src/VOXFIELD_NOTES.md` |
+| change a cutscene's look or the dialogue box | `src/cutscene.cpp` ⚠; `./capture.sh --dialog`, `--clips-selftest` | `src/ENGINE.md` |
+| profile | `./perf.sh [map]`, Dev panel → Perf HUD | `src/notes/rendering.md` |
 | put it on the phone (**only when asked**) | `./fast_reload.sh`, or `./deploy.sh` for `host.cpp`/`game_api.h` | *Hot reload*, above |
 
-Where things live: `src/` (`star_logic.cpp` ⚠ the game shell, `voxfield.cpp` ⚠ the world,
-`battle.cpp` ⚠ combat, `host.cpp` window/GL/hot reload, `chapter01.h` the chapter table;
-`cutscene_data.h` and `field_text.h` are **generated** by `export`) · `story/` (`STYLE.md`,
+Where things live: `src/` — **`ENGINE.md` is its map**, and `notes/` (`world`, `movement`,
+`rendering`, `battle`, `chapter`, `testing`) the long-form record. The game is `star_logic.cpp` the
+entry, `game.cpp` ⚠ screens and the GameAPI, `cutscene.cpp` ⚠ the page player, `chapter.cpp` ⚠ the
+chapter in the field, `dev_panel.cpp`, `settings.cpp`, `audio.cpp`, and `star_test.cpp` /
+`playtest.cpp` the suites; combat is `battle_rules/ui/script/test.cpp` ⚠; the world is
+`voxfield.cpp` + the `vox_*.cpp` files ⚠; `host.cpp` window/GL/hot reload; `chapter01.h` the chapter
+table; `cutscene_data.h` and `field_text.h` are **generated** by `export`) · `story/` (`STYLE.md`,
 `characters.md`, `playlist.md`, `scenes/`, `panels/`, `refs/`, `portraits/` and `packages/` the
 tray, `sheets/` archived returns, `palette/`, `v3/` the live story, `notes/`, `DECISIONS.md`) ·
 `story/field/` (`sprites.md`+`sprites/`, `walkers.md`+`walkers/`, `tmaps/`, `tilesets/valley/`

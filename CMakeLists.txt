@@ -47,7 +47,9 @@ if(ANDROID)
 
     # Game logic: hot-reloadable
     # The game.
-    add_library(game_logic SHARED src/star_logic.cpp src/battle.cpp
+    add_library(game_logic SHARED src/star_logic.cpp src/game.cpp src/cutscene.cpp src/chapter.cpp src/dev_panel.cpp
+        src/settings.cpp src/audio.cpp src/star_test.cpp src/playtest.cpp
+        src/battle_rules.cpp src/battle_ui.cpp src/battle_script.cpp src/battle_test.cpp
         src/voxfield.cpp src/vox_world.cpp src/vox_palette.cpp src/vox_mesh.cpp
         src/vox_render.cpp src/vox_nav.cpp src/vox_actors.cpp src/vox_triggers.cpp
         src/vox_dev.cpp src/vox_bot.cpp)
@@ -69,7 +71,9 @@ else()
     target_link_libraries(imgui_shared PUBLIC SDL3::SDL3-static "-framework OpenGL")
 
     # The game.
-    add_library(game_logic SHARED src/star_logic.cpp src/battle.cpp
+    add_library(game_logic SHARED src/star_logic.cpp src/game.cpp src/cutscene.cpp src/chapter.cpp src/dev_panel.cpp
+        src/settings.cpp src/audio.cpp src/star_test.cpp src/playtest.cpp
+        src/battle_rules.cpp src/battle_ui.cpp src/battle_script.cpp src/battle_test.cpp
         src/voxfield.cpp src/vox_world.cpp src/vox_palette.cpp src/vox_mesh.cpp
         src/vox_render.cpp src/vox_nav.cpp src/vox_actors.cpp src/vox_triggers.cpp
         src/vox_dev.cpp src/vox_bot.cpp)
@@ -85,7 +89,9 @@ else()
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 
     # BATTLE agent's own tool: --selftest and the battle-screen capture. Not part of the game.
-    add_executable(battle_tool src/battle.cpp)
+    # It compiles the same four files the game does, with BATTLE_TOOL_MAIN turning on §6's main().
+    add_executable(battle_tool src/battle_rules.cpp src/battle_ui.cpp src/battle_script.cpp
+        src/battle_test.cpp)
     target_compile_definitions(battle_tool PRIVATE BATTLE_TOOL_MAIN)
     target_link_libraries(battle_tool PRIVATE imgui_shared)
     target_include_directories(battle_tool PRIVATE src ${THIRD_PARTY}

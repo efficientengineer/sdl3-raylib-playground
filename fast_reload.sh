@@ -19,7 +19,9 @@ OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
 # Every translation unit of libgame_logic.so. CMakeLists.txt's game_logic target must match.
 GAME_SRCS=""
-for F in star_logic.cpp battle.cpp \
+for F in star_logic.cpp game.cpp cutscene.cpp chapter.cpp dev_panel.cpp \
+         settings.cpp audio.cpp star_test.cpp playtest.cpp \
+         battle_rules.cpp battle_ui.cpp battle_script.cpp battle_test.cpp \
          voxfield.cpp vox_world.cpp vox_palette.cpp vox_mesh.cpp vox_render.cpp \
          vox_nav.cpp vox_actors.cpp vox_triggers.cpp vox_dev.cpp vox_bot.cpp; do
     GAME_SRCS="$GAME_SRCS $SCRIPT_DIR/src/$F"
