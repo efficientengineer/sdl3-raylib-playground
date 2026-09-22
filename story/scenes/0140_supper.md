@@ -16,6 +16,8 @@ Three people who eat together most nights. {{HERO}} has come back from the guild
 - {{HERO}} (annoyed) {tense}: I beat two of your machines! I can't be far off!
 - {{MENTOR}} (annoyed): You have never beaten the swing.
 - {{HERO}} (angry): Then tell me what I'm doing wrong!
+- {{MENTOR}} (neutral): You hit everything as hard as you can. Every single time.
+- {{HERO}} (annoyed): That's how you hit things!
 - {{MENTOR}} (annoyed): Eat.
 - {{HEALER}} (smile): He's never told me either.
 - {{MENTOR}} (neutral): Eat here tomorrow as well.

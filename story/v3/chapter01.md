@@ -1,4 +1,4 @@
-# CHAPTER ONE — *The High Pasture*
+# CHAPTER ONE — *The Sheep on the Hill*
 
 **THE SPINE.** Written by the designer, 2026-09-21, replacing *The Jar Run* completely. This file
 says what the player **does**; `story/scenes/` says what anyone says. Clip slots here are one

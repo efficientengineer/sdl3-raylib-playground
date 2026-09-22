@@ -82,6 +82,8 @@ minutes of play to six of clip.
 **Falke** *(annoyed)*: I beat two of your machines! I can't be far off!  
 **Hart** *(annoyed)*: You have never beaten the swing.  
 **Falke** *(angry)*: Then tell me what I'm doing wrong!  
+**Hart** *(neutral)*: You hit everything as hard as you can. Every single time.  
+**Falke** *(annoyed)*: That's how you hit things!  
 **Hart** *(annoyed)*: Eat.  
 **Ottilie** *(smile)*: He's never told me either.  
 **Hart** *(neutral)*: Eat here tomorrow as well.  

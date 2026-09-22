@@ -42,7 +42,7 @@
 
 // The chapter title, drawn on the title card. The scene data carries no title field, so it is here
 // with its source named: story/v3/chapter01.md line 1.
-#define CH_TITLE "Chapter 1  -  The High Pasture"
+#define CH_TITLE "Chapter 1  -  The Sheep on the Hill"
 
 // ───────────────────────── the party lantern ─────────────────────────
 // PALETTE.md's `lamp` colormap table runs 32 light levels and the top of it is the most saturated

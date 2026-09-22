@@ -6,7 +6,7 @@ A Phantasy Star IV style JRPG on SDL3 + OpenGL, built **one chapter at a time**.
 **voxel world with billboard sprites** (`src/voxfield.cpp`), talk in dialogue boxes, watch manga-page
 cutscenes, and fight **turn-based battles whose twist is an effort slider** — every action is spent
 at effort 1-5 against a stamina bar (`story/v3/COMBAT.md`, `src/battle_rules.cpp`). Chapter one is
-*The High Pasture*. Terrain and buildings need **no drawn art** — the engine generates them from
+*The Sheep on the Hill*. Terrain and buildings need **no drawn art** — the engine generates them from
 `.tmap` text maps — so the only art is what moves or reads as a character, and it comes from ChatGPT
 through **the art tray** (`story/packages/`). **The phone is the target**; the Mac is where it is
 tested. C11 own code, C++ deps allowed.
@@ -75,7 +75,7 @@ writer pass when the owner says write → a cold read by an agent who knows noth
 good in its own scene. `story/v3/THREADS.md` is the short list of what finished chapters have
 promised the player. **Art, maps and generators are built only for chapters that are written.**
 
-Chapter one is *The High Pasture*: `story/v3/chapter01.md` (the spine — what the player does),
+Chapter one is *The Sheep on the Hill*: `story/v3/chapter01.md` (the spine — what the player does),
 `story/scenes/01*.md` (six scenes — what anyone says), `story/v3/chapter01_script.md`,
 `story/v3/ch01_room/` (the slot contract and the designer's brief), `BESTIARY.md`, `LOOT.md`,
 `COMBAT.md`, and `story/field/text.md` (what the world says when you look at it).

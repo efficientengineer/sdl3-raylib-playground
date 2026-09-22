@@ -30,7 +30,9 @@ All eight test suites pass under my own runs, and every game source cross-compil
   identical output); voxfield.cpp (6.5k) → nine vox_*.cpp files; CLAUDE.md has a task→files entry map and
   your standing rules; 13 stale doc references fixed; tray statuses have one source (stale shown red).
 
-## Owner rulings needed (none block anything)
+## Owner rulings — ANSWERED 2026-09-21: title *The Sheep on the Hill*; Hart's hint and Falke's reply restored; bell run 20 s is fine; cycling stays off; WINDED stays; names and handover fine.
+
+## (the questions as asked)
 1. Chapter title: "The High Pasture" (alternates: The Sheep on the Hill / The Hunt on the High Pasture).
 2. Hart's supper hint was cut (it gave away the swing); it took Falke's "That's how you hit things!" with
    it. Keep the cut, restore both, or rehome Falke's line?
