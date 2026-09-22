@@ -18,7 +18,12 @@ HASH="$(basename "$(dirname "$CXX_DIR")")"
 OBJ_DIR="$CXX_DIR/obj_fast"
 mkdir -p "$OBJ_DIR"
 # Every translation unit of libgame_logic.so. CMakeLists.txt's game_logic target must match.
-GAME_SRCS="$SCRIPT_DIR/src/star_logic.cpp $SCRIPT_DIR/src/voxfield.cpp $SCRIPT_DIR/src/battle.cpp"
+GAME_SRCS=""
+for F in star_logic.cpp battle.cpp \
+         voxfield.cpp vox_world.cpp vox_palette.cpp vox_mesh.cpp vox_render.cpp \
+         vox_nav.cpp vox_actors.cpp vox_triggers.cpp vox_dev.cpp vox_bot.cpp; do
+    GAME_SRCS="$GAME_SRCS $SCRIPT_DIR/src/$F"
+done
 
 IMGUI_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libimgui_shared.so"
 SDL3_SO="$SCRIPT_DIR/android/app/build/intermediates/cxx/Debug/$HASH/obj/arm64-v8a/libSDL3.so"

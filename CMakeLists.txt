@@ -47,7 +47,10 @@ if(ANDROID)
 
     # Game logic: hot-reloadable
     # The game.
-    add_library(game_logic SHARED src/star_logic.cpp src/voxfield.cpp src/battle.cpp)
+    add_library(game_logic SHARED src/star_logic.cpp src/battle.cpp
+        src/voxfield.cpp src/vox_world.cpp src/vox_palette.cpp src/vox_mesh.cpp
+        src/vox_render.cpp src/vox_nav.cpp src/vox_actors.cpp src/vox_triggers.cpp
+        src/vox_dev.cpp src/vox_bot.cpp)
     target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(game_logic PRIVATE imgui_shared)
@@ -66,7 +69,10 @@ else()
     target_link_libraries(imgui_shared PUBLIC SDL3::SDL3-static "-framework OpenGL")
 
     # The game.
-    add_library(game_logic SHARED src/star_logic.cpp src/voxfield.cpp src/battle.cpp)
+    add_library(game_logic SHARED src/star_logic.cpp src/battle.cpp
+        src/voxfield.cpp src/vox_world.cpp src/vox_palette.cpp src/vox_mesh.cpp
+        src/vox_render.cpp src/vox_nav.cpp src/vox_actors.cpp src/vox_triggers.cpp
+        src/vox_dev.cpp src/vox_bot.cpp)
     target_include_directories(game_logic PRIVATE src ${THIRD_PARTY}
         ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(game_logic PRIVATE imgui_shared)
